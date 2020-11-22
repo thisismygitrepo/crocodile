@@ -13,7 +13,6 @@ from glob import glob
 from pathlib import Path
 import copy
 import numpy as np
-from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -704,6 +703,8 @@ class SaveType:
             self.data_gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs)
             plt.pause(0.5)  # give time for figures to show up before updating them
+            assert_package_installed("tqdm")
+            from tqdm import tqdm
             for idx, datum in tqdm(enumerate(self.data_gen())):
                 self.plotter.animate(datum)
                 self.saver.add(names=[self.names_list[idx]])
@@ -780,6 +781,8 @@ class SaveType:
             self.data = gen_function
             self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
             plt.pause(0.5)  # give time for figures to show up before updating them
+            assert_package_installed("tqdm")
+            from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
                 for datum in tqdm(self.data()):
                     self.plotter.animate(datum)
@@ -1982,7 +1985,8 @@ class Save:
         files = P(path).myglob('*.nii')
         import gzip
         import shutil
-        for file in tqdm(files):
+        for file in files:
+            print(file)
             with open(file, 'rb') as f_in:
                 with gzip.open(str(file) + '.gz', 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
@@ -2026,26 +2030,6 @@ def accelerate(func, ip):
 
 
 class Manipulator:
-    @staticmethod
-    def inverse(my_map):
-        return {v: k for k, v in my_map.items()}
-
-    @staticmethod
-    def concat_dicts(*dicts, lenient=True):
-        if not lenient:
-            keys = dicts[0].keys()
-            for i in dicts[1:]:
-                assert i.keys() == keys
-        total_dict = dicts[0].copy()  # take first dict in the tuple
-        if len(dicts) > 1:  # are there more tuples?
-            for key in total_dict.keys():
-                for adict in dicts[1:]:
-                    try:
-                        total_dict[key] += adict[key]
-                    except KeyError:
-                        pass
-        return total_dict
-
     @staticmethod
     def merge_adjacent_axes(array, ax1, ax2):
         """Multiplies out two axes to generate reduced order array.
@@ -2370,12 +2354,16 @@ class List(list, Base):
 
         if lest is None:
             if jobs:
+                assert_package_installed("tqdm")
+                from tqdm import tqdm
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in tqdm(self.list)))
             else:
                 return List([func(i, *args, **kwargs) for i in self.list])
         else:
             if jobs:
+                assert_package_installed("tqdm")
+                from tqdm import tqdm
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in tqdm(zip(self.list, lest))))
             else:
@@ -2540,33 +2528,72 @@ class Struct(Base):
     def copy(self):
         return self.__copy__()
 
-    def reverse(self):
-        return Struct(Manipulator.inverse(self.__dict__))
+    def inverse(self):
+        return Struct({v: k for k, v in self.dict.items()})
 
-    @property
+    def append(self, *others, **kwargs):
+        return Struct(self.concat_dicts_(*((self.dict,) + others), **kwargs))
+
+    @staticmethod
+    def concat_dicts_(*dicts, method=None, lenient=True, collect_items=False, copyit=True):
+        if method is None:
+            method = list.__add__
+        if not lenient:
+            keys = dicts[0].keys()
+            for i in dicts[1:]:
+                assert i.keys() == keys
+        # else if lenient, take the union
+        if copyit:
+            total_dict = dicts[0].copy()  # take first dict in the tuple
+        else:
+            total_dict = dicts[0]  # take first dict in the tuple
+        if collect_items:
+            for key, val in total_dict.item():
+                total_dict[key] = [val]
+
+            def method(tmp1, tmp2):
+                return tmp1 + [tmp2]
+
+        if len(dicts) > 1:  # are there more dicts?
+            for adict in dicts[1:]:
+                for key in adict.keys():  # get everything from this dict
+                    try:  # may be the key exists in the total dict already.
+                        total_dict[key] = method(total_dict[key], adict[key])
+                    except KeyError:  # key does not exist in total dict
+                        if collect_items:
+                            total_dict[key] = [adict[key]]
+                        else:
+                            total_dict[key] = adict[key]
+        return total_dict
+
+    # @property
     def keys(self):
         return List(self.dict.keys())
 
-    @property
+    # @property
     def values(self):
         return List(self.dict.values())
+
+    def items(self):
+        return List(self.dict.items())
 
     @property
     def df(self):
         return None
 
     def index(self, idx):
-        return self.keys[idx], self.values[idx]
+        return self.keys()[idx], self.values()[idx]
 
     def spawn_from_values(self, values):
         return self.from_keys_values(self.keys, self.evalstr(values, expected='self'))
 
-    def plot(self):
-        obj = Artist(figname='Structure Plot')
+    def plot(self, artist=None):
+        if artist is None:
+            artist = Artist(figname='Structure Plot')
         for key, val in self:
-            obj.plot(val, label=key)
-        obj.fig.legend()
-        return obj
+            artist.plot(val, label=key)
+        artist.fig.legend()
+        return artist
 
 
 def assert_package_installed(package):

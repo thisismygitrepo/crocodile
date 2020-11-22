@@ -1,6 +1,6 @@
-from abc import ABC
 
-import resources.deeplearning as dl
+from abc import ABC
+import myresources.alexlib.deeplearning as dl
 # import resources.toolbox as tb
 from collections import OrderedDict
 import torch as t
@@ -118,7 +118,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
 
 class ImagesModel(PTBaseModel):
     def __init__(self, *args, **kwargs):
-        super(ImagesModel, self).__init__(*args)
+        super(ImagesModel, self).__init__(*args, **kwargs)
 
     # @tb.batcher(func_type='method')
     def preprocess(self, images):

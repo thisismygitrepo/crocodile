@@ -1,14 +1,14 @@
 
 
-import resources.toolbox as tb
-import resources.s_params as stb
+import myresources.alexlib.toolbox as tb
+# import resources.s_params as stb
 import numpy as np
 from abc import ABC, abstractmethod
 import enum
 from tqdm import tqdm
 
 
-#%% ========================== DeepLearning Accessories =================================
+# %% ========================== DeepLearning Accessories =================================
 
 
 class Device(enum.Enum):
@@ -282,16 +282,6 @@ class DataReader:
         :param path: full path to the saved .npy file containing a dictionary of attributes names and values.
         :return: An object with attributes similar to keys and values as in dictionary loaded.
         """
-        # meta_path = path / f'metadata'
-        # data_specs = np.load(meta_path / 'DataReader.npy', allow_pickle=True).all()
-
-        # class Gist:
-        #     def __init__(self, data_dict):
-        #         for key, val in zip(data_dict.keys(), data_dict.values()):
-        #             setattr(self, key, val)
-        #
-        # gist = Gist(data_specs)
-        # return gist
         return tb.Struct.from_saved(path / f'metadata' / 'DataReader.npy')
 
 
@@ -353,7 +343,7 @@ class BaseModel(ABC):
                 if optimizer is None:
                     optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.lr)
                 if metrics is None:
-                    import resources.deeplearning_torch as tmp  # TODO: this is cyclic import.
+                    import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
                     metrics = [tmp.MeanSquareError()]
             # Create a new compiler object
             self.compiler = Compiler(loss, optimizer, metrics)
@@ -389,8 +379,8 @@ class BaseModel(ABC):
         return None
 
     def plot_loss(self):
-        total_hist = tb.Manipulator.concat_dicts(*self.history)
-        tb.plot_dict(total_hist)
+        total_hist = tb.Struct(tb.Struct.concat_dicts_(*self.history))
+        total_hist.plot()
 
     def switch_to_sgd(self, epochs=10):
         # if self.hp.pkg.__name__ == 'tensorflow':
@@ -410,13 +400,15 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == 'tensorflow':
             new_loss = self.hp.pkg.keras.losses.MeanAbsoluteError()
         else:
-            import resources.deeplearning_torch as tmp
+            import myresources.alexlib.deeplearning_torch as tmp
             new_loss = tmp.MeanAbsoluteError()
         self.compile(loss=new_loss)
         return self.fit(epochs=epochs)
 
     def preprocess(self, *args, **kwargs):
-        return stb.preprocess(self.hp, *args, **kwargs)
+        # return stb.preprocess(self.hp, *args, **kwargs)
+        _ = args, kwargs, self
+        return args
 
     def postprocess(self, x, *args, **kwargs):
         _, __, ___ = args, kwargs, self
@@ -449,8 +441,8 @@ class BaseModel(ABC):
         if viz:
             self.viz([postprocessed], **kwargs)
 
-    def predict_from_s_path(self, s_path, cal_path=None):
-        return self.predict_from_s_obj(stb.S(s_path), stb.S(cal_path) if cal_path is not None else None)
+    # def predict_from_s_path(self, s_path, cal_path=None):
+    #     return self.predict_from_s_obj(stb.S(s_path), stb.S(cal_path) if cal_path is not None else None)
 
     def predict_from_s_obj(self, s_obj, cal_obj=None, viz=True, names=None, **kwargs):
         measurement_dict_ = s_obj.get_data_dict()
