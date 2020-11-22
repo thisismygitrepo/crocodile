@@ -1342,7 +1342,7 @@ class Base:
             if expected == 'func':
                 return eval("lambda x: " + string_)
             elif expected == 'self':
-                if "self." in string:
+                if "self." in string_:
                     return eval(string_)
                 else:
                     return string_
@@ -2272,9 +2272,11 @@ class List(list, Base):
         else:
             return List(result)
 
-    @property
-    def struct(self):  # it has to be a property so that the struct is updated when list is updated.
-        return Struct.from_keys_values([str(item) for item in self.list], self.list)
+    def to_struct(self, keys=None):
+        """it has to be a property so that the struct is updated when list is updated."""
+        keys = self.evalstr(keys)
+        keys = keys or [str(item) for item in self.list]
+        return Struct.from_keys_values(keys, self.list)
 
     def find(self, patt, match="fnmatch"):
         """Looks up the string representation of all items in the list and finds the one that partially matches
