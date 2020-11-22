@@ -1,6 +1,6 @@
-
 """
-A collection of indispensible classes and functions for various purposes.
+A collection of classes extending the functionality of Python's builtins.
+email programmer@usa.com
 """
 
 import re
@@ -18,7 +18,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-#%% ========================== Plot Helper funcs ========================================
+# %% ========================== Plot Helper funcs ========================================
 
 class FigurePolicy(enum.Enum):
     close_create_new = 'Close the previous figure that has the same figname and create a new fresh one'
@@ -40,6 +40,7 @@ class FigureManager:
     """
     Handles figures of matplotlib.
     """
+
     def __init__(self, info_loc=None, figure_policy=FigurePolicy.same):
         self.figure_policy = figure_policy
         self.fig = self.ax = self.event = None
@@ -47,6 +48,7 @@ class FigureManager:
         import matplotlib.colors as mcolors
         self.mcolors = list(mcolors.CSS4_COLORS.keys())
         self.facecolor = Cycle(list(mcolors.CSS4_COLORS.values()))
+        self.colors = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
         self.cmaps.set('viridis')
         self.index = self.pause = self.index_max = None
         self.auto_brightness = False
@@ -97,7 +99,8 @@ class FigureManager:
 
     def maximize_fig(self):
         _ = self
-        plt.get_current_fig_manager().window.state('zoom')
+        # plt.get_current_fig_manager().window.state('zoom')
+        plt.get_current_fig_manager().full_screen_toggle()
 
     def toggle_annotate(self, event):
         self.annot_flag = not self.annot_flag
@@ -116,12 +119,12 @@ class FigureManager:
         else:
             ax = axis
         if ax:
-            if not hasattr(ax, 'annot_obj'):   # first time
+            if not hasattr(ax, 'annot_obj'):  # first time
                 ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30),
                                            textcoords="offset points",
                                            arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
                                            va="bottom", ha="left", fontsize=10,
-                                           bbox=dict(boxstyle="round", fc="w"),)
+                                           bbox=dict(boxstyle="round", fc="w"), )
             else:
                 ax.annot_obj.set_visible(self.annot_flag)
 
@@ -184,7 +187,7 @@ class FigureManager:
         else:
             fig = plt.figure(num="Keyboard shortcuts")
             for i, key in enumerate(self.help_menu.keys()):
-                fig.text(0.1, 1 - 0.05 * (i+1), f"{key:30s} {self.help_menu[key]['help']}")
+                fig.text(0.1, 1 - 0.05 * (i + 1), f"{key:30s} {self.help_menu[key]['help']}")
             print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']))
             print(f"\nDefault plt Keys:\n")
             print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
@@ -417,7 +420,7 @@ class FigureManager:
         return w * width, h * height
 
     @staticmethod
-    def set_ax_to_real_life_size(ax, inch_per_unit=1/25.4):
+    def set_ax_to_real_life_size(ax, inch_per_unit=1 / 25.4):
         limit_x = ax.get_xlim()[1] - ax.get_xlim()[0]
         limit_y = ax.get_ylim()[1] - ax.get_ylim()[0]
         FigureManager.set_ax_size(ax, limit_x * inch_per_unit, limit_y * inch_per_unit)
@@ -437,8 +440,9 @@ class FigureManager:
     @staticmethod
     def write(txt, name="text", size=8, **kwargs):
         fig = plt.figure(figsize=(11.69, 8.27), num=name)
+        FigureManager.maximize_fig(fig)
         fig.clf()
-        fig.text(0.5, 0.5, txt, transform=fig.transFigure, size=size, ha="center", **kwargs)
+        fig.text(0.5, 0.5, txt, transform=fig.transFigure, size=size, ha="center", va='center', **kwargs)
         return fig
 
     @staticmethod
@@ -447,10 +451,27 @@ class FigureManager:
         plt.rc('xtick', labelsize=size)
         plt.rc('ytick', labelsize=size)
         plt.rc('axes', labelsize=size)
-        plt.rc('legend', fontsize=size-5)
+        plt.rc('axes', titlesize=size)
+        plt.rc('legend', fontsize=size / 1.5)
         # rc('text', usetex=True)
         plt.rcParams['text.usetex'] = True
         plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+
+    @staticmethod
+    def set_linestyles_and_markers_and_colors(test=False):
+        from cycler import cycler
+        from matplotlib import lines
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        markers = list(lines.lineMarkers.keys())[:-4]  # ignore the None
+        linestyles = list(lines.lineStyles.keys())[:-3]  # ignore the Nones
+        linestyles = (linestyles * 10)[:len(markers)]
+        colors = (colors * 10)[:len(markers)]
+        default_cycler = (cycler(linestyle=linestyles) + cycler(marker=markers) + cycler(color=colors))
+        plt.rc('axes', prop_cycle=default_cycler)
+        if test:
+            temp = np.random.randn(10, 10)
+            for idx, aq in enumerate(temp):
+                plt.plot(aq + idx * 2)
 
 
 class SaveType:
@@ -474,8 +495,7 @@ class SaveType:
                 if type(watch_figs[0]) is str:
                     self.watch_figs = [plt.figure(num=afig) for afig in watch_figs]
 
-            if save_dir is None:
-                save_dir = Path('./').absolute().__str__()
+            save_dir = save_dir or P.tmp().string
             self.save_name = get_time_stamp(save_name)
             self.save_dir = save_dir
             self.kwargs = kwargs
@@ -814,6 +834,7 @@ class VisibilityViewer(FigureManager):
     
     Here and in all Visibility classes, the artist is assumed to be always creating new axes along the way.
     """
+
     def __init__(self, artist=None, hide_artist_axes=True):
         """
         This class works on hiding axes shown on a plot, so that a new plot can be drawn.
@@ -1113,7 +1134,7 @@ class ImShow(FigureManager):
             label_subcontainer = []
             for an_image in alist:
                 image_subcontainer.append(plt.imread(an_image))
-                label_subcontainer.append(os.path.basename(an_image).split('.')[0])
+                label_subcontainer.append(P(an_image).name)
             images.append(image_subcontainer)
             sub_labels.append(label_subcontainer)
         return cls(*images, sub_labels=sub_labels, **kwargs)
@@ -1166,14 +1187,6 @@ class ImShow(FigureManager):
         image = plt.imread(path)
         image_resized = resize(image, (m, n), anti_aliasing=True)
         plt.imsave(path, image_resized)
-
-
-def plot_dict(adict):
-    obj = Artist(figname='Dictionary Plot')
-    for key, val in zip(adict.keys(), adict.values()):
-        obj.plot(val, label=key)
-    obj.fig.legend()
-    return obj
 
 
 class Artist(FigureManager):
@@ -1239,6 +1252,7 @@ class Artist(FigureManager):
             index = labels.index(label)
             self.ax.lines[index].set_visible(not self.ax.lines[index].get_visible())
             self.fig.canvas.draw()
+
         self.check_b.on_clicked(func)
 
     @staticmethod
@@ -1253,36 +1267,87 @@ class Artist(FigureManager):
 
 
 class Cycle:
-    def __init__(self, c):
-        self._c = c
-        self._index = -1
+    def __init__(self, c, name=''):
+        self.c = c
+        self.index = -1
+        self.name = name
+
+    def __str__(self):
+        return self.name
 
     def next(self):
-        self._index += 1
-        if self._index >= len(self._c):
-            self._index = 0
-        return self._c[self._index]
+        self.index += 1
+        if self.index >= len(self.c):
+            self.index = 0
+        return self.c[self.index]
 
     def previous(self):
-        self._index -= 1
-        if self._index < 0:
-            self._index = len(self._c)-1
-        return self._c[self._index]
+        self.index -= 1
+        if self.index < 0:
+            self.index = len(self.c) - 1
+        return self.c[self.index]
 
     def set(self, value):
-        self._index = self._c.index(value)
+        self.index = self.c.index(value)
 
     def get(self):
-        return self._c[self._index]
+        return self.c[self.index]
 
     def get_index(self):
-        return self._index
+        return self.index
 
     def set_index(self, index):
-        self._index = index
+        self.index = index
+
+    def sample(self, size=1):
+        return np.random.choice(self.c, size)
 
 
-#%% ========================== File Management  =========================================
+# %% ========================== File Management  =========================================
+
+
+class Base:
+    @classmethod
+    def from_saved(cls, path):
+        boundaries = cls()  # whether the save format is .json or .mat or .npy, Reader returns Structure
+        boundaries.__dict__ = Read.read(path).dict
+        return boundaries
+
+    def save(self, path):  # default is npy (generic)
+        # P(path).parent.create()
+        np.save(path, self.__dict__)
+
+    def save_json(self, path):  # json is good for simple dicts
+        Save.json(path, self.__dict__)
+        return self
+
+    def save_mat(self, path):  # for Matlab compatibility.
+        Save.mat(path, self.__dict__)
+        return self
+
+    def get_attributes(self):
+        attrs = list(filter(lambda x: '__' not in x, dir(self)))
+        return attrs
+        # [setattr(Path, name, getattr(MyPath, name)) for name in funcs]
+
+    # def get_methods(self):
+    # def get_dict(self):
+
+    # def __getattr__(self, item):
+    #     pass
+
+    def evalstr(self, string_, expected='self'):
+        _ = self
+        if type(string_) is str:
+            if expected == 'func':
+                return eval("lambda x: " + string_)
+            elif expected == 'self':
+                if "self." in string:
+                    return eval(string_)
+                else:
+                    return string_
+        else:
+            return string_
 
 
 class Browse(object):
@@ -1317,12 +1382,57 @@ class Browse(object):
         return self.__path__
 
 
-class P(type(Path()), Path):
+def browse(path, depth=2, width=20):
+    """
+    :param width: if there are more than this items in a directory, dont' parse the rest.
+    :param depth: to prevent crash, limit how deep recursive call can happen.
+    :param path: absolute path
+    :return: constructs a class dynamically by using object method.
+    """
+    if depth > 0:
+        my_dict = {'z_path': P(path)}  # prepare _path attribute which returns current path from the browser object
+        val_paths = glob(os.path.join(path, '*'))  # prepare other methods that refer to the contents.
+        temp = [os.path.basename(i) for i in val_paths]
+        # this is better than listdir, gives consistent results with glob (no hidden files)
+        key_contents = []  # keys cannot be folders/file names immediately, there are caveats.
+        for akey in temp:
+            # if not akey[0].isalpha():  # cannot start with digit or +-/?.,<>{}\|/[]()*&^%$#@!~`
+            #     akey = '_' + akey
+            for i in string.punctuation.replace('_', ' '):  # disallow punctuation and space except for _
+                akey = akey.replace(i, '_')
+            key_contents.append(akey)  # now we have valid attribute name
+        for i, (akey, avalue) in enumerate(zip(key_contents, val_paths)):
+            if i < width:
+                if os.path.isfile(avalue):
+                    my_dict['FLE_' + akey] = P(avalue)
+                else:
+                    my_dict['FDR_' + akey] = browse(avalue, depth=depth - 1)
+
+        def repr_func(self):
+            if self.z_path.is_file():
+                return 'Explorer object. File: \n' + str(self.z_path)
+            else:
+                return 'Explorer object. Folder: \n' + str(self.z_path)
+
+        def str_func(self):
+            return str(self.z_path)
+
+        my_dict["__repr__"] = repr_func
+        my_dict["__str__"] = str_func
+        my_class = type(os.path.basename(path), (), dict(zip(my_dict.keys(), my_dict.values())))
+        return my_class()
+    else:
+        return path
+
+
+class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
 
     def size(self, units='mb'):
-        factor = {'b': 1, 'kb': 1024, 'mb': 1024**2, 'gb': 1024**3}[units]
+        sizes = List(['b', 'kb', 'mb', 'gb'])
+        factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
+                          np.tile(1024**np.arange(len(sizes)), 2)))[units]
         if self.is_file():
             total_size = self.stat().st_size
         elif self.is_dir():
@@ -1342,7 +1452,7 @@ class P(type(Path()), Path):
 
     def make_python_name(self, astring=None):
         if astring is None:
-            astring = self.stem
+            astring = self.name
         return re.sub(r'^(?=\d)|\W', '_', str(astring))
 
     @property
@@ -1387,28 +1497,42 @@ class P(type(Path()), Path):
         send2trash.send2trash(self.string)
 
     def move(self, new_path):
+        new_path = P(new_path)
         temp = self.absolute()
         temp.rename(new_path.absolute() / temp.name)
-        return self
+        return new_path
 
     def renameit(self, new_name):
-        self.rename(self.parent / new_name)
-        return self
+        new_path = self.parent / new_name
+        self.rename(new_path)
+        return new_path
 
-    def copy(self, target=None, verbose=False):
-        import shutil
-        # assert self.is_file()
+    def copy(self, target=None, contents=False, verbose=False):
+        """
+        contents: copy the parent directory or its contents.
+        """
         if target is None:
-            target = self.append(f"_copy_{get_time_stamp()}")
-        shutil.copy(str(self), str(target))  # str() only there for Python < (3.6)
-        if verbose:
-            print(f"File \n{self}\ncopied successfully to: \n{target}")
+            target = self.append(f"_copy__{get_time_stamp()}")
+            contents = True
+        if self.is_file():
+            import shutil
+            shutil.copy(str(self), str(target))  # str() only there for Python < (3.6)
+            if verbose:
+                print(f"File \n{self}\ncopied successfully to: \n{target}")
+        elif self.is_dir():
+            from distutils.dir_util import copy_tree
+            if contents:
+                copy_tree(str(self), str(target))
+            else:
+                target = P(target).joinpath(self.name).create()
+                copy_tree(str(self), str(target))
         return target
 
     def clean(self):
         """removes contents on a folder, rather than deleting the folder."""
-        self.send2trash()
-        self.mkdir()
+        contents = self.listdir()
+        for content in contents:
+            self.joinpath(content).send2trash()
         return self
 
     def create(self, parents=True, exist_ok=True, parent_only=False):
@@ -1422,6 +1546,12 @@ class P(type(Path()), Path):
 
     @property
     def browse(self):
+        contents = self.listdir().make_python_name()
+        paths = self.myglob("*")
+        return Struct.from_keys_values(contents, paths).empty_class()
+
+    @property
+    def browse2(self):
         return browse(self)
 
     def relativity_transform(self, reference='deephead', abs_reference=None):
@@ -1437,10 +1567,6 @@ class P(type(Path()), Path):
         if abs_reference is None:  # find it for reference.
             abs_reference = paths[names.index(reference)]
         return abs_reference / self
-        # rel_deephead = os.path.relpath(abs_reference, start=os.curdir)
-        # rel_path = os.path.join(rel_deephead, self)
-        # abs_path = os.path.abspath(rel_path)
-        # return Path(abs_path)
 
     def split(self, at=None, index=None):
         """Splits a path at a given string or index
@@ -1449,8 +1575,10 @@ class P(type(Path()), Path):
         :param index:
         :return: two paths
         """
-        if index is None:
-            idx = self.parts.index(at)
+        if index is None:  # at is provided
+            if str(at) == ".":  # special case handling
+                return self, P()
+            idx = self.parts.index(str(at))
             return self.split(index=idx)
         else:
             one = self[:index]
@@ -1458,7 +1586,20 @@ class P(type(Path()), Path):
             return one, two
 
     def __getitem__(self, slici):
-        return P(*self.parts[slici])
+        if type(slici) is slice:
+            return P(*self.parts[slici])
+        else:
+            return P(self.parts[slici])
+
+    def __setitem__(self, key, value):
+        fullparts = list(self.parts)
+        fullparts[key] = value
+        return P(*fullparts)  # TODO: how to change self[-1]
+
+    def setitem(self, key, val):
+        fullparts = list(self.parts)
+        fullparts[key] = val
+        return P(*fullparts)
 
     def myglob(self, pattern='*', r=False, list_=True, files=True, folders=True, dotfiles=False,
                return_type=None,
@@ -1484,6 +1625,8 @@ class P(type(Path()), Path):
 
         if filters is None:
             filters = []
+        else:
+            pass
 
         if dotfiles:
             raw = self.glob(pattern) if not r else self.rglob(pattern)
@@ -1505,7 +1648,7 @@ class P(type(Path()), Path):
         #         return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
 
         if not raw:  # if empty, don't proceeed
-            return raw
+            return List(raw)
 
         if absolute:
             if not raw[0].is_absolute():
@@ -1539,22 +1682,25 @@ class P(type(Path()), Path):
             return generator
 
     def listdir(self):
-        contents = self.glob('*')
-        return List([apath.stem for apath in contents])
+        return List(os.listdir(self)).apply(P)
 
-    def find(self, *args, **kwargs):
+    def find(self, *args, r=True, **kwargs):
         """short for globbing then using next method to get the first result
         """
-        results = self.myglob(*args, **kwargs)
+        results = self.myglob(*args, r=r, **kwargs)
         return results[0] if len(results) > 0 else None
 
     def readit(self, reader=None, **kwargs):
         if reader is None:
-            reader = getattr(Read, self.suffix[1:])
-        return reader(str(self), **kwargs)
+            return Read.read(self, **kwargs)
+        else:
+            return reader(str(self), **kwargs)
 
-    def explore(self):
+    def explore(self):  # explore folders.
         os.startfile(os.path.realpath(self))
+
+    # def open_with_system(self):
+    #     self.explore()  # if it is a file, it will be opened with its default program.
 
     def __repr__(self):  # this is useful only for the console
         return "AlexPath(" + self.__str__() + ")"
@@ -1579,67 +1725,191 @@ class P(type(Path()), Path):
             path = path / fn
         return path
 
-        # funcs = list(filter(lambda x: '__' not in x, list(MyPath.__dict__)))
-        # [setattr(Path, name, getattr(MyPath, name)) for name in funcs]
+    # def __getattribute__(self, item):
+    #     function = super(P, self).__getattribute__(item)
+    #
+    #     def update_args_decorator(funk):
+    #         def decorator(*args, **kwargs):
+    #             _ = self
+    #             new_args = []
+    #             new_kwargs = {}
+    #             for arg in args:
+    #                 if type(arg) is tuple:
+    #                     new_args.append(eval(arg[0]))
+    #                 else:
+    #                     new_args.append(arg)
+    #             for key, val in kwargs.items():
+    #                 if type(val) is tuple:
+    #                     new_kwargs[key] = eval(val[0])
+    #                 else:
+    #                     new_kwargs[key] = eval(val)
+    #             print(args, kwargs)
+    #             return funk(new_args, new_kwargs)
+    #         return decorator
+    #     return update_args_decorator(function)
+
+    def zip(self, op_path=None, arcname=None, **kwargs):
+        """
+        """
+        op_path = op_path or self
+        arcname = arcname or self.name
+        arcname = P(self.evalstr(arcname, expected="self"))
+        op_path = P(self.evalstr(op_path, expected="self"))
+        if arcname.name != self.name:
+            arcname /= self.name  # arcname has to start from somewhere and end with filename
+        if self.is_file():
+            op_path = Compression.zip_file(ip_path=self, op_path=op_path, arcname=arcname, **kwargs)
+        else:
+            op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
+                                                  arcname=arcname, format_='zip', **kwargs)
+        return op_path
+
+    def unzip(self, op_path=None, fname=None, **kwargs):
+        from zipfile import ZipFile
+        if op_path is None:
+            op_path = self.parent / self.stem
+        else:
+            op_path = P(self.evalstr(op_path, expected="self"))
+
+        with ZipFile(str(self), 'r') as zipObj:
+            if fname is None:  # extract all:
+                zipObj.extractall(op_path, **kwargs)
+            else:
+                zipObj.extract(str(fname), str(op_path), **kwargs)
+                op_path = P(op_path) / fname
+        return P(op_path)
+
+    def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):
+        formats = ["zip", "tar", "gzip"]
+        assert format_ in formats, f"Unsupported format {format_}. The supported formats are {formats}"
+        _ = self, op_path, base_dir, kwargs
+        pass
+
+    def decompress(self):
+        pass
 
 
 tmp = P.tmp
 
 
-def browse(path, depth=8, width=20):
-    """
-    :param width: if there are more than this items in a directory, dont' parse the rest.
-    :param depth: to prevent crash, limit how deep recursive call can happen.
-    :param path: absolute path
-    :return: constructs a class dynamically by using object method.
-    """
-    if depth > 0:
-        my_dict = {'z_path': P(path)}  # prepare _path attribute which returns current path from the browser object
-        val_paths = glob(os.path.join(path, '*'))  # prepare other methods that refer to the contents.
-        temp = [os.path.basename(i) for i in val_paths]
-        # this is better than listdir, gives consistent results with glob (no hidden files)
-        key_contents = []  # keys cannot be folders/file names immediately, there are caveats.
-        for akey in temp:
-            # if not akey[0].isalpha():  # cannot start with digit or +-/?.,<>{}\|/[]()*&^%$#@!~`
-            #     akey = '_' + akey
-            for i in string.punctuation.replace('_', ' '):  # disallow punctuation and space except for _
-                akey = akey.replace(i, '_')
-            key_contents.append(akey)  # now we have valid attribute name
-        for i, (akey, avalue) in enumerate(zip(key_contents, val_paths)):
-            if i < width:
-                if os.path.isfile(avalue):
-                    my_dict['FLE_' + akey] = P(avalue)
-                else:
-                    my_dict['FDR_' + akey] = browse(avalue, depth=depth - 1)
+class Compression:
+    """Provides consistent behaviour across all methods ...
+    Both files and folders when compressed, default is being under the root of archive."""
+    def __init__(self):
+        pass
 
-        def repr_func(self):
-            if self.z_path.is_file():
-                return 'Explorer object. File: \n' + str(self.z_path)
-            else:
-                return 'Explorer object. Folder: \n' + str(self.z_path)
+    @staticmethod
+    def compress_folder(ip_path, op_path, arcname, format_='zip', **kwargs):
+        """base_dir has to be relevant to op_path. If you want to compress a folder in Downloads/myfolder/compress_this
+        Then, say that your rootdir is where you want the archive structure to include,
+        then mention the folder you want to actually archive relatively to that root.
+        fromat_: zip, tar, gztar, bztar, xztar
+        """
+        root_dir = ip_path.split(at=arcname[0:1])[0]
+        # if op_path.suffix != f".{format_}":
+        #     op_path += f".{format_}"
+        import shutil  # shutil works with folders nicely (recursion is done interally)
+        result_path = shutil.make_archive(base_name=op_path, format=format_,
+                                          root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
+        return P(result_path)  # same as op_path but (possibly) with format extension
 
-        def str_func(self):
-            return str(self.z_path)
+    @staticmethod
+    def zip_file(ip_path, op_path, arcname, **kwargs):
+        """
+        arcname determines the directory of the file being archived inside the archive. Defaults to same
+        as original directory except for drive. When changed, it should still include the file name in its end.
+        If arcname = filename without any path, then, it will be in the root of the archive.
+        """
+        import zipfile
+        if op_path.suffix != ".zip":
+            op_path = op_path + f".zip"
+        jungle_zip = zipfile.ZipFile(str(op_path), 'w')
+        jungle_zip.write(filename=str(ip_path), arcname=str(arcname), compress_type=zipfile.ZIP_DEFLATED, **kwargs)
+        jungle_zip.close()
+        return op_path
 
-        my_dict["__repr__"] = repr_func
-        my_dict["__str__"] = str_func
-        my_class = type(os.path.basename(path), (), dict(zip(my_dict.keys(), my_dict.values())))
-        return my_class()
-    else:
-        return path
+    @staticmethod
+    def ungz(self, op_path=None):
+        import shutil
+        import gzip
+        fn = str(self)
+        op_path = op_path or self.parent / self.stem
+        with gzip.open(fn, 'r') as f_in, open(op_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+        return P(op_path)
+
+    @staticmethod
+    def untar(self, fname=None, mode='r', **kwargs):
+        import tarfile
+        file = tarfile.open(str(self), mode)
+        if fname is None:  # extract all files in the archive
+            file.extractall(**kwargs)
+        else:
+            file.extract(fname, **kwargs)
+        file.close()
+        return fname
+
+    def decompress(self):
+        pass
 
 
 class Read:
     @staticmethod
-    def read(path):
-        return P(path).readit()
+    def read(path, **kwargs):
+        suffix = P(path).suffix[1:]
+        if suffix in plt.gcf().canvas.get_supported_filetypes().keys():
+            return plt.imread(path, **kwargs)
+        else:
+            reader = getattr(Read, suffix)
+        return reader(str(path), **kwargs)
 
     @staticmethod
     def npy(path):
-        data = np.load(path, allow_pickle=True)
+        """returns Structure if the object loaded is a dictionary"""
+        data = np.load(str(path), allow_pickle=True)
         if data.dtype == np.object:
             data = data.all()
+        if type(data) is dict:
+            data = Struct(data)
         return data
+
+    @staticmethod
+    def mat(path, correct_dims=True):
+        """
+        :param path:
+        :param correct_dims:
+        :return: Structure object
+        """
+        try:  # try the old version
+            from scipy.io import loadmat
+            data = loadmat(path)
+            metadata_ = Struct()
+            for akey in ['__header__', '__version__', '__globals__']:
+                metadata_[akey] = data[akey]
+                del data[akey]
+            data = Struct(data)
+            data.metadata_ = metadata_
+        except NotImplementedError:
+            import h5py  # For Matlab v7.3 files, we need:
+            f = h5py.File(path, mode='r')  # returns an object
+            data = Struct()
+            for item in f:
+                temp = np.array(f[item], order='F')  # Now you get the correct shape.
+                if correct_dims:
+                    n = len(temp.shape)
+                    arrangements = tuple(range(n - 2)) + (n - 1, n - 2)
+                    temp = temp.transpose(arrangements)
+                data[item] = temp
+            f.close()
+        return data
+
+    @staticmethod
+    def json(path):
+        """Returns a Structure"""
+        import json
+        with open(str(path), "r") as file:
+            mydict = json.load(file)
+        return Struct(mydict)
 
     @staticmethod
     def pickle(path):
@@ -1647,6 +1917,10 @@ class Read:
         with open(path, 'rb') as file:
             obj = pickle.load(file)
         return obj
+
+    @staticmethod
+    def csv(path, *args, **kwargs):
+        return pd.read_csv(path, *args, **kwargs)
 
     @staticmethod
     def nii(path):
@@ -1664,78 +1938,16 @@ class Read:
     #     dicom2nifti.convert_directory(directory, directory)
     #     return Path(directory).glob('*.nii').__next__()
 
-    @staticmethod
-    def gz(fn):
-        import shutil
-        import gzip
-        fn = Path(fn)
-        name = fn.parent / fn.stem
-        with gzip.open(fn, 'r') as f_in, open(name, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-        return name
-
-    @staticmethod
-    def tar(fn, mode='r', fname=None, **kwargs):
-        import tarfile
-        file = tarfile.open(fn, mode)
-        if fname is None:  # extract all files in the archive
-            file.extractall(**kwargs)
-        else:
-            file.extract(fname, **kwargs)
-        file.close()
-
-    @staticmethod
-    def zip(fn, op_path=None):
-        from zipfile import ZipFile
-        if op_path is None:
-            op_path = fn.parent / fn.stem
-        with ZipFile(fn, 'r') as zipObj:
-            zipObj.extractall(op_path)
-        return op_path
-
-    @staticmethod
-    def mat(path, correct_dims=True, single_item=False):
-        """
-        :param path:
-        :param correct_dims:
-        :param single_item: if the .mat file contains a single item, not need to return a dictionary.
-                            the default is False cause it is not standard behaviour and possibly confusing.
-        :return:
-        """
-        try:  # try the old version
-            from scipy.io import loadmat
-            data = loadmat(path)
-            keys = list(data.keys())
-            for akey in ['__header__', '__version__', '__globals__']:
-                keys.remove(akey)
-            data['_data'] = [data[i] for i in keys]
-            data['_names'] = keys
-            if len(data.keys()) == 3 + 2 + 1 and single_item:  # single data item
-                return data['_data'][0]
-        except NotImplementedError:
-            import h5py  # For Matlab v7.3 files, we need:
-            f = h5py.File(path, mode='r')  # returns an object
-            data = {}
-            for item in f:
-                temp = np.array(f[item], order='F')  # Now you get the correct shape.
-                if correct_dims:
-                    n = len(temp.shape)
-                    arrangements = tuple(range(n - 2)) + (n - 1, n - 2)
-                    temp = temp.transpose(arrangements)
-                data[item] = temp
-            f.close()
-        return data
-
-    @staticmethod
-    def json(path):
-        import json
-        with open(str(path), "r") as file:
-            return json.load(file)
-
 
 class Save:
     @staticmethod
-    def mat(path=P('.'), mdict=None):
+    def mat(path=P.tmp(), mdict=None):
+        """Avoid using mat for saving results because of incompatiblity.
+        * Nones are not accepted.
+        * Scalars are conveteed to [1 x 1] arrays.
+        * etc.
+        Unless you want to pass the results to Matlab animals, avoid this format.
+        """
         from scipy.io import savemat
         if '.mat' not in str(path):
             path += '.mat'
@@ -1747,6 +1959,9 @@ class Save:
 
     @staticmethod
     def json(path, obj):
+        """This format is compatible with simple dictionaries that hold strings or numbers but nothing more than that.
+        E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
+        inspected using any text editor."""
         import json
         if not str(path).endswith(".json"):
             path = str(path) + ".json"
@@ -1755,8 +1970,10 @@ class Save:
 
     @staticmethod
     def pickle(path, obj):
+        if ".pickle" not in str(path):
+            path = path + ".pickle"
         import pickle
-        with open(path, 'wb') as file:
+        with open(str(path), 'wb') as file:
             pickle.dump(obj, file)
 
     @staticmethod
@@ -1810,7 +2027,7 @@ def accelerate(func, ip):
 
 class Manipulator:
     @staticmethod
-    def reverse(my_map):
+    def inverse(my_map):
         return {v: k for k, v in my_map.items()}
 
     @staticmethod
@@ -1855,7 +2072,7 @@ class Manipulator:
         return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
 
     @staticmethod
-    def expand_axis(array, ax_idx, factor):
+    def expand_axis(array, ax_idx, factor):  # opposite functionality of merge_axes.
         total_shape = list(array.shape)
         size = total_shape.pop(ax_idx)
         new_shape = (int(size / factor), factor)
@@ -1864,15 +2081,33 @@ class Manipulator:
         return array.reshape(tuple(total_shape))
 
     @staticmethod
-    def slicer(array, lower_, upper_):
+    def slicer(array, a_slice: slice, axis=0):
+        lower_ = a_slice.start
+        upper_ = a_slice.stop
         n = len(array)
         lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
         roll = lower_
         lower_ = lower_ - roll
         upper_ = upper_ - roll
-        array_ = np.roll(array, -roll, axis=0)
+        array_ = np.roll(array, -roll, axis=axis)
         upper_ = upper_ % n
-        return array_[lower_: upper_]
+        new_slice = slice(lower_, upper_, a_slice.step)
+        return array_[Manipulator.indexer(axis=axis, myslice=new_slice, rank=array.ndim)]
+
+    @staticmethod
+    def indexer(axis, myslice, rank=None):
+        """
+        Returns a tuple of slicers.
+        """
+        everything = slice(None, None, None)  # `:`
+        if rank is not None:
+            indices = [everything] * rank
+            indices[axis] = myslice
+            return tuple(indices)
+        else:
+            indices = [everything] * (axis + 1)
+            indices[axis] = myslice
+            return tuple(indices)
 
 
 def batcher(func_type='function'):
@@ -1944,6 +2179,7 @@ class DisplayData:
         pd.set_option('display.width', 1000)
         pd.set_option('display.max_columns', 200)
         pd.set_option('display.max_colwidth', 40)
+        pd.set_option('display.max_rows', 1000)
 
     @staticmethod
     def eng():
@@ -1953,10 +2189,17 @@ class DisplayData:
         # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
 
-class List(list):
+class List(list, Base):
+    """Use this class to keep items of the same type.
+    """
+    # =============================== Constructor Methods ====================
     def __init__(self, obj_list=None):
         super().__init__()
-        self.list = obj_list if obj_list is not None else []
+        self.list = list(obj_list) if obj_list is not None else []
+        # for attr in filter(lambda x: not x.startswith("_"), dir(self.list[0])):
+        #     setattr(self, attr, self.list[0](attr))
+
+        # self.struct = None
         # if len(self.list) > 0:
         #     class Fake(self.list[0].__class__):
         #         def __getattr__(self, item):
@@ -1964,9 +2207,16 @@ class List(list):
         #     self.example = Fake
 
     @classmethod
-    def replica(cls, obj, count):
-        from copy import deepcopy
-        return cls([deepcopy(obj) for _ in range(count)])
+    def from_replication(cls, obj, count):
+        return cls([copy.deepcopy(obj) for _ in range(count)])
+
+    def save_items(self, directory, names=None, saver=None):
+        if saver is None:
+            saver = Save.pickle
+        if names is None:
+            names = range(len(self))
+        for name, item in zip(names, self.list):
+            saver(path=directory + name, obj=item)
 
     def __deepcopy__(self, memodict=None):
         if memodict is None:
@@ -1977,13 +2227,33 @@ class List(list):
     def __copy__(self):
         return self.__deepcopy__()
 
+    # ================= call methods =====================================
     def method(self, name, *args, **kwargs):
         return List([getattr(i, name)(*args, **kwargs) for i in self.list])
 
     def attr(self, name):
         return List([getattr(i, name) for i in self.list])
 
-    def __getattr__(self, name):
+    # def __getattribute__(self, item):
+    #     # you can dispense with this method. Its only purpose is to make eaisr experience qwith the linter
+    #     # obj = object.__getattribute__(self, "list")[0]
+    #     # try:
+    #     #     attr = object.__getattribute__(self, item)
+    #     #     if hasattr(obj, item):
+    #     #         return self.__getattr__(item)
+    #     #     else:
+    #     #         return attr
+    #     # except AttributeError:
+    #     #     return self.__getattr__(item)
+    #     if item == "list":  # grant special access to this attribute.
+    #         return object.__getattribute__(self, "list")
+    #     if item in object.__getattribute__(self, "__dict__").keys():
+    #         return self.__getattr__(item)
+    #     else:
+    #         return object.__getattribute__(self, item)
+
+    def __getattr__(self, name):  # fallback position when normal mechanism fails.
+        # this is called when __getattribute__ raises an error or call this explicitly.
         result = List([getattr(i, name) for i in self.list])
         return result
 
@@ -1993,22 +2263,58 @@ class List(list):
         else:
             return [i(*args, **kwargs) for i in self.list]
 
+    # ======================== Access Methods ==========================================
     def __getitem__(self, key):
+        # behaves similarly to Numpy A[1] vs A[1:2]
         result = self.list[key]
         if type(key) is not slice:
             return result  # choose one item
         else:
             return List(result)
 
-    def find(self, string_):
+    @property
+    def struct(self):  # it has to be a property so that the struct is updated when list is updated.
+        return Struct.from_keys_values([str(item) for item in self.list], self.list)
+
+    def find(self, patt, match="fnmatch"):
         """Looks up the string representation of all items in the list and finds the one that partially matches
         the argument passed. This method is a short for self.filter(lambda x: string_ in str(x)) If you need more
         complicated logic in the search, revert to filter method.
         """
-        for item in self.list:
-            if string_ in str(item):
-                return item
+        if match == "string" or None:
+            for idx, item in enumerate(self.list):
+                if patt in str(item):
+                    return item
+        elif match == "fnmatch":
+            import fnmatch
+            for idx, item in enumerate(self.list):
+                if fnmatch.fnmatch(str(item), patt):
+                    return item
+        else:  # "regex"
+            # escaped = re.escape(string_)
+            compiled = re.compile(patt)
+            for idx, item in enumerate(self.list):
+                if compiled.search(str(item)) is not None:
+                    return item
         return None
+
+    def index_entries(self, start, end=None, step=None):
+        """Used to access entries of items
+        """
+        return List([item[start:end:step] for item in self.list])
+
+    def find_index(self, string_):
+        for idx, item in enumerate(self.list):
+            if string_ in str(item):
+                return idx
+        return None
+
+    # ======================= Modify Methods ===============================
+    def combine(self):
+        res = self.list[0]
+        for item in self.list[1:]:
+            res = res + item
+        return res
 
     def append(self, obj):
         self.list.append(obj)
@@ -2018,11 +2324,16 @@ class List(list):
 
     def __repr__(self):
         if len(self.list) > 0:
-            tmp1 = f"List object with {len(self.list)}"
-            tmp2 = f" elements. One example of those elements: \n{self.list[0].__repr__()}"
-            return tmp1 + tmp2
+            if len(self.list) > 50:
+                tmp1 = f"AlexList object with {len(self.list)} elements. One example of those elements: \n"
+                tmp2 = f"{self.list[0].__repr__()}"
+                return tmp1 + tmp2
+            else:
+                tmp1 = f"AlexList object with the following elements: \n"
+                tmp2 = "\n".join([repr(item) for item in self.list])
+                return tmp1 + tmp2
         else:
-            return f"An Empty List []"
+            return f"An Empty AlexList []"
 
     def __len__(self):
         return len(self.list)
@@ -2037,12 +2348,6 @@ class List(list):
     @property
     def np(self):
         return np.array(self.list)
-
-    def combine(self):
-        res = self.list[0]
-        for item in self.list[1:]:
-            res = res + item
-        return res
 
     def apply(self, func, *args, lest=None, jobs=None, depth=1, **kwargs):
         """
@@ -2059,20 +2364,20 @@ class List(list):
             # assert type(self.list[0]) == List, "items are not Lists".
             self.apply(lambda x: x.apply(func, *args, lest=lest, jobs=jobs, depth=depth, **kwargs))
 
-        if type(func) is str:
-            func = eval("lambda x: " + func)
+        func = self.evalstr(func, expected='func')
 
-        from joblib import Parallel, delayed
         if lest is None:
             if jobs:
+                from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in tqdm(self.list)))
             else:
                 return List([func(i, *args, **kwargs) for i in self.list])
         else:
             if jobs:
-                return List(Parallel(n_jobs=jobs)(delayed(func)(obj, obj_) for obj, obj_ in tqdm(zip(self.list, lest))))
+                from joblib import Parallel, delayed
+                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in tqdm(zip(self.list, lest))))
             else:
-                return List([func(obj, obj_) for obj, obj_ in zip(self.list, lest)])
+                return List([func(x, y) for x, y in zip(self.list, lest)])
 
     def modify(self, func, lest=None):
         """Modifies objects rather than returning new list of objects, hence the name of the method.
@@ -2092,14 +2397,10 @@ class List(list):
 
     def sort(self, *args, **kwargs):
         self.list.sort(*args, **kwargs)
+        return self
 
     def sorted(self, *args, **kwargs):
         return List(sorted(self.list, *args, **kwargs))
-
-    def idx(self, start, end=None, step=None):
-        """Used to access entries of items
-        """
-        return List([item[start:end:step] for item in self.list])
 
     def filter(self, func):
         if type(func) is str:
@@ -2110,21 +2411,160 @@ class List(list):
                 result.append(item)
         return result
 
-    def print(self, nl=1, sep=False, char='-'):
+    def print(self, nl=1, sep=False, char='-', style=str):
         for idx, item in enumerate(self.list):
-            print(f"{idx:2}- {item}", end=' ')
+            print(f"{idx:2}- {style(item)}", end=' ')
             for _ in range(nl):
                 print('', end='\n')
             if sep:
-                print(char*100)
+                print(char * 100)
 
-    def df(self):
+    def df(self, names=None):
         DisplayData.set_display()
         columns = ['object'] + list(self.list[0].__dict__.keys())
         df = pd.DataFrame(columns=columns)
         for i, obj in enumerate(self.list):
-            df.loc[i] = [obj] + list(self.list[i].__dict__.values())
+            if names is None:
+                name = [obj]
+            else:
+                name = [names[i]]
+            df.loc[i] = name + list(self.list[i].__dict__.values())
         return df
+
+    def sample(self, size=1):
+        return self[np.random.choice(len(self.list), size)[0]]
+
+
+L = List
+
+
+class Struct(Base):
+    """Use this class to keep bits and sundry items.
+    """
+    def __init__(self, dictionary=None, **kwargs):
+        """Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
+        """
+        # super().__init__()
+        if type(dictionary) is Struct:
+            dictionary = dictionary.dict
+        if dictionary is None:  # only kwargs were passed
+            final_dict = kwargs
+        elif not kwargs:  # only dictionary was passed
+            final_dict = dictionary
+        else:  # both were passed
+            final_dict = dictionary
+            final_dict.update(kwargs)
+        self.__dict__ = final_dict
+
+    @classmethod
+    def defaultdict(cls, *args, **kwargs):
+        obj = cls(*args, **kwargs)
+        from collections import defaultdict
+        mydict = defaultdict(lambda: None)
+        mydict.update(obj.__dict__)
+        obj.__dict__ = mydict
+        return obj
+
+    @classmethod
+    def from_keys_values(cls, names, values):
+        return cls(dict(zip(names, values)))
+
+    @classmethod
+    def from_names(cls, *names, default=None):  # Mimick NamedTuple and defaultdict
+        if default is None:
+            default = [None] * len(names)
+        return cls.from_keys_values(names, values=default)
+
+    def map(self, keys):
+        return List([self[key] for key in keys])
+
+    def empty_class(self):
+
+        class Temp:
+            pass
+
+        temp = Temp()
+        temp.__dict__ = self.__dict__
+        return temp
+
+    def __repr__(self):
+        repr_string = ""
+        for item, value in self.__dict__.items():
+            repr_string += f"{item} = {value}\n"
+        return "Structure\n" + repr_string
+
+    def __str__(self):
+        mystr = str(self.__dict__)
+        mystr = mystr[1:-1].replace(":", " =").replace("'", "")
+        return mystr
+
+    def __getitem__(self, item):  # allows indexing into entries of __dict__ attribute
+        return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def __getattr__(self, item):  # this works better with the linter.
+        try:
+            self.__dict__[item]
+        except KeyError:
+            # raise KeyError
+            # super(Structure, self).__getattr__(item)
+            super(Struct, self).__getattribute__(item)
+
+    def __getstate__(self):
+        return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+
+    def __iter__(self):
+        return iter(self.dict.items())
+
+    @property
+    def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
+        return self.__dict__
+
+    def update(self, *args, **kwargs):
+        """Accepts dicts and keyworded args
+        """
+        new_struct = Struct(*args, **kwargs)
+        self.__dict__.update(new_struct.__dict__)
+        return self
+
+    def __copy__(self):
+        return Struct(self.__dict__.copy())
+
+    def copy(self):
+        return self.__copy__()
+
+    def reverse(self):
+        return Struct(Manipulator.inverse(self.__dict__))
+
+    @property
+    def keys(self):
+        return List(self.dict.keys())
+
+    @property
+    def values(self):
+        return List(self.dict.values())
+
+    @property
+    def df(self):
+        return None
+
+    def index(self, idx):
+        return self.keys[idx], self.values[idx]
+
+    def spawn_from_values(self, values):
+        return self.from_keys_values(self.keys, self.evalstr(values, expected='self'))
+
+    def plot(self):
+        obj = Artist(figname='Structure Plot')
+        for key, val in self:
+            obj.plot(val, label=key)
+        obj.fig.legend()
+        return obj
 
 
 def assert_package_installed(package):
@@ -2135,7 +2575,10 @@ def assert_package_installed(package):
         pip.main(['install', package])
 
 
-def run(name, asis=False):
+def run_globally(name, asis=False):
+    """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
+    This is useful to debug functions and class methods alike.
+    """
     import inspect
     import textwrap
     assert_package_installed("clipboard")
@@ -2143,7 +2586,7 @@ def run(name, asis=False):
 
     codelines = inspect.getsource(name)
     if not asis:
-        # remove def func_name() line from the list, and return statement
+        # remove def func_name() line from the list
         idx = codelines.find("):\n")
         codelines = codelines[idx + 4:]
 
@@ -2177,27 +2620,6 @@ class Log:
     def finish(self):
         sys.stdout.close()
         print(f"Finished ... have a look @ \n {self.path}")
-
-
-def classisize(dictionary, name=None):
-    class Classizer:
-        pass
-    obj = Classizer()  # we have to add attributes to instance not to class to avoid sharing.
-    obj.__dict__ = dictionary
-    obj.name = name
-    return obj
-
-
-def polygon_area(points):
-    """Return the area of the polygon whose vertices are given by the
-    sequence points.
-    """
-    area = 0
-    q = points[-1]
-    for p in points:
-        area += p[0] * q[1] - p[1] * q[0]
-        q = p
-    return abs(area / 2)
 
 
 if __name__ == '__main__':
