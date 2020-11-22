@@ -23,7 +23,7 @@ You can read the details in the code to grapple the motivation and the philosoph
 just do this in your command line
 `pip install alexlib`.
 
-Worry NOT about your virenv, this package installs itself peacefully, never interfere with your other packages, not requires anything with force. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it. The package is not fussy about versions.
+Worry NOT about your virenv, this package installs itself peacefully, never interfere with your other packages, not requires anything with force. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it. The package is not fussy about versions either.
 
 # Getting Started
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
@@ -37,20 +37,20 @@ import alexlib.toolbox as tb
 Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.
 
 
-To achieve this, all you need is a imminently readable one-liner.
+To achieve this, all you need is an imminently readable one-liner.
 ```
 tb.P.cwd().myglob("*.py", r=True).read_text().split('\n').apply(len).np.sum()
 ```
 
 How does this make perfect sense?
 * `myglob` returns `List` of `P` path objects
-* `read_text` is a `P` method, but it is being run against `List` object. Behind the scense **responsible black magic** fails to find such a method in `List` and realizes it is a method of items inside the list, so it reads all files and containerize them in another `List` object and returns it.
+* `read_text` is a `P` method, but it is being run against `List` object. Behind the scenes, **responsible black magic** fails to find such a method in `List` and realizes it is a method of items inside the list, so it runs it against them and thus read all files and containerize them in another `List` object and returns it.
 * Similar story applies to `split` which is a method of strings in Python.
 * Next, `apply` is a method of `List`. Sure enough, it lives up to its apt name and applies the passed function `len` to all items in the list and returns another `List` object that contains the results.
 * `.np` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
 
 # Other use cases
-Invitably in life, you will encounter objects of the same type and you are struggling to get a tough grab on them. `List` gives you a handle so tough, that the objects behave like one object.
+Invitably in life, you will encounter objects of the same type and you will be struggling to get a tough grab on them. `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object.
 
 This is the power of implicit `for` loops. Share with us your one-liner snippets to add it to use-cases of this package.
 
