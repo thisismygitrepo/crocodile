@@ -1,10 +1,10 @@
 
 # Welcome to alexlib
 
-This package extends many native Python classes to equip you with an uneasy to tame power. Beside many minor extensions, the major classes extended are:
+This package extends many native Python classes to equip you with an uneasy-to-tame power. Beside many minor extensions, the major classes extended are:
  
  * `list` is  extended to `List`
-    * Forget that for loops exist in your life, because with this class, for loops are implicitly applied to all items.
+    * Forget that `for` loops exist in your life, because with this class, `for` loops are implicitly applied to all items.
   * `dict` is  extended to `Strcut`.
     * Combines the power of dot notation like classes and key access like dictionaries.
     
@@ -21,7 +21,9 @@ You can read the details in the code to grapple the motivation and the philosoph
 
 # Install
 just do this in your command line
-`pip install alexlib`
+`pip install alexlib`.
+
+Worry NOT about your virenv, this package installs itself peacefully, never interfere with your other packages, not requires anything with force. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it. The package is not fussy about versions.
 
 # Getting Started
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
@@ -32,7 +34,7 @@ import alexlib.toolbox as tb
 
 
 # A Taste of Power
-Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the the lines, add up everything from all strings of code.
+Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.
 
 
 To achieve this, all you need is a imminently readable one-liner.
@@ -50,5 +52,5 @@ How does this make perfect sense?
 # Other use cases
 Invitably in life, you will encounter objects of the same type and you are struggling to get a tough grab on them. `List` gives you a handle so tough, that the objects behave like one object.
 
-This is the power of implicit for loops. Share with us your one-liner snippets to add it to use-cases of this package.
+This is the power of implicit `for` loops. Share with us your one-liner snippets to add it to use-cases of this package.
 

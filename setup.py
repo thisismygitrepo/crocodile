@@ -5,7 +5,7 @@ with open("README.md", "r") as file:
 
 setup(
     name='alexlib',
-    version='0.0.2',
+    version='0.0.4',
     packages=['alexlib'],
     package_dir={'': 'myresources'},
     py_modules=['toolbox'],
