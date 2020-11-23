@@ -20,3 +20,8 @@ setup(
 
 # useful webiste: gitignore.io
 # choosealicense.com
+
+# steps:
+# git push origin
+# python setup.py sdist bdist_wheel
+# twine upload dist/*

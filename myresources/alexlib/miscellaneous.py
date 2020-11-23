@@ -1,5 +1,5 @@
 
-import resources.toolbox as tb
+import myresources.alexlib.toolbox as tb
 
 
 def compute_num_of_lines_of_code_in_repo(path=tb.P.cwd(), extension=".py", r=True, **kwargs):
