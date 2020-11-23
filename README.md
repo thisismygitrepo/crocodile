@@ -5,7 +5,7 @@ This package extends many native Python classes to equip you with an uneasy-to-t
  
  * `list` is  extended to `List`
     * Forget that `for` loops exist in your life, because with this class, `for` loops are implicitly applied to all items.
-  * `dict` is  extended to `Strcut`.
+  * `dict` is  extended to `Struct`.
     * Combines the power of dot notation like classes and key access like dictionaries.
     
    * `pathlib` is  extended to `P`
@@ -54,3 +54,5 @@ Invitably in life, you will encounter objects of the same type and you will be s
 
 This is the power of implicit `for` loops. Share with us your one-liner snippets to add it to use-cases of this package.
 
+# Full docs:
+Click [Here](<https://alexlib.readthedocs.io/en/latest/>)

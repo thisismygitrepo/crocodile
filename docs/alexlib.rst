@@ -4,6 +4,14 @@ alexlib package
 Submodules
 ----------
 
+alexlib.toolbox module
+----------------------
+
+.. automodule:: alexlib.toolbox
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 alexlib.deeplearning module
 ---------------------------
 
@@ -24,14 +32,6 @@ alexlib.miscellaneous module
 ----------------------------
 
 .. automodule:: alexlib.miscellaneous
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-alexlib.toolbox module
-----------------------
-
-.. automodule:: alexlib.toolbox
    :members:
    :undoc-members:
    :show-inheritance:

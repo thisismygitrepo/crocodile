@@ -49,7 +49,9 @@ class Base:
         # [setattr(Path, name, getattr(MyPath, name)) for name in funcs]
 
     # def get_methods(self):
+
     # def get_dict(self):
+    #     return list(self.__dict__.keys())
 
     # def __getattr__(self, item):
     #     pass
@@ -1192,11 +1194,13 @@ class Struct(Base):
     def spawn_from_values(self, values):
         return self.from_keys_values(self.keys, self.evalstr(values, expected='self'))
 
-    def plot(self, artist=None):
+    def plot(self, artist=None, xdata=None):
         if artist is None:
             artist = Artist(figname='Structure Plot')
         for key, val in self:
-            artist.plot(val, label=key)
+            if xdata is None:
+                xdata = np.arange(len(val))
+            artist.plot(xdata, val, label=key)
         try:
             artist.fig.legend()
         except AttributeError:
