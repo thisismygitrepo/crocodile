@@ -190,10 +190,20 @@ class P(type(Path()), Path, Base):
             astring = self.stem
         return int("".join(filter(str.isdigit, str(astring))))
 
-    def make_python_name(self, astring=None):
-        if astring is None:
-            astring = self.name
-        return re.sub(r'^(?=\d)|\W', '_', str(astring))
+    def make_valid_filename(self, replace='_'):
+        return self.make_valid_filename_(self.trunk, replace=replace)
+
+    @staticmethod
+    def make_valid_filename_(astring, replace='_'):
+        return re.sub(r'^(?=\d)|\W', replace, str(astring))
+
+    @staticmethod
+    def get_random_string(length=10, pool=None):
+        if pool is None:
+            pool = string.ascii_letters
+        import random
+        result_str = ''.join(random.choice(pool) for _ in range(length))
+        return result_str
 
     @property
     def trunk(self):
@@ -286,9 +296,7 @@ class P(type(Path()), Path, Base):
 
     @property
     def browse(self):
-        contents = self.listdir().make_python_name()
-        paths = self.myglob("*")
-        return Struct.from_keys_values(contents, paths).empty_class()
+        return self.myglob("*").to_struct(keys="self.make_python_name()").empty_class()
 
     @property
     def browse2(self):
@@ -670,11 +678,11 @@ class Read:
         return data
 
     @staticmethod
-    def json(path):
+    def json(path, **kwargs):
         """Returns a Structure"""
         import json
         with open(str(path), "r") as file:
-            mydict = json.load(file)
+            mydict = json.load(file, **kwargs)
         return Struct(mydict)
 
     @staticmethod
@@ -724,7 +732,7 @@ class Save:
         savemat(str(path), mdict)
 
     @staticmethod
-    def json(path, obj):
+    def json(path, obj, **kwargs):
         """This format is compatible with simple dictionaries that hold strings or numbers but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
         inspected using any text editor."""
@@ -732,7 +740,7 @@ class Save:
         if not str(path).endswith(".json"):
             path = str(path) + ".json"
         with open(str(path), "w") as file:
-            json.dump(obj, file)
+            json.dump(obj, file, **kwargs)
 
     @staticmethod
     def pickle(path, obj):
@@ -798,8 +806,27 @@ class List(list, Base):
         #     self.example = Fake
 
     @classmethod
-    def from_replication(cls, obj, count):
+    def from_copies(cls, obj, count):
         return cls([copy.deepcopy(obj) for _ in range(count)])
+
+    @classmethod
+    def from_replicating(cls, func, *args, replicas=None, **kwargs):
+        """
+        :param args: could be one item repeated for all instances, or iterable. If iterable, it can by a Cycle object.
+        :param kwargs: those could be structures
+        :param replicas
+        :param func:
+        """
+        if not args and not kwargs:  # empty args list and kwargs list
+            return cls([func() for _ in range(replicas)])
+        else:
+            result = []
+            for params in zip(*(args + tuple(kwargs.values()))):
+                an_arg = params[:len(args)]
+                a_val = params[len(args):]
+                a_kwarg = dict(zip(kwargs.keys(), a_val))
+                result.append(func(*an_arg, **a_kwarg))
+            return cls(result)
 
     def save_items(self, directory, names=None, saver=None):
         if saver is None:
@@ -863,11 +890,11 @@ class List(list, Base):
         else:
             return List(result)
 
-    def to_struct(self, keys=None):
-        """it has to be a property so that the struct is updated when list is updated."""
-        keys = self.evalstr(keys)
-        keys = keys or [str(item) for item in self.list]
-        return Struct.from_keys_values(keys, self.list)
+    def to_struct(self, keys=None, values=None):
+        """"""
+        keys = self.evalstr(keys, expected="self") or [str(item) for item in self.list]
+        values = self.evalstr(values, expected="self") or self.list
+        return Struct.from_keys_values(keys, values)
 
     def find(self, patt, match="fnmatch"):
         """Looks up the string representation of all items in the list and finds the one that partially matches
@@ -938,6 +965,9 @@ class List(list, Base):
     def __iter__(self):
         return iter(self.list)
 
+    def to_numpy(self):
+        return self.np
+
     @property
     def np(self):
         return np.array(self.list)
@@ -966,7 +996,7 @@ class List(list, Base):
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in tqdm(self.list)))
             else:
-                return List([func(i, *args, **kwargs) for i in self.list])
+                return List([func(x, *args, **kwargs) for x in self.list])
         else:
             if jobs:
                 assert_package_installed("tqdm")
@@ -988,7 +1018,7 @@ class List(list, Base):
                 exec(func)
         else:
             for idx, (x, y) in enumerate(zip(self.list, lest)):
-                _, _, _ = idx, x, y
+                _ = idx, x, y
                 exec(func)
         return self
 

@@ -5,7 +5,7 @@ with open("README.md", "r") as file:
 
 setup(
     name='alexlib',
-    version='0.0.4',
+    version='0.0.6',
     packages=['alexlib'],
     package_dir={'': 'myresources'},
     py_modules=['toolbox'],
@@ -25,3 +25,4 @@ setup(
 # git push origin
 # python setup.py sdist bdist_wheel
 # twine upload dist/*
+# ^iLyZ5^Ph6R3

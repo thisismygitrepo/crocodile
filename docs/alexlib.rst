@@ -1,8 +1,6 @@
 alexlib package
 ===============
 
-Submodules
-----------
 
 alexlib.toolbox module
 ----------------------

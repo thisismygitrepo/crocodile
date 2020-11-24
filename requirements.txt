@@ -1,7 +1,13 @@
 
 numpy
+scipy
 pandas
+h5py
 matplotlib
 tqdm
 setuptools
 send2trash
+skimage
+cycler
+joblib
+pip
