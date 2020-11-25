@@ -1,11 +1,12 @@
 from setuptools import setup
+from myresources.alexlib import __version__
 
 with open("README.md", "r") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
 setup(
     name='alexlib',
-    version='0.0.6',
+    version=__version__,
     packages=['alexlib'],
     package_dir={'': 'myresources'},
     py_modules=['toolbox'],

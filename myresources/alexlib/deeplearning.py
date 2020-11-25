@@ -1,6 +1,6 @@
 
 
-import myresources.alexlib.toolbox as tb
+import alexlib.toolbox as tb
 # import resources.s_params as stb
 import numpy as np
 from abc import ABC, abstractmethod
@@ -102,9 +102,8 @@ class HyperParam:
         # ==================== Enviroment ========================
         self.exp_name = 'default'
         self.root = 'tmp'
-        self._code = None
         self.pkg = None
-        # self.device = config_device(HyperParam, Device.gpu0)
+        # self.device = dl.config_device(self.pkg, dl.Device.gpu0)
         # ===================== DATA ============================
         self.seed = 234
         # ===================== Model =============================
@@ -113,6 +112,8 @@ class HyperParam:
         self.lr = 0.0005
         self.batch_size = 32
         self.epochs = 30
+
+        self._code = None
 
     def save_code(self):
         import inspect
@@ -124,27 +125,18 @@ class HyperParam:
          the run was done from. This is especially useful during imports, resulting in predicted behaviour.
         """
         self.root = tb.P(self.root)
-        rel_full_path = self.root / self.exp_name
-        # abs_full_path = tb.P(rel_full_path).relativity_transform().create()
-        abs_full_path = tb.P.tmp() / rel_full_path
+        abs_full_path = tb.P.tmp() / self.root / self.exp_name
         return abs_full_path.create()
 
     def save(self):
         path = self.save_dir.joinpath(f'metadata').create()
         (path / 'HyperParam.txt').write_text(data=str(self))
-        tb.Save.pickle(path / f'HyperParam', self.__class__)  # consider using .pickle suffix
+        tb.Save.pickle(path / f'HyperParam', self.__class__)
 
     @staticmethod
     def from_saved(path):
-        path = tb.P(path)
-        path = path / f'metadata/HyperParam'
-        # with open(path, 'r') as f:
-        #     txt = f.readlines()
-        # exec(''.join(txt), *args, **kwargs)
-        # class_name = txt[0].split('class ')[1].split('(')[0]
-        # return eval(class_name)()
-        import pickle
-        return pickle.load(open(path, "rb"))()
+        path = tb.P(path) / f'metadata/HyperParam.pickle'
+        return tb.Read.pickle(path if path.exists() else path.with_suffix(""))
 
     def __repr__(self):
         if self._code:
@@ -233,15 +225,10 @@ class DataReader:
         self.split = split
 
     def __getattr__(self, item):
-        """:Warning: this method has a black magic aspect: when an attribute is set directly it creates a new one
-        instead of updating data_specs dictionary. Not recommended for general use.
-        :param item:
-        :return:
-        """
         try:
             return self.data_specs[item]
         except KeyError:
-            raise KeyError  # return object.__getattribute__(self, item)
+            raise KeyError(f"{item} not found")
 
     def data_split(self, *args, strings=None, **kwargs):
         """
@@ -253,25 +240,17 @@ class DataReader:
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.split, shuffle=self.hp.shuffle,
                                   random_state=self.hp.seed, **kwargs)
-
-        # class Data:
-        #     def __init__(self):
-        #         self.train_loader = None
-        #         self.test_loader = None
-        #         for ii, astring in enumerate(strings):
-        #             jj = ii * 2
-        #             self.__setattr__(astring + '_train', result[jj])
-        #             self.__setattr__(astring + '_test', result[jj + 1])
-        #
-        # self.split = Data()
         self.split = tb.Struct(train_loader=None, test_loader=None)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
 
-    def save(self):
-        # path = (self.hp.save_dir / f'metadata').create()
-        # np.save(path / 'DataReader.npy', self.data_specs)
-        self.data_specs.save(path=self.hp.save_dir.joinpath("metadata/DataReader.npy").create(parent_only=True))
+    def save(self, *names):
+        if names:
+            self.relay_to_specs(*names)
+        self.data_specs.save_npy(path=self.hp.save_dir.joinpath("metadata/DataReader.npy").create(parent_only=True))
+
+    def relay_to_specs(self, *names):
+        self.data_specs.update({name: self.__dict__[name] for name in names})
 
     @staticmethod
     def from_saved(path):

@@ -23,14 +23,18 @@ import matplotlib.pyplot as plt
 class Base:
     @classmethod
     def from_saved(cls, path):
-        boundaries = cls()  # whether the save format is .json or .mat or .npy, Reader returns Structure
-        boundaries.__dict__ = Read.read(path).dict
-        return boundaries
+        inst = cls()  # whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
+        data = Read.read(path)
+        inst.__dict__ = data.dict if type(data) is Struct else data
+        return inst
 
-    def save(self, path):
+    def save_npy(self, path, **kwargs):
         """this method goes with default `.npy` format (because it is generic).
         # P(path).parent.create()"""
-        np.save(path, self.__dict__)
+        np.save(path, self.__dict__, **kwargs)
+
+    def save_pickle(self, path, **kwargs):
+        Save.pickle(path, self.__dict__, **kwargs)
 
     def save_json(self, path):
         """Use case: json is good for simple dicts, e.g. settings.
@@ -149,8 +153,10 @@ def assert_package_installed(package):
     try:
         __import__(package)
     except ImportError:
-        import pip
-        pip.main(['install', package])
+        # import pip
+        # pip.main(['install', package])
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 
 class Log:
@@ -243,6 +249,7 @@ class P(type(Path()), Path, Base):
             print("File not deleted because user is not sure.")
 
     def send2trash(self):
+        assert_package_installed("send2trash")
         import send2trash
         send2trash.send2trash(self.string)
 
@@ -631,16 +638,17 @@ class Read:
     @staticmethod
     def read(path, **kwargs):
         suffix = P(path).suffix[1:]
-        if suffix in plt.gcf().canvas.get_supported_filetypes().keys():
-            return plt.imread(path, **kwargs)
-        else:
-            reader = getattr(Read, suffix)
+        # if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']:
+        #     # plt.gcf().canvas.get_supported_filetypes().keys():
+        #     return plt.imread(path, **kwargs)
+        # else:
+        reader = getattr(Read, suffix)
         return reader(str(path), **kwargs)
 
     @staticmethod
-    def npy(path):
+    def npy(path, **kwargs):
         """returns Structure if the object loaded is a dictionary"""
-        data = np.load(str(path), allow_pickle=True)
+        data = np.load(str(path), allow_pickle=True, **kwargs)
         if data.dtype == np.object:
             data = data.all()
         if type(data) is dict:
@@ -648,7 +656,7 @@ class Read:
         return data
 
     @staticmethod
-    def mat(path, correct_dims=True):
+    def mat(path, correct_dims=True, **kwargs):
         """
         :param path:
         :param correct_dims:
@@ -656,7 +664,7 @@ class Read:
         """
         try:  # try the old version
             from scipy.io import loadmat
-            data = loadmat(path)
+            data = loadmat(path, **kwargs)
             metadata_ = Struct()
             for akey in ['__header__', '__version__', '__globals__']:
                 metadata_[akey] = data[akey]
@@ -686,10 +694,12 @@ class Read:
         return Struct(mydict)
 
     @staticmethod
-    def pickle(path):
+    def pickle(path, **kwargs):
         import pickle
         with open(path, 'rb') as file:
-            obj = pickle.load(file)
+            obj = pickle.load(file, **kwargs)
+        if type(obj) is dict:
+            obj = Struct(obj)
         return obj
 
     @staticmethod
@@ -715,7 +725,7 @@ class Read:
 
 class Save:
     @staticmethod
-    def mat(path=P.tmp(), mdict=None):
+    def mat(path=P.tmp(), mdict=None, **kwargs):
         """Avoid using mat for saving results because of incompatiblity.
         * Nones are not accepted.
         * Scalars are conveteed to [1 x 1] arrays.
@@ -729,7 +739,7 @@ class Save:
         for key, value in mdict.items():
             if value is None:
                 mdict[key] = []
-        savemat(str(path), mdict)
+        savemat(str(path), mdict, **kwargs)
 
     @staticmethod
     def json(path, obj, **kwargs):
@@ -743,12 +753,12 @@ class Save:
             json.dump(obj, file, **kwargs)
 
     @staticmethod
-    def pickle(path, obj):
+    def pickle(path, obj, **kwargs):
         if ".pickle" not in str(path):
             path = path + ".pickle"
         import pickle
         with open(str(path), 'wb') as file:
-            pickle.dump(obj, file)
+            pickle.dump(obj, file, **kwargs)
 
 
 def accelerate(func, ip):
@@ -834,7 +844,7 @@ class List(list, Base):
         if names is None:
             names = range(len(self))
         for name, item in zip(names, self.list):
-            saver(path=directory + name, obj=item)
+            saver(path=directory / name, obj=item)
 
     def __deepcopy__(self, memodict=None):
         if memodict is None:
@@ -844,6 +854,12 @@ class List(list, Base):
 
     def __copy__(self):
         return self.__deepcopy__()
+
+    def __getstate__(self):
+        return self.list
+
+    def __setstate__(self, state):
+        self.list = state
 
     # ================= call methods =====================================
     def method(self, name, *args, **kwargs):
@@ -972,7 +988,7 @@ class List(list, Base):
     def np(self):
         return np.array(self.list)
 
-    def apply(self, func, *args, lest=None, jobs=None, depth=1, **kwargs):
+    def apply(self, func, *args, lest=None, jobs=None, depth=1, verbose=False, **kwargs):
         """
         :param jobs:
         :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
@@ -988,23 +1004,24 @@ class List(list, Base):
             self.apply(lambda x: x.apply(func, *args, lest=lest, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
+        if verbose or jobs:
+            assert_package_installed("tqdm")
+            from tqdm import tqdm
 
         if lest is None:
             if jobs:
-                assert_package_installed("tqdm")
-                from tqdm import tqdm
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in tqdm(self.list)))
             else:
-                return List([func(x, *args, **kwargs) for x in self.list])
+                iterator = self.list if not verbose else tqdm(self.list)
+                return List([func(x, *args, **kwargs) for x in iterator])
         else:
             if jobs:
-                assert_package_installed("tqdm")
-                from tqdm import tqdm
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in tqdm(zip(self.list, lest))))
             else:
-                return List([func(x, y) for x, y in zip(self.list, lest)])
+                iterator = zip(self.list, lest) if not verbose else tqdm(zip(self.list, lest))
+                return List([func(x, y) for x, y in iterator])
 
     def modify(self, func, lest=None):
         """Modifies objects rather than returning new list of objects, hence the name of the method.
@@ -1152,6 +1169,10 @@ class Struct(Base):
     def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
         return self.__dict__
 
+    @dict.setter
+    def dict(self, adict):
+        self.__dict__ = adict
+
     def update(self, *args, **kwargs):
         """Accepts dicts and keyworded args
         """
@@ -1222,7 +1243,10 @@ class Struct(Base):
         return self.keys()[idx], self.values()[idx]
 
     def spawn_from_values(self, values):
-        return self.from_keys_values(self.keys, self.evalstr(values, expected='self'))
+        return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
+
+    def spawn_from_keys(self, keys):
+        return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
 
     def plot(self, artist=None, xdata=None):
         if artist is None:
@@ -2592,8 +2616,8 @@ class ImShow(FigureManager):
 
     @classmethod
     def from_saved(cls, *things, **kwargs):
-        exmaple_item = things[0]
-        if isinstance(exmaple_item, list):
+        example_item = things[0]
+        if isinstance(example_item, list):
             return cls.from_saved_images_path_lists(*things, **kwargs)
         else:
             return cls.from_directories(*things, **kwargs)

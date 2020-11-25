@@ -39,7 +39,7 @@ Suppose you want to know how many lines of code in your repository. The procedur
 
 To achieve this, all you need is an eminently readable one-liner.
 ```
-tb.P.cwd().myglob("*.py", r=True).read_text().split('\n').apply(len).np.sum()
+tb.P.cwd().myglob("*.py", r=True).read_text().split('\n').apply(len).to_numpy().sum()
 ```
 
 How does this make perfect sense?
@@ -47,7 +47,7 @@ How does this make perfect sense?
 * `read_text` is a `P` method, but it is being run against `List` object. Behind the scenes, **responsible black magic** fails to find such a method in `List` and realizes it is a method of items inside the list, so it runs it against them and thus read all files and containerize them in another `List` object and returns it.
 * Similar story applies to `split` which is a method of strings in Python.
 * Next, `apply` is a method of `List`. Sure enough, it lives up to its apt name and applies the passed function `len` to all items in the list and returns another `List` object that contains the results.
-* `.np` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
+* `.to_numpy()` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
 
 # Other use cases
 Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them. `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object.
