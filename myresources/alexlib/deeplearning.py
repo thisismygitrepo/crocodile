@@ -19,74 +19,7 @@ class Device(enum.Enum):
     auto = 'auto'
 
 
-def config_device(handle, device: Device = Device.gpu0):
-    """
-    :param handle: package handle
-    :param device: device
-    :return: possibly a handle to device (in case of Pytorch)
-    """
-    try:
-        if handle.__name__ == 'tensorflow':
-            """
-            To disable gpu, here's one way: # before importing tensorflow do this:
-            if device == 'cpu':
-                os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-            handle.device(device)  # used as context, every tensor constructed and every computation takes place therein
-            For more manual control, use .cpu() and .gpu('0') .gpu('1') attributes.
-            """
-            devices = handle.config.experimental.list_physical_devices('CPU')
-            devices += handle.config.experimental.list_physical_devices('GPU')
-            device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
-
-            if device is Device.auto:
-                device = Device.gpu0 if len(devices) > 1 else Device.cpu
-
-            device_str = device.value if 1 > 0 else "haha"
-            assert device_str in device_dict.keys(), f"This machine has no such a device to be chosen! ({device_str})"
-            if device_str != '2gpus':
-                device = device_dict[device_str]
-                # Now we want only one device to be seen:
-                if device_str in ['gpu0', 'gpu1']:
-                    limit_memory = True
-                    if limit_memory:  # memory growth can only be limited for GPU devices.
-                        handle.config.experimental.set_memory_growth(device, True)
-                    handle.config.experimental.set_visible_devices(device, 'GPU')  # will only see this device
-                    logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                    # now, logical gpu is created only for visible device
-                    print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-                else:  # for cpu devices, we want no gpu to be seen:
-                    handle.config.experimental.set_visible_devices([], 'GPU')  # will only see this device
-                    logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                    # now, logical gpu is created only for visible device
-                    print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-                return device
-            else:
-                assert len(handle.config.experimental.get_visible_devices()) > 2
-                mirrored_strategy = handle.distribute.MirroredStrategy()
-                return mirrored_strategy
-
-        elif handle.__name__ == 'torch':
-            if device is Device.auto:
-                return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
-            elif device is Device.gpu0:
-                assert handle.cuda.device_count() > 0, f"GPU {device} not available"
-                return handle.device('cuda:0')
-            elif device is Device.gpu1:
-                assert handle.cuda.device_count() > 1, f"GPU {device} not available"
-                return handle.device('cuda:1')
-            elif device is Device.cpu:
-                return handle.device('cpu')
-            # How to run Torch model on 2 GPUs ?
-
-        else:
-            raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
-    except AssertionError as e:
-        print(e)
-        print(f"Trying again with auto-device {Device.auto}")
-        config_device(handle, device=Device.auto)
-
-
-class HyperParam:
+class HyperParam(tb.Base):
     """
     Benefits of this way of organizing the hyperparameters:
 
@@ -94,7 +27,7 @@ class HyperParam:
     * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
     * Ease of saving settings of experiments! and also replicating it later.
     """
-
+    subpath = 'metadata/HyperParam.pickle'
     def __init__(self):
         """
         It is prefferable to pass the packages used, so that later this class can be saved and loaded.
@@ -102,7 +35,7 @@ class HyperParam:
         # ==================== Enviroment ========================
         self.exp_name = 'default'
         self.root = 'tmp'
-        self.pkg = None
+        self.pkg_name = None
         # self.device = dl.config_device(self.pkg, dl.Device.gpu0)
         # ===================== DATA ============================
         self.seed = 234
@@ -128,15 +61,17 @@ class HyperParam:
         abs_full_path = tb.P.tmp() / self.root / self.exp_name
         return abs_full_path.create()
 
-    def save(self):
-        path = self.save_dir.joinpath(f'metadata').create()
-        (path / 'HyperParam.txt').write_text(data=str(self))
-        tb.Save.pickle(path / f'HyperParam', self.__class__)
+    def save_pickle(self, path=None, **kwargs):
+        if path is None:
+            path = self.save_dir.joinpath(self.subpath).create(parent_only=True)
+        (path.parent / 'HyperParam.txt').write_text(data=str(self))
+        super(HyperParam, self).save_pickle(path, **kwargs)
 
-    @staticmethod
-    def from_saved(path):
-        path = tb.P(path) / f'metadata/HyperParam.pickle'
-        return tb.Read.pickle(path if path.exists() else path.with_suffix(""))
+    @classmethod
+    def from_saved(cls, path):
+        path = tb.P(path) / cls.subpath
+        path = path if path.exists() else path.with_suffix("")
+        return super(HyperParam, cls).from_saved(path, reader=tb.Read.pickle)
 
     def __repr__(self):
         if self._code:
@@ -145,80 +80,88 @@ class HyperParam:
             raise NotImplementedError("The code was not saved at instantiation time. Use save_code()"
                                       " method at the end of HP init method.")
 
+    @property
+    def device(self):
+        return self.config_device(self.pkg, self.device_name)
 
-class HPTuning:
-    def __init__(self):
-        # ================== Tuning ===============
-        from tensorboard.plugins.hparams import api as hpt
-        self.hpt = hpt
-        import tensorflow as tf
-        self.pkg = tf
-        self.dir = None
-        self.params = tb.List()
-        self.acc_metric = None
-        self.metrics = None
+    @property
+    def pkg(self):
+        if self.pkg_name == "tensorflow":
+            handle = __import__("tensorflow")
+        elif self.pkg_name == "torch":
+            handle = __import__("torch")
+        return handle
 
     @staticmethod
-    def help():
-        """Steps of use: subclass this and do the following:
-        * Set directory attribute.
-        * set params
-        * set accuracy metric
-        * generate writer.
-        * implement run method.
-        * run loop method.
-        * in the command line, run `tensorboard --logdir <self.dir>`
+    def config_device(handle, device: Device = Device.gpu0):
         """
-        pass
+        :param handle: package handle
+        :param device: device
+        :return: possibly a handle to device (in case of Pytorch)
+        """
+        try:
+            if handle.__name__ == 'tensorflow':
+                """
+                To disable gpu, here's one way: # before importing tensorflow do this:
+                if device == 'cpu':
+                    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+                handle.device(device)  # used as context, every tensor constructed and every computation takes place therein
+                For more manual control, use .cpu() and .gpu('0') .gpu('1') attributes.
+                """
+                devices = handle.config.experimental.list_physical_devices('CPU')
+                devices += handle.config.experimental.list_physical_devices('GPU')
+                device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
 
-    def run(self, param_dict):
-        _, _ = self, param_dict
-        # should return a result that you want to maximize
-        return _
+                if device is Device.auto:
+                    device = Device.gpu0 if len(devices) > 1 else Device.cpu
 
-    def gen_writer(self):
-        import tensorflow as tf
-        with tf.summary.create_file_writer(str(self.dir)).as_default():
-            self.hpt.hparams_config(
-                hparams=self.params,
-                metrics=self.metrics)
+                device_str = device.value if 1 > 0 else "haha"
+                assert device_str in device_dict.keys(), f"This machine has no such a device to be chosen! ({device_str})"
+                if device_str != '2gpus':
+                    device = device_dict[device_str]
+                    # Now we want only one device to be seen:
+                    if device_str in ['gpu0', 'gpu1']:
+                        limit_memory = True
+                        if limit_memory:  # memory growth can only be limited for GPU devices.
+                            handle.config.experimental.set_memory_growth(device, True)
+                        handle.config.experimental.set_visible_devices(device, 'GPU')  # will only see this device
+                        logical_gpus = handle.config.experimental.list_logical_devices('GPU')
+                        # now, logical gpu is created only for visible device
+                        print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
+                    else:  # for cpu devices, we want no gpu to be seen:
+                        handle.config.experimental.set_visible_devices([], 'GPU')  # will only see this device
+                        logical_gpus = handle.config.experimental.list_logical_devices('GPU')
+                        # now, logical gpu is created only for visible device
+                        print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
+                    return device
+                else:
+                    assert len(handle.config.experimental.get_visible_devices()) > 2
+                    mirrored_strategy = handle.distribute.MirroredStrategy()
+                    return mirrored_strategy
 
-    def loop(self):
-        import itertools
-        counter = -1
-        tmp = self.params.list[0].domain.values
-        for combination in itertools.product(*[tmp]):
-            counter += 1
-            param_dict = dict(zip(self.params.list, combination))
-            with self.pkg.summary.create_file_writer(str(self.dir / f"run_{counter}")).as_default():
-                self.hpt.hparams(param_dict)  # record the values used in this trial
-                accuracy = self.run(param_dict)
-                self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
+            elif handle.__name__ == 'torch':
+                if device is Device.auto:
+                    return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
+                elif device is Device.gpu0:
+                    assert handle.cuda.device_count() > 0, f"GPU {device} not available"
+                    return handle.device('cuda:0')
+                elif device is Device.gpu1:
+                    assert handle.cuda.device_count() > 1, f"GPU {device} not available"
+                    return handle.device('cuda:1')
+                elif device is Device.cpu:
+                    return handle.device('cpu')
+                # How to run Torch model on 2 GPUs ?
 
-    def optimize(self):
-        self.gen_writer()
-        self.loop()
-
-
-class KerasOptimizer:
-    def __init__(self, d):
-        self.data = d
-        self.tuner = None
-
-    def __call__(self, ktp):
-        pass
-
-    def tune(self):
-        import kerastuner as kt
-        self.tuner = kt.Hyperband(self,
-                                  objective='loss',
-                                  max_epochs=10,
-                                  factor=3,
-                                  directory=tb.P.tmp('my_dir'),
-                                  project_name='intro_to_kt')
+            else:
+                raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
+        except AssertionError as e:
+            print(e)
+            print(f"Trying again with auto-device {Device.auto}")
+            config_device(handle, device=Device.auto)
 
 
 class DataReader(tb.Base):
+    subpath = "metadata/DataReader.pickle"
     import sklearn.preprocessing as preprocessing
 
     def __init__(self, hp=None, data_specs=None, split=None):
@@ -246,18 +189,18 @@ class DataReader(tb.Base):
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
 
-    def save(self, *names):
+    def save_pickle(self, path, *names):
         """This differs from the standard save from `Base` class in that it only saved .data_specs attribute
         and loads up with them only. This is reasonable as saving an entire dataset is not feasible."""
         if names:
             self.relay_to_specs(*names)
-        self.data_specs.save_npy(path=self.hp.save_dir.joinpath("metadata/DataReader.npy").create(parent_only=True))
+        self.data_specs.save_pickle(path=self.hp.save_dir.joinpath(self.subpath).create(parent_only=True))
 
     def relay_to_specs(self, *names):
         self.data_specs.update({name: self.__dict__[name] for name in names})
 
     @classmethod
-    def from_saved(cls, path):
+    def from_saved(cls, path, *args, **kwargs):
         """ This method offers an alternative constructer for DataReader class. It is a thin wrapper around `Base`
         equivalent that is being overriden.
         Use this when loading training data is not required. It requires saved essential parameters to be stored.
@@ -265,14 +208,8 @@ class DataReader(tb.Base):
         :param path: full path to the saved .npy file containing a dictionary of attributes names and values.
         :return: An object with attributes similar to keys and values as in dictionary loaded.
         """
-        return super(DataReader, self).from_saved(path / f'metadata' / 'DataReader.npy')
-
-
-class Compiler:
-    def __init__(self, loss=None, optimizer=None, metrics=None):
-        self.loss = loss
-        self.optimizer = optimizer
-        self.metrics = [None] if not metrics else metrics
+        path = (tb.P(path) / cls.subpath).parent.find("DataReader*")
+        return super(DataReader, cls).from_saved(path, *args, **kwargs)
 
 
 class BaseModel(ABC):
@@ -329,7 +266,7 @@ class BaseModel(ABC):
                     import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
                     metrics = [tmp.MeanSquareError()]
             # Create a new compiler object
-            self.compiler = Compiler(loss, optimizer, metrics)
+            self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics)
         else:  # there is a compiler, just update as appropriate.
             if loss:
                 self.compiler.loss = loss
@@ -373,7 +310,7 @@ class BaseModel(ABC):
             new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.lr * 0.5)
         else:
             new_optimizer = self.hp.pkg.optim.SGD(lr=self.hp.lr * 0.5)
-        self.compile(optimizer=new_optimizer)
+        self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
     def switch_to_l1(self, epochs=10):
@@ -385,7 +322,7 @@ class BaseModel(ABC):
         else:
             import myresources.alexlib.deeplearning_torch as tmp
             new_loss = tmp.MeanAbsoluteError()
-        self.compile(loss=new_loss)
+        self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
 
     def preprocess(self, *args, **kwargs):
@@ -511,7 +448,7 @@ class BaseModel(ABC):
         name = directory.glob('*.data*').__next__().__str__().split('.data')[0]
         self.model.load_weights(name)  # requires path to file name.
 
-    def save_class(self, weights_only=True, version='0'):
+    def save_class(self, weights_only=True, version='0', itself=False, **kwargs):
         """Simply saves everything:
 
         1. Hparams
@@ -523,8 +460,8 @@ class BaseModel(ABC):
         :return:
 
         """
-        self.hp.save()
-        self.data.save()
+        self.hp.save_pickle(itself=itself)
+        self.data.save_pickle(itself=itself)
 
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
         if weights_only:
@@ -542,10 +479,17 @@ class BaseModel(ABC):
         print(f'Model calss saved successfully!, check out: \n {self.hp.save_dir}')
 
     @classmethod
-    def from_class_weights(cls, path, hp_class, data_class):
+    def from_class_weights(cls, path, hp_class=None, data_class=None):
         path = tb.P(path)
-        data_obj = hp_class.from_saved(path)
-        hp_obj = data_class.from_saved(path)
+        if hp_class:
+            hp_obj = hp_class.from_saved(path)
+        else:
+            hp_obj = tb.Read.pickle(path / HyperParam.subpath)
+        if data_class:
+            data_obj = data_class.from_saved(path, hp_obj)
+        else:
+            data_path = path / DataReader.subpath
+            data_obj = tb.Read.pickle(data_path)  # if data_path.exists() else data_path.with_suffix("")
         model_obj = cls(hp_obj, data_obj)
         model_obj.load_weights(path.myglob('*_save_*')[0])
         history = path / "metadata/history.npy"
@@ -581,7 +525,8 @@ class BaseModel(ABC):
 
     def plot_model(self):
         import tensorflow as tf
-        tf.keras.utils.plot_model(self.model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+        tf.keras.utils.plot_model(self.model, to_file=self.hp.save_dir / 'model_plot.png',
+                                  show_shapes=True, show_layer_names=True)
         print('Successfully plotted the model')
 
     def build(self, shape=None, dtype=np.float32):
@@ -608,7 +553,7 @@ class BaseModel(ABC):
         print("----------------------------------------", '\n\n')
 
 
-class Ensemble:
+class Ensemble(tb.Base):
     def __init__(self, hp_class=None, data_class=None, model_class=None, n=15, _from_saved=False):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
@@ -693,12 +638,6 @@ class Ensemble:
         print(self.fit_results)
         self.fit_results.to_csv(self.models[0].hp.save_dir.parent / "fit_results.csv")
 
-    def infer(self, s):
-        results = self.models.infer(s).np
-        print("STD".center(100, "="))
-        print(results.std(axis=0))
-        return results
-
     def predict_from_position(self, pos, central_tendency='mean', bins=None, verbose=True):
         pos.predictions = tb.List()  # empty the list of predictions made on that position
         self.models.predict_from_position(pos, viz=False)  # each model will append its result to the container
@@ -751,3 +690,75 @@ def get_mean_max_error(tf):
         def reset_states(self):
             self.mme.assign(0.0)
     return MeanMaxError
+
+
+class HPTuning:
+    def __init__(self):
+        # ================== Tuning ===============
+        from tensorboard.plugins.hparams import api as hpt
+        self.hpt = hpt
+        import tensorflow as tf
+        self.pkg = tf
+        self.dir = None
+        self.params = tb.List()
+        self.acc_metric = None
+        self.metrics = None
+
+    @staticmethod
+    def help():
+        """Steps of use: subclass this and do the following:
+        * Set directory attribute.
+        * set params
+        * set accuracy metric
+        * generate writer.
+        * implement run method.
+        * run loop method.
+        * in the command line, run `tensorboard --logdir <self.dir>`
+        """
+        pass
+
+    def run(self, param_dict):
+        _, _ = self, param_dict
+        # should return a result that you want to maximize
+        return _
+
+    def gen_writer(self):
+        import tensorflow as tf
+        with tf.summary.create_file_writer(str(self.dir)).as_default():
+            self.hpt.hparams_config(
+                hparams=self.params,
+                metrics=self.metrics)
+
+    def loop(self):
+        import itertools
+        counter = -1
+        tmp = self.params.list[0].domain.values
+        for combination in itertools.product(*[tmp]):
+            counter += 1
+            param_dict = dict(zip(self.params.list, combination))
+            with self.pkg.summary.create_file_writer(str(self.dir / f"run_{counter}")).as_default():
+                self.hpt.hparams(param_dict)  # record the values used in this trial
+                accuracy = self.run(param_dict)
+                self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
+
+    def optimize(self):
+        self.gen_writer()
+        self.loop()
+
+
+class KerasOptimizer:
+    def __init__(self, d):
+        self.data = d
+        self.tuner = None
+
+    def __call__(self, ktp):
+        pass
+
+    def tune(self):
+        import kerastuner as kt
+        self.tuner = kt.Hyperband(self,
+                                  objective='loss',
+                                  max_epochs=10,
+                                  factor=3,
+                                  directory=tb.P.tmp('my_dir'),
+                                  project_name='intro_to_kt')

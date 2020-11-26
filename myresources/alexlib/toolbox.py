@@ -22,13 +22,16 @@ import matplotlib.pyplot as plt
 
 class Base:
     @classmethod
-    def from_saved(cls, path, *args, **kwargs):
+    def from_saved(cls, path, *args, reader=None, **kwargs):
         """Whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
-        For best experience, make sure that your subclass can be initialized with no or fake inputs.
+        For best experience, make sure that your subclass can be initialized with no or only fake inputs.
         """
         inst = cls(*args, **kwargs)
-        data = Read.read(path)
-        inst.__dict__ = data.dict if type(data) is Struct else data
+        if reader is None:
+            data = Read.read(path)
+        else:
+            data = reader(path)
+        inst.__dict__ = data.dict if type(data) is Struct else data  # __setitem__ should be defined.
         return inst
 
     def save_npy(self, path, **kwargs):
@@ -36,18 +39,21 @@ class Base:
         # P(path).parent.create()"""
         np.save(path, self.__dict__, **kwargs)
 
-    def save_pickle(self, path, **kwargs):
-        Save.pickle(path, self.__dict__, **kwargs)
+    def save_pickle(self, path, itself=False, **kwargs):
+        if not itself:
+            Save.pickle(path, self.__dict__, **kwargs)
+        else:
+            Save.pickle(path, self, **kwargs)
 
-    def save_json(self, path):
+    def save_json(self, path, *args, **kwargs):
         """Use case: json is good for simple dicts, e.g. settings.
         Advantage: human-readable from file explorer."""
-        Save.json(path, self.__dict__)
+        Save.json(path, self.__dict__, *args, **kwargs)
         return self
 
-    def save_mat(self, path):
+    def save_mat(self, path, *args, **kwargs):
         """for Matlab compatibility."""
-        Save.mat(path, self.__dict__)
+        Save.mat(path, self.__dict__, *args, **kwargs)
         return self
 
     def get_attributes(self):
@@ -61,16 +67,22 @@ class Base:
     #     return list(self.__dict__.keys())
 
     def __copy__(self):
-        """Shallow copy. New object, but the keys of which are referencing the values from the old object.
-        Does similar functionality to copy.copy"""
-        obj = self.__init__()
-        obj.__dict__.update(self.__dict__)
-        return obj
+        return copy.copy(self)
 
     def __deepcopy__(self, memodict={}):
+        return copy.deepcopy(self, memodict)
+
+    def deepcopy(self, *args, **kwargs):
         """Literally creates a new copy of values of old object, rather than referencing them"""
         # similar to copy.deepcopy()
-        obj = self.__init__()
+        obj = self.__init__(*args, **kwargs)
+        obj.__dict__.update(copy.deepcopy(self.__dict__))
+        return obj
+
+    def shallowcopy(self, *args, **kwargs):
+        """Shallow copy. New object, but the keys of which are referencing the values from the old object.
+        Does similar functionality to copy.copy"""
+        obj = self.__class__.__init__(*args, **kwargs)
         obj.__dict__.update(self.__dict__.copy())
         return obj
 
@@ -165,12 +177,15 @@ def browse(path, depth=2, width=20):
 
 def assert_package_installed(package):
     try:
-        __import__(package)
+        pkg = __import__(package)
+        return pkg
     except ImportError:
         # import pip
         # pip.main(['install', package])
         import subprocess
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+    pkg = __import__(package)
+    return pkg
 
 
 class Log:
@@ -263,8 +278,7 @@ class P(type(Path()), Path, Base):
             print("File not deleted because user is not sure.")
 
     def send2trash(self):
-        assert_package_installed("send2trash")
-        import send2trash
+        send2trash = assert_package_installed("send2trash")
         send2trash.send2trash(self.string)
 
     def move(self, new_path):
@@ -709,9 +723,10 @@ class Read:
 
     @staticmethod
     def pickle(path, **kwargs):
-        import pickle
+        # import pickle
+        dill = assert_package_installed("dill")
         with open(path, 'rb') as file:
-            obj = pickle.load(file, **kwargs)
+            obj = dill.load(file, **kwargs)
         if type(obj) is dict:
             obj = Struct(obj)
         return obj
@@ -766,13 +781,22 @@ class Save:
         with open(str(path), "w") as file:
             json.dump(obj, file, **kwargs)
 
+    # @staticmethod
+    # def pickle(path, obj, **kwargs):
+    #     if ".pickle" not in str(path):
+    #         path = path + ".pickle"
+    #     import pickle
+    #     with open(str(path), 'wb') as file:
+    #         pickle.dump(obj, file, **kwargs)
+
     @staticmethod
     def pickle(path, obj, **kwargs):
         if ".pickle" not in str(path):
-            path = path + ".pickle"
-        import pickle
+            path += ".pickle"
+        dill = assert_package_installed("dill")
+        # import dill
         with open(str(path), 'wb') as file:
-            pickle.dump(obj, file, **kwargs)
+            dill.dump(obj, file, **kwargs)
 
 
 def accelerate(func, ip):
@@ -1090,7 +1114,7 @@ class List(list, Base):
         return df
 
     def sample(self, size=1):
-        return self[np.random.choice(len(self.list), size)[0]]
+        return L(self.np[np.random.choice(len(self.list), size)])  # convert to numpy as it allows fancy indexing
 
 
 L = List
@@ -1195,12 +1219,6 @@ class Struct(Base):
         new_struct = Struct(*args, **kwargs)
         self.__dict__.update(new_struct.__dict__)
         return self
-
-    def __copy__(self):
-        return Struct(self.__dict__.copy())
-
-    def copy(self):
-        return self.__copy__()
 
     def inverse(self):
         return Struct({v: k for k, v in self.dict.items()})
@@ -1324,8 +1342,7 @@ def run_globally(name, asis=False):
     """
     import inspect
     import textwrap
-    assert_package_installed("clipboard")
-    import clipboard
+    clipboard = assert_package_installed("clipboard")
 
     codelines = inspect.getsource(name)
     if not asis:
