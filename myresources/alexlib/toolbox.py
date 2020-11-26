@@ -22,8 +22,11 @@ import matplotlib.pyplot as plt
 
 class Base:
     @classmethod
-    def from_saved(cls, path):
-        inst = cls()  # whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
+    def from_saved(cls, path, *args, **kwargs):
+        """Whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
+        For best experience, make sure that your subclass can be initialized with no or fake inputs.
+        """
+        inst = cls(*args, **kwargs)
         data = Read.read(path)
         inst.__dict__ = data.dict if type(data) is Struct else data
         return inst
@@ -57,8 +60,19 @@ class Base:
     # def get_dict(self):
     #     return list(self.__dict__.keys())
 
-    # def __getattr__(self, item):
-    #     pass
+    def __copy__(self):
+        """Shallow copy. New object, but the keys of which are referencing the values from the old object.
+        Does similar functionality to copy.copy"""
+        obj = self.__init__()
+        obj.__dict__.update(self.__dict__)
+        return obj
+
+    def __deepcopy__(self, memodict={}):
+        """Literally creates a new copy of values of old object, rather than referencing them"""
+        # similar to copy.deepcopy()
+        obj = self.__init__()
+        obj.__dict__.update(self.__dict__.copy())
+        return obj
 
     def evalstr(self, string_, expected='self'):
         _ = self
@@ -1084,9 +1098,11 @@ L = List
 
 class Struct(Base):
     """Use this class to keep bits and sundry items.
+    Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     """
     def __init__(self, dictionary=None, **kwargs):
-        """Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
+        """
+        :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
         """
         # super().__init__()
         if type(dictionary) is Struct:
@@ -1094,9 +1110,9 @@ class Struct(Base):
         if dictionary is None:  # only kwargs were passed
             final_dict = kwargs
         elif not kwargs:  # only dictionary was passed
-            final_dict = dictionary
+            final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
         else:  # both were passed
-            final_dict = dictionary
+            final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
             final_dict.update(kwargs)
         self.__dict__ = final_dict
 

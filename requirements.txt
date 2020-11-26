@@ -12,3 +12,4 @@ setuptools
 send2trash
 clipboard
 skimage
+twine

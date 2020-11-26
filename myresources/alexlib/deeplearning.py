@@ -218,7 +218,9 @@ class KerasOptimizer:
                                   project_name='intro_to_kt')
 
 
-class DataReader:
+class DataReader(tb.Base):
+    import sklearn.preprocessing as preprocessing
+
     def __init__(self, hp=None, data_specs=None, split=None):
         self.hp = hp
         self.data_specs = data_specs if data_specs else tb.Struct()  # Summary of data to be memorized by model
@@ -245,6 +247,8 @@ class DataReader:
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
 
     def save(self, *names):
+        """This differs from the standard save from `Base` class in that it only saved .data_specs attribute
+        and loads up with them only. This is reasonable as saving an entire dataset is not feasible."""
         if names:
             self.relay_to_specs(*names)
         self.data_specs.save_npy(path=self.hp.save_dir.joinpath("metadata/DataReader.npy").create(parent_only=True))
@@ -252,16 +256,16 @@ class DataReader:
     def relay_to_specs(self, *names):
         self.data_specs.update({name: self.__dict__[name] for name in names})
 
-    @staticmethod
-    def from_saved(path):
-        """ This method offers an alternative constructer for DataReader class.
+    @classmethod
+    def from_saved(cls, path):
+        """ This method offers an alternative constructer for DataReader class. It is a thin wrapper around `Base`
+        equivalent that is being overriden.
         Use this when loading training data is not required. It requires saved essential parameters to be stored.
         Those parameters are required by models to work.
-
         :param path: full path to the saved .npy file containing a dictionary of attributes names and values.
         :return: An object with attributes similar to keys and values as in dictionary loaded.
         """
-        return tb.Struct.from_saved(path / f'metadata' / 'DataReader.npy')
+        return super(DataReader, self).from_saved(path / f'metadata' / 'DataReader.npy')
 
 
 class Compiler:
@@ -534,15 +538,14 @@ class BaseModel(ABC):
         meta_dir = tb.P(self.hp.save_dir).joinpath('metadata').create()
         meta_dir.joinpath('model_arch.txt').write_text(codelines)
 
-        np.save(meta_dir.joinpath('history.npy'), self.history.list)
-        print(f'Mocdel calss saved successfully!, check out: \n {self.hp.save_dir}')
+        np.save(meta_dir.joinpath('history.npy'), self.history)
+        print(f'Model calss saved successfully!, check out: \n {self.hp.save_dir}')
 
     @classmethod
-    def from_class_weights(cls, path, hp=None):
-        _ = hp
+    def from_class_weights(cls, path, hp_class, data_class):
         path = tb.P(path)
-        data_obj = DataReader.from_saved(path)
-        hp_obj = HyperParam.from_saved(path)
+        data_obj = hp_class.from_saved(path)
+        hp_obj = data_class.from_saved(path)
         model_obj = cls(hp_obj, data_obj)
         model_obj.load_weights(path.myglob('*_save_*')[0])
         history = path / "metadata/history.npy"
