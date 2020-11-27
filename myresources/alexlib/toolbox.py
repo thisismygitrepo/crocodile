@@ -48,12 +48,14 @@ class Base:
     def save_json(self, path, *args, **kwargs):
         """Use case: json is good for simple dicts, e.g. settings.
         Advantage: human-readable from file explorer."""
-        Save.json(path, self.__dict__, *args, **kwargs)
+        _ = args
+        Save.json(path, self.__dict__, **kwargs)
         return self
 
     def save_mat(self, path, *args, **kwargs):
         """for Matlab compatibility."""
-        Save.mat(path, self.__dict__, *args, **kwargs)
+        _ = args
+        Save.mat(path, self.__dict__, **kwargs)
         return self
 
     def get_attributes(self):
@@ -69,8 +71,9 @@ class Base:
     def __copy__(self):
         return copy.copy(self)
 
-    def __deepcopy__(self, memodict={}):
-        return copy.deepcopy(self, memodict)
+    def __deepcopy__(self, memodict=None):
+        _ = memodict
+        return copy.deepcopy(self)
 
     def deepcopy(self, *args, **kwargs):
         """Literally creates a new copy of values of old object, rather than referencing them"""
@@ -732,6 +735,10 @@ class Read:
         return obj
 
     @staticmethod
+    def pkl(*args, **kwargs):
+        return Read.pickle(*args, **kwargs)
+
+    @staticmethod
     def csv(path, *args, **kwargs):
         return pd.read_csv(path, *args, **kwargs)
 
@@ -791,8 +798,6 @@ class Save:
 
     @staticmethod
     def pickle(path, obj, **kwargs):
-        if ".pickle" not in str(path):
-            path += ".pickle"
         dill = assert_package_installed("dill")
         # import dill
         with open(str(path), 'wb') as file:
@@ -1032,6 +1037,7 @@ class List(list, Base):
         :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
         :param args:
         :param lest:
+        :param verbose:
         :param depth: apply the function to inner Lists
         :param kwargs: a list of outputs each time the function is called on elements of the list.
         :return:
@@ -1042,6 +1048,8 @@ class List(list, Base):
             self.apply(lambda x: x.apply(func, *args, lest=lest, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
+
+        tqdm = 0
         if verbose or jobs:
             assert_package_installed("tqdm")
             from tqdm import tqdm
@@ -1128,7 +1136,7 @@ class Struct(Base):
         """
         :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
         """
-        # super().__init__()
+        super(Struct, self).__init__()
         if type(dictionary) is Struct:
             dictionary = dictionary.dict
         if dictionary is None:  # only kwargs were passed

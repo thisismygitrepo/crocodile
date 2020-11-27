@@ -19,7 +19,7 @@ class Device(enum.Enum):
     auto = 'auto'
 
 
-class HyperParam(tb.Base):
+class HyperParam(tb.Struct):
     """
     Benefits of this way of organizing the hyperparameters:
 
@@ -77,8 +77,7 @@ class HyperParam(tb.Base):
         if self._code:
             return self._code
         else:
-            raise NotImplementedError("The code was not saved at instantiation time. Use save_code()"
-                                      " method at the end of HP init method.")
+            return super(HyperParam, self).__repr__()
 
     @property
     def device(self):
@@ -211,6 +210,14 @@ class DataReader(tb.Base):
         path = (tb.P(path) / cls.subpath).parent.find("DataReader*")
         return super(DataReader, cls).from_saved(path, *args, **kwargs)
 
+    def preprocess(self, *args, **kwargs):
+        _ = args, kwargs, self
+        return args
+
+    def postprocess(self, *args, **kwargs):
+        _ = args, kwargs, self
+        return args
+
 
 class BaseModel(ABC):
     f"""My basic model. It implements the following methods:
@@ -233,13 +240,6 @@ class BaseModel(ABC):
         self.plotter = tb.SaveType.NullAuto
         self.kwargs = None
         self.tmp = None
-
-        class PredictionResults:
-            def __init__(self, prep=None, pred=None, postp=None):
-                self.preprocessed = prep
-                self.prediction = pred
-                self.postprocessed = postp
-        self.result_class = PredictionResults
 
     def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True):
         """ Updates compiler attributes. This acts like a setter.
@@ -326,13 +326,10 @@ class BaseModel(ABC):
         return self.fit(epochs=epochs)
 
     def preprocess(self, *args, **kwargs):
-        # return stb.preprocess(self.hp, *args, **kwargs)
-        _ = args, kwargs, self
-        return args
+        return self.data.preprocess(*args, **kwargs)
 
-    def postprocess(self, x, *args, **kwargs):
-        _, __, ___ = args, kwargs, self
-        return x
+    def postprocess(self, *args, **kwargs):
+        return self.data.postprocess(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
         return self.model(*args, **kwargs)
@@ -352,32 +349,22 @@ class BaseModel(ABC):
         return self.postprocess(inferred, **kwargs)
 
     def predict_from_position(self, position, viz=True, **kwargs):
-        position.read()
-        tmp = position.data_cal.get_data_dict() if position.data_cal is not None else None
-        preprocessed = self.preprocess(position.data_m.get_data_dict(), tmp)
+        preprocessed = self.preprocess(position)
         prediction = self.infer(preprocessed)
-        postprocessed = self.postprocess(prediction, name=position.bname, **kwargs)[0]
-        position.predictions.append(self.result_class(preprocessed, prediction, postprocessed))
+        postprocessed = self.postprocess(prediction, name=position.bname, **kwargs)[0]  # avoid batches
+        position.predictions.append(tb.Struct(preprocessed=preprocessed, prediction=prediction,
+                                              postprocessed=postprocessed))
         if viz:
             self.viz([postprocessed], **kwargs)
 
-    # def predict_from_s_path(self, s_path, cal_path=None):
-    #     return self.predict_from_s_obj(stb.S(s_path), stb.S(cal_path) if cal_path is not None else None)
-
-    def predict_from_s_obj(self, s_obj, cal_obj=None, viz=True, names=None, **kwargs):
-        measurement_dict_ = s_obj.get_data_dict()
-        if cal_obj:
-            cal_dict_ = cal_obj.get_data_dict()
-        else:
-            cal_dict_ = None
-        s_processed = self.preprocess(measurement_dict_, cal_dict_)
-        prediction = self.infer(s_processed)
-        final_result = self.postprocess(prediction, **kwargs)
-        if names is None:
-            names = measurement_dict_['names']
+    def predict_from_s_obj(self, s_obj, viz=True, **kwargs):
+        preprocessed = self.preprocess(s_obj)
+        prediction = self.infer(preprocessed[0])
+        postprocessed = self.postprocess(prediction, **kwargs)[0]
+        s_obj.prediction = tb.Struct(preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz:
-            return self.viz(final_result, names=names, **kwargs), final_result
-        return final_result
+            return self.viz(postprocessed, **kwargs), postprocessed
+        return postprocessed
 
     def viz(self, pred, gt=None, names=None, **kwargs):
         """
