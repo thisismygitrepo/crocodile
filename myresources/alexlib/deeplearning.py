@@ -161,7 +161,6 @@ class HyperParam(tb.Struct):
 
 class DataReader(tb.Base):
     subpath = "metadata/DataReader.pickle"
-    import sklearn.preprocessing as preprocessing
 
     def __init__(self, hp=None, data_specs=None, split=None):
         self.hp = hp
@@ -174,6 +173,15 @@ class DataReader(tb.Base):
         except KeyError:
             raise KeyError(f"{item} not found")
 
+    def __str__(self):
+        return f"DataReader Object with these keys: \n{self.__dict__.keys()}"
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+
+    def __getstate__(self):
+        return self.__dict__
+
     def data_split(self, *args, strings=None, **kwargs):
         """
         :param args: whatever to be sent to train_test_split
@@ -181,6 +189,7 @@ class DataReader(tb.Base):
         :param strings:
         :return:
         """
+        import sklearn.preprocessing as preprocessing
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.split, shuffle=self.hp.shuffle,
                                   random_state=self.hp.seed, **kwargs)
@@ -359,8 +368,8 @@ class BaseModel(ABC):
 
     def predict_from_s_obj(self, s_obj, viz=True, **kwargs):
         preprocessed = self.preprocess(s_obj)
-        prediction = self.infer(preprocessed[0])
-        postprocessed = self.postprocess(prediction, **kwargs)[0]
+        prediction = self.infer(preprocessed)
+        postprocessed = self.postprocess(prediction, **kwargs)
         s_obj.prediction = tb.Struct(preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz:
             return self.viz(postprocessed, **kwargs), postprocessed

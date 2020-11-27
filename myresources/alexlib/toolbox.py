@@ -31,7 +31,9 @@ class Base:
             data = Read.read(path)
         else:
             data = reader(path)
-        inst.__dict__ = data.dict if type(data) is Struct else data  # __setitem__ should be defined.
+        # return inst, data
+        new_data = data.dict if type(data) is Struct else data  # __setitem__ should be defined.
+        inst.__dict__.update(new_data)
         return inst
 
     def save_npy(self, path, **kwargs):
