@@ -28,11 +28,13 @@ class HyperParam(tb.Struct):
     * Ease of saving settings of experiments! and also replicating it later.
     """
     subpath = 'metadata/HyperParam.pickle'
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         """
         It is prefferable to pass the packages used, so that later this class can be saved and loaded.
         """
         # ==================== Enviroment ========================
+        super().__init__(**kwargs)
         self.exp_name = 'default'
         self.root = 'tmp'
         self.pkg_name = None
@@ -68,10 +70,10 @@ class HyperParam(tb.Struct):
         super(HyperParam, self).save_pickle(path, **kwargs)
 
     @classmethod
-    def from_saved(cls, path):
-        path = tb.P(path) / cls.subpath
-        path = path if path.exists() else path.with_suffix("")
-        return super(HyperParam, cls).from_saved(path, reader=tb.Read.pickle)
+    def from_saved(cls, path, *args, **kwargs):
+        path2 = tb.P(path) / cls.subpath
+        path3 = path2 if path2.exists() else path2.with_suffix("")
+        return super(HyperParam, cls).from_saved(path3, reader=tb.Read.pickle)
 
     def __repr__(self):
         if self._code:
@@ -85,6 +87,7 @@ class HyperParam(tb.Struct):
 
     @property
     def pkg(self):
+        handle = None
         if self.pkg_name == "tensorflow":
             handle = __import__("tensorflow")
         elif self.pkg_name == "torch":
@@ -156,7 +159,7 @@ class HyperParam(tb.Struct):
         except AssertionError as e:
             print(e)
             print(f"Trying again with auto-device {Device.auto}")
-            config_device(handle, device=Device.auto)
+            HyperParam.config_device(handle, device=Device.auto)
 
 
 class DataReader(tb.Base):
@@ -372,7 +375,7 @@ class BaseModel(ABC):
         postprocessed = self.postprocess(prediction, **kwargs)
         s_obj.prediction = tb.Struct(preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz:
-            return self.viz(postprocessed, **kwargs), postprocessed
+            return self.viz(postprocessed, **kwargs)
         return postprocessed
 
     def viz(self, pred, gt=None, names=None, **kwargs):
@@ -456,6 +459,7 @@ class BaseModel(ABC):
         :return:
 
         """
+        _ = kwargs
         self.hp.save_pickle(itself=itself)
         self.data.save_pickle(itself=itself)
 
