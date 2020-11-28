@@ -31,14 +31,12 @@ class HyperParam(tb.Struct):
 
     def __init__(self, **kwargs):
         """
-        It is prefferable to pass the packages used, so that later this class can be saved and loaded.
         """
         # ==================== Enviroment ========================
-        super().__init__(**kwargs)
         self.exp_name = 'default'
         self.root = 'tmp'
         self.pkg_name = None
-        # self.device = dl.config_device(self.pkg, dl.Device.gpu0)
+        self.device_name = Device.gpu0
         # ===================== DATA ============================
         self.seed = 234
         # ===================== Model =============================
@@ -47,8 +45,8 @@ class HyperParam(tb.Struct):
         self.lr = 0.0005
         self.batch_size = 32
         self.epochs = 30
-
         self._code = None
+        super().__init__(**kwargs)
 
     def save_code(self):
         import inspect
@@ -165,7 +163,8 @@ class HyperParam(tb.Struct):
 class DataReader(tb.Base):
     subpath = "metadata/DataReader.pickle"
 
-    def __init__(self, hp=None, data_specs=None, split=None):
+    def __init__(self, hp=None, data_specs=None, split=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.hp = hp
         self.data_specs = data_specs if data_specs else tb.Struct()  # Summary of data to be memorized by model
         self.split = split
@@ -259,59 +258,43 @@ class BaseModel(ABC):
         * Must be run prior to fit method.
         * Can be run only after defining model attribute.
         """
-        if self.compiler is None:  # first compilation
-            if self.hp.pkg.__name__ == 'tensorflow':
-                import tensorflow as pkg
-                if loss is None:
-                    loss = pkg.keras.losses.MeanSquaredError()
-                if optimizer is None:
-                    optimizer = pkg.keras.optimizers.Adam(self.hp.lr)
-                if metrics is None:
-                    metrics = [pkg.keras.metrics.MeanSquaredError()]
-            elif self.hp.pkg.__name__ == 'torch':
-                import torch as pkg
-                if loss is None:
-                    loss = pkg.nn.MSELoss()
-                if optimizer is None:
-                    optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.lr)
-                if metrics is None:
-                    import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
-                    metrics = [tmp.MeanSquareError()]
-            # Create a new compiler object
-            self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics)
-        else:  # there is a compiler, just update as appropriate.
-            if loss:
-                self.compiler.loss = loss
-            if optimizer:
-                self.compiler.optimizer = optimizer
-            if metrics:
-                self.compiler.metrics = metrics
+        pkg = self.hp.pkg
+        if self.hp.pkg_name == 'tensorflow':
+            if loss is None:
+                loss = pkg.keras.losses.MeanSquaredError()
+            if optimizer is None:
+                optimizer = pkg.keras.optimizers.Adam(self.hp.lr)
+            if metrics is None:
+                metrics = [pkg.keras.metrics.MeanSquaredError()]
+        elif self.hp.pkg_name == 'torch':
+            if loss is None:
+                loss = pkg.nn.MSELoss()
+            if optimizer is None:
+                optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.lr)
+            if metrics is None:
+                import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
+                metrics = [tmp.MeanSquareError()]
+        # Create a new compiler object
+        self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics)
 
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model:
             self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz=False, update_default=False, fit_kwargs=None, epochs=None, **kwargs):
-        if epochs is not None:
-            self.hp.epochs = epochs
-        self.kwargs = kwargs
-        default_settings = dict(x=self.data.split.x_train, y=self.data.split.y_train,
+    def fit(self, viz=False, **kwargs):
+        default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train,
                                 validation_data=(self.data.split.x_test, self.data.split.y_test),
                                 batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1,
                                 shuffle=self.hp.shuffle, callbacks=[])
-        if fit_kwargs is None:
-            fit_kwargs = default_settings
-        if update_default:
-            default_settings.update(fit_kwargs)
-            fit_kwargs = default_settings
-        hist = self.model.fit(**fit_kwargs)
-        self.history.append(hist.history.copy())  # it is paramount to copy, cause source can change.
+        default_settings.update(kwargs)
+        hist = self.model.fit(**fit_kwarg)
+        self.history.append(tb.copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             self.plot_loss()
-        return None
+        return self
 
     def plot_loss(self):
-        total_hist = tb.Struct(tb.Struct.concat_dicts_(*self.history))
+        total_hist = tb.Struct.concat_dicts_(*self.history)
         total_hist.plot()
 
     def switch_to_sgd(self, epochs=10):
@@ -554,7 +537,7 @@ class BaseModel(ABC):
 
 
 class Ensemble(tb.Base):
-    def __init__(self, hp_class=None, data_class=None, model_class=None, n=15, _from_saved=False):
+    def __init__(self, hp_class=None, data_class=None, model_class=None, n=15, _from_saved=False, *args, **kwargs):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
@@ -564,6 +547,7 @@ class Ensemble(tb.Base):
         :param n: size of ensemble
         """
 
+        super().__init__(*args, **kwargs)
         if not _from_saved:
             self.size = n
             self.hp_class = hp_class

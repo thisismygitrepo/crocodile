@@ -21,6 +21,9 @@ import matplotlib.pyplot as plt
 
 
 class Base:
+    def __init__(self, *args, **kwargs):
+        pass
+
     @classmethod
     def from_saved(cls, path, *args, reader=None, **kwargs):
         """Whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
@@ -80,7 +83,7 @@ class Base:
     def deepcopy(self, *args, **kwargs):
         """Literally creates a new copy of values of old object, rather than referencing them"""
         # similar to copy.deepcopy()
-        obj = self.__init__(*args, **kwargs)
+        obj = self.__class__(*args, **kwargs)
         obj.__dict__.update(copy.deepcopy(self.__dict__))
         return obj
 
@@ -1237,7 +1240,7 @@ class Struct(Base):
         return Struct(self.concat_dicts_(*((self.dict,) + others), **kwargs))
 
     @staticmethod
-    def concat_dicts_(*dicts, method=None, lenient=True, collect_items=False, copyit=True):
+    def concat_dicts_(*dicts, method=None, lenient=True, collect_items=False, copy_=True):
         if method is None:
             method = list.__add__
         if not lenient:
@@ -1245,8 +1248,8 @@ class Struct(Base):
             for i in dicts[1:]:
                 assert i.keys() == keys
         # else if lenient, take the union
-        if copyit:
-            total_dict = dicts[0].copy()  # take first dict in the tuple
+        if copy_:
+            total_dict = copy.deepcopy(dicts[0])  # take first dict in the tuple
         else:
             total_dict = dicts[0]  # take first dict in the tuple
         if collect_items:
@@ -1266,7 +1269,7 @@ class Struct(Base):
                             total_dict[key] = [adict[key]]
                         else:
                             total_dict[key] = adict[key]
-        return total_dict
+        return Struct(total_dict)
 
     # @property
     def keys(self):
@@ -1378,6 +1381,27 @@ def run_globally(name, asis=False):
     result = arg_string + code_string
     clipboard.copy(result)
     return result  # ready to be run with exec()
+
+
+def edit_source(module, *edits):
+    sourcelines = P(module.__file__).read_text().split("\n")
+    for edit_idx, edit in enumerate(edits):
+        line_idx = 0
+        for line_idx, line in enumerate(sourcelines):
+            if f"here{edit_idx}" in line:
+                new_line = line.replace(edit[0], edit[1])
+                print(f"Old Line: {line}\nNew Line: {new_line}")
+                if new_line == line:
+                    raise KeyError(f"Text Not found.")
+                sourcelines[line_idx] = new_line
+                break
+        else:
+            raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
+    newsource = "\n".join(sourcelines)
+    P(module.__file__).write_text(newsource)
+    import importlib
+    importlib.reload(module)
+    return module
 
 
 class Manipulator:

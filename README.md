@@ -1,29 +1,29 @@
 
 # Welcome to alexlib
 
-This package extends many native Python classes to equip you with an uneasy-to-tame power. Beside many minor extensions, the major classes extended are:
+Fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
+
+This package extends many native Python classes to equip you with an uneasy-to-tame power. The major classes extended are:
  
  * `list` is  extended to `List`
     * Forget that `for` loops exist in your life, because with this class, `for` loops are implicitly applied to all items.
   * `dict` is  extended to `Struct`.
     * Combines the power of dot notation like classes and key access like dictionaries.
     
-   * `pathlib` is  extended to `P`
+   * `pathlib.Path` is  extended to `P`
         * `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation.
         
-    * Some other classes that make honorable mention here are `Read` and `Save` classes. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those.
+   * Some other classes that make honorable mention here are `Read` and `Save` classes. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and reloading in one line.
 
    
 Furthermore, those classes are inextricably connected. Example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` with one method, and so on.
 
-You can read the details in the code to grapple the motivation and the philosophy behind its implementation mechanics. Fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
-
 
 # Install
-just do this in your command line
+In the commandline:
 `pip install alexlib`.
 
-Worry **not** about your venv, this package installs itself peacefully, never interfere with your other packages, not requires anything with force. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it. The package is not fussy about versions either.
+Being a thin extension on top of almost pure Python, you need to worry **not** about your venv, the package is not aggressive in requirements, it installs itself peacefully, never interfere with your other packages. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it. The package is not fussy about versions either. It can though at runtime, install packages on the fly, e.g. `dill` and `tqdm` which are very lightweight libraries.
 
 # Getting Started
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
@@ -49,10 +49,9 @@ How does this make perfect sense?
 * Next, `apply` is a method of `List`. Sure enough, it lives up to its apt name and applies the passed function `len` to all items in the list and returns another `List` object that contains the results.
 * `.to_numpy()` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
 
-# Other use cases
-Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them. `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object.
+# Philosophy
+Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them. `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. This is the power of implicit `for` loops. Share on Github one-liner snippets to add it to use-cases of this package.
 
-This is the power of implicit `for` loops. Share with us your one-liner snippets to add it to use-cases of this package.
 
 # Full docs:
 Click [Here](<https://alexlib.readthedocs.io/en/latest/>)
