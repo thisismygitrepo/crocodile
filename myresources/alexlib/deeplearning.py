@@ -1,7 +1,6 @@
 
 
 import alexlib.toolbox as tb
-# import resources.s_params as stb
 import numpy as np
 from abc import ABC, abstractmethod
 import enum
@@ -30,6 +29,7 @@ class HyperParam(tb.Struct):
     subpath = 'metadata/HyperParam.pickle'
 
     def __init__(self, **kwargs):
+        super(HyperParam, self).__init__(**kwargs)
         """
         """
         # ==================== Enviroment ========================
@@ -46,7 +46,6 @@ class HyperParam(tb.Struct):
         self.batch_size = 32
         self.epochs = 30
         self._code = None
-        super().__init__(**kwargs)
 
     def save_code(self):
         import inspect
@@ -162,7 +161,13 @@ class HyperParam(tb.Struct):
 
 class DataReader(tb.Base):
     subpath = "metadata/DataReader.pickle"
-
+    """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
+    and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
+    at save time, this class only remember the attributes inside `.data_specs` `Struct`. Thus, whenever encountering
+    such type of data, make sure to keep them inside that `Struct`. Lastly, for convenience purpose, the class has
+    implemented a fallback `getattr` method that allows accessing those attributes from the class itself, without the 
+    need to reference `.dataspects`.
+    """
     def __init__(self, hp=None, data_specs=None, split=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hp = hp
@@ -173,7 +178,7 @@ class DataReader(tb.Base):
         try:
             return self.data_specs[item]
         except KeyError:
-            raise KeyError(f"{item} not found")
+            raise KeyError(f"The item `{item}` not found in {self.__class__.__name__} attributes.")
 
     def __str__(self):
         return f"DataReader Object with these keys: \n{self.__dict__.keys()}"
@@ -199,12 +204,19 @@ class DataReader(tb.Base):
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
 
-    def save_pickle(self, path, *names):
+    def get_data_tuple(self, aslice, dataset="test"):
+        # returns a tuple containing a slice of data (x_test, x_test, names_test, index_test etc)
+        keys = self.split.keys().filter(f"'_{train}' in x")
+        return tuple([self.split[key][aslice] for key in keys])
+
+    def save_pickle(self, path=None, *names, **kwargs):
         """This differs from the standard save from `Base` class in that it only saved .data_specs attribute
         and loads up with them only. This is reasonable as saving an entire dataset is not feasible."""
         if names:
             self.relay_to_specs(*names)
-        self.data_specs.save_pickle(path=self.hp.save_dir.joinpath(self.subpath).create(parent_only=True))
+        if path is None:
+            path = self.hp.save_dir.joinpath(self.subpath).create(parent_only=True)
+        self.data_specs.save_pickle(path=path, **kwargs)
 
     def relay_to_specs(self, *names):
         self.data_specs.update({name: self.__dict__[name] for name in names})
@@ -219,7 +231,12 @@ class DataReader(tb.Base):
         :return: An object with attributes similar to keys and values as in dictionary loaded.
         """
         path = (tb.P(path) / cls.subpath).parent.find("DataReader*")
-        return super(DataReader, cls).from_saved(path, *args, **kwargs)
+        if path is None:
+            raise FileNotFoundError(f"Could not find the required file {tb.P(path) / cls.subpath}")
+        data_specs = tb.Read.read(path)
+        instance = cls(*args, **kwargs)
+        instance.data_specs = data_specs
+        return instance
 
     def preprocess(self, *args, **kwargs):
         _ = args, kwargs, self
@@ -228,6 +245,12 @@ class DataReader(tb.Base):
     def postprocess(self, *args, **kwargs):
         _ = args, kwargs, self
         return args
+
+    @staticmethod
+    def configure_data_path(path):
+        return f"""import alexlib.toolbox as tb
+        path = tb.P(r{path})
+        tb.P.home().joinpath(path[-1]).symlink_to(path, target_is_directory=True)"""
 
 
 class BaseModel(ABC):
@@ -287,8 +310,8 @@ class BaseModel(ABC):
                                 batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1,
                                 shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
-        hist = self.model.fit(**fit_kwarg)
-        self.history.append(tb.copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
+        hist = self.model.fit(**default_settings)
+        self.history.append(tb.Struct(tb.copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
         if viz:
             self.plot_loss()
         return self
@@ -300,7 +323,7 @@ class BaseModel(ABC):
     def switch_to_sgd(self, epochs=10):
         # if self.hp.pkg.__name__ == 'tensorflow':
         #     self.model.reset_metrics()
-        print('Switching the optimizer to SGD. Loss is fixed'.center(100, '*'))
+        print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         if self.hp.pkg.__name__ == 'tensorflow':
             new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.lr * 0.5)
         else:
@@ -311,7 +334,7 @@ class BaseModel(ABC):
     def switch_to_l1(self, epochs=10):
         if self.hp.pkg.__name__ == 'tensorflow':
             self.model.reset_metrics()
-        print('Switching the loss to l1. Optimizer is fixed'.center(100, '*'))
+        print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
         if self.hp.pkg.__name__ == 'tensorflow':
             new_loss = self.hp.pkg.keras.losses.MeanAbsoluteError()
         else:
@@ -371,15 +394,17 @@ class BaseModel(ABC):
             labels = ['Reconstruction', 'Ground Truth']
         self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
 
-    def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, return_loss=False, **kwargs):
+    def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
+        # ================= Data Procurement ===================================
         x_test = x_test if x_test is not None else self.data.split.x_test
         y_test = y_test if y_test is not None else self.data.split.y_test
-        names_test = names_test if names_test is not None else self.data.split.names_test
+        this = self.data.split.names_test if hasattr(self.data.split, "names_test") else range(len(x_test))
+        names_test = names_test if names_test is not None else this
         if idx is None:
             def get_rand(x, y):
-                idx_ = np.random.choice(len(x)-1)
-                return x[idx_:idx_ + 5], y[idx_:idx_ + 5], names_test[idx_: idx_ + 5], np.arange(idx_, idx_ + 5)
-
+                idx_ = np.random.choice(len(x)-sample)
+                return x[idx_:idx_ + sample], y[idx_:idx_ + sample],\
+                       names_test[idx_: idx_ + sample], np.arange(idx_, idx_ + sample)
             assert self.data is not None, 'Data attribute is not defined'
             x_test, y_test, names_test, idx = get_rand(x_test, y_test)  # already processed S's
         else:
@@ -389,31 +414,40 @@ class BaseModel(ABC):
                 # idx = [idx]
             else:
                 x_test, y_test, names_test = x_test[idx], y_test[idx], names_test[idx]
+        # ==========================================================================
 
         prediction = self.infer(x_test)
-        if self.compiler is not None:
-            losses = []
-            loss_dict = {}
-            print("========== Evaluation losses ==========")
-            for a_metric in self.compiler.metrics:
-                loss = a_metric(prediction, y_test)
-                losses.append(loss)
-                try:  # EAFP principle.
-                    name = a_metric.name
-                    print(f"{name} = {np.mean(loss)}")  # works for subclasses Metrics
-                except AttributeError:
-                    name = a_metric.__name__
-                    print(f"{name} = {np.mean(loss)}")  # works for functions.
-                loss_dict[name] = loss
-            print(f"---------------------------------")
-            if return_loss:
-                return loss_dict
-
+        loss_dict = self.get_metrics_evaluations(prediction, y_test)
         pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
+        results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test,
+                            names=names_test, losses=loss_dict,)
         if viz:
-            self.viz(pred, gt, names=names_test, **kwargs)
-        return pred, gt, names_test
+            loss_name = results.losses.index(0)[0]
+            names = f" = {loss_name}\n".join(results.losses.index(0)[1].apply("x.numpy()").apply(str)).split("\n")
+            names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(names, names_test)]
+            self.viz(pred, gt, names=names, **kwargs)
+        return results
+
+    def get_metrics_evaluations(self, prediction, y_test):
+        if self.compiler is None or self.compiler.metrics is None:
+            return None
+        loss_dict = tb.Struct()
+        for a_metric in self.compiler.metrics:
+            stateful = False
+            try:  # EAFP principle.
+                name = a_metric.name  # works for subclasses Metrics
+                stateful = True
+            except AttributeError:
+                name = a_metric.__name__  # works for functions.
+            loss_dict[name] = tb.List()
+
+            for a_prediction, a_y_test in zip(prediction, y_test):
+                if stateful:
+                    a_metric.reset_states()
+                loss = a_metric(a_prediction[None], a_y_test[None])
+                loss_dict[name].append(loss)
+        return loss_dict
 
     def save_model(self, directory):
         self.model.save(directory, include_optimizer=False)  # send only folder name. Save name is saved_model.pb
@@ -454,11 +488,11 @@ class BaseModel(ABC):
 
         # Saving wrapper_class
         import inspect
-        codelines = inspect.getsourcelines(self.__class__)[0]
+        code_string = inspect.getsource(self.__class__)
         meta_dir = tb.P(self.hp.save_dir).joinpath('metadata').create()
-        meta_dir.joinpath('model_arch.txt').write_text(codelines)
+        meta_dir.joinpath('model_arch.txt').write_text(code_string)
 
-        np.save(meta_dir.joinpath('history.npy'), self.history)
+        self.history.save_npy(path=meta_dir.joinpath('history.npy'))
         print(f'Model calss saved successfully!, check out: \n {self.hp.save_dir}')
 
     @classmethod
@@ -467,16 +501,18 @@ class BaseModel(ABC):
         if hp_class:
             hp_obj = hp_class.from_saved(path)
         else:
+            print(f"HParam class not passed to constructor, assuming it is a self-sufficient save.")
             hp_obj = tb.Read.pickle(path / HyperParam.subpath)
         if data_class:
             data_obj = data_class.from_saved(path, hp_obj)
         else:
+            print(f"Data class not passed to constructor, assuming it is a self-sufficient save.")
             data_path = path / DataReader.subpath
             data_obj = tb.Read.pickle(data_path)  # if data_path.exists() else data_path.with_suffix("")
         model_obj = cls(hp_obj, data_obj)
         model_obj.load_weights(path.myglob('*_save_*')[0])
         history = path / "metadata/history.npy"
-        model_obj.history = tb.Read.npy(history) if history.exists() else []
+        model_obj.history = tb.List.from_saved(history) if history.exists() else tb.List()
         print(f"Class {model_obj.__class__} Loaded Successfully.")
         return model_obj
 
@@ -537,115 +573,58 @@ class BaseModel(ABC):
 
 
 class Ensemble(tb.Base):
-    def __init__(self, hp_class=None, data_class=None, model_class=None, n=15, _from_saved=False, *args, **kwargs):
+    def __init__(self, hp_class=None, data_class=None, model_class=None, size=15, *args, **kwargs):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
           __init__, load, load_weights, save, save_weights, predict, fit
           Model constructor should takes everything it needs from self.hp and self.data only.
           Otherwise, you must pass a list of already constructed saved_models.
-        :param n: size of ensemble
+        :param size: size of ensemble
         """
-
         super().__init__(*args, **kwargs)
-        if not _from_saved:
-            self.size = n
-            self.hp_class = hp_class
-            self.data_class = data_class
-            self.model_class = model_class
-
+        self.__dict__.update(kwargs)
+        self.size = size
+        self.hp_class = hp_class
+        self.data_class = data_class
+        self.model_class = model_class
+        if hp_class and data_class and model_class:
             self.models = tb.List()
-            self.data = None
+            # only generate the dataset once and attach it to the ensemble to be reused by models.
+            self.data = self.data_class(hp)
             print("Creating Models".center(100, "="))
             for i in tqdm(range(n)):
                 hp = self.hp_class()
                 hp.exp_name = str(hp.exp_name) + f'__model__{i}'
-                if i == 0:  # only generate the dataset once and attach it to the ensemble to be reused by models.
-                    self.data = self.data_class(hp)
-                self.models.append(model_class(hp, self.data))
-        else:
-            self.models = model_class
-
-        self.m = self.models[0]  # to access the functionalities of a single model.
-        self.fit_results = None
-
-    def get_model(self, n):
-        self.data.hp = self.models[n].hp
-        return self.models[n]
+                datacopy = tb.copy.copy(self.data)  # shallow copy
+                datacopy.hp = hp
+                self.models.append(model_class(hp, datacopy))
+        self.performance = None
 
     @classmethod
-    def from_saved_models(cls, parent_dir, wrapper_class):
-        parent_dir = tb.P(parent_dir)
-        models = tb.List()
-        for afolder in tqdm(parent_dir.myglob('*__model__*')):
-            amodel = wrapper_class.from_class_model(afolder)
-            models.append(amodel)
-        obj = cls(model_class=models, n=len(models), _from_saved=True)
-        obj.read_fit_results()
+    def from_saved_models(cls, parent_dir, model_class):
+        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).myglob('*__model__*')))
+        obj.models = tb.P(parent_dir).myglob('*__model__*').apply(model_class.from_class_model)
         return obj
 
     @classmethod
-    def from_saved_weights(cls, parent_dir, wrapper_class):
-        parent_dir = tb.P(parent_dir)
-        models = tb.List()
-        for afolder in tqdm(parent_dir.myglob('*__model__*')):
-            amodel = wrapper_class.from_class_weights(afolder)
-            models.append(amodel)
-        obj = cls(model_class=models, n=len(models), _from_saved=True)
-        obj.read_fit_results()
+    def from_saved_weights(cls, parent_dir, model_class):
+        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).myglob('*__model__*')))
+        obj.models = tb.P(parent_dir).myglob('*__model__*').apply(model_class.from_class_weights)
         return obj
-
-    def read_fit_results(self):
-        try:
-            self.fit_results = tb.pd.read_csv(self.models[0].hp.save_dir.parent / "fit_results.csv", index_col=0)
-        except FileNotFoundError:
-            pass
 
     def fit(self, shuffle_train_test=True, save=True, **kwargs):
+        self.performance = tb.L()
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
             if shuffle_train_test:
                 self.data.split_my_data_now(seed=np.random.randint(0, 1000))  # shuffle data (shared among models)
-            amodel = self.get_model(i)
-            amodel.fit(**kwargs)
-
-            loss_dict = amodel.evaluate(idx=slice(0, -1), return_loss=True, viz=False)
-            for key, val in loss_dict.items():
-                loss_dict[key] = np.mean(val)
-            if i == 0:
-                self.fit_results = tb.pd.DataFrame.from_dict(loss_dict, orient='index').transpose()
-            else:
-                self.fit_results = self.fit_results.append(loss_dict, ignore_index=True)
+            self.models[i].fit(**kwargs)
+            self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
             if save:
                 amodel.save_class()
-        print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n Summary of fit results:")
-        print(self.fit_results)
-        self.fit_results.to_csv(self.models[0].hp.save_dir.parent / "fit_results.csv")
-
-    def predict_from_position(self, pos, central_tendency='mean', bins=None, verbose=True):
-        pos.predictions = tb.List()  # empty the list of predictions made on that position
-        self.models.predict_from_position(pos, viz=False)  # each model will append its result to the container
-
-        averaged = None
-        data = pos.predictions.prediction.np.squeeze()
-        if central_tendency == 'mean':
-            averaged = np.mean(data, axis=0)[None]
-        elif central_tendency == 'median':
-            averaged = np.median(data, axis=0)[None]
-        elif central_tendency == 'mode':
-            if bins is None:
-                bins = np.arange(-4, 4, 0.4)
-            tmp = np.digitize(data, bins)
-            import scipy.stats as st
-            mode = st.mode(tmp, axis=0)
-            averaged = bins[mode.mode.squeeze()][None]
-        std = tb.List(pos.predictions.prediction.np.std(axis=0).squeeze())
-        if verbose:
-            print("STD".center(100, "="))
-            std.print()
-        result = self.models[0].postprocess(averaged)[0]
-        result.std = std
-        return result
+                self.performance.save_pickle(self.hp_class.save_dir / "performance.pkl")
+        print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self):
         # t.cuda.empty_cache()

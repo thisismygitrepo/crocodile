@@ -339,7 +339,7 @@ class P(type(Path()), Path, Base):
 
     @property
     def browse(self):
-        return self.myglob("*").to_struct(keys="self.make_python_name()").empty_class()
+        return self.myglob("*").to_struct(keys="self.make_python_name()").clean_view
 
     @property
     def browse2(self):
@@ -791,7 +791,7 @@ class Save:
         if not str(path).endswith(".json"):
             path = str(path) + ".json"
         with open(str(path), "w") as file:
-            json.dump(obj, file, **kwargs)
+            json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
     # @staticmethod
     # def pickle(path, obj, **kwargs):
@@ -954,6 +954,9 @@ class List(list, Base):
         else:
             return List(result)
 
+    def __setitem__(self, key, value):
+        self.list[key] = value
+
     def to_struct(self, keys=None, values=None):
         """"""
         keys = self.evalstr(keys, expected="self") or [str(item) for item in self.list]
@@ -982,10 +985,10 @@ class List(list, Base):
                     return item
         return None
 
-    def index_entries(self, start, end=None, step=None):
+    def index_entries(self, a_slice: slice):
         """Used to access entries of items
         """
-        return List([item[start:end:step] for item in self.list])
+        return List([item[a_slice] for item in self.list])
 
     def find_index(self, string_):
         for idx, item in enumerate(self.list):
@@ -1154,20 +1157,33 @@ class Struct(Base):
         self.__dict__ = final_dict
 
     @classmethod
-    def defaultdict(cls, *args, **kwargs):
+    def defaultdict(cls, *args, default_=lambda: None, **kwargs):
+        """Returns default value if encoutered a new key."""
         obj = cls(*args, **kwargs)
         from collections import defaultdict
-        mydict = defaultdict(lambda: None)
+        mydict = defaultdict(default_)
         mydict.update(obj.__dict__)
         obj.__dict__ = mydict
         return obj
+
+    @classmethod
+    def make_namedtuple(cls, *names, default_=None, **kwargs):
+        """Has preset keys with it upon construction. Throws error for any other key."""
+        args_struct = cls.from_names(*names, default=default_)
+        _struct = cls(**kwargs).update(args_struct)
+        class NamedTuple(cls):
+            default_struct = _struct
+            def __init__(self, *args, **kwargs):
+                self.__dict__ = self.default_struct.__dict__
+                super(NamedTuple, self).__init__(*args, **kwargs)
+        return NamedTuple
 
     @classmethod
     def from_keys_values(cls, names, values):
         return cls(dict(zip(names, values)))
 
     @classmethod
-    def from_names(cls, *names, default=None):  # Mimick NamedTuple and defaultdict
+    def from_names(cls, *names, default_=None):  # Mimick NamedTuple and defaultdict
         if default is None:
             default = [None] * len(names)
         return cls.from_keys_values(names, values=default)
@@ -1175,7 +1191,8 @@ class Struct(Base):
     def map(self, keys):
         return List([self[key] for key in keys])
 
-    def empty_class(self):
+    @property
+    def clean_view(self):
 
         class Temp:
             pass
@@ -1186,9 +1203,15 @@ class Struct(Base):
 
     def __repr__(self):
         repr_string = ""
+        for key in self.keys().list:
+            repr_string += key + ", "
+        return "Structure, with following keys:\n" + repr_string
+
+    def print(self):
+        repr_string = ""
         for item, value in self.__dict__.items():
             repr_string += f"{item} = {value}\n"
-        return "Structure\n" + repr_string
+        print("Structure\n" + repr_string)
 
     def __str__(self):
         mystr = str(self.__dict__)
@@ -1205,9 +1228,10 @@ class Struct(Base):
         try:
             self.__dict__[item]
         except KeyError:
-            # raise KeyError
-            # super(Structure, self).__getattr__(item)
-            super(Struct, self).__getattribute__(item)
+            try:
+                super(Struct, self).__getattribute__(item)
+            except AttributeError:
+                raise AttributeError(f"Could not find the attribute `{item}` in object `{self.__class__}`")
 
     def __getstate__(self):
         return self.__dict__
@@ -1282,6 +1306,9 @@ class Struct(Base):
     def items(self):
         return List(self.dict.items())
 
+    def to_tuples(self):
+        return List([(key, value) for key, value in self.items()])
+
     @property
     def df(self):
         return None
@@ -1349,59 +1376,76 @@ class Cycle:
         pass  # see behviour of matplotlib cyclers.
 
 
-def run_globally(name, asis=False):
-    """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
-    This is useful to debug functions and class methods alike.
-    """
-    import inspect
-    import textwrap
-    clipboard = assert_package_installed("clipboard")
+class Debugger:
+    @staticmethod
+    def run_globally(func):
+        exec(Debugger.convert_to_global(func))
+        globals().update(vars())
 
-    codelines = inspect.getsource(name)
-    if not asis:
-        # remove def func_name() line from the list
-        idx = codelines.find("):\n")
-        codelines = codelines[idx + 4:]
+    @staticmethod
+    def convert_to_global(name, asis=False):
+        """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
+        This is useful to debug functions and class methods alike.
+        """
+        import inspect
+        import textwrap
+        clipboard = assert_package_installed("clipboard")
 
-        # remove any indentation (4 for funcs and 8 for classes methods, etc)
-        codelines = textwrap.dedent(codelines)
+        codelines = inspect.getsource(name)
+        if not asis:
+            # remove def func_name() line from the list
+            idx = codelines.find("):\n")
+            header = codelines[:idx]
+            codelines = codelines[idx + 3:]
 
-        # remove return statements
-        codelines = codelines.split("\n")
-        codelines = [code + "\n" for code in codelines if not code.startswith("return ")]
+            # remove any indentation (4 for funcs and 8 for classes methods, etc)
+            codelines = textwrap.dedent(codelines)
 
-    code_string = ''.join(codelines)  # convert list to string.
+            # remove return statements
+            codelines = codelines.split("\n")
+            codelines = [code + "\n" for code in codelines if not code.startswith("return ")]
 
-    temp = inspect.getfullargspec(name)
-    arg_string = """"""
-    # if isinstance(type(name), types.MethodType) else tmp.args
-    for key, val in zip(temp.args[1:], temp.defaults):
-        arg_string += f"{key} = {val}\n"
+        code_string = ''.join(codelines)  # convert list to string.
 
-    result = arg_string + code_string
-    clipboard.copy(result)
-    return result  # ready to be run with exec()
+        temp = inspect.getfullargspec(name)
+        arg_string = """"""
+        # if isinstance(type(name), types.MethodType) else tmp.args
+        if temp.defaults:  # not None
+            for key, val in zip(temp.args[1:], temp.defaults):
+                arg_string += f"{key} = {val}\n"
+        if "*args" in header:
+            arg_string += "args = (,)\n"
+        if "**kwargs" in header:
+            arg_string += "kwargs = {}\n"
+        result = arg_string + code_string
+        clipboard.copy(result)
+        print(result, '\n', "=" * 100)
+        return result  # ready to be run with exec()
 
+    @staticmethod
+    def edit_source(module, *edits):
+        sourcelines = P(module.__file__).read_text().split("\n")
+        for edit_idx, edit in enumerate(edits):
+            line_idx = 0
+            for line_idx, line in enumerate(sourcelines):
+                if f"here{edit_idx}" in line:
+                    new_line = line.replace(edit[0], edit[1])
+                    print(f"Old Line: {line}\nNew Line: {new_line}")
+                    if new_line == line:
+                        raise KeyError(f"Text Not found.")
+                    sourcelines[line_idx] = new_line
+                    break
+            else:
+                raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
+        newsource = "\n".join(sourcelines)
+        P(module.__file__).write_text(newsource)
+        import importlib
+        importlib.reload(module)
+        return module
 
-def edit_source(module, *edits):
-    sourcelines = P(module.__file__).read_text().split("\n")
-    for edit_idx, edit in enumerate(edits):
-        line_idx = 0
-        for line_idx, line in enumerate(sourcelines):
-            if f"here{edit_idx}" in line:
-                new_line = line.replace(edit[0], edit[1])
-                print(f"Old Line: {line}\nNew Line: {new_line}")
-                if new_line == line:
-                    raise KeyError(f"Text Not found.")
-                sourcelines[line_idx] = new_line
-                break
-        else:
-            raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
-    newsource = "\n".join(sourcelines)
-    P(module.__file__).write_text(newsource)
-    import importlib
-    importlib.reload(module)
-    return module
+    @staticmethod
+    def monkey_patch(class_inst, func):  # lambda *args, **kwargs: func(class_inst, *args, **kwargs)
+        setattr(class_inst.__class__, func.__name__, func)
 
 
 class Manipulator:
@@ -2004,6 +2048,9 @@ class FigureManager:
             for idx, aq in enumerate(temp):
                 plt.plot(aq + idx * 2)
 
+    def close(self):
+        plt.close(self.fig)
+
 
 class SaveType:
     """
@@ -2444,7 +2491,7 @@ class VisibilityViewerAuto(VisibilityViewer):
         internally, hence the suffix `Auto`.
 
         :param data: shoud be of the form [[ip1 list], [ip2 list], ...]
-                     i.e. NumInputs x LengthInputs x Input
+                     i.e. NumArgsPerPlot x NumInputsForAnimation x Input (possible points x signals)
         :param artist: an instance of a class that subclasses `Artist`
         :param memorize: if set to True, then axes are hidden and shown again, otherwise, plots constructed freshly
                          every time they're shown (axes are cleaned instead of hidden)
@@ -2461,10 +2508,10 @@ class VisibilityViewerAuto(VisibilityViewer):
         self.lables = x_labels
 
         if artist is None:
-            artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends[0], create_new_axes=True,
+            artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends, create_new_axes=True,
                             **kwargs)
         else:
-            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends[0])
+            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
             if memorize:
                 assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new " \
                                                        "axes from the artist with every plot"

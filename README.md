@@ -7,11 +7,23 @@ This package extends many native Python classes to equip you with an uneasy-to-t
  
  * `list` is  extended to `List`
     * Forget that `for` loops exist in your life, because with this class, `for` loops are implicitly applied to all items.
+      Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them.  `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. This is the power of implicit `for` loops.
+
   * `dict` is  extended to `Struct`.
     * Combines the power of dot notation like classes and key access like dictionaries.
     
    * `pathlib.Path` is  extended to `P`
-        * `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation.
+        * `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a shufti at this:
+        ```
+     path = tb.P("dataset/type1/meta/images/file3.ext")
+     >> path[0]  # ALLOWS INDEXING !
+        P("dataset")
+     >> path[-1]  # NIFTY
+        P("file3.ext")
+     >> path[2:-1]  # Even slicing!
+        P("meta/images/file3.ext")
+     ```
+     This and much much more, is only on top of the indesipensible `pathlib.Path` functionalities.
         
    * Some other classes that make honorable mention here are `Read` and `Save` classes. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and reloading in one line.
 
@@ -48,9 +60,6 @@ How does this make perfect sense?
 * Similar story applies to `split` which is a method of strings in Python.
 * Next, `apply` is a method of `List`. Sure enough, it lives up to its apt name and applies the passed function `len` to all items in the list and returns another `List` object that contains the results.
 * `.to_numpy()` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
-
-# Philosophy
-Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them. `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. This is the power of implicit `for` loops. Share on Github one-liner snippets to add it to use-cases of this package.
 
 
 # Full docs:

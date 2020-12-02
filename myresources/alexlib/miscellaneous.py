@@ -15,5 +15,6 @@ def polygon_area(points):
     for p in points:
         area += p[0] * q[1] - p[1] * q[0]
         q = p
+    # 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
     return abs(area / 2)
 
