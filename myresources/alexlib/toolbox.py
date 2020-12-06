@@ -108,81 +108,6 @@ class Base:
             return string_
 
 
-class Browse(object):
-    def __init__(self, path, directory=True):
-        # Create an attribute in __dict__ for each child
-        self.__path__ = path
-        if directory:
-            sub_paths = glob(os.path.join(path, '*'))
-            names = [os.path.basename(i) for i in sub_paths]
-            # this is better than listdir, gives consistent results with glob
-            for file, full in zip(names, sub_paths):
-                key = P(file).make_python_name()
-                setattr(self, 'FDR_' + key if os.path.isdir(full) else 'FLE_' + key,
-                        full if os.path.isdir(full) else Browse(full, False))
-
-    def __getattribute__(self, name):
-        if name == '__path__':
-            return super().__getattribute__(name)
-        d = super().__getattribute__('__dict__')
-        if name in d:
-            child = d[name]
-            if isinstance(child, str):
-                child = Browse(child)
-                setattr(self, name, child)
-            return child
-        return super().__getattribute__(name)
-
-    def __repr__(self):
-        return self.__path__
-
-    def __str__(self):
-        return self.__path__
-
-
-def browse(path, depth=2, width=20):
-    """
-    :param width: if there are more than this items in a directory, dont' parse the rest.
-    :param depth: to prevent crash, limit how deep recursive call can happen.
-    :param path: absolute path
-    :return: constructs a class dynamically by using object method.
-    """
-    if depth > 0:
-        my_dict = {'z_path': P(path)}  # prepare _path attribute which returns current path from the browser object
-        val_paths = glob(os.path.join(path, '*'))  # prepare other methods that refer to the contents.
-        temp = [os.path.basename(i) for i in val_paths]
-        # this is better than listdir, gives consistent results with glob (no hidden files)
-        key_contents = []  # keys cannot be folders/file names immediately, there are caveats.
-        for akey in temp:
-            # if not akey[0].isalpha():  # cannot start with digit or +-/?.,<>{}\|/[]()*&^%$#@!~`
-            #     akey = '_' + akey
-            for i in string.punctuation.replace('_', ' '):  # disallow punctuation and space except for _
-                akey = akey.replace(i, '_')
-            key_contents.append(akey)  # now we have valid attribute name
-        for i, (akey, avalue) in enumerate(zip(key_contents, val_paths)):
-            if i < width:
-                if os.path.isfile(avalue):
-                    my_dict['FLE_' + akey] = P(avalue)
-                else:
-                    my_dict['FDR_' + akey] = browse(avalue, depth=depth - 1)
-
-        def repr_func(self):
-            if self.z_path.is_file():
-                return 'Explorer object. File: \n' + str(self.z_path)
-            else:
-                return 'Explorer object. Folder: \n' + str(self.z_path)
-
-        def str_func(self):
-            return str(self.z_path)
-
-        my_dict["__repr__"] = repr_func
-        my_dict["__str__"] = str_func
-        my_class = type(os.path.basename(path), (), dict(zip(my_dict.keys(), my_dict.values())))
-        return my_class()
-    else:
-        return path
-
-
 def assert_package_installed(package):
     try:
         pkg = __import__(package)
@@ -339,11 +264,7 @@ class P(type(Path()), Path, Base):
 
     @property
     def browse(self):
-        return self.myglob("*").to_struct(keys="self.make_python_name()").clean_view
-
-    @property
-    def browse2(self):
-        return browse(self)
+        return self.myglob("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
 
     def relativity_transform(self, reference='deephead', abs_reference=None):
         """Takes in a path defined relative to reference, transform it to a path relative to execution
@@ -529,29 +450,6 @@ class P(type(Path()), Path, Base):
         if fn is not None:
             path = path / fn
         return path
-
-    # def __getattribute__(self, item):
-    #     function = super(P, self).__getattribute__(item)
-    #
-    #     def update_args_decorator(funk):
-    #         def decorator(*args, **kwargs):
-    #             _ = self
-    #             new_args = []
-    #             new_kwargs = {}
-    #             for arg in args:
-    #                 if type(arg) is tuple:
-    #                     new_args.append(eval(arg[0]))
-    #                 else:
-    #                     new_args.append(arg)
-    #             for key, val in kwargs.items():
-    #                 if type(val) is tuple:
-    #                     new_kwargs[key] = eval(val[0])
-    #                 else:
-    #                     new_kwargs[key] = eval(val)
-    #             print(args, kwargs)
-    #             return funk(new_args, new_kwargs)
-    #         return decorator
-    #     return update_args_decorator(function)
 
     def zip(self, op_path=None, arcname=None, **kwargs):
         """
@@ -747,22 +645,6 @@ class Read:
     def csv(path, *args, **kwargs):
         return pd.read_csv(path, *args, **kwargs)
 
-    @staticmethod
-    def nii(path):
-        import nibabel as nib
-        return nib.load(path)
-
-    # @staticmethod
-    # def dicom(directory):
-    #     import dicom2nifti
-    #     import dicom2nifti.settings as settings
-    #     settings.disable_validate_orthogonal()
-    #     settings.enable_resampling()
-    #     settings.set_resample_spline_interpolation_order(1)
-    #     settings.set_resample_padding(-1000)
-    #     dicom2nifti.convert_directory(directory, directory)
-    #     return Path(directory).glob('*.nii').__next__()
-
 
 class Save:
     @staticmethod
@@ -853,15 +735,6 @@ class List(list, Base):
     def __init__(self, obj_list=None):
         super().__init__()
         self.list = list(obj_list) if obj_list is not None else []
-        # for attr in filter(lambda x: not x.startswith("_"), dir(self.list[0])):
-        #     setattr(self, attr, self.list[0](attr))
-
-        # self.struct = None
-        # if len(self.list) > 0:
-        #     class Fake(self.list[0].__class__):
-        #         def __getattr__(self, item):
-        #             pass
-        #     self.example = Fake
 
     @classmethod
     def from_copies(cls, obj, count):
@@ -1109,13 +982,16 @@ class List(list, Base):
                 result.append(item)
         return result
 
-    def print(self, nl=1, sep=False, char='-', style=str):
+    def print(self, nl=1, sep=False, style=str):
         for idx, item in enumerate(self.list):
             print(f"{idx:2}- {style(item)}", end=' ')
             for _ in range(nl):
                 print('', end='\n')
             if sep:
-                print(char * 100)
+                print(sep * 100)
+
+    def to_dataframe(self, *args, **kwargs):
+        return self.df(*args, **kwargs)
 
     def df(self, names=None):
         DisplayData.set_display()
@@ -1169,13 +1045,15 @@ class Struct(Base):
     @classmethod
     def make_namedtuple(cls, *names, default_=None, **kwargs):
         """Has preset keys with it upon construction. Throws error for any other key."""
-        args_struct = cls.from_names(*names, default=default_)
+        args_struct = cls.from_names(*names, default_=default_)
         _struct = cls(**kwargs).update(args_struct)
+
         class NamedTuple(cls):
             default_struct = _struct
-            def __init__(self, *args, **kwargs):
+
+            def __init__(self, *args, **kw):
                 self.__dict__ = self.default_struct.__dict__
-                super(NamedTuple, self).__init__(*args, **kwargs)
+                super(NamedTuple, self).__init__(*args, **kw)
         return NamedTuple
 
     @classmethod
@@ -1184,9 +1062,9 @@ class Struct(Base):
 
     @classmethod
     def from_names(cls, *names, default_=None):  # Mimick NamedTuple and defaultdict
-        if default is None:
-            default = [None] * len(names)
-        return cls.from_keys_values(names, values=default)
+        if default_ is None:
+            default_ = [None] * len(names)
+        return cls.from_keys_values(names, values=default_)
 
     def map(self, keys):
         return List([self[key] for key in keys])
@@ -1228,15 +1106,16 @@ class Struct(Base):
         try:
             self.__dict__[item]
         except KeyError:
-            try:
-                super(Struct, self).__getattribute__(item)
-            except AttributeError:
-                raise AttributeError(f"Could not find the attribute `{item}` in object `{self.__class__}`")
+            # try:
+                # super(Struct, self).__getattribute__(item)
+                # object.__getattribute__(self, item)
+            # except AttributeError:
+            raise AttributeError(f"Could not find the attribute `{item}` in object `{self.__class__}`")
 
-    def __getstate__(self):
+    def __getstate__(self):  # serialize
         return self.__dict__
 
-    def __setstate__(self, state):
+    def __setstate__(self, state):  # deserialize
         self.__dict__ = state
 
     def __iter__(self):
@@ -1295,23 +1174,20 @@ class Struct(Base):
                             total_dict[key] = adict[key]
         return Struct(total_dict)
 
-    # @property
     def keys(self):
+        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(self.dict.keys())
 
-    # @property
     def values(self):
+        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(self.dict.values())
 
     def items(self):
+        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(self.dict.items())
 
-    def to_tuples(self):
-        return List([(key, value) for key, value in self.items()])
-
-    @property
-    def df(self):
-        return None
+    def to_dataframe(self):
+        return self.values().to_dataframe(names=self.keys())
 
     def index(self, idx):
         return self.keys()[idx], self.values()[idx]
@@ -1378,12 +1254,28 @@ class Cycle:
 
 class Debugger:
     @staticmethod
+    def get_locals(func):
+        exec(Debugger.convert_to_global(func))  # run the function here.
+        return Struct(vars())
+
+    @staticmethod
+    def update_globals(local_dict):
+        sys.modules['__main__'].__dict__.update(local_dict)
+
+    @staticmethod
+    def in_main(func):  # a decorator
+        def wrapper():  # a wrapper that remembers the function func because it was in the closure when construced.
+            local_dict = Debugger.get_locals(func)
+            Debugger.update_globals(local_dict)
+        return wrapper
+
+    @staticmethod
     def run_globally(func):
         exec(Debugger.convert_to_global(func))
         globals().update(vars())
 
     @staticmethod
-    def convert_to_global(name, asis=False):
+    def convert_to_global(name):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         """
@@ -1392,18 +1284,17 @@ class Debugger:
         clipboard = assert_package_installed("clipboard")
 
         codelines = inspect.getsource(name)
-        if not asis:
-            # remove def func_name() line from the list
-            idx = codelines.find("):\n")
-            header = codelines[:idx]
-            codelines = codelines[idx + 3:]
+        # remove def func_name() line from the list
+        idx = codelines.find("):\n")
+        header = codelines[:idx]
+        codelines = codelines[idx + 3:]
 
-            # remove any indentation (4 for funcs and 8 for classes methods, etc)
-            codelines = textwrap.dedent(codelines)
+        # remove any indentation (4 for funcs and 8 for classes methods, etc)
+        codelines = textwrap.dedent(codelines)
 
-            # remove return statements
-            codelines = codelines.split("\n")
-            codelines = [code + "\n" for code in codelines if not code.startswith("return ")]
+        # remove return statements
+        codelines = codelines.split("\n")
+        codelines = [code + "\n" for code in codelines if not code.startswith("return ")]
 
         code_string = ''.join(codelines)  # convert list to string.
 
@@ -1419,7 +1310,7 @@ class Debugger:
             arg_string += "kwargs = {}\n"
         result = arg_string + code_string
         clipboard.copy(result)
-        print(result, '\n', "=" * 100)
+        print("code to be run \n", result, "=" * 100)
         return result  # ready to be run with exec()
 
     @staticmethod

@@ -16,11 +16,11 @@ This package extends many native Python classes to equip you with an uneasy-to-t
         * `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a shufti at this:
         ```
      path = tb.P("dataset/type1/meta/images/file3.ext")
-     >> path[0]  # ALLOWS INDEXING !
+     >> path[0]  # allows indexing!
         P("dataset")
-     >> path[-1]  # NIFTY
+     >> path[-1]  # nifty!
         P("file3.ext")
-     >> path[2:-1]  # Even slicing!
+     >> path[2:-1]  # even slicing!
         P("meta/images/file3.ext")
      ```
      This and much much more, is only on top of the indesipensible `pathlib.Path` functionalities.
@@ -64,3 +64,6 @@ How does this make perfect sense?
 
 # Full docs:
 Click [Here](<https://alexlib.readthedocs.io/en/latest/>)
+
+# Author
+Alex Al-Saffar [email](mailto:programmer@usa.com)

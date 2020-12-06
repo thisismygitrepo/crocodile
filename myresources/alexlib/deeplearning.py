@@ -150,7 +150,6 @@ class HyperParam(tb.Struct):
                 elif device is Device.cpu:
                     return handle.device('cpu')
                 # How to run Torch model on 2 GPUs ?
-
             else:
                 raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
         except AssertionError as e:
@@ -230,12 +229,14 @@ class DataReader(tb.Base):
         :param path: full path to the saved .npy file containing a dictionary of attributes names and values.
         :return: An object with attributes similar to keys and values as in dictionary loaded.
         """
+        instance = cls(*args, **kwargs)
         path = (tb.P(path) / cls.subpath).parent.find("DataReader*")
         if path is None:
-            raise FileNotFoundError(f"Could not find the required file {tb.P(path) / cls.subpath}")
-        data_specs = tb.Read.read(path)
-        instance = cls(*args, **kwargs)
-        instance.data_specs = data_specs
+            # raise FileNotFoundError(f"Could not find the required file {path / cls.subpath}")
+            print("DataReader file was not found, ignoring data_specs.")
+        else:
+            data_specs = tb.Read.read(path)
+            instance.data_specs = data_specs
         return instance
 
     def preprocess(self, *args, **kwargs):
@@ -245,12 +246,6 @@ class DataReader(tb.Base):
     def postprocess(self, *args, **kwargs):
         _ = args, kwargs, self
         return args
-
-    @staticmethod
-    def configure_data_path(path):
-        return f"""import alexlib.toolbox as tb
-        path = tb.P(r{path})
-        tb.P.home().joinpath(path[-1]).symlink_to(path, target_is_directory=True)"""
 
 
 class BaseModel(ABC):
@@ -288,15 +283,15 @@ class BaseModel(ABC):
             if optimizer is None:
                 optimizer = pkg.keras.optimizers.Adam(self.hp.lr)
             if metrics is None:
-                metrics = [pkg.keras.metrics.MeanSquaredError()]
+                metrics = tb.List()  # [pkg.keras.metrics.MeanSquaredError()]
         elif self.hp.pkg_name == 'torch':
             if loss is None:
                 loss = pkg.nn.MSELoss()
             if optimizer is None:
                 optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.lr)
             if metrics is None:
-                import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
-                metrics = [tmp.MeanSquareError()]
+                # import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
+                metrics = tb.List()  # [tmp.MeanSquareError()]
         # Create a new compiler object
         self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics)
 
@@ -367,13 +362,8 @@ class BaseModel(ABC):
         return self.postprocess(inferred, **kwargs)
 
     def predict_from_position(self, position, viz=True, **kwargs):
-        preprocessed = self.preprocess(position)
-        prediction = self.infer(preprocessed)
-        postprocessed = self.postprocess(prediction, name=position.bname, **kwargs)[0]  # avoid batches
-        position.predictions.append(tb.Struct(preprocessed=preprocessed, prediction=prediction,
-                                              postprocessed=postprocessed))
-        if viz:
-            self.viz([postprocessed], **kwargs)
+        s_obj = self.process_position(position)
+        self.predict_from_s_obj(s_obj, viz=viz, **kwargs)
 
     def predict_from_s_obj(self, s_obj, viz=True, **kwargs):
         preprocessed = self.preprocess(s_obj)
@@ -496,19 +486,23 @@ class BaseModel(ABC):
         print(f'Model calss saved successfully!, check out: \n {self.hp.save_dir}')
 
     @classmethod
-    def from_class_weights(cls, path, hp_class=None, data_class=None):
+    def from_class_weights(cls, path, hp_class=None, data_class=None, device_name=None):
         path = tb.P(path)
+
         if hp_class:
             hp_obj = hp_class.from_saved(path)
         else:
             print(f"HParam class not passed to constructor, assuming it is a self-sufficient save.")
             hp_obj = tb.Read.pickle(path / HyperParam.subpath)
+        if device_name:
+            hp_obj.device_name = device_name
+
         if data_class:
-            data_obj = data_class.from_saved(path, hp_obj)
+            data_obj = data_class.from_saved(path, hp_obj) if path.exists() else None
         else:
             print(f"Data class not passed to constructor, assuming it is a self-sufficient save.")
             data_path = path / DataReader.subpath
-            data_obj = tb.Read.pickle(data_path)  # if data_path.exists() else data_path.with_suffix("")
+            data_obj = tb.Read.pickle(data_path) if data_path.exists() else None
         model_obj = cls(hp_obj, data_obj)
         model_obj.load_weights(path.myglob('*_save_*')[0])
         history = path / "metadata/history.npy"
@@ -542,13 +536,13 @@ class BaseModel(ABC):
             print(layer.get_config())
             print("==============================")
 
-    def plot_model(self):
+    def plot_model(self, **kwargs):
         import tensorflow as tf
         tf.keras.utils.plot_model(self.model, to_file=self.hp.save_dir / 'model_plot.png',
-                                  show_shapes=True, show_layer_names=True)
+                                  show_shapes=True, show_layer_names=True, **kwargs)
         print('Successfully plotted the model')
 
-    def build(self, shape=None, dtype=np.float32):
+    def build(self, shape=None):
         """ Building has two main uses.
 
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually
@@ -561,7 +555,7 @@ class BaseModel(ABC):
         """
         if shape is None:
             shape = self.data.split.x_train[:2].shape[1:]
-        ip = np.random.randn(*((self.hp.batch_size,) + shape)).astype(dtype)
+        ip = np.random.randn(*((self.hp.batch_size,) + shape)).astype(self.hp.precision)
         op = self.model(ip)
         self.tmp = op
         print("============  Build Test ==============")
