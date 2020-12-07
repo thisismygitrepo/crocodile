@@ -422,8 +422,8 @@ class P(type(Path()), Path, Base):
             os.startfile(filename)  # works for files and folders alike
         else:
             import subprocess
-            opener = "xdg-open" if self.is_file() else "open"
-            subprocess.call([opener, filename])
+            opener = "xdg-open"
+            subprocess.call([opener, filename])  # works for files and folders alike
 
     # def open_with_system(self):
     #     self.explore()  # if it is a file, it will be opened with its default program.
@@ -2026,13 +2026,14 @@ class SaveType:
         def finish(self, open_result=True):
             print(f"Saving results ...")
             self.pp.close()
-            print(f"PDF Saved @", Path(self.fname).absolute().as_uri())
+            print(f"PDF Saved @", P(self.fname).absolute().as_uri())
             if open_result:
                 import webbrowser as wb
-                chrome_path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-                wb.register('chrome', None, wb.BackgroundBrowser(chrome_path))
-                wb.get('chrome').open(self.fname)
-            return self.fname
+                # chrome_path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe".replace('\\', '/')
+                # wb.register('chrome', None, wb.BackgroundBrowser(chrome_path))
+                # wb.get('chrome').open(self.fname)
+                wb.open(self.fname)
+            return self
 
     class PNG(GenericSave):
         def __init__(self, *args, **kwargs):

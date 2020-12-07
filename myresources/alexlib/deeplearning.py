@@ -555,7 +555,11 @@ class BaseModel(ABC):
         """
         if shape is None:
             shape = self.data.split.x_train[:2].shape[1:]
-        ip = np.random.randn(*((self.hp.batch_size,) + shape)).astype(self.hp.precision)
+        if hasattr(self.hp, "precision"):
+            dtype = self.hp.precision
+        else:
+            dtype = "float32"
+        ip = np.random.randn(*((self.hp.batch_size,) + shape)).astype(dtype)
         op = self.model(ip)
         self.tmp = op
         print("============  Build Test ==============")
