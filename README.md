@@ -23,7 +23,7 @@ This package extends many native Python classes to equip you with an uneasy-to-t
      >> path[2:-1]  # even slicing!
         P("meta/images/file3.ext")
      ```
-     This and much much more, is only on top of the indesipensible `pathlib.Path` functionalities.
+     This and much more, is only on top of the indespensible `pathlib.Path` functionalities.
         
    * Some other classes that make honorable mention here are `Read` and `Save` classes. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and reloading in one line.
 
@@ -61,9 +61,10 @@ How does this make perfect sense?
 * Next, `apply` is a method of `List`. Sure enough, it lives up to its apt name and applies the passed function `len` to all items in the list and returns another `List` object that contains the results.
 * `.to_numpy()` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
 
+Methods naming convention like `apply` and `to_numpy` are inspired from the popular `pandas` library, resulting in almost non-existing learning curve.
 
 # Full docs:
 Click [Here](<https://alexlib.readthedocs.io/en/latest/>)
 
 # Author
-Alex Al-Saffar [email](mailto:programmer@usa.com)
+Alex Al-Saffar. [email](mailto:programmer@usa.com)

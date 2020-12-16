@@ -117,8 +117,8 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
 
 
 class ImagesModel(PTBaseModel):
-    def __init__(self, *args, **kwargs):
-        super(ImagesModel, self).__init__(*args, **kwargs)
+    def __init__(self, *args):
+        super(ImagesModel, self).__init__(*args)
 
     # @tb.batcher(func_type='method')
     def preprocess(self, images):
@@ -200,7 +200,7 @@ class Accuracy(object):
         """Used during training process to find overall accuracy through out an epoch
         """
         self.counter += len(correct)
-        tmpo = (t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
+        tmpo = t.tensor(t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
         self.total += tmpo * len(correct)
         return tmpo
 
@@ -208,7 +208,7 @@ class Accuracy(object):
     def measure(pred, correct):
         """ This method measures the accuracy for once. Useful at test time, rather than training time.
         """
-        return (t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
+        return t.tensor(t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
 
     def result(self):
         return self.total / self.counter

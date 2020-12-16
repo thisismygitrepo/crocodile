@@ -1,5 +1,3 @@
-
-
 import alexlib.toolbox as tb
 import numpy as np
 from abc import ABC, abstractmethod
@@ -28,24 +26,31 @@ class HyperParam(tb.Struct):
     """
     subpath = 'metadata/HyperParam.pickle'
 
-    def __init__(self, **kwargs):
-        super(HyperParam, self).__init__(**kwargs)
-        """
-        """
-        # ==================== Enviroment ========================
-        self.exp_name = 'default'
-        self.root = 'tmp'
-        self.pkg_name = None
-        self.device_name = Device.gpu0
-        # ===================== DATA ============================
-        self.seed = 234
-        # ===================== Model =============================
-        # ===================== Training ========================
-        self.split = 0.2
-        self.lr = 0.0005
-        self.batch_size = 32
-        self.epochs = 30
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            # ==================== Enviroment =========================
+            exp_name='default',
+            root='tmp',
+            pkg_name='tensorflow',
+            device_name=Device.gpu0,
+            # ===================== Data ==============================
+            seed=234,
+            shuffle=True,
+            precision='float32',
+            # ===================== Model =============================
+            # ===================== Training ==========================
+            split=0.2,
+            lr=0.0005,
+            batch_size=32,
+            epochs=30,
+        )
         self._code = None
+        self._configured = False
+        self.root = None
+        self.device_name = None
+        self.update(*args, **kwargs)
+        # self.save_code()
+        # self.config_device()
 
     def save_code(self):
         import inspect
@@ -80,7 +85,50 @@ class HyperParam(tb.Struct):
 
     @property
     def device(self):
-        return self.config_device(self.pkg, self.device_name)
+        handle = self.pkg
+        if handle.__name__ == 'tensorflow':
+            """
+            To disable gpu, here's one way: # before importing tensorflow do this:
+            if device == 'cpu':
+                os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+            handle.device(device)  # used as context, every tensor constructed and every computation takes place therein
+            For more manual control, use .cpu() and .gpu('0') .gpu('1') attributes.
+            """
+            devices = handle.config.experimental.list_physical_devices('CPU')
+            devices += handle.config.experimental.list_physical_devices('GPU')
+            device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
+
+            if self.device_name is Device.auto:
+                chosen_device = Device.gpu0 if len(devices) > 1 else Device.cpu
+            else:
+                chosen_device = self.device_name
+
+            device_str = chosen_device.value if 1 > 0 else "haha"
+            assert device_str in device_dict.keys(), f"This machine has no such a device to be chosen! ({device_str})"
+
+            try:
+                device = device_dict[device_str]
+                return device
+            except KeyError:  # 2gpus not a key in the dict.
+                assert len(handle.config.experimental.get_visible_devices()) > 2
+                mirrored_strategy = handle.distribute.MirroredStrategy()
+                return mirrored_strategy
+
+        elif handle.__name__ == 'torch':
+            device = self.device_name
+            if device is Device.auto:
+                return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
+            elif device is Device.gpu0:
+                assert handle.cuda.device_count() > 0, f"GPU {device} not available"
+                return handle.device('cuda:0')
+            elif device is Device.gpu1:
+                assert handle.cuda.device_count() > 1, f"GPU {device} not available"
+                return handle.device('cuda:1')
+            elif device is Device.cpu:
+                return handle.device('cpu')
+            # How to run Torch model on 2 GPUs ?
+        else:
+            raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
 
     @property
     def pkg(self):
@@ -91,71 +139,36 @@ class HyperParam(tb.Struct):
             handle = __import__("torch")
         return handle
 
-    @staticmethod
-    def config_device(handle, device: Device = Device.gpu0):
+    def config_device(self):
         """
-        :param handle: package handle
-        :param device: device
-        :return: possibly a handle to device (in case of Pytorch)
         """
+        handle = self.pkg
+        device_str = self.device_name.value
+        device = self.device
+        if handle.__name__ == 'torch':
+            return None
+
         try:
-            if handle.__name__ == 'tensorflow':
-                """
-                To disable gpu, here's one way: # before importing tensorflow do this:
-                if device == 'cpu':
-                    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-                handle.device(device)  # used as context, every tensor constructed and every computation takes place therein
-                For more manual control, use .cpu() and .gpu('0') .gpu('1') attributes.
-                """
-                devices = handle.config.experimental.list_physical_devices('CPU')
-                devices += handle.config.experimental.list_physical_devices('GPU')
-                device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
+            # Now we want only one device to be seen:
+            if device_str in ['gpu0', 'gpu1']:
+                limit_memory = True
+                if limit_memory:  # memory growth can only be limited for GPU devices.
+                    handle.config.experimental.set_memory_growth(device, True)
+                handle.config.experimental.set_visible_devices(device, 'GPU')  # will only see this device
+                # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
+                # now, logical gpu is created only for visible device
+                # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
+            else:  # for cpu devices, we want no gpu to be seen:
+                handle.config.experimental.set_visible_devices([], 'GPU')  # will only see this device
+                # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
+                # now, logical gpu is created only for visible device
+                # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
 
-                if device is Device.auto:
-                    device = Device.gpu0 if len(devices) > 1 else Device.cpu
-
-                device_str = device.value if 1 > 0 else "haha"
-                assert device_str in device_dict.keys(), f"This machine has no such a device to be chosen! ({device_str})"
-                if device_str != '2gpus':
-                    device = device_dict[device_str]
-                    # Now we want only one device to be seen:
-                    if device_str in ['gpu0', 'gpu1']:
-                        limit_memory = True
-                        if limit_memory:  # memory growth can only be limited for GPU devices.
-                            handle.config.experimental.set_memory_growth(device, True)
-                        handle.config.experimental.set_visible_devices(device, 'GPU')  # will only see this device
-                        logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                        # now, logical gpu is created only for visible device
-                        print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-                    else:  # for cpu devices, we want no gpu to be seen:
-                        handle.config.experimental.set_visible_devices([], 'GPU')  # will only see this device
-                        logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                        # now, logical gpu is created only for visible device
-                        print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-                    return device
-                else:
-                    assert len(handle.config.experimental.get_visible_devices()) > 2
-                    mirrored_strategy = handle.distribute.MirroredStrategy()
-                    return mirrored_strategy
-
-            elif handle.__name__ == 'torch':
-                if device is Device.auto:
-                    return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
-                elif device is Device.gpu0:
-                    assert handle.cuda.device_count() > 0, f"GPU {device} not available"
-                    return handle.device('cuda:0')
-                elif device is Device.gpu1:
-                    assert handle.cuda.device_count() > 1, f"GPU {device} not available"
-                    return handle.device('cuda:1')
-                elif device is Device.cpu:
-                    return handle.device('cpu')
-                # How to run Torch model on 2 GPUs ?
-            else:
-                raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
         except AssertionError as e:
             print(e)
             print(f"Trying again with auto-device {Device.auto}")
-            HyperParam.config_device(handle, device=Device.auto)
+            self.device_name = Device.auto
+            self.config_device()
 
 
 class DataReader(tb.Base):
@@ -167,11 +180,13 @@ class DataReader(tb.Base):
     implemented a fallback `getattr` method that allows accessing those attributes from the class itself, without the 
     need to reference `.dataspects`.
     """
+
     def __init__(self, hp=None, data_specs=None, split=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hp = hp
         self.data_specs = data_specs if data_specs else tb.Struct()  # Summary of data to be memorized by model
         self.split = split
+        self.plotter = None
 
     def __getattr__(self, item):
         try:
@@ -195,17 +210,19 @@ class DataReader(tb.Base):
         :param strings:
         :return:
         """
-        import sklearn.preprocessing as preprocessing
+        # import sklearn.preprocessing as preprocessing
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.split, shuffle=self.hp.shuffle,
                                   random_state=self.hp.seed, **kwargs)
         self.split = tb.Struct(train_loader=None, test_loader=None)
+        if strings is None:
+            strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
 
     def get_data_tuple(self, aslice, dataset="test"):
         # returns a tuple containing a slice of data (x_test, x_test, names_test, index_test etc)
-        keys = self.split.keys().filter(f"'_{train}' in x")
+        keys = self.split.keys().filter(f"'_{dataset}' in x")
         return tuple([self.split[key][aslice] for key in keys])
 
     def save_pickle(self, path=None, *names, **kwargs):
@@ -246,6 +263,16 @@ class DataReader(tb.Base):
     def postprocess(self, *args, **kwargs):
         _ = args, kwargs, self
         return args
+
+    def image_viz(self, pred, gt=None, names=None, **kwargs):
+        """
+        Assumes numpy inputs
+        """
+        if gt is None:
+            labels = None
+        else:
+            labels = ['Reconstruction', 'Ground Truth']
+        self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
 
 
 class BaseModel(ABC):
@@ -301,12 +328,13 @@ class BaseModel(ABC):
 
     def fit(self, viz=False, **kwargs):
         default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train,
-                                validation_data=(self.data.split.x_test, self.data.split.y_test),
-                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1,
-                                shuffle=self.hp.shuffle, callbacks=[])
+                                     validation_data=(self.data.split.x_test, self.data.split.y_test),
+                                     batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1,
+                                     shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
-        hist = self.model.fit(**default_settings)
-        self.history.append(tb.Struct(tb.copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
+        hist = self.model.fit(**default_settings.dict)
+        self.history.append(tb.Struct(tb.copy.deepcopy(hist.history)))
+        # it is paramount to copy, cause source can change.
         if viz:
             self.plot_loss()
         return self
@@ -361,11 +389,7 @@ class BaseModel(ABC):
         inferred = self.infer(x)
         return self.postprocess(inferred, **kwargs)
 
-    def predict_from_position(self, position, viz=True, **kwargs):
-        s_obj = self.process_position(position)
-        self.predict_from_s_obj(s_obj, viz=viz, **kwargs)
-
-    def predict_from_s_obj(self, s_obj, viz=True, **kwargs):
+    def predict_from_obj(self, s_obj, viz=True, **kwargs):
         preprocessed = self.preprocess(s_obj)
         prediction = self.infer(preprocessed)
         postprocessed = self.postprocess(prediction, **kwargs)
@@ -374,15 +398,8 @@ class BaseModel(ABC):
             return self.viz(postprocessed, **kwargs)
         return postprocessed
 
-    def viz(self, pred, gt=None, names=None, **kwargs):
-        """
-        Assumes numpy inputs
-        """
-        if gt is None:
-            labels = None
-        else:
-            labels = ['Reconstruction', 'Ground Truth']
-        self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
+    def viz(self, *args, **kwargs):
+        self.data.viz(*args, **kwargs)
 
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
@@ -392,9 +409,10 @@ class BaseModel(ABC):
         names_test = names_test if names_test is not None else this
         if idx is None:
             def get_rand(x, y):
-                idx_ = np.random.choice(len(x)-sample)
-                return x[idx_:idx_ + sample], y[idx_:idx_ + sample],\
-                       names_test[idx_: idx_ + sample], np.arange(idx_, idx_ + sample)
+                idx_ = np.random.choice(len(x) - sample)
+                return x[idx_:idx_ + sample], y[idx_:idx_ + sample], \
+                    names_test[idx_: idx_ + sample], np.arange(idx_, idx_ + sample)
+
             assert self.data is not None, 'Data attribute is not defined'
             x_test, y_test, names_test, idx = get_rand(x_test, y_test)  # already processed S's
         else:
@@ -411,29 +429,30 @@ class BaseModel(ABC):
         pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test,
-                            names=names_test, losses=loss_dict,)
+                            names=names_test, losses=loss_dict, )
         if viz:
-            loss_name = results.losses.index(0)[0]
-            names = f" = {loss_name}\n".join(results.losses.index(0)[1].apply("x.numpy()").apply(str)).split("\n")
-            names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(names, names_test)]
+            loss_name = results.losses.items()[0][0]  # items = tuples of (loss_name, values)
+            loss_val_str = results.losses.items()[0][1].apply("np.array(x).item()").apply(str)
+            loss_label = loss_val_str.apply(lambda x: f"{loss_name} = {x}")
+            names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
             self.viz(pred, gt, names=names, **kwargs)
         return results
 
     def get_metrics_evaluations(self, prediction, y_test):
-        if self.compiler is None or self.compiler.metrics is None:
+        if self.compiler is None:
             return None
+
+        metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
         loss_dict = tb.Struct()
-        for a_metric in self.compiler.metrics:
-            stateful = False
+        for a_metric in metrics:
             try:  # EAFP principle.
                 name = a_metric.name  # works for subclasses Metrics
-                stateful = True
             except AttributeError:
                 name = a_metric.__name__  # works for functions.
             loss_dict[name] = tb.List()
 
             for a_prediction, a_y_test in zip(prediction, y_test):
-                if stateful:
+                if hasattr(a_metric, "reset_states"):
                     a_metric.reset_states()
                 loss = a_metric(a_prediction[None], a_y_test[None])
                 loss_dict[name].append(loss)
@@ -462,6 +481,7 @@ class BaseModel(ABC):
         3. Model architecture or weights depending on the following argument.
 
         :param version:
+        :param itself:
         :param weights_only: self-explanatory
         :return:
 
@@ -492,7 +512,7 @@ class BaseModel(ABC):
         if hp_class:
             hp_obj = hp_class.from_saved(path)
         else:
-            print(f"HParam class not passed to constructor, assuming it is a self-sufficient save.")
+            print(f"HParam class not passed to constructor, assuming it is a self-contained save.")
             hp_obj = tb.Read.pickle(path / HyperParam.subpath)
         if device_name:
             hp_obj.device_name = device_name
@@ -500,7 +520,7 @@ class BaseModel(ABC):
         if data_class:
             data_obj = data_class.from_saved(path, hp_obj) if path.exists() else None
         else:
-            print(f"Data class not passed to constructor, assuming it is a self-sufficient save.")
+            print(f"Data class not passed to constructor, assuming it is a self-contained save.")
             data_path = path / DataReader.subpath
             data_obj = tb.Read.pickle(data_path) if data_path.exists() else None
         model_obj = cls(hp_obj, data_obj)
@@ -549,7 +569,6 @@ class BaseModel(ABC):
           happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
-        :param dtype:
         :param shape:
         :return:
         """
@@ -566,7 +585,7 @@ class BaseModel(ABC):
         print(f"Input shape = {ip.shape}")
         print(f"Output shape = {op.shape}")
         print("Stats on output data for random normal input:")
-        print(tb.pd.DataFrame(op.numpy().flatten()).describe())
+        print(tb.pd.DataFrame(np.array(op).flatten()).describe())
         print("----------------------------------------", '\n\n')
 
 
@@ -589,9 +608,9 @@ class Ensemble(tb.Base):
         if hp_class and data_class and model_class:
             self.models = tb.List()
             # only generate the dataset once and attach it to the ensemble to be reused by models.
-            self.data = self.data_class(hp)
+            self.data = self.data_class(hp_class())
             print("Creating Models".center(100, "="))
-            for i in tqdm(range(n)):
+            for i in tqdm(range(size)):
                 hp = self.hp_class()
                 hp.exp_name = str(hp.exp_name) + f'__model__{i}'
                 datacopy = tb.copy.copy(self.data)  # shallow copy
@@ -620,7 +639,7 @@ class Ensemble(tb.Base):
             self.models[i].fit(**kwargs)
             self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
             if save:
-                amodel.save_class()
+                self.models[i].save_class()
                 self.performance.save_pickle(self.hp_class.save_dir / "performance.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
@@ -650,6 +669,7 @@ def get_mean_max_error(tf):
 
         def reset_states(self):
             self.mme.assign(0.0)
+
     return MeanMaxError
 
 

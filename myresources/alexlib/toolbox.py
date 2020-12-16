@@ -140,7 +140,7 @@ class P(type(Path()), Path, Base):
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
         factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
-                          np.tile(1024**np.arange(len(sizes)), 2)))[units]
+                          np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
         if self.is_file():
             total_size = self.stat().st_size
         elif self.is_dir():
@@ -172,6 +172,9 @@ class P(type(Path()), Path, Base):
         import random
         result_str = ''.join(random.choice(pool) for _ in range(length))
         return result_str
+
+    def as_unix(self):
+        return P(str(self).replace('\\', '/').replace('//', '/'))
 
     @property
     def trunk(self):
@@ -266,19 +269,19 @@ class P(type(Path()), Path, Base):
     def browse(self):
         return self.myglob("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
 
-    def relativity_transform(self, reference='deephead', abs_reference=None):
-        """Takes in a path defined relative to reference, transform it to a path relative to execution
-        directory, then makes it absolute path.
+    def absolute_from(self, reference=None):
+        """As opposed to `relative_to` which takes two abolsute paths and make `self` relative to `other`, this one
+        takes in two relative paths, and return an absolute version of `self` there reference for which is `other`.
 
-        .. warning:: reference must be included in the execution directory. Otherwise, absolute path of reference
-           should be provided.
+        :param reference: no more than a directory name from which the current relative path `self` is defined.
+        Default value of reference is current directory name, making the method act like `absolute` method
+        .. warning:: `reference` should be within working directory, otherwise it raises an error.
+        .. note:: If you have the full path of the reference, this method is not for you. You can easily get the
+        absolute path by `reference / current_relative_path`
         """
-        # step one: find absolute path for reference, if not given.
-        paths = [P.cwd()] + list(P.cwd().parents)
-        names = list(reversed(P.cwd().parts))
-        if abs_reference is None:  # find it for reference.
-            abs_reference = paths[names.index(reference)]
-        return abs_reference / self
+        if reference is None:
+            reference = P.cwd()[-1].string
+        return P.cwd().split(at=reference)[0] / reference / self
 
     def split(self, at=None, index=None):
         """Splits a path at a given string or index
@@ -490,6 +493,7 @@ tmp = P.tmp
 class Compression:
     """Provides consistent behaviour across all methods ...
     Both files and folders when compressed, default is being under the root of archive."""
+
     def __init__(self):
         pass
 
@@ -731,10 +735,14 @@ def accelerate(func, ip):
 class List(list, Base):
     """Use this class to keep items of the same type.
     """
+
     # =============================== Constructor Methods ====================
     def __init__(self, obj_list=None):
         super().__init__()
         self.list = list(obj_list) if obj_list is not None else []
+
+    def __bool__(self):
+        return bool(self.list)
 
     @classmethod
     def from_copies(cls, obj, count):
@@ -858,16 +866,14 @@ class List(list, Base):
                     return item
         return None
 
-    def index_entries(self, a_slice: slice):
-        """Used to access entries of items
-        """
-        return List([item[a_slice] for item in self.list])
-
-    def find_index(self, string_):
+    def index_from_string(self, string_):
         for idx, item in enumerate(self.list):
             if string_ in str(item):
                 return idx
         return None
+
+    def index(self, item, **kwargs):
+        return self.list.index(item)
 
     # ======================= Modify Methods ===============================
     def combine(self):
@@ -904,13 +910,6 @@ class List(list, Base):
 
     def __iter__(self):
         return iter(self.list)
-
-    def to_numpy(self):
-        return self.np
-
-    @property
-    def np(self):
-        return np.array(self.list)
 
     def apply(self, func, *args, lest=None, jobs=None, depth=1, verbose=False, **kwargs):
         """
@@ -990,10 +989,7 @@ class List(list, Base):
             if sep:
                 print(sep * 100)
 
-    def to_dataframe(self, *args, **kwargs):
-        return self.df(*args, **kwargs)
-
-    def df(self, names=None):
+    def to_df(self, names=None):
         DisplayData.set_display()
         columns = ['object'] + list(self.list[0].__dict__.keys())
         df = pd.DataFrame(columns=columns)
@@ -1004,6 +1000,13 @@ class List(list, Base):
                 name = [names[i]]
             df.loc[i] = name + list(self.list[i].__dict__.values())
         return df
+
+    def to_numpy(self):
+        return self.np
+
+    @property
+    def np(self):
+        return np.array(self.list)
 
     def sample(self, size=1):
         return L(self.np[np.random.choice(len(self.list), size)])  # convert to numpy as it allows fancy indexing
@@ -1016,6 +1019,7 @@ class Struct(Base):
     """Use this class to keep bits and sundry items.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     """
+
     def __init__(self, dictionary=None, **kwargs):
         """
         :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
@@ -1031,6 +1035,9 @@ class Struct(Base):
             final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
             final_dict.update(kwargs)
         self.__dict__ = final_dict
+
+    def __bool__(self):
+        return bool(self.__dict__)
 
     @classmethod
     def defaultdict(cls, *args, default_=lambda: None, **kwargs):
@@ -1054,6 +1061,7 @@ class Struct(Base):
             def __init__(self, *args, **kw):
                 self.__dict__ = self.default_struct.__dict__
                 super(NamedTuple, self).__init__(*args, **kw)
+
         return NamedTuple
 
     @classmethod
@@ -1107,8 +1115,8 @@ class Struct(Base):
             self.__dict__[item]
         except KeyError:
             # try:
-                # super(Struct, self).__getattribute__(item)
-                # object.__getattribute__(self, item)
+            # super(Struct, self).__getattribute__(item)
+            # object.__getattribute__(self, item)
             # except AttributeError:
             raise AttributeError(f"Could not find the attribute `{item}` in object `{self.__class__}`")
 
@@ -1189,9 +1197,6 @@ class Struct(Base):
     def to_dataframe(self):
         return self.values().to_dataframe(names=self.keys())
 
-    def index(self, idx):
-        return self.keys()[idx], self.values()[idx]
-
     def spawn_from_values(self, values):
         return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
 
@@ -1267,6 +1272,7 @@ class Debugger:
         def wrapper():  # a wrapper that remembers the function func because it was in the closure when construced.
             local_dict = Debugger.get_locals(func)
             Debugger.update_globals(local_dict)
+
         return wrapper
 
     @staticmethod
@@ -1481,6 +1487,24 @@ class DisplayData:
         pd.options.display.float_format = '{:, .5f}'.format
         pd.set_option('precision', 7)
         # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+
+    @staticmethod
+    def summarize(array, name=None, print_=True):
+        if name is None:
+            name = type(array)
+
+        if type(array) is np.ndarray:
+            string_ = f"{name}: shape = {array.shape}, dtype = {array.dtype}."
+        else:
+            string_ = f"{name}: {str(array)}"
+        if not print_:
+            return string_
+        else:
+            print(string_)
+
+    @staticmethod
+    def describe(array):
+        pd.DataFrame(array).describe()
 
 
 # %% ========================== Plot Helper funcs ========================================
@@ -1776,7 +1800,7 @@ class FigureManager:
                 self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
 
         else:
-            for ax in self.ax.figure.axes:
+            for ax in self.ax:
                 # ax.axis(['off', 'on'][self.boundaries_flag])
                 self.toggle_ticks(ax)
 
@@ -2400,10 +2424,10 @@ class VisibilityViewerAuto(VisibilityViewer):
         self.lables = x_labels
 
         if artist is None:
-            artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends, create_new_axes=True,
+            artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends[0], create_new_axes=True,
                             **kwargs)
         else:
-            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
+            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends[0])
             if memorize:
                 assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new " \
                                                        "axes from the artist with every plot"
