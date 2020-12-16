@@ -9,7 +9,7 @@ setup(
     version=__version__,
     packages=['alexlib'],
     package_dir={'': 'myresources'},
-    py_modules=['toolbox'],
+    py_modules=['toolbox', "deeplearning", "deeplearning_torch"],
     url='https://github.com/thisismygitrepo/alexlib',
     license='Apache 2.0',
     author='Alex Al-Saffar',
@@ -26,4 +26,4 @@ setup(
 # git push origin
 # python setup.py sdist bdist_wheel
 # twine upload dist/*
-# ^iLyZ5^Ph6R3
+#
