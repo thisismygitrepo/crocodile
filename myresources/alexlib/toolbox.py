@@ -132,6 +132,22 @@ class Log:
         sys.stdout.close()
         print(f"Finished ... have a look @ \n {self.path}")
 
+    @staticmethod
+    def generate_readme(path, obj=None, meta=None):
+        if not "README.md" in str(path):
+            assert path.is_dir()
+            path = path / "README.md"
+
+        text = "# Meta\n"
+        if meta is not None:
+            text = text + meta + "\n\n"
+        if obj is not None:
+            import inspect
+            lines = inspect.getsource(obj)
+            lines = "```\n" + lines + "```\n"
+            text += f"# Code generated me: \n'{inspect.getfile(obj)}'\n" + lines
+        path.write_text(text)
+
 
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
@@ -270,14 +286,17 @@ class P(type(Path()), Path, Base):
         return self.myglob("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
 
     def absolute_from(self, reference=None):
-        """As opposed to `relative_to` which takes two abolsute paths and make `self` relative to `other`, this one
-        takes in two relative paths, and return an absolute version of `self` there reference for which is `other`.
+        """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
+        this one takes in two relative paths, and return an absolute version of `self` the reference
+        for which is ``reference``.
 
-        :param reference: no more than a directory name from which the current relative path `self` is defined.
-        Default value of reference is current directory name, making the method act like `absolute` method
-        .. warning:: `reference` should be within working directory, otherwise it raises an error.
+        :param reference: no more than a directory name from which the current relative path ``self`` is defined.
+            Default value of reference is current directory name, making the method act like ``absolute`` method
+
+        .. warning:: ``reference`` should be within working directory, otherwise it raises an error.
+
         .. note:: If you have the full path of the reference, this method is not for you. You can easily get the
-        absolute path by `reference / current_relative_path`
+            absolute path by `reference / current_relative_path`
         """
         if reference is None:
             reference = P.cwd()[-1].string
@@ -285,6 +304,7 @@ class P(type(Path()), Path, Base):
 
     def split(self, at=None, index=None):
         """Splits a path at a given string or index
+
         :param self:
         :param at:
         :param index:
@@ -624,12 +644,25 @@ class Read:
         return data
 
     @staticmethod
-    def json(path, **kwargs):
+    def json(path, r=False, **kwargs):
         """Returns a Structure"""
         import json
         with open(str(path), "r") as file:
             mydict = json.load(file, **kwargs)
-        return Struct(mydict)
+        if r:
+            return Struct.recursive_struct(mydict)
+        else:
+            return Struct(mydict)
+
+    @staticmethod
+    def yaml(path, r=False, **kwargs):
+        import yaml
+        with open(str(path), "r") as file:
+            mydict = yaml.load(file, Loader=yaml.FullLoader, **kwargs)
+        if r:
+            return Struct.recursive_struct(mydict)
+        else:
+            return Struct(mydict)
 
     @staticmethod
     def pickle(path, **kwargs):
@@ -653,11 +686,15 @@ class Read:
 class Save:
     @staticmethod
     def mat(path=P.tmp(), mdict=None, **kwargs):
-        """Avoid using mat for saving results because of incompatiblity.
-        * Nones are not accepted.
-        * Scalars are conveteed to [1 x 1] arrays.
-        * etc.
-        Unless you want to pass the results to Matlab animals, avoid this format.
+        """
+        .. note::
+            Avoid using mat for saving results because of incompatiblity:
+
+            * `None` type is not accepted.
+            * Scalars are conveteed to [1 x 1] arrays.
+            * etc. As such, there is no gaurantee that you restore what you saved.
+
+            Unless you want to pass the results to Matlab animals, avoid this format.
         """
         from scipy.io import savemat
         if '.mat' not in str(path):
@@ -670,7 +707,7 @@ class Save:
 
     @staticmethod
     def json(path, obj, **kwargs):
-        """This format is compatible with simple dictionaries that hold strings or numbers but nothing more than that.
+        """This format is **compatible** with simple dictionaries that hold strings or numbers but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
         inspected using any text editor."""
         import json
@@ -678,6 +715,14 @@ class Save:
             path = str(path) + ".json"
         with open(str(path), "w") as file:
             json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
+
+    @staticmethod
+    def yaml(path, obj, **kwargs):
+        import yaml
+        if not str(path).endswith(".yaml"):
+            path = str(path) + ".yaml"
+        with open(str(path), "w") as file:
+            yaml.dump(obj, file, **kwargs)
 
     # @staticmethod
     # def pickle(path, obj, **kwargs):
@@ -752,9 +797,10 @@ class List(list, Base):
     def from_replicating(cls, func, *args, replicas=None, **kwargs):
         """
         :param args: could be one item repeated for all instances, or iterable. If iterable, it can by a Cycle object.
-        :param kwargs: those could be structures
-        :param replicas
+        :param kwargs: those could be structures:
+        :param replicas:
         :param func:
+
         """
         if not args and not kwargs:  # empty args list and kwargs list
             return cls([func() for _ in range(replicas)])
@@ -1039,6 +1085,22 @@ class Struct(Base):
     def __bool__(self):
         return bool(self.__dict__)
 
+    @staticmethod
+    def recursive_struct(mydict):
+        struct = Struct(mydict)
+        for key, val in struct.items():
+            if type(val) is dict:
+                struct[key] = Struct.recursive_struct(val)
+        return struct
+
+    @staticmethod
+    def recursive_dict(struct):
+        mydict = struct.dict
+        for key, val in mydict.items():
+            if type(val) is Struct:
+                mydict[key] = Struct.recursive_dict(val)
+        return mydict
+
     @classmethod
     def defaultdict(cls, *args, default_=lambda: None, **kwargs):
         """Returns default value if encoutered a new key."""
@@ -1093,7 +1155,12 @@ class Struct(Base):
             repr_string += key + ", "
         return "Structure, with following keys:\n" + repr_string
 
-    def print(self):
+    def print(self, yaml=False):
+        if yaml:
+            self.save_yaml(P.tmp(fn="__tmp.yaml"))
+            txt = P.tmp(fn="__tmp.yaml").read_text()
+            print(txt)
+            return None
         repr_string = ""
         for item, value in self.__dict__.items():
             repr_string += f"{item} = {value}\n"
@@ -1128,6 +1195,9 @@ class Struct(Base):
 
     def __iter__(self):
         return iter(self.dict.items())
+
+    def save_yaml(self, path):
+        Save.yaml(path, self.recursive_dict(self))
 
     @property
     def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
@@ -1968,11 +2038,6 @@ class FigureManager:
 
 
 class SaveType:
-    """
-    Programming philosophy: this class only worries about saving, and saving only. In other words, the figure must
-    be fully prepared beforehand. Names here are only used for the purpose of saving, never putting titles on figures.
-    """
-
     class GenericSave:
         """ You can either pass the figures to be tracked or, pass them dynamically at add method, or,
         add method will capture every figure and axis

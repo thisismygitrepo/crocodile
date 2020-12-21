@@ -299,6 +299,9 @@ class BaseModel(ABC):
 
     def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True):
         """ Updates compiler attributes. This acts like a setter.
+        .. note: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
+                 * In case of TF, this is not the case as TF requires actual futher different compilation before changes
+                 take effect.
 
         * Must be run prior to fit method.
         * Can be run only after defining model attribute.

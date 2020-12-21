@@ -12,8 +12,8 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../myresources'))  # for importing modules
-sys.path.insert(0, os.path.abspath('..'))  # for importing version
+sys.path.insert(0, os.path.abspath('../myresources/alexlib'))  # for importing modules
+# sys.path.insert(0, os.path.abspath('..'))  # for importing version
 
 
 # -- Project information -----------------------------------------------------
@@ -22,7 +22,7 @@ project = 'alexlib'
 copyright = '2020, Alex Al-Saffar'
 author = 'Alex Al-Saffar'
 
-from myresources import __version__
+from alexlib import __version__
 version = __version__  # simple X.Y.Z
 release = __version__  # full anem with alpha beta rc etc tags.
 
