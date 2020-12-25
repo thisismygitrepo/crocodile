@@ -153,6 +153,9 @@ class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
 
+    def __deepcopy__(self, memodict={}):
+        return P(str(self))
+
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
         factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
@@ -443,10 +446,14 @@ class P(type(Path()), Path, Base):
         filename = self.absolute().string
         if sys.platform == "win32":
             os.startfile(filename)  # works for files and folders alike
-        else:
+        elif sys.platform == 'linux':
             import subprocess
             opener = "xdg-open"
             subprocess.call([opener, filename])  # works for files and folders alike
+        else:  # mac
+            # os.system(f"open {filename}")
+            import subprocess
+            subprocess.call(["open", filename])  # works for files and folders alike
 
     # def open_with_system(self):
     #     self.explore()  # if it is a file, it will be opened with its default program.
@@ -519,14 +526,19 @@ class Compression:
 
     @staticmethod
     def compress_folder(ip_path, op_path, arcname, format_='zip', **kwargs):
-        """base_dir has to be relevant to op_path. If you want to compress a folder in Downloads/myfolder/compress_this
-        Then, say that your rootdir is where you want the archive structure to include,
-        then mention the folder you want to actually archive relatively to that root.
-        fromat_: zip, tar, gztar, bztar, xztar
+        """Explanation of Shutil parameters:
+
+        * ``base_dir`` (here referred to as ``op_path``) is what is going to be acturally archived.
+            When provided, it **has to** be relevant to ``root_dir`` (here referred to as ``op_path``).
+        * ``root_dir`` is where the archive is going to start from. It will create all the necessary subfolder till
+            it reaches the ``base_dir`` where archiving actually starts.
+        * Example: If you want to compress a folder in ``Downloads/myfolder/compress_this``
+            Then, say that your rootdir is where you want the archive structure to include,
+            then mention the folder you want to actually archive relatively to that root.
+
+        .. note:: ``format_`` can only be one of ``zip, tar, gztar, bztar, xztar``.
         """
-        root_dir = ip_path.split(at=arcname[0:1])[0]
-        # if op_path.suffix != f".{format_}":
-        #     op_path += f".{format_}"
+        root_dir = ip_path.split(at=arcname[0])[0]
         import shutil  # shutil works with folders nicely (recursion is done interally)
         result_path = shutil.make_archive(base_name=op_path, format=format_,
                                           root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
@@ -578,14 +590,15 @@ class Compression:
 
     @staticmethod
     def tar():
+        import tarfile
         pass
 
     @staticmethod
-    def untar(self, fname=None, mode='r', **kwargs):
+    def untar(self, fname=None, extract_dir='.', mode='r', **kwargs):
         import tarfile
         file = tarfile.open(str(self), mode)
         if fname is None:  # extract all files in the archive
-            file.extractall(**kwargs)
+            file.extractall(path=extract_dir, **kwargs)
         else:
             file.extract(fname, **kwargs)
         file.close()
@@ -608,7 +621,7 @@ class Read:
         """returns Structure if the object loaded is a dictionary"""
         data = np.load(str(path), allow_pickle=True, **kwargs)
         if data.dtype == np.object:
-            data = data.all()
+            data = data
         if type(data) is dict:
             data = Struct(data)
         return data
@@ -892,7 +905,7 @@ class List(list, Base):
 
     def find(self, patt, match="fnmatch"):
         """Looks up the string representation of all items in the list and finds the one that partially matches
-        the argument passed. This method is a short for self.filter(lambda x: string_ in str(x)) If you need more
+        the argument passed. This method is a short for ``self.filter(lambda x: string_ in str(x))`` If you need more
         complicated logic in the search, revert to filter method.
         """
         if match == "string" or None:
@@ -1027,7 +1040,7 @@ class List(list, Base):
                 result.append(item)
         return result
 
-    def print(self, nl=1, sep=False, style=str):
+    def print(self, nl=1, sep=False, style=repr):
         for idx, item in enumerate(self.list):
             print(f"{idx:2}- {style(item)}", end=' ')
             for _ in range(nl):
@@ -1035,7 +1048,7 @@ class List(list, Base):
             if sep:
                 print(sep * 100)
 
-    def to_df(self, names=None):
+    def to_dataframe(self, names=None):
         DisplayData.set_display()
         columns = ['object'] + list(self.list[0].__dict__.keys())
         df = pd.DataFrame(columns=columns)
@@ -1152,7 +1165,7 @@ class Struct(Base):
     def __repr__(self):
         repr_string = ""
         for key in self.keys().list:
-            repr_string += key + ", "
+            repr_string += str(key) + ", "
         return "Structure, with following keys:\n" + repr_string
 
     def print(self, yaml=False):
@@ -1264,13 +1277,16 @@ class Struct(Base):
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(self.dict.items())
 
-    def to_dataframe(self):
-        return self.values().to_dataframe(names=self.keys())
+    def to_dataframe(self, *args, **kwargs):
+        # return self.values().to_dataframe(names=self.keys())
+        return pd.DataFrame(self.__dict__, *args, **kwargs)
 
     def spawn_from_values(self, values):
+        """From the same keys, generate a new Struct with different values passed."""
         return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
 
     def spawn_from_keys(self, keys):
+        """From the same values, generate a new Struct with different keys passed."""
         return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
 
     def plot(self, artist=None, xdata=None):
@@ -1357,7 +1373,6 @@ class Debugger:
         """
         import inspect
         import textwrap
-        clipboard = assert_package_installed("clipboard")
 
         codelines = inspect.getsource(name)
         # remove def func_name() line from the list
@@ -1385,6 +1400,8 @@ class Debugger:
         if "**kwargs" in header:
             arg_string += "kwargs = {}\n"
         result = arg_string + code_string
+
+        clipboard = assert_package_installed("clipboard")
         clipboard.copy(result)
         print("code to be run \n", result, "=" * 100)
         return result  # ready to be run with exec()
@@ -1414,6 +1431,28 @@ class Debugger:
     def monkey_patch(class_inst, func):  # lambda *args, **kwargs: func(class_inst, *args, **kwargs)
         setattr(class_inst.__class__, func.__name__, func)
 
+    @staticmethod
+    def run_cell(pointer, module=sys.modules[__name__]):
+        # update the module by reading it again.
+        # if type(module) is str:
+        #     module = __import__(module)
+        # import importlib
+        # importlib.reload(module)
+        if type(module) is str:
+            sourcecells = P(module).read_text().split("#%%")
+        else:
+            sourcecells = P(module.__file__).read_text().split("#%%")
+
+        for cell in sourcecells:
+            if pointer in cell.split('\n')[0]:
+                break  # bingo
+        else:
+            raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
+        print(cell)
+        clipboard = assert_package_installed("clipboard")
+        clipboard.copy(cell)
+        return cell
+
 
 class Manipulator:
     @staticmethod
@@ -1442,12 +1481,16 @@ class Manipulator:
         return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
 
     @staticmethod
-    def expand_axis(array, ax_idx, factor):  # opposite functionality of merge_axes.
+    def expand_axis(array, ax_idx, factor):
+        """opposite functionality of merge_axes.
+        While ``numpy.split`` requires the division number, this requies the split size.
+        """
         total_shape = list(array.shape)
         size = total_shape.pop(ax_idx)
         new_shape = (int(size / factor), factor)
         for index, item in enumerate(new_shape):
             total_shape.insert(ax_idx + index, item)
+        # should be same as return np.split(array, new_shape, ax_idx)
         return array.reshape(tuple(total_shape))
 
     @staticmethod
@@ -2484,15 +2527,17 @@ class VisibilityViewerAuto(VisibilityViewer):
         if transpose:
             data = np.array(list(zip(*data)))
         self.data = data
-        self.legends = legends if legends is not None else [f"Curve {i}" for i in range(len(self.data))]
+        self.legends = legends
+        if legends is None:
+            self.legends = [f"Curve {i}" for i in range(len(self.data))]
         self.titles = titles if titles is not None else np.arange(len(self.data))
         self.lables = x_labels
 
         if artist is None:
-            artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends[0], create_new_axes=True,
+            artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends, create_new_axes=True,
                             **kwargs)
         else:
-            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends[0])
+            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
             if memorize:
                 assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new " \
                                                        "axes from the artist with every plot"
@@ -2510,7 +2555,7 @@ class VisibilityViewerAuto(VisibilityViewer):
             if self.memorize:  # ==> plot and use .add() method
                 if self.index > self.max_index_memorized:  # a new plot never done before
                     self.hide_artist_axes()
-                    self.artist.plot(*datum, title=self.titles[i], legends=self.legends[i])
+                    self.artist.plot(*datum, title=self.titles[i], legends=self.legends)
                     self.add(increment_index=False, hide_artist_axes=False)  # index incremented via press_key manually
                     self.max_index_memorized += 1
                 else:  # already seen this plot before ==> use animate method of parent class to hide and show,
@@ -2519,7 +2564,7 @@ class VisibilityViewerAuto(VisibilityViewer):
                     super().animate()
             else:
                 self.fig.clf()  # instead of making previous axis invisible, delete it completely.
-                self.artist.plot(*datum, title=self.titles[i], legends=self.legends[i])
+                self.artist.plot(*datum, title=self.titles[i], legends=self.legends)
                 # replot the new data point on a new axis.
             self.saver.add()
             if self.pause:

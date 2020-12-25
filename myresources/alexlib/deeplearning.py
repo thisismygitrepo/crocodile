@@ -276,7 +276,7 @@ class DataReader(tb.Base):
 
 
 class BaseModel(ABC):
-    f"""My basic model. It implements the following methods:
+    """My basic model. It implements the following methods:
 
     * :func:`BaseModel.preprocess` This should convert to tensors as appropriate for the model.
     * :func:`BaseModel.postprocess` This method should convert back to numpy arrays.
@@ -284,6 +284,7 @@ class BaseModel(ABC):
     * :func:`BaseModel.predict` expects a processed input, uese infer and does postprocessing.
     * :func:`BaseModel.predict_from_s` reads, preprocess, then uses predict method.
     * :func:`BseModel.evaluate` Expects processed input and internally calls infer and postprocess methods.
+    
     """
 
     @abstractmethod
@@ -299,12 +300,16 @@ class BaseModel(ABC):
 
     def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True):
         """ Updates compiler attributes. This acts like a setter.
-        .. note: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
-                 * In case of TF, this is not the case as TF requires actual futher different compilation before changes
-                 take effect.
+
+        .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
+                  * In case of TF, this is not the case as TF requires actual futher different
+                    compilation before changes take effect.
+
+        Remember:
 
         * Must be run prior to fit method.
         * Can be run only after defining model attribute.
+
         """
         pkg = self.hp.pkg
         if self.hp.pkg_name == 'tensorflow':
@@ -392,14 +397,14 @@ class BaseModel(ABC):
         inferred = self.infer(x)
         return self.postprocess(inferred, **kwargs)
 
-    def predict_from_obj(self, s_obj, viz=True, **kwargs):
-        preprocessed = self.preprocess(s_obj)
+    def deduce(self, obj_s, viz=True, **kwargs):
+        preprocessed = np.concatenate([self.preprocess(obj) for obj in obj_s], axis=0)
         prediction = self.infer(preprocessed)
         postprocessed = self.postprocess(prediction, **kwargs)
-        s_obj.prediction = tb.Struct(preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
+        result = tb.Struct(input=obj_s, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz:
-            return self.viz(postprocessed, **kwargs)
-        return postprocessed
+            self.viz(postprocessed, **kwargs)
+        return result
 
     def viz(self, *args, **kwargs):
         self.data.viz(*args, **kwargs)
@@ -429,37 +434,37 @@ class BaseModel(ABC):
 
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
+        loss_dict['names'] = names_test
         pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test,
-                            names=names_test, losses=loss_dict, )
+                            names=names_test, loss_df=loss_dict, )
         if viz:
-            loss_name = results.losses.items()[0][0]  # items = tuples of (loss_name, values)
-            loss_val_str = results.losses.items()[0][1].apply("np.array(x).item()").apply(str)
-            loss_label = loss_val_str.apply(lambda x: f"{loss_name} = {x}")
+            loss_name = results.loss_df.columns.to_list()[0]  # first loss name
+            loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
             names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
             self.viz(pred, gt, names=names, **kwargs)
         return results
 
-    def get_metrics_evaluations(self, prediction, y_test):
+    def get_metrics_evaluations(self, prediction, groun_truth):
         if self.compiler is None:
             return None
 
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
-        loss_dict = tb.Struct()
+        loss_dict = dict()
         for a_metric in metrics:
             try:  # EAFP principle.
                 name = a_metric.name  # works for subclasses Metrics
             except AttributeError:
                 name = a_metric.__name__  # works for functions.
-            loss_dict[name] = tb.List()
+            loss_dict[name] = []
 
-            for a_prediction, a_y_test in zip(prediction, y_test):
+            for a_prediction, a_y_test in zip(prediction, groun_truth):
                 if hasattr(a_metric, "reset_states"):
                     a_metric.reset_states()
                 loss = a_metric(a_prediction[None], a_y_test[None])
-                loss_dict[name].append(loss)
-        return loss_dict
+                loss_dict[name].append(np.array(loss).item())
+        return tb.pd.DataFrame(loss_dict)
 
     def save_model(self, directory):
         self.model.save(directory, include_optimizer=False)  # send only folder name. Save name is saved_model.pb
@@ -506,7 +511,7 @@ class BaseModel(ABC):
         meta_dir.joinpath('model_arch.txt').write_text(code_string)
 
         self.history.save_npy(path=meta_dir.joinpath('history.npy'))
-        print(f'Model calss saved successfully!, check out: \n {self.hp.save_dir}')
+        print(f'Model class saved successfully!, check out: \n {self.hp.save_dir.as_uri()}')
 
     @classmethod
     def from_class_weights(cls, path, hp_class=None, data_class=None, device_name=None):
@@ -538,7 +543,7 @@ class BaseModel(ABC):
         path = tb.P(path)
         data_obj = DataReader.from_saved(path)
         hp_obj = HyperParam.from_saved(path)
-        model_obj = cls.load_model(path.myglob('/*_save_*')[0])  # static method.
+        model_obj = cls.load_model(path.myglob('*_save_*')[0])  # static method.
         tmp = cls.__init__
 
         def initializer(self, hp_object, data_object, model_object_):
@@ -572,6 +577,7 @@ class BaseModel(ABC):
           happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
+
         :param shape:
         :return:
         """

@@ -1,14 +1,8 @@
 alexlib package
 ===============
 
-
-alexlib.toolbox module
-----------------------
-
-.. automodule:: alexlib.toolbox
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Submodules
+----------
 
 alexlib.deeplearning module
 ---------------------------
@@ -26,6 +20,14 @@ alexlib.deeplearning\_torch module
    :undoc-members:
    :show-inheritance:
 
+alexlib.history module
+----------------------
+
+.. automodule:: alexlib.history
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 alexlib.miscellaneous module
 ----------------------------
 
@@ -34,6 +36,13 @@ alexlib.miscellaneous module
    :undoc-members:
    :show-inheritance:
 
+alexlib.toolbox module
+----------------------
+
+.. automodule:: alexlib.toolbox
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Module contents
 ---------------
