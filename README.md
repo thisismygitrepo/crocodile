@@ -25,17 +25,19 @@ This package extends many native Python classes to equip you with an uneasy-to-t
      ```
      This and much more, is only on top of the indespensible `pathlib.Path` functionalities.
         
-   * Some other classes that make honorable mention here are `Read` and `Save` classes. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and reloading in one line.
+   * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and reloading in one line.
 
    
-Furthermore, those classes are inextricably connected. Example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` with one method, and so on.
+Furthermore, those classes are inextricably connected. Example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.
 
 
 # Install
 In the commandline:
 `pip install alexlib`.
 
-Being a thin extension on top of almost pure Python, you need to worry **not** about your venv, the package is not aggressive in requirements, it installs itself peacefully, never interfere with your other packages. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it. The package is not fussy about versions either. It can though at runtime, install packages on the fly, e.g. `dill` and `tqdm` which are very lightweight libraries.
+Being a thin extension on top of almost pure Python, you need to worry **not** about your venv, the package is not aggressive in requirements, it installs itself peacefully, never interfere with your other packages. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it.
+
+[comment]: # (The package is not fussy about versions either. It can though at runtime, install packages on the fly, e.g. `dill` and `tqdm` which are very lightweight libraries.)
 
 # Getting Started
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
@@ -57,7 +59,7 @@ tb.P.cwd().myglob("*.py", r=True).read_text().split('\n').apply(len).to_numpy().
 How does this make perfect sense?
 * `myglob` returns `List` of `P` path objects
 * `read_text` is a `P` method, but it is being run against `List` object. Behind the scenes, **responsible black magic** fails to find such a method in `List` and realizes it is a method of items inside the list, so it runs it against them and thus read all files and containerize them in another `List` object and returns it.
-* Similar story applies to `split` which is a method of strings in Python.
+* A similar story applies to `split` which is a method of strings in Python.
 * Next, `apply` is a method of `List`. Sure enough, it lives up to its apt name and applies the passed function `len` to all items in the list and returns another `List` object that contains the results.
 * `.to_numpy()` converts `List` to `numpy` array, then `.sum` is a method of `numpy`, which gives the final result.
 
