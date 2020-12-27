@@ -24,7 +24,7 @@ class HyperParam(tb.Struct):
     * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
     * Ease of saving settings of experiments! and also replicating it later.
     """
-    subpath = 'metadata/HyperParam.pickle'
+    subpath = 'metadata/HyperParam.pkl'
 
     def __init__(self, *args, **kwargs):
         super().__init__(
@@ -170,9 +170,13 @@ class HyperParam(tb.Struct):
             self.device_name = Device.auto
             self.config_device()
 
+        except RuntimeError as e:
+            print(e)
+            print(f"Device already configured, skipping ... ")
+
 
 class DataReader(tb.Base):
-    subpath = "metadata/DataReader.pickle"
+    subpath = "metadata/DataReader.pkl"
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
     at save time, this class only remember the attributes inside `.data_specs` `Struct`. Thus, whenever encountering
@@ -258,11 +262,11 @@ class DataReader(tb.Base):
 
     def preprocess(self, *args, **kwargs):
         _ = args, kwargs, self
-        return args
+        return args[0]  # acts like identity.
 
     def postprocess(self, *args, **kwargs):
         _ = args, kwargs, self
-        return args
+        return args[0]  # acts like identity
 
     def image_viz(self, pred, gt=None, names=None, **kwargs):
         """
@@ -273,6 +277,9 @@ class DataReader(tb.Base):
         else:
             labels = ['Reconstruction', 'Ground Truth']
         self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
+
+    def viz(self, *args, **kwargs):
+        return None
 
 
 class BaseModel(ABC):
@@ -481,15 +488,14 @@ class BaseModel(ABC):
         name = directory.glob('*.data*').__next__().__str__().split('.data')[0]
         self.model.load_weights(name)  # requires path to file name.
 
-    def save_class(self, weights_only=True, version='0', itself=False, **kwargs):
+    def save_class(self, weights_only=True, save_sourcecode=True, version='0', itself=False, **kwargs):
         """Simply saves everything:
 
         1. Hparams
         2. Data specs
         3. Model architecture or weights depending on the following argument.
 
-        :param version:
-        :param itself:
+        :param version: Model version, up to the user.
         :param weights_only: self-explanatory
         :return:
 
@@ -509,6 +515,8 @@ class BaseModel(ABC):
         code_string = inspect.getsource(self.__class__)
         meta_dir = tb.P(self.hp.save_dir).joinpath('metadata').create()
         meta_dir.joinpath('model_arch.txt').write_text(code_string)
+        if save_sourcecode:
+            tb.P(inspect.getmodule(self).__file__).zip(op_path=meta_dir / "source_code")
 
         self.history.save_npy(path=meta_dir.joinpath('history.npy'))
         print(f'Model class saved successfully!, check out: \n {self.hp.save_dir.as_uri()}')
@@ -520,7 +528,8 @@ class BaseModel(ABC):
         if hp_class:
             hp_obj = hp_class.from_saved(path)
         else:
-            print(f"HParam class not passed to constructor, assuming it is a self-contained save.")
+            print("<" * 1000, f"HParam class not passed to constructor, assuming it is a self-contained save.",
+                  "<" * 1000)
             hp_obj = tb.Read.pickle(path / HyperParam.subpath)
         if device_name:
             hp_obj.device_name = device_name
@@ -528,7 +537,8 @@ class BaseModel(ABC):
         if data_class:
             data_obj = data_class.from_saved(path, hp_obj) if path.exists() else None
         else:
-            print(f"Data class not passed to constructor, assuming it is a self-contained save.")
+            print("<" * 1000, f"Data class not passed to constructor, assuming it is a self-contained save.",
+                  "<" * 1000)
             data_path = path / DataReader.subpath
             data_obj = tb.Read.pickle(data_path) if data_path.exists() else None
         model_obj = cls(hp_obj, data_obj)
@@ -570,7 +580,7 @@ class BaseModel(ABC):
                                   show_shapes=True, show_layer_names=True, **kwargs)
         print('Successfully plotted the model')
 
-    def build(self, shape=None):
+    def build(self, shape=None, verbose=True):
         """ Building has two main uses.
 
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually
@@ -590,12 +600,13 @@ class BaseModel(ABC):
         ip = np.random.randn(*((self.hp.batch_size,) + shape)).astype(dtype)
         op = self.model(ip)
         self.tmp = op
-        print("============  Build Test ==============")
-        print(f"Input shape = {ip.shape}")
-        print(f"Output shape = {op.shape}")
-        print("Stats on output data for random normal input:")
-        print(tb.pd.DataFrame(np.array(op).flatten()).describe())
-        print("----------------------------------------", '\n\n')
+        if verbose:
+            print("============  Build Test ==============")
+            print(f"Input shape = {ip.shape}")
+            print(f"Output shape = {op.shape}")
+            print("Stats on output data for random normal input:")
+            print(tb.pd.DataFrame(np.array(op).flatten()).describe())
+            print("----------------------------------------", '\n\n')
 
 
 class Ensemble(tb.Base):

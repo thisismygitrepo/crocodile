@@ -45,6 +45,9 @@ class Base:
         np.save(path, self.__dict__, **kwargs)
 
     def save_pickle(self, path, itself=False, **kwargs):
+        """
+        :param itself: determiens whether to save the weights only or the entire class.
+        """
         if not itself:
             Save.pickle(path, self.__dict__, **kwargs)
         else:
@@ -108,19 +111,6 @@ class Base:
             return string_
 
 
-def assert_package_installed(package):
-    try:
-        pkg = __import__(package)
-        return pkg
-    except ImportError:
-        # import pip
-        # pip.main(['install', package])
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-    pkg = __import__(package)
-    return pkg
-
-
 class Log:
     def __init__(self, path=None):
         if path is None:
@@ -133,10 +123,11 @@ class Log:
         print(f"Finished ... have a look @ \n {self.path}")
 
     @staticmethod
-    def generate_readme(path, obj=None, meta=None):
-        if not "README.md" in str(path):
-            assert path.is_dir()
-            path = path / "README.md"
+    def generate_readme(filepath, obj=None, meta=None):
+        """Generates a readme file to contextualize any binary files.
+        """
+        filename = filepath[-1].trunk
+        readmepath = filepath / f"{filename}_README.md"
 
         text = "# Meta\n"
         if meta is not None:
@@ -146,7 +137,7 @@ class Log:
             lines = inspect.getsource(obj)
             lines = "```\n" + lines + "```\n"
             text += f"# Code generated me: \n'{inspect.getfile(obj)}'\n" + lines
-        path.write_text(text)
+        readmepath.write_text(text)
 
 
 class P(type(Path()), Path, Base):
@@ -233,7 +224,7 @@ class P(type(Path()), Path, Base):
             print("File not deleted because user is not sure.")
 
     def send2trash(self):
-        send2trash = assert_package_installed("send2trash")
+        send2trash = Experimental.assert_package_installed("send2trash")
         send2trash.send2trash(self.string)
 
     def move(self, new_path):
@@ -621,7 +612,7 @@ class Read:
         """returns Structure if the object loaded is a dictionary"""
         data = np.load(str(path), allow_pickle=True, **kwargs)
         if data.dtype == np.object:
-            data = data
+            data = data.item()
         if type(data) is dict:
             data = Struct(data)
         return data
@@ -680,7 +671,7 @@ class Read:
     @staticmethod
     def pickle(path, **kwargs):
         # import pickle
-        dill = assert_package_installed("dill")
+        dill = Experimental.assert_package_installed("dill")
         with open(path, 'rb') as file:
             obj = dill.load(file, **kwargs)
         if type(obj) is dict:
@@ -747,7 +738,7 @@ class Save:
 
     @staticmethod
     def pickle(path, obj, **kwargs):
-        dill = assert_package_installed("dill")
+        dill = Experimental.assert_package_installed("dill")
         # import dill
         with open(str(path), 'wb') as file:
             dill.dump(obj, file, **kwargs)
@@ -990,7 +981,7 @@ class List(list, Base):
 
         tqdm = 0
         if verbose or jobs:
-            assert_package_installed("tqdm")
+            Experimental.assert_package_installed("tqdm")
             from tqdm import tqdm
 
         if lest is None:
@@ -1343,7 +1334,37 @@ class Cycle:
         pass  # see behviour of matplotlib cyclers.
 
 
-class Debugger:
+class Experimental:
+    @staticmethod
+    def assert_package_installed(package):
+        try:
+            pkg = __import__(package)
+            return pkg
+        except ImportError:
+            # import pip
+            # pip.main(['install', package])
+            import subprocess
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        pkg = __import__(package)
+        return pkg
+
+    @staticmethod
+    def from_source_code(directory, obj: str=None):
+        """Does the following:
+
+        * Globs directory passed for ``source_code`` module.
+        * Loads the directory to the memroy.
+        * Returns either the package or a piece of it as indicated by ``obj``
+        """
+        P(directory).find("source_code*", r=True).unzip(tmpdir:=P.tmp() / get_time_stamp("tmp_sourcecode"))
+        sys.path.insert(0, str(tmpdir))
+        sourcefile = __import__(tmpdir.find("*").stem)
+        if obj is not None:
+            loaded = getattr(sourcefile, obj)
+            return loaded
+        else:
+            return sourcefile
+
     @staticmethod
     def get_locals(func):
         exec(Debugger.convert_to_global(func))  # run the function here.
@@ -1401,7 +1422,7 @@ class Debugger:
             arg_string += "kwargs = {}\n"
         result = arg_string + code_string
 
-        clipboard = assert_package_installed("clipboard")
+        clipboard = Experimental.assert_package_installed("clipboard")
         clipboard.copy(result)
         print("code to be run \n", result, "=" * 100)
         return result  # ready to be run with exec()
@@ -1449,7 +1470,7 @@ class Debugger:
         else:
             raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
         print(cell)
-        clipboard = assert_package_installed("clipboard")
+        clipboard = Experimental.assert_package_installed("clipboard")
         clipboard.copy(cell)
         return cell
 
@@ -2306,7 +2327,7 @@ class SaveType:
             self.data_gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs)
             plt.pause(0.5)  # give time for figures to show up before updating them
-            assert_package_installed("tqdm")
+            Experimental.assert_package_installed("tqdm")
             from tqdm import tqdm
             for idx, datum in tqdm(enumerate(self.data_gen())):
                 self.plotter.animate(datum)
@@ -2384,7 +2405,7 @@ class SaveType:
             self.data = gen_function
             self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
             plt.pause(0.5)  # give time for figures to show up before updating them
-            assert_package_installed("tqdm")
+            Experimental.assert_package_installed("tqdm")
             from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
                 for datum in tqdm(self.data()):
@@ -2429,9 +2450,9 @@ class VisibilityViewer(FigureManager):
 
     * Refresh mechanism.
 
-        * Clear the axis.
-        * accumulate, using visibility to hide previous axes.
-        * The artist has an update method.
+        * Clear the axis. (slowest, but easy on memory)
+        * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)
+        * The artist has an update method. (best)
 
     The artist has to have:
     

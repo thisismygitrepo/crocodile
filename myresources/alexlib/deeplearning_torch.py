@@ -134,7 +134,7 @@ class ImagesModel(PTBaseModel):
 
     # @tb.batcher(func_type='method')
     def postprocess(self, x, *args, **kwargs):
-        """
+        """  > cpu > squeeeze > np > undo norm
         Recieves tensors from model and returns numpy images.
         """
         x = AssertType.np(x.squeeze())
