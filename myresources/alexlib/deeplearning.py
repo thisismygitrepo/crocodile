@@ -488,7 +488,7 @@ class BaseModel(ABC):
         name = directory.glob('*.data*').__next__().__str__().split('.data')[0]
         self.model.load_weights(name)  # requires path to file name.
 
-    def save_class(self, weights_only=True, save_sourcecode=True, version='0', itself=False, **kwargs):
+    def save_class(self, weights_only=True, version='0', itself=False, **kwargs):
         """Simply saves everything:
 
         1. Hparams
@@ -500,25 +500,19 @@ class BaseModel(ABC):
         :return:
 
         """
-        _ = kwargs
-        self.hp.save_pickle(itself=itself)
-        self.data.save_pickle(itself=itself)
+        self.hp.save_pickle(itself=itself)  # goes into the meta folder.
+        self.data.save_pickle(itself=itself)  # goes into the meta folder.
+        self.history.save_npy(path=self.hp.save_dir / 'metadata/history.npy')  # goes to meta folder
 
+        # model save goes into data folder.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
         if weights_only:
             self.save_weights(save_dir)
         else:
             self.save_model(save_dir)
 
-        # Saving wrapper_class
-        import inspect
-        code_string = inspect.getsource(self.__class__)
-        meta_dir = tb.P(self.hp.save_dir).joinpath('metadata').create()
-        meta_dir.joinpath('model_arch.txt').write_text(code_string)
-        if save_sourcecode:
-            tb.P(inspect.getmodule(self).__file__).zip(op_path=meta_dir / "source_code")
-
-        self.history.save_npy(path=meta_dir.joinpath('history.npy'))
+        # Saving wrapper_class and model architecture in the main folder:
+        tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         print(f'Model class saved successfully!, check out: \n {self.hp.save_dir.as_uri()}')
 
     @classmethod
@@ -542,7 +536,7 @@ class BaseModel(ABC):
             data_path = path / DataReader.subpath
             data_obj = tb.Read.pickle(data_path) if data_path.exists() else None
         model_obj = cls(hp_obj, data_obj)
-        model_obj.load_weights(path.myglob('*_save_*')[0])
+        model_obj.load_weights(path.search('*_save_*')[0])
         history = path / "metadata/history.npy"
         model_obj.history = tb.List.from_saved(history) if history.exists() else tb.List()
         print(f"Class {model_obj.__class__} Loaded Successfully.")
@@ -553,7 +547,7 @@ class BaseModel(ABC):
         path = tb.P(path)
         data_obj = DataReader.from_saved(path)
         hp_obj = HyperParam.from_saved(path)
-        model_obj = cls.load_model(path.myglob('*_save_*')[0])  # static method.
+        model_obj = cls.load_model(path.search('*_save_*')[0])  # static method.
         tmp = cls.__init__
 
         def initializer(self, hp_object, data_object, model_object_):
@@ -640,14 +634,14 @@ class Ensemble(tb.Base):
 
     @classmethod
     def from_saved_models(cls, parent_dir, model_class):
-        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).myglob('*__model__*')))
-        obj.models = tb.P(parent_dir).myglob('*__model__*').apply(model_class.from_class_model)
+        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
+        obj.models = tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_model)
         return obj
 
     @classmethod
     def from_saved_weights(cls, parent_dir, model_class):
-        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).myglob('*__model__*')))
-        obj.models = tb.P(parent_dir).myglob('*__model__*').apply(model_class.from_class_weights)
+        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
+        obj.models = tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights)
         return obj
 
     def fit(self, shuffle_train_test=True, save=True, **kwargs):

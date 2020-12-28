@@ -6,7 +6,7 @@ import sys
 
 
 def compute_num_of_lines_of_code_in_repo(path=tb.P.cwd(), extension=".py", r=True, **kwargs):
-    return tb.P(path).myglob(f"*{extension}", r=r, **kwargs).read_text().splitlines().apply(len).np.sum()
+    return tb.P(path).search(f"*{extension}", r=r, **kwargs).read_text().splitlines().apply(len).np.sum()
 
 
 def polygon_area(points):

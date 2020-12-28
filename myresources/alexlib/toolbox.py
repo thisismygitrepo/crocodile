@@ -40,12 +40,11 @@ class Base:
         return inst
 
     def save_npy(self, path, **kwargs):
-        """this method goes with default `.npy` format (because it is generic).
-        # P(path).parent.create()"""
         np.save(path, self.__dict__, **kwargs)
 
     def save_pickle(self, path, itself=False, **kwargs):
         """
+        :param path:
         :param itself: determiens whether to save the weights only or the entire class.
         """
         if not itself:
@@ -76,24 +75,17 @@ class Base:
     # def get_dict(self):
     #     return list(self.__dict__.keys())
 
-    def __copy__(self):
-        return copy.copy(self)
-
-    def __deepcopy__(self, memodict=None):
-        _ = memodict
-        return copy.deepcopy(self)
-
-    def deepcopy(self, *args, **kwargs):
-        """Literally creates a new copy of values of old object, rather than referencing them"""
-        # similar to copy.deepcopy()
+    def __deepcopy__(self, *args, **kwargs):
+        """Literally creates a new copy of values of old object, rather than referencing them.
+        similar to copy.deepcopy()"""
         obj = self.__class__(*args, **kwargs)
         obj.__dict__.update(copy.deepcopy(self.__dict__))
         return obj
 
-    def shallowcopy(self, *args, **kwargs):
+    def __copy__(self, *args, **kwargs):
         """Shallow copy. New object, but the keys of which are referencing the values from the old object.
         Does similar functionality to copy.copy"""
-        obj = self.__class__.__init__(*args, **kwargs)
+        obj = self.__class__(*args, **kwargs)
         obj.__dict__.update(self.__dict__.copy())
         return obj
 
@@ -111,40 +103,13 @@ class Base:
             return string_
 
 
-class Log:
-    def __init__(self, path=None):
-        if path is None:
-            path = P('console_output')
-        self.path = path + '.log'
-        sys.stdout = open(self.path, 'w')
-
-    def finish(self):
-        sys.stdout.close()
-        print(f"Finished ... have a look @ \n {self.path}")
-
-    @staticmethod
-    def generate_readme(filepath, obj=None, meta=None):
-        """Generates a readme file to contextualize any binary files.
-        """
-        filename = filepath[-1].trunk
-        readmepath = filepath / f"{filename}_README.md"
-
-        text = "# Meta\n"
-        if meta is not None:
-            text = text + meta + "\n\n"
-        if obj is not None:
-            import inspect
-            lines = inspect.getsource(obj)
-            lines = "```\n" + lines + "```\n"
-            text += f"# Code generated me: \n'{inspect.getfile(obj)}'\n" + lines
-        readmepath.write_text(text)
-
-
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict=None):
+        if memodict is None:
+            _ = {}
         return P(str(self))
 
     def size(self, units='mb'):
@@ -241,6 +206,8 @@ class P(type(Path()), Path, Base):
     def copy(self, target=None, contents=False, verbose=False):
         """
         contents: copy the parent directory or its contents.
+
+        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
         """
         if target is None:
             target = self.append(f"_copy__{get_time_stamp()}")
@@ -277,7 +244,7 @@ class P(type(Path()), Path, Base):
 
     @property
     def browse(self):
-        return self.myglob("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
+        return self.search("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
 
     def absolute_from(self, reference=None):
         """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
@@ -337,27 +304,24 @@ class P(type(Path()), Path, Base):
         fullparts[key] = val
         return P(*fullparts)
 
-    def myglob(self, pattern='*', r=False, list_=True, files=True, folders=True, dotfiles=False,
-               return_type=None,
-               absolute=True, filters=None, win_order=False):
+    def search(self, pattern='*', r=False, list_=True, files=True, folders=True, dotfiles=False,
+               absolute=True, filters: list = None, win_order=False):
         """
-        :param win_order:
-        :param self:
-        :param filters:
-        :param dotfiles:
-        :param pattern:  regex expression.
-        :param r: recursive search
+        :param filters: list of filters
+        :param dotfiles: flag to indicate whether the search should include those or not.
+        :param pattern:  linux search pattern
+        :param r: recursive search flag
         :param list_: output format, list or generator.
         :param files: include files in search.
         :param folders: include directories in search.
-        :param return_type: output type, Pathlib objects or strings.
         :param absolute: return relative paths or abosolute ones.
+        :param win_order:
+
         :return: search results.
 
         # :param visible: exclude hidden files and folders (Windows)
         """
-        if return_type is None:
-            return_type = P
+        return_type = P
 
         if filters is None:
             filters = []
@@ -421,9 +385,9 @@ class P(type(Path()), Path, Base):
         return List(os.listdir(self)).apply(P)
 
     def find(self, *args, r=True, **kwargs):
-        """short for globbing then using next method to get the first result
+        """short for the method ``search`` then pick first item from results.
         """
-        results = self.myglob(*args, r=r, **kwargs)
+        results = self.search(*args, r=r, **kwargs)
         return results[0] if len(results) > 0 else None
 
     def readit(self, reader=None, **kwargs):
@@ -581,7 +545,7 @@ class Compression:
 
     @staticmethod
     def tar():
-        import tarfile
+        # import tarfile
         pass
 
     @staticmethod
@@ -659,10 +623,10 @@ class Read:
             return Struct(mydict)
 
     @staticmethod
-    def yaml(path, r=False, **kwargs):
+    def yaml(path, r=False):
         import yaml
         with open(str(path), "r") as file:
-            mydict = yaml.load(file, Loader=yaml.FullLoader, **kwargs)
+            mydict = yaml.load(file, Loader=yaml.FullLoader)
         if r:
             return Struct.recursive_struct(mydict)
         else:
@@ -711,7 +675,8 @@ class Save:
 
     @staticmethod
     def json(path, obj, **kwargs):
-        """This format is **compatible** with simple dictionaries that hold strings or numbers but nothing more than that.
+        """This format is **compatible** with simple dictionaries that hold strings or numbers
+         but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
         inspected using any text editor."""
         import json
@@ -739,7 +704,6 @@ class Save:
     @staticmethod
     def pickle(path, obj, **kwargs):
         dill = Experimental.assert_package_installed("dill")
-        # import dill
         with open(str(path), 'wb') as file:
             dill.dump(obj, file, **kwargs)
 
@@ -832,7 +796,7 @@ class List(list, Base):
         return List([copy.deepcopy(i) for i in self.list])
 
     def __copy__(self):
-        return self.__deepcopy__()
+        return List(self.list.copy())
 
     def __getstate__(self):
         return self.list
@@ -1335,6 +1299,17 @@ class Cycle:
 
 
 class Experimental:
+    class Log:
+        def __init__(self, path=None):
+            if path is None:
+                path = P('console_output')
+            self.path = path + '.log'
+            sys.stdout = open(self.path, 'w')
+
+        def finish(self):
+            sys.stdout.close()
+            print(f"Finished ... have a look @ \n {self.path}")
+
     @staticmethod
     def assert_package_installed(package):
         try:
@@ -1349,14 +1324,42 @@ class Experimental:
         return pkg
 
     @staticmethod
-    def from_source_code(directory, obj: str=None):
+    def generate_readme(path, obj=None, meta=None, save_source_code=True):
+        """Generates a readme file to contextualize any binary files.
+
+        :param path: directory or file path.
+        :param obj: Python module, class, method or function used to generate the result (not the result or an
+            instance of any class)
+        """
+        import inspect
+        path = P(path)
+        readmepath = path / f"README.md" if path.is_dir() else path
+
+        separator = "\n" + "-----" + "\n\n"
+        text = "# Meta\n"
+        if meta is not None:
+            text = text + meta
+        text += separator
+
+        if obj is not None:
+            lines = inspect.getsource(obj)
+            text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
+            text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
+        readmepath.write_text(text)
+        print(f"Successfully generated README.md file. Checkout:\n", readmepath.as_uri())
+        if save_source_code:
+            P(inspect.getmodule(obj).__file__).zip(op_path=readmepath.with_name("source_code.zip"))
+            print(readmepath.with_name("source_code.zip").as_uri())
+
+    @staticmethod
+    def load_from_source_code(directory, obj=None):
         """Does the following:
 
         * Globs directory passed for ``source_code`` module.
         * Loads the directory to the memroy.
         * Returns either the package or a piece of it as indicated by ``obj``
         """
-        P(directory).find("source_code*", r=True).unzip(tmpdir:=P.tmp() / get_time_stamp("tmp_sourcecode"))
+        P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / get_time_stamp("tmp_sourcecode"))
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
         if obj is not None:
@@ -1367,7 +1370,7 @@ class Experimental:
 
     @staticmethod
     def get_locals(func):
-        exec(Debugger.convert_to_global(func))  # run the function here.
+        exec(Experimental.convert_to_global(func))  # run the function here.
         return Struct(vars())
 
     @staticmethod
@@ -1377,14 +1380,14 @@ class Experimental:
     @staticmethod
     def in_main(func):  # a decorator
         def wrapper():  # a wrapper that remembers the function func because it was in the closure when construced.
-            local_dict = Debugger.get_locals(func)
-            Debugger.update_globals(local_dict)
+            local_dict = Experimental.get_locals(func)
+            Experimental.update_globals(local_dict)
 
         return wrapper
 
     @staticmethod
     def run_globally(func):
-        exec(Debugger.convert_to_global(func))
+        exec(Experimental.convert_to_global(func))
         globals().update(vars())
 
     @staticmethod
@@ -2772,7 +2775,7 @@ class ImShow(FigureManager):
     def from_directories(cls, *directories, extension='png', **kwargs):
         paths = []
         for a_dir in directories:
-            paths.append(P(a_dir).myglob(f"*.{extension}", win_order=True))
+            paths.append(P(a_dir).search(f"*.{extension}", win_order=True))
         return cls.from_saved_images_path_lists(*paths, **kwargs)
 
     @classmethod
