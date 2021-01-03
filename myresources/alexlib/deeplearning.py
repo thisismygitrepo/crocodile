@@ -291,7 +291,7 @@ class BaseModel(ABC):
     * :func:`BaseModel.predict` expects a processed input, uese infer and does postprocessing.
     * :func:`BaseModel.predict_from_s` reads, preprocess, then uses predict method.
     * :func:`BseModel.evaluate` Expects processed input and internally calls infer and postprocess methods.
-    
+
     """
 
     @abstractmethod
@@ -404,11 +404,12 @@ class BaseModel(ABC):
         inferred = self.infer(x)
         return self.postprocess(inferred, **kwargs)
 
-    def deduce(self, obj_s, viz=True, **kwargs):
-        preprocessed = np.concatenate([self.preprocess(obj) for obj in obj_s], axis=0)
+    def deduce(self, obj, viz=True, **kwargs):
+        """Assumes that contents of the object are in the form of a batch."""
+        preprocessed = self.preprocess(obj)
         prediction = self.infer(preprocessed)
         postprocessed = self.postprocess(prediction, **kwargs)
-        result = tb.Struct(input=obj_s, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
+        result = tb.Struct(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz:
             self.viz(postprocessed, **kwargs)
         return result
@@ -569,10 +570,17 @@ class BaseModel(ABC):
             print("==============================")
 
     def plot_model(self, **kwargs):
+        """
+        .. note:: Functionally or Sequentually built models are much more powerful than Subclassed models.
+            They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
+            Alternative visualization is via tf2onnx then Netron.
+        """
         import tensorflow as tf
         tf.keras.utils.plot_model(self.model, to_file=self.hp.save_dir / 'model_plot.png',
-                                  show_shapes=True, show_layer_names=True, **kwargs)
-        print('Successfully plotted the model')
+                                  show_shapes=True, show_layer_names=True, show_dtype=True,
+                                  expand_nested=True,
+                                  dpi=150, **kwargs)
+        print('Successfully plotted the model, check out \n', (self.hp.save_dir / 'model_plot.png').as_uri())
 
     def build(self, shape=None, verbose=True):
         """ Building has two main uses.

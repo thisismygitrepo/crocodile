@@ -28,6 +28,14 @@ class TorchDataReader(dl.DataReader):
         batch = next(iter(loader))[0]
         return loader, batch
 
+    def to_torch_tensor(self, x):
+        """.. note:: Data type is inferred from the input."""
+        return t.tensor(x).to(self.hp.device)
+
+    @staticmethod
+    def to_numpy(x):
+        return x.cpu().detach().numpy()
+
 
 class PTBaseModel(dl.BaseModel, dl.ABC):
 
@@ -57,8 +65,8 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
     def infer(self, xx):
         self.model.eval()
         with t.no_grad():
-            op = self.model(AssertType.pt(xx, self.hp.device)).cpu()
-        return AssertType.np(op)
+            op = self.model(self.data.to_torch_tensor(xx))
+        return self.data.to_numpy(op)
 
     def fit(self, epochs=None, plot=True, **kwargs):
         """
@@ -111,7 +119,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
 
     def deploy(self, dummy_ip=None):
         if not dummy_ip:
-            dummy_ip = AssertType.pt(self.data.split.x_train[:1])
+            dummy_ip = t.randn_like(self.data.split.x_train[:1]).to(self.hp.device)
         from torch import onnx
         onnx.export(self.model, dummy_ip, 'onnx_model.onnx', verbose=True)
 
@@ -122,24 +130,23 @@ class ImagesModel(PTBaseModel):
 
     # @tb.batcher(func_type='method')
     def preprocess(self, images):
-        """
-        Recieves 2D numpy input and returns tensors ready to be fed to Pytorch model.
-        mu, sig = 47, 8
+        """Recieves Batch of 2D numpy input and returns tensors ready to be fed to Pytorch model.
         """
         images[images == 0] = self.hp.ip_mu  # To fix contrast issues, change the invalid region from 0 to 1.
-        images = images[:, None, ...]
+        images = images[:, None, ...]  # add channel axis first
         images = (images - self.hp.ip_mu) / self.hp.ip_sig
-        images = t.tensor(images, dtype=t.float32).to(self.hp.device)
+        images = self.data.to_torch_tensor(images)
         return images
 
     # @tb.batcher(func_type='method')
-    def postprocess(self, x, *args, **kwargs):
+    def postprocess(self, images, *args, **kwargs):
         """  > cpu > squeeeze > np > undo norm
         Recieves tensors from model and returns numpy images.
         """
-        x = AssertType.np(x.squeeze())
-        x = (x * self.hp.op_sig) + self.hp.op_mu
-        return x
+        images = self.data.to_numpy(images)
+        images = images[:, 0, ...]  # removing channel axis.
+        images = (images * self.hp.op_sig) + self.hp.op_mu
+        return images
 
     @staticmethod
     def make_channel_last(images):
@@ -179,7 +186,7 @@ def check_shapes(module, ip):
                 op = a_layer(op)
         print(f'{idx + 1:2}- {a_name:20s}, {op.shape}')
     print("Stats on output data for random normal input:")
-    print(dl.tb.pd.DataFrame(AssertType.np(op).flatten()).describe())
+    print(dl.tb.pd.DataFrame(TorchDataReader.to_numpy(op).flatten()).describe())
     return op
 
 
@@ -221,35 +228,6 @@ class View(t.nn.Module, ABC):
 
     def forward(self, xx):
         return xx.view(*self.shape)
-
-
-class AssertType:
-    @staticmethod
-    def pt(x, device='cpu'):
-        # import torch
-        if type(x) == np.ndarray:
-            return t.tensor(x.astype('float32')).to(device)
-        else:
-            return x.to(device)
-
-    @staticmethod
-    def np(x):
-        # import torch
-        # import tensorflow as tf
-        if x.dtype is t.float32:
-            return x.cpu().detach().numpy()
-        # elif x.dtype is tf.float32:
-        #     return x.numpy()
-        else:
-            return x
-
-    @staticmethod
-    def tf(x):
-        import tensorflow as tf
-        if type(x) is np.ndarray:
-            return tf.convert_to_tensor(x.astype('float32'))  # Which device?
-        else:
-            return x
 
 
 class MeanSquareError:

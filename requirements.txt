@@ -13,6 +13,4 @@ send2trash
 clipboard
 skimage
 twine
-
-alexlib~=0.1.11
 torch~=1.7.0

@@ -160,14 +160,14 @@ class P(type(Path()), Path, Base):
     def __add__(self, name):
         return self.parent.joinpath(self.stem + name)
 
-    def prepend(self, name, stem=False):
+    def prepend(self, prefix, stem=False):
         """Add extra text before file name
         e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension
         """
         if stem:
-            return self.parent.joinpath(name + '_' + self.stem)
+            return self.parent.joinpath(prefix + self.stem)
         else:
-            return self.parent.joinpath(name + '_' + self.name)
+            return self.parent.joinpath(prefix + self.name)
 
     def append(self, name='', suffix=None):
         """Add extra text after file name, and optionally add extra suffix.
@@ -284,6 +284,8 @@ class P(type(Path()), Path, Base):
     def __getitem__(self, slici):
         if type(slici) is slice:
             return P(*self.parts[slici])
+        elif type(slici) is list or type(slice) is np.ndarray:
+            return P(*[self[item] for item in slici])
         else:
             return P(self.parts[slici])
 
@@ -842,8 +844,11 @@ class List(list, Base):
 
     # ======================== Access Methods ==========================================
     def __getitem__(self, key):
+        if type(key) is list or type(key) is np.ndarray:  # to allow fancy indexing like List[1, 5, 6]
+            return List([self[item] for item in key])
+
         # behaves similarly to Numpy A[1] vs A[1:2]
-        result = self.list[key]
+        result = self.list[key]  # return the required item only (not a List)
         if type(key) is not slice:
             return result  # choose one item
         else:
@@ -851,6 +856,9 @@ class List(list, Base):
 
     def __setitem__(self, key, value):
         self.list[key] = value
+
+    def sample(self, size=1):
+        return self[np.random.choice(len(self), size)]
 
     def to_struct(self, keys=None, values=None):
         """"""
@@ -1022,9 +1030,6 @@ class List(list, Base):
     def np(self):
         return np.array(self.list)
 
-    def sample(self, size=1):
-        return L(self.np[np.random.choice(len(self.list), size)])  # convert to numpy as it allows fancy indexing
-
 
 L = List
 
@@ -1189,7 +1194,7 @@ class Struct(Base):
         return Struct(self.concat_dicts_(*((self.dict,) + others), **kwargs))
 
     @staticmethod
-    def concat_dicts_(*dicts, method=None, lenient=True, collect_items=False, copy_=True):
+    def concat_dicts_(*dicts, method=None, lenient=True, collect_items=False, clone=True):
         if method is None:
             method = list.__add__
         if not lenient:
@@ -1197,7 +1202,7 @@ class Struct(Base):
             for i in dicts[1:]:
                 assert i.keys() == keys
         # else if lenient, take the union
-        if copy_:
+        if clone:
             total_dict = copy.deepcopy(dicts[0])  # take first dict in the tuple
         else:
             total_dict = dicts[0]  # take first dict in the tuple
@@ -1345,8 +1350,10 @@ class Experimental:
             lines = inspect.getsource(obj)
             text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
+
         readmepath.write_text(text)
         print(f"Successfully generated README.md file. Checkout:\n", readmepath.as_uri())
+
         if save_source_code:
             P(inspect.getmodule(obj).__file__).zip(op_path=readmepath.with_name("source_code.zip"))
             print(readmepath.with_name("source_code.zip").as_uri())
@@ -1668,8 +1675,8 @@ class FigureManager:
     Handles figures of matplotlib.
     """
 
-    def __init__(self, info_loc=None, figure_policy=FigurePolicy.same):
-        self.figure_policy = figure_policy
+    def __init__(self, info_loc=None, fig_policy=FigurePolicy.same):
+        self.fig_policy = fig_policy
         self.fig = self.ax = self.event = None
         self.cmaps = Cycle(plt.colormaps())
         import matplotlib.colors as mcolors
@@ -1968,17 +1975,17 @@ class FigureManager:
                 ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8)
 
     @staticmethod
-    def update(fig_name, obj_name, data=None):
+    def update(figname, obj_name, data=None):
         """Fastest update ever. But, you need access to label name.
         Using this function external to the plotter. But inside the plotter you need to define labels to objects
         The other alternative is to do the update inside the plotter, but it will become very verbose.
 
-        :param fig_name:
+        :param figname:
         :param obj_name:
         :param data:
         :return:
         """
-        obj = FigureManager.findobj(fig_name, obj_name)
+        obj = FigureManager.findobj(figname, obj_name)
         if data is not None:
             obj.set_data(data)
             # update scale:
@@ -1986,39 +1993,39 @@ class FigureManager:
             # obj.axes.autoscale()
 
     @staticmethod
-    def findobj(fig_name, obj_name):
-        if type(fig_name) is str:
-            fig = plt.figure(num=fig_name)
+    def findobj(figname, obj_name):
+        if type(figname) is str:
+            fig = plt.figure(num=figname)
         else:
-            fig = fig_name
+            fig = figname
         search_results = fig.findobj(lambda x: x.get_label() == obj_name)
         if len(search_results) > 0:  # list of length 1, 2 ...
             search_results = search_results[0]  # the first one is good enough.
         return search_results
 
     def get_fig(self, figname='', suffix=None, **kwargs):
-        return FigureManager.get_fig_static(self.figure_policy, figname, suffix, **kwargs)
+        return FigureManager.get_fig_static(self.fig_policy, figname, suffix, **kwargs)
 
     @staticmethod
-    def get_fig_static(figure_policy, figname='', suffix=None, **kwargs):
+    def get_fig_static(fig_policy, figname='', suffix=None, **kwargs):
         """
-        :param figure_policy:
+        :param fig_policy:
         :param figname:
-        :param suffix: only relevant if figure_policy is add_new
+        :param suffix: only relevant if fig_policy is add_new
         :param kwargs:
         :return:
         """
         fig = None
         exist = True if figname in plt.get_figlabels() else False
-        if figure_policy is FigurePolicy.same:
+        if fig_policy is FigurePolicy.same:
             fig = plt.figure(num=figname, **kwargs)
-        elif figure_policy is FigurePolicy.add_new:
+        elif fig_policy is FigurePolicy.add_new:
             if exist:
                 new_name = get_time_stamp(figname) if suffix is None else figname + suffix
             else:
                 new_name = figname
             fig = plt.figure(num=new_name, **kwargs)
-        elif figure_policy is FigurePolicy.close_create_new:
+        elif fig_policy is FigurePolicy.close_create_new:
             if exist:
                 plt.close(figname)
             fig = plt.figure(num=figname, **kwargs)
@@ -2127,7 +2134,7 @@ class SaveType:
             self.counter = 0
             self.max = max_calls
 
-        def add(self, fig_names=None, names=None, **kwargs):
+        def add(self, fignames=None, names=None, **kwargs):
             print(f"Saver added frame number {self.counter}", end='\r')
             self.counter += 1
             plt.pause(self.delay * 0.001)
@@ -2135,8 +2142,8 @@ class SaveType:
                 print('Turning off IO')
                 plt.ioff()
 
-            if fig_names:  # name sent explicitly
-                self.watch_figs = [plt.figure(fig_name) for fig_name in fig_names]
+            if fignames:  # name sent explicitly
+                self.watch_figs = [plt.figure(figname) for figname in fignames]
             else:  # tow choices:
                 if self.watch_figs is None:  # None exist ==> add all
                     figure_names = plt.get_figlabels()  # add all.
@@ -2612,7 +2619,7 @@ class ImShow(FigureManager):
                  save_type=SaveType.Null, save_name=None, save_dir=None, save_kwargs=None,
                  subplots_adjust=None, gridspec=None, tight=True, info_loc=None,
                  nrows=None, ncols=None, ax=None,
-                 figsize=None, figname='im_show', figure_policy=FigurePolicy.add_new,
+                 figsize=None, figname='im_show', fig_policy=FigurePolicy.add_new,
                  auto_brightness=True, delay=200, pause=False,
                  **kwargs):
         """
@@ -2680,7 +2687,7 @@ class ImShow(FigureManager):
         self.cmaps.set('viridis')
         self.auto_brightness = auto_brightness
         if ax is None:
-            self.figure_policy = figure_policy
+            self.fig_policy = fig_policy
             self.fig = self.get_fig(figname=figname,
                                     figsize=(14, 9) if figsize is None else figsize, facecolor='white')
             if figsize is None:
@@ -2823,8 +2830,8 @@ class ImShow(FigureManager):
 
 class Artist(FigureManager):
     def __init__(self, *args, ax=None, figname='Graph', title='', label='curve', style='seaborn',
-                 create_new_axes=False, figure_policy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
-        super().__init__(figure_policy=figure_policy)
+                 create_new_axes=False, fig_policy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
+        super().__init__(fig_policy=fig_policy)
         self.style = style
         # self.kwargs = kwargs
         self.title = title
