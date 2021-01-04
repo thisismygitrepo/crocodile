@@ -503,7 +503,7 @@ class BaseModel(ABC):
         """
         self.hp.save_pickle(itself=itself)  # goes into the meta folder.
         self.data.save_pickle(itself=itself)  # goes into the meta folder.
-        self.history.save_npy(path=self.hp.save_dir / 'metadata/history.npy')  # goes to meta folder
+        self.history.save_npy(path=self.hp.save_dir / 'metadata/history.npy', itself=True)  # goes to meta folder
 
         # model save goes into data folder.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
@@ -670,29 +670,44 @@ class Ensemble(tb.Base):
         pass
 
 
-def get_mean_max_error(tf):
-    """
-    For Tensorflow
-    """
+class Losses:
+    @staticmethod
+    def get_log_square_loss_class():
+        import tensorflow as tf
+        class LogSquareLoss(tf.keras.losses.Loss):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.name = "LogSquareLoss"
 
-    class MeanMaxError(tf.keras.metrics.Metric):
-        def __init__(self, name='MeanMaximumError', **kwargs):
-            super(MeanMaxError, self).__init__(name=name, **kwargs)
-            self.mme = self.add_weight(name='mme', initializer='zeros')
-            self.__name__ = name
+            def call(self, y_true, y_pred):
+                factor = (20 / tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype)))
+                return factor * tf.math.log(tf.reduce_mean(abs(y_true - y_pred)))
+        return LogSquareLoss
 
-        def update_state(self, y_true, y_pred, sample_weight=None):
-            if sample_weight is None:
-                sample_weight = 1.0
-            self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight * tf.abs(y_pred - y_true), axis=1)))
+    @staticmethod
+    def get_mean_max_error(tf):
+        """
+        For Tensorflow
+        """
 
-        def result(self):
-            return self.mme
+        class MeanMaxError(tf.keras.metrics.Metric):
+            def __init__(self, name='MeanMaximumError', **kwargs):
+                super(MeanMaxError, self).__init__(name=name, **kwargs)
+                self.mme = self.add_weight(name='mme', initializer='zeros')
+                self.__name__ = name
 
-        def reset_states(self):
-            self.mme.assign(0.0)
+            def update_state(self, y_true, y_pred, sample_weight=None):
+                if sample_weight is None:
+                    sample_weight = 1.0
+                self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight * tf.abs(y_pred - y_true), axis=1)))
 
-    return MeanMaxError
+            def result(self):
+                return self.mme
+
+            def reset_states(self):
+                self.mme.assign(0.0)
+
+        return MeanMaxError
 
 
 class HPTuning:

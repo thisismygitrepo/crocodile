@@ -106,12 +106,7 @@ class Base:
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
-
-    def __deepcopy__(self, memodict=None):
-        if memodict is None:
-            _ = {}
-        return P(str(self))
-
+    # ===================================== File Specs ================================================================
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
         factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
@@ -128,29 +123,21 @@ class P(type(Path()), Path, Base):
             raise TypeError("This thing is not a file nor a folder.")
         return round(total_size / factor, 1)
 
-    def get_num(self, astring=None):
-        if astring is None:
-            astring = self.stem
-        return int("".join(filter(str.isdigit, str(astring))))
+    def time(self, which="m", **kwargs):
+        """Meaning of ``which values``
+            * ``m`` time of modifying file ``content``, i.e. the time it was created.
+            * ``c`` time of changing file status (its inode is changed like permissions, name etc, but not contents)
+            * ``a`` last time the file was accessed.
 
-    def make_valid_filename(self, replace='_'):
-        return self.make_valid_filename_(self.trunk, replace=replace)
+        :param which: Determines which time to be returned. Three options are availalable:
+        :param kwargs:
+        :return:
+        """
+        time = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
+        from datetime import datetime
+        return datetime.fromtimestamp(time, **kwargs)
 
-    @staticmethod
-    def make_valid_filename_(astring, replace='_'):
-        return re.sub(r'^(?=\d)|\W', replace, str(astring))
-
-    @staticmethod
-    def get_random_string(length=10, pool=None):
-        if pool is None:
-            pool = string.ascii_letters
-        import random
-        result_str = ''.join(random.choice(pool) for _ in range(length))
-        return result_str
-
-    def as_unix(self):
-        return P(str(self).replace('\\', '/').replace('//', '/'))
-
+    # ================================ Path Object management ===========================================
     @property
     def trunk(self):
         """ useful if you have multiple dots in file name where .stem fails.
@@ -176,75 +163,6 @@ class P(type(Path()), Path, Base):
         if suffix is None:
             suffix = ''.join(self.suffixes)
         return self.parent.joinpath(self.stem + '_' + name + suffix)
-
-    def delete(self, are_you_sure=False):
-        if are_you_sure:
-            if self.is_file():
-                self.unlink()  # missing_ok=True added in 3.8
-            else:
-                import shutil
-                shutil.rmtree(self, ignore_errors=True)
-                # self.rmdir()  # dir must be empty
-        else:
-            print("File not deleted because user is not sure.")
-
-    def send2trash(self):
-        send2trash = Experimental.assert_package_installed("send2trash")
-        send2trash.send2trash(self.string)
-
-    def move(self, new_path):
-        new_path = P(new_path)
-        temp = self.absolute()
-        temp.rename(new_path.absolute() / temp.name)
-        return new_path
-
-    def renameit(self, new_name):
-        new_path = self.parent / new_name
-        self.rename(new_path)
-        return new_path
-
-    def copy(self, target=None, contents=False, verbose=False):
-        """
-        contents: copy the parent directory or its contents.
-
-        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
-        """
-        if target is None:
-            target = self.append(f"_copy__{get_time_stamp()}")
-            contents = True
-        if self.is_file():
-            import shutil
-            shutil.copy(str(self), str(target))  # str() only there for Python < (3.6)
-            if verbose:
-                print(f"File \n{self}\ncopied successfully to: \n{target}")
-        elif self.is_dir():
-            from distutils.dir_util import copy_tree
-            if contents:
-                copy_tree(str(self), str(target))
-            else:
-                target = P(target).joinpath(self.name).create()
-                copy_tree(str(self), str(target))
-        return target
-
-    def clean(self):
-        """removes contents on a folder, rather than deleting the folder."""
-        contents = self.listdir()
-        for content in contents:
-            self.joinpath(content).send2trash()
-        return self
-
-    def create(self, parents=True, exist_ok=True, parent_only=False):
-        """Creates directory while returning the same object
-        """
-        if parent_only:
-            self.parent.mkdir(parents=parents, exist_ok=exist_ok)
-        else:
-            self.mkdir(parents=parents, exist_ok=exist_ok)
-        return self
-
-    @property
-    def browse(self):
-        return self.search("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
 
     def absolute_from(self, reference=None):
         """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
@@ -306,91 +224,98 @@ class P(type(Path()), Path, Base):
         fullparts[key] = val
         return P(*fullparts)
 
-    def search(self, pattern='*', r=False, list_=True, files=True, folders=True, dotfiles=False,
-               absolute=True, filters: list = None, win_order=False):
-        """
-        :param filters: list of filters
-        :param dotfiles: flag to indicate whether the search should include those or not.
-        :param pattern:  linux search pattern
-        :param r: recursive search flag
-        :param list_: output format, list or generator.
-        :param files: include files in search.
-        :param folders: include directories in search.
-        :param absolute: return relative paths or abosolute ones.
-        :param win_order:
+    def __deepcopy__(self, memodict=None):
+        if memodict is None:
+            _ = {}
+        return P(str(self))
 
-        :return: search results.
+    # ================================ String Nature management ====================================
+    def __repr__(self):  # this is useful only for the console
+        return "AlexPath(" + self.__str__() + ")"
 
-        # :param visible: exclude hidden files and folders (Windows)
-        """
-        return_type = P
+    @property
+    def string(self):  # this method is used by other functions to get string representation of path
+        return str(self)
 
-        if filters is None:
-            filters = []
-        else:
-            pass
+    def get_num(self, astring=None):
+        if astring is None:
+            astring = self.stem
+        return int("".join(filter(str.isdigit, str(astring))))
 
-        if dotfiles:
-            raw = self.glob(pattern) if not r else self.rglob(pattern)
-            raw = list(raw)
-        else:
-            if r:
-                path = self / "**" / pattern
-                raw = [Path(item) for item in glob(str(path), recursive=r)]
+    def make_valid_filename(self, replace='_'):
+        return self.make_valid_filename_(self.trunk, replace=replace)
+
+    @staticmethod
+    def make_valid_filename_(astring, replace='_'):
+        return re.sub(r'^(?=\d)|\W', replace, str(astring))
+
+    @staticmethod
+    def get_random_string(length=10, pool=None):
+        if pool is None:
+            pool = string.ascii_letters
+        import random
+        result_str = ''.join(random.choice(pool) for _ in range(length))
+        return result_str
+
+    def as_unix(self):
+        return P(str(self).replace('\\', '/').replace('//', '/'))
+
+    # ==================================== File management =========================================
+    def delete(self, are_you_sure=False):
+        if are_you_sure:
+            if self.is_file():
+                self.unlink()  # missing_ok=True added in 3.8
             else:
-                path = self.joinpath(pattern)
-                raw = [Path(item) for item in glob(str(path))]
-
-        # if os.name == 'nt':
-        #     import win32api, win32con
-
-        # def folder_is_hidden(p):
-        #     if os.name == 'nt':
-        #         attribute = win32api.GetFileAttributes(p)
-        #         return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
-
-        if not raw:  # if empty, don't proceeed
-            return List(raw)
-
-        if absolute:
-            if not raw[0].is_absolute():
-                raw = [item.absolute() for item in raw]
-
-        def run_filter(item):
-            flags = [True]
-            if not files:
-                flags.append(item.is_dir())
-            if not folders:
-                flags.append(item.is_file())
-            for afilter in filters:
-                flags.append(afilter(item))
-            return all(flags)
-
-        if list_:
-            processed = list(filter(run_filter, raw))
-            processed = [return_type(item) for item in processed]
-            if win_order:
-                processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
-            return List(processed)
+                import shutil
+                shutil.rmtree(self, ignore_errors=True)
+                # self.rmdir()  # dir must be empty
         else:
-            def generator():
-                flag = False
-                while not flag:
-                    item = next(raw)
-                    flag = run_filter(item)
-                    if flag:
-                        yield return_type(item)
+            print("File not deleted because user is not sure.")
 
-            return generator
+    def send2trash(self):
+        send2trash = Experimental.assert_package_installed("send2trash")
+        send2trash.send2trash(self.string)
 
-    def listdir(self):
-        return List(os.listdir(self)).apply(P)
+    def move(self, new_path):
+        new_path = P(new_path)
+        temp = self.absolute()
+        temp.rename(new_path.absolute() / temp.name)
+        return new_path
 
-    def find(self, *args, r=True, **kwargs):
-        """short for the method ``search`` then pick first item from results.
+    def renameit(self, new_name):
+        new_path = self.parent / new_name
+        self.rename(new_path)
+        return new_path
+
+    def copy(self, target=None, contents=False, verbose=False):
         """
-        results = self.search(*args, r=r, **kwargs)
-        return results[0] if len(results) > 0 else None
+        contents: copy the parent directory or its contents.
+
+        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
+        """
+        if target is None:
+            target = self.append(f"_copy__{get_time_stamp()}")
+            contents = True
+        if self.is_file():
+            import shutil
+            shutil.copy(str(self), str(target))  # str() only there for Python < (3.6)
+            if verbose:
+                print(f"File \n{self}\ncopied successfully to: \n{target}")
+        elif self.is_dir():
+            from distutils.dir_util import copy_tree
+            if contents:
+                copy_tree(str(self), str(target))
+            else:
+                target = P(target).joinpath(self.name).create()
+                copy_tree(str(self), str(target))
+        return target
+
+    def clean(self):
+        """removes contents on a folder, rather than deleting the folder."""
+        contents = self.listdir()
+        for content in contents:
+            self.joinpath(content).send2trash()
+        return self
 
     def readit(self, reader=None, **kwargs):
         if reader is None:
@@ -412,15 +337,118 @@ class P(type(Path()), Path, Base):
             import subprocess
             subprocess.call(["open", filename])  # works for files and folders alike
 
-    # def open_with_system(self):
-    #     self.explore()  # if it is a file, it will be opened with its default program.
-
-    def __repr__(self):  # this is useful only for the console
-        return "AlexPath(" + self.__str__() + ")"
+    # ======================================== Folder management =======================================
+    def create(self, parents=True, exist_ok=True, parent_only=False):
+        """Creates directory while returning the same object
+        """
+        if parent_only:
+            self.parent.mkdir(parents=parents, exist_ok=exist_ok)
+        else:
+            self.mkdir(parents=parents, exist_ok=exist_ok)
+        return self
 
     @property
-    def string(self):  # this method is used by other functions to get string representation of path
-        return str(self)
+    def browse(self):
+        return self.search("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
+
+
+    def search(self, pattern='*', r=False, generator=False, files=True, folders=True, dotfiles=False,
+               absolute=True, filters: list = None, not_in: list=None, win_order=False):
+        """
+        :param filters: list of filters
+        :param dotfiles: flag to indicate whether the search should include those or not.
+        :param pattern:  linux search pattern
+        :param r: recursive search flag
+        :param generator: output format, list or generator.
+        :param files: include files in search.
+        :param folders: include directories in search.
+        :param absolute: return relative paths or abosolute ones.
+        :param win_order:
+
+        :return: search results.
+
+        # :param visible: exclude hidden files and folders (Windows)
+        """
+        # ================= Get concrete values for default arguments ========================================
+        if filters is None:
+            filters = []
+        else:
+            pass
+
+        if not_in is not None:
+            for notin in not_in:
+                filters += [lambda x: str(notin) not in str(x)]
+
+        # ============================ get generator of search results ========================================
+        if dotfiles:
+            raw = self.glob(pattern) if not r else self.rglob(pattern)
+        else:
+            if r:
+                path = self / "**" / pattern
+                raw = glob(str(path), recursive=r)
+            else:
+                path = self.joinpath(pattern)
+                raw = glob(str(path))
+
+
+               # if os.name == 'nt':
+        #     import win32api, win32con
+
+        # def folder_is_hidden(p):
+        #     if os.name == 'nt':
+        #         attribute = win32api.GetFileAttributes(p)
+        #         return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
+
+        def run_filter(item):
+            flags = [True]
+            if not files:
+                flags.append(item.is_dir())
+            if not folders:
+                flags.append(item.is_file())
+            for afilter in filters:
+                flags.append(afilter(item))
+            return all(flags)
+
+        def do_screening(item):
+            item = P(item)  # because some filters needs advanced functionalities of P objects.
+            if absolute:
+                item = item.absolute()
+
+            if run_filter(item):
+                return item
+            else:
+                return None
+
+        if generator:
+            def gen():
+                flag = False
+                while not flag:
+                    item = next(raw)
+                    flag = do_screening(item)
+                    if flag:
+                        yield item
+
+            return gen
+        else:
+            # unpack the generator and vet the items (the function also returns P objects)
+            processed = [result for item in raw if (result:=do_screening(item))]
+            if not processed:  # if empty, don't proceeed
+                return List(processed)
+            if win_order:  # this option only supported in non-generator mode.
+                processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
+            return List(processed)
+
+    def listdir(self):
+        return List(os.listdir(self)).apply(P)
+
+    def find(self, *args, r=True, **kwargs):
+        """short for the method ``search`` then pick first item from results.
+        """
+        results = self.search(*args, r=r, **kwargs)
+        return results[0] if len(results) > 0 else None
+
+    # def open_with_system(self):
+    #     self.explore()  # if it is a file, it will be opened with its default program.
 
     @staticmethod
     def tmp(folder=None, fn=None, path="home"):
@@ -438,6 +466,7 @@ class P(type(Path()), Path, Base):
             path = path / fn
         return path
 
+    # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):
         """
         """

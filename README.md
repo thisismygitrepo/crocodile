@@ -6,8 +6,8 @@ Fill your life with one-liners, take your code to artistic level of brevity and 
 This package extends many native Python classes to equip you with an uneasy-to-tame power. The major classes extended are:
  
  * `list` is  extended to `List`
-    * Forget that `for` loops exist in your life, because with this class, `for` loops are implicitly applied to all items.
-      Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them.  `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. This is the power of implicit `for` loops.
+    * Forget that `for` loops exist, because with this class, `for` loops are implicitly used to apply a function to all items.
+      Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them.  `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. Behaviour is ala-JavaScript implementation of ``forEach`` method of Arrays.
 
   * `dict` is  extended to `Struct`.
     * Combines the power of dot notation like classes and key access like dictionaries.
@@ -25,10 +25,10 @@ This package extends many native Python classes to equip you with an uneasy-to-t
      ```
      This and much more, is only on top of the indespensible `pathlib.Path` functionalities.
         
-   * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and reloading in one line.
+   * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and loading in one line.
 
    
-Furthermore, those classes are inextricably connected. Example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.
+Furthermore, those classes are inextricably connected. For example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.
 
 
 # Install
