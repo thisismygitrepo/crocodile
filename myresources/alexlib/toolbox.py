@@ -66,7 +66,7 @@ class Base:
         return self
 
     def get_attributes(self):
-        attrs = list(filter(lambda x: '__' not in x, dir(self)))
+        attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
         return attrs
         # [setattr(Path, name, getattr(MyPath, name)) for name in funcs]
 
@@ -162,7 +162,7 @@ class P(type(Path()), Path, Base):
         """
         if suffix is None:
             suffix = ''.join(self.suffixes)
-        return self.parent.joinpath(self.stem + '_' + name + suffix)
+        return self.parent.joinpath(self.stem + name + suffix)
 
     def absolute_from(self, reference=None):
         """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
@@ -363,7 +363,7 @@ class P(type(Path()), Path, Base):
         :param files: include files in search.
         :param folders: include directories in search.
         :param absolute: return relative paths or abosolute ones.
-        :param win_order:
+        :param win_order: return search results in the order of files as they appear on a Windows machine.
 
         :return: search results.
 
