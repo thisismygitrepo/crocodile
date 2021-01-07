@@ -95,7 +95,7 @@ class Base:
             if expected == 'func':
                 return eval("lambda x: " + string_)
             elif expected == 'self':
-                if "self." in string_:
+                if "self" in string_:
                     return eval(string_)
                 else:
                     return string_
@@ -1157,16 +1157,24 @@ class Struct(Base):
             repr_string += str(key) + ", "
         return "Structure, with following keys:\n" + repr_string
 
-    def print(self, yaml=False):
+    def print(self, sep=20, yaml=False):
         if yaml:
             self.save_yaml(P.tmp(fn="__tmp.yaml"))
             txt = P.tmp(fn="__tmp.yaml").read_text()
             print(txt)
             return None
         repr_string = ""
-        for item, value in self.__dict__.items():
-            repr_string += f"{item} = {value}\n"
-        print("Structure\n" + repr_string)
+        repr_string += "Structure, with following entries:\n"
+        repr_string += "Key" + " " * sep + "Item Type" + " " * sep + "Item Details\n"
+        repr_string += "---" + " " * sep + "---------" + " " * sep + "------------\n"
+        for key in self.keys().list:
+            key_str = str(key)
+            type_str = str(type(self[key]))
+            val_str = DisplayData.get_repr(self[key])
+            repr_string += key_str + " " * abs(sep - len(key_str)) +\
+                           type_str + " " * abs(sep - len(type_str)) +\
+                           val_str + "\n"
+        print(repr_string)
 
     def __str__(self):
         mystr = str(self.__dict__)
@@ -1662,18 +1670,17 @@ class DisplayData:
         # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
     @staticmethod
-    def summarize(array, name=None, print_=True):
-        if name is None:
-            name = type(array)
-
-        if type(array) is np.ndarray:
-            string_ = f"{name}: shape = {array.shape}, dtype = {array.dtype}."
-        else:
-            string_ = f"{name}: {str(array)}"
-        if not print_:
+    def get_repr(data):
+        """A well-behaved repr function for all data types."""
+        if type(data) is np.ndarray:
+            string_ = f"shape = {data.shape}, dtype = {data.dtype}."
             return string_
+        elif type(data) is str:
+            return data
+        elif type(data) is list:
+            return "list"
         else:
-            print(string_)
+            return repr(data)
 
     @staticmethod
     def describe(array):
@@ -1704,8 +1711,8 @@ class FigureManager:
     Handles figures of matplotlib.
     """
 
-    def __init__(self, info_loc=None, fig_policy=FigurePolicy.same):
-        self.fig_policy = fig_policy
+    def __init__(self, info_loc=None, figpolicy=FigurePolicy.same):
+        self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
         self.cmaps = Cycle(plt.colormaps())
         import matplotlib.colors as mcolors
@@ -2033,28 +2040,28 @@ class FigureManager:
         return search_results
 
     def get_fig(self, figname='', suffix=None, **kwargs):
-        return FigureManager.get_fig_static(self.fig_policy, figname, suffix, **kwargs)
+        return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
 
     @staticmethod
-    def get_fig_static(fig_policy, figname='', suffix=None, **kwargs):
+    def get_fig_static(figpolicy, figname='', suffix=None, **kwargs):
         """
-        :param fig_policy:
+        :param figpolicy:
         :param figname:
-        :param suffix: only relevant if fig_policy is add_new
+        :param suffix: only relevant if figpolicy is add_new
         :param kwargs:
         :return:
         """
         fig = None
         exist = True if figname in plt.get_figlabels() else False
-        if fig_policy is FigurePolicy.same:
+        if figpolicy is FigurePolicy.same:
             fig = plt.figure(num=figname, **kwargs)
-        elif fig_policy is FigurePolicy.add_new:
+        elif figpolicy is FigurePolicy.add_new:
             if exist:
                 new_name = get_time_stamp(figname) if suffix is None else figname + suffix
             else:
                 new_name = figname
             fig = plt.figure(num=new_name, **kwargs)
-        elif fig_policy is FigurePolicy.close_create_new:
+        elif figpolicy is FigurePolicy.close_create_new:
             if exist:
                 plt.close(figname)
             fig = plt.figure(num=figname, **kwargs)
@@ -2648,7 +2655,7 @@ class ImShow(FigureManager):
                  save_type=SaveType.Null, save_name=None, save_dir=None, save_kwargs=None,
                  subplots_adjust=None, gridspec=None, tight=True, info_loc=None,
                  nrows=None, ncols=None, ax=None,
-                 figsize=None, figname='im_show', fig_policy=FigurePolicy.add_new,
+                 figsize=None, figname='im_show', figpolicy=FigurePolicy.add_new,
                  auto_brightness=True, delay=200, pause=False,
                  **kwargs):
         """
@@ -2716,7 +2723,7 @@ class ImShow(FigureManager):
         self.cmaps.set('viridis')
         self.auto_brightness = auto_brightness
         if ax is None:
-            self.fig_policy = fig_policy
+            self.figpolicy = figpolicy
             self.fig = self.get_fig(figname=figname,
                                     figsize=(14, 9) if figsize is None else figsize, facecolor='white')
             if figsize is None:
@@ -2859,8 +2866,8 @@ class ImShow(FigureManager):
 
 class Artist(FigureManager):
     def __init__(self, *args, ax=None, figname='Graph', title='', label='curve', style='seaborn',
-                 create_new_axes=False, fig_policy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
-        super().__init__(fig_policy=fig_policy)
+                 create_new_axes=False, figpolicy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
+        super().__init__(figpolicy=figpolicy)
         self.style = style
         # self.kwargs = kwargs
         self.title = title

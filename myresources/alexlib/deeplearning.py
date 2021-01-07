@@ -503,7 +503,7 @@ class BaseModel(ABC):
         """
         self.hp.save_pickle(itself=itself)  # goes into the meta folder.
         self.data.save_pickle(itself=itself)  # goes into the meta folder.
-        self.history.save_npy(path=self.hp.save_dir / 'metadata/history.npy', itself=True)  # goes to meta folder
+        self.history.save_pickle(path=self.hp.save_dir / 'metadata/history.npy', itself=True)  # goes to meta folder
 
         # model save goes into data folder.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
@@ -538,8 +538,8 @@ class BaseModel(ABC):
             data_obj = tb.Read.pickle(data_path) if data_path.exists() else None
         model_obj = cls(hp_obj, data_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
-        history = path / "metadata/history.npy"
-        model_obj.history = tb.List.from_saved(history) if history.exists() else tb.List()
+        history = path / "metadata/history.pkl"
+        model_obj.history = history.readit() if history.exists() else tb.List()
         print(f"Class {model_obj.__class__} Loaded Successfully.")
         return model_obj
 
