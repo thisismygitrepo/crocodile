@@ -351,18 +351,18 @@ class P(type(Path()), Path, Base):
     def browse(self):
         return self.search("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
 
-
     def search(self, pattern='*', r=False, generator=False, files=True, folders=True, dotfiles=False,
-               absolute=True, filters: list = None, not_in: list=None, win_order=False):
+               absolute=True, filters: list = None, not_in: list = None, win_order=False):
         """
-        :param filters: list of filters
-        :param dotfiles: flag to indicate whether the search should include those or not.
         :param pattern:  linux search pattern
         :param r: recursive search flag
         :param generator: output format, list or generator.
         :param files: include files in search.
         :param folders: include directories in search.
+        :param dotfiles: flag to indicate whether the search should include those or not.
+        :param filters: list of filters
         :param absolute: return relative paths or abosolute ones.
+        :param not_in: list of strings that search results should not contain them (short for filter with simple lambda)
         :param win_order: return search results in the order of files as they appear on a Windows machine.
 
         :return: search results.

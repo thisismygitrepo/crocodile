@@ -65,6 +65,9 @@ How does this make perfect sense?
 
 Methods naming convention like `apply` and `to_numpy` are inspired from the popular `pandas` library, resulting in almost non-existing learning curve.
 
+# Friendly interactive tutorial.
+Please refer to [Here](<https://github.com/thisismygitrepo/alexlib/blob/master/tutorial.ipynb>) on the main git repo.
+
 # Full docs:
 Click [Here](<https://alexlib.readthedocs.io/en/latest/>)
 
