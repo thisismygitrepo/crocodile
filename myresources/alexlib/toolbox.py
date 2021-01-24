@@ -106,6 +106,7 @@ class Base:
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
+
     # ===================================== File Specs ================================================================
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
@@ -147,6 +148,15 @@ class P(type(Path()), Path, Base):
     def __add__(self, name):
         return self.parent.joinpath(self.stem + name)
 
+    def __sub__(self, other):
+        return P(str(self).replace(str(other), ""))
+
+    # def __rtruediv__(self, other):
+    #     tmp = str(self)
+    #     if tmp[0] == "/":  # if dir starts with this, all Path methods fail.
+    #         tmp = tmp[1:]
+    #     return P(other) / tmp
+
     def prepend(self, prefix, stem=False):
         """Add extra text before file name
         e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension
@@ -164,40 +174,60 @@ class P(type(Path()), Path, Base):
             suffix = ''.join(self.suffixes)
         return self.parent.joinpath(self.stem + name + suffix)
 
+    def append_time_stamp(self, ft=None):
+        return self.append(name="-" + get_time_stamp(ft=ft))
+
     def absolute_from(self, reference=None):
         """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
         this one takes in two relative paths, and return an absolute version of `self` the reference
         for which is ``reference``.
 
-        :param reference: no more than a directory name from which the current relative path ``self`` is defined.
+        :param reference: a directory `name` from which the current relative path ``self`` is defined.
             Default value of reference is current directory name, making the method act like ``absolute`` method
 
         .. warning:: ``reference`` should be within working directory, otherwise it raises an error.
 
-        .. note:: If you have the full path of the reference, this method is not for you. You can easily get the
-            absolute path by `reference / current_relative_path`
+        .. note:: If you have the full path of the reference, then this method would give the same result as
+            agoing with `reference / self`
         """
         if reference is None:
             reference = P.cwd()[-1].string
         return P.cwd().split(at=reference)[0] / reference / self
 
-    def split(self, at=None, index=None):
+    def split(self, at : str =None, index : int =None, sep: int= 1):
         """Splits a path at a given string or index
 
         :param self:
         :param at:
         :param index:
+        :param sep: can be either [-1, 0, 1]. Determines where the separator is going to live with:
+               left portion, none or right portion.
         :return: two paths
         """
         if index is None:  # at is provided
-            if str(at) == ".":  # special case handling
-                return self, P()
-            idx = self.parts.index(str(at))
-            return self.split(index=idx)
+            items = str(self).split(sep=at)
+            one, two = items[0], items[1]
+
+            one = one[:-1] if one.endswith("/") else one
+            two = two[1:] if two.startswith("/") else two
+
+            one, two = P(one), P(two)
+
         else:
             one = self[:index]
-            two = P(*self.parts[index:])
-            return one, two
+            two = P(*self.parts[index + 1:])
+
+        # appending `at` to one of the portions
+        if sep == 0:
+            pass  # neither of the portions get the sperator appended to it.
+        elif sep == 1:  # append it to right portion
+            two = at / two
+        elif sep == -1:  # append it to left portion.
+            one = one / at
+        else:
+            raise ValueError(f"`sep` should take a value from the set [-1, 0, 1] but got {sep}")
+
+        return one, two
 
     def __getitem__(self, slici):
         if type(slici) is slice:
@@ -219,7 +249,12 @@ class P(type(Path()), Path, Base):
         fullparts[key] = value
         return P(*fullparts)  # TODO: how to change self[-1]
 
-    def setitem(self, key, val):
+    def switch(self, key: str, val: str):
+        """Changes a given part of the path to another given one"""
+        return P(str(self).replace(key, val))
+
+    def switch_index(self, key: int, val: str):
+        """Changes a given index of the path to another given one"""
         fullparts = list(self.parts)
         fullparts[key] = val
         return P(*fullparts)
@@ -287,28 +322,48 @@ class P(type(Path()), Path, Base):
         self.rename(new_path)
         return new_path
 
-    def copy(self, target=None, contents=False, verbose=False):
+    def copy(self, target_dir=None, target_name=None, contents=False, verbose=False):
         """
-        contents: copy the parent directory or its contents.
+
+        :param target_dir: copy the file to this directory.
+        :param target_name: full path of destination (including -potentially different-  file name).
+        :param contents: copy the parent directory or its contents (relevant only if copying a directory)
+        :param verbose:
+        :return: path to copied file or directory.
 
         .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
+
         """
-        if target is None:
-            target = self.append(f"_copy__{get_time_stamp()}")
-            contents = True
+        dest = None  # destination.
+
+        if target_dir is not None:
+            assert target_name is None, f"You can either pass target_dir or target_name but not both"
+            dest = P(target_dir).create()
+
+        if target_name is not None:
+            assert target_dir is None, f"You can either pass target_dir or target_name but not both"
+            target_name = P(target_name)
+            target_name.parent.create()
+            dest = target_name
+
+        if dest is None:
+            dest = self.append(f"_copy__{get_time_stamp()}")
+
         if self.is_file():
+
             import shutil
-            shutil.copy(str(self), str(target))  # str() only there for Python < (3.6)
+            shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
             if verbose:
-                print(f"File \n{self}\ncopied successfully to: \n{target}")
+                print(f"File \n{self}\ncopied successfully to: \n{dest}")
         elif self.is_dir():
             from distutils.dir_util import copy_tree
             if contents:
-                copy_tree(str(self), str(target))
+                copy_tree(str(self), str(dest))
             else:
-                target = P(target).joinpath(self.name).create()
-                copy_tree(str(self), str(target))
-        return target
+                copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
+        else:
+            print("Could not copy this thing. Not a file nor a folder.")
+        return dest
 
     def clean(self):
         """removes contents on a folder, rather than deleting the folder."""
@@ -317,11 +372,24 @@ class P(type(Path()), Path, Base):
             self.joinpath(content).send2trash()
         return self
 
-    def readit(self, reader=None, **kwargs):
-        if reader is None:
-            return Read.read(self, **kwargs)
+    def readit(self, reader=None, notexist=None, **kwargs):
+        filename = self
+        if '.zip' in str(self):
+            filename = self.unzip(op_path=tb.tmp("unzipped"))
+
+        def func():
+            if reader is None:
+                return Read.read(filename, **kwargs)
+            else:
+                return reader(str(filename), **kwargs)
+
+        if notexist is None:
+            return func()
         else:
-            return reader(str(self), **kwargs)
+            try:
+                return func()
+            except Exception:
+                return notexist
 
     def explore(self):  # explore folders.
         # os.startfile(os.path.realpath(self))
@@ -349,7 +417,7 @@ class P(type(Path()), Path, Base):
 
     @property
     def browse(self):
-        return self.search("*").to_struct(keys="self.make_valid_filename().apply(lambda x: 'qq_' + x)").clean_view
+        return self.search("*").to_struct(key_val=lambda x: ("qq_" + x.make_valid_filename(), x)).clean_view
 
     def search(self, pattern='*', r=False, generator=False, files=True, folders=True, dotfiles=False,
                absolute=True, filters: list = None, not_in: list = None, win_order=False):
@@ -380,7 +448,15 @@ class P(type(Path()), Path, Base):
                 filters += [lambda x: str(notin) not in str(x)]
 
         # ============================ get generator of search results ========================================
-        if dotfiles:
+
+        if self.suffix == ".zip":
+            import zipfile
+            with zipfile.ZipFile(str(self)) as z:
+                contents = L(z.namelist())
+            from fnmatch import fnmatch
+            raw = contents.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: self / x)
+
+        elif dotfiles:
             raw = self.glob(pattern) if not r else self.rglob(pattern)
         else:
             if r:
@@ -390,8 +466,8 @@ class P(type(Path()), Path, Base):
                 path = self.joinpath(pattern)
                 raw = glob(str(path))
 
+            # if os.name == 'nt':
 
-               # if os.name == 'nt':
         #     import win32api, win32con
 
         # def folder_is_hidden(p):
@@ -431,7 +507,7 @@ class P(type(Path()), Path, Base):
             return gen
         else:
             # unpack the generator and vet the items (the function also returns P objects)
-            processed = [result for item in raw if (result:=do_screening(item))]
+            processed = [result for item in raw if (result := do_screening(item))]
             if not processed:  # if empty, don't proceeed
                 return List(processed)
             if win_order:  # this option only supported in non-generator mode.
@@ -443,6 +519,8 @@ class P(type(Path()), Path, Base):
 
     def find(self, *args, r=True, **kwargs):
         """short for the method ``search`` then pick first item from results.
+
+        .. note:: it is delibrately made to return None in case and object is not found.
         """
         results = self.search(*args, r=r, **kwargs)
         return results[0] if len(results) > 0 else None
@@ -484,11 +562,18 @@ class P(type(Path()), Path, Base):
         return op_path
 
     def unzip(self, op_path=None, fname=None, **kwargs):
+        zipfile = self
+
+        if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
+            assert ".zip" in str(self), f"Not a zip archive."
+            zipfile, fname = self.split(at=".zip", sep=0)
+            zipfile += ".zip"
+
         if op_path is None:
-            op_path = self.parent / self.stem
+            op_path = zipfile.parent / zipfile.stem
         else:
             op_path = P(self.evalstr(op_path, expected="self"))
-        return Compression.unzip(self, op_path, fname, **kwargs)
+        return Compression.unzip(zipfile, op_path, fname, **kwargs)
 
     def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):
         formats = ["zip", "tar", "gzip"]
@@ -514,8 +599,8 @@ class Compression:
     def compress_folder(ip_path, op_path, arcname, format_='zip', **kwargs):
         """Explanation of Shutil parameters:
 
-        * ``base_dir`` (here referred to as ``op_path``) is what is going to be acturally archived.
-            When provided, it **has to** be relevant to ``root_dir`` (here referred to as ``op_path``).
+        * ``base_dir`` (here referred to as ``ip_path``) is what is going to be acturally archived.
+            When provided, it **has to** be relevant to ``root_dir`` (here referred to as ``arcname``).
         * ``root_dir`` is where the archive is going to start from. It will create all the necessary subfolder till
             it reaches the ``base_dir`` where archiving actually starts.
         * Example: If you want to compress a folder in ``Downloads/myfolder/compress_this``
@@ -592,6 +677,7 @@ class Compression:
 
 
 class Read:
+
     @staticmethod
     def read(path, **kwargs):
         suffix = P(path).suffix[1:]
@@ -613,34 +699,13 @@ class Read:
         return data
 
     @staticmethod
-    def mat(path, correct_dims=True, **kwargs):
+    def mat(path, **kwargs):
         """
         :param path:
-        :param correct_dims:
         :return: Structure object
         """
-        try:  # try the old version
-            from scipy.io import loadmat
-            data = loadmat(path, **kwargs)
-            metadata_ = Struct()
-            for akey in ['__header__', '__version__', '__globals__']:
-                metadata_[akey] = data[akey]
-                del data[akey]
-            data = Struct(data)
-            data.metadata_ = metadata_
-        except NotImplementedError:
-            import h5py  # For Matlab v7.3 files, we need:
-            f = h5py.File(path, mode='r')  # returns an object
-            data = Struct()
-            for item in f:
-                temp = np.array(f[item], order='F')  # Now you get the correct shape.
-                if correct_dims:
-                    n = len(temp.shape)
-                    arrangements = tuple(range(n - 2)) + (n - 1, n - 2)
-                    temp = temp.transpose(arrangements)
-                data[item] = temp
-            f.close()
-        return data
+        from scipy.io import loadmat
+        return Struct(loadmat(path, **kwargs))
 
     @staticmethod
     def json(path, r=False, **kwargs):
@@ -664,6 +729,12 @@ class Read:
             return Struct(mydict)
 
     @staticmethod
+    def csv(path, **kwargs):
+        w = P(path).append(".dtypes").readit(reader=pd.read_csv, notexist=None)
+        w = dict(zip(w['index'], w['dtypes'])) if w else w
+        return pd.read_csv(path, dtypes=w, **kwargs)
+
+    @staticmethod
     def pickle(path, **kwargs):
         # import pickle
         dill = Experimental.assert_package_installed("dill")
@@ -683,6 +754,10 @@ class Read:
 
 
 class Save:
+    @staticmethod
+    def csv(path, obj):
+        obj.to_frame('dtypes').reset_index().to_csv(P(path).append(".dtypes").string)
+
     @staticmethod
     def mat(path=P.tmp(), mdict=None, **kwargs):
         """
@@ -889,42 +964,55 @@ class List(list, Base):
     def sample(self, size=1):
         return self[np.random.choice(len(self), size)]
 
-    def to_struct(self, keys=None, values=None):
-        """"""
-        keys = self.evalstr(keys, expected="self") or [str(item) for item in self.list]
-        values = self.evalstr(values, expected="self") or self.list
-        return Struct.from_keys_values(keys, values)
-
-    def find(self, patt, match="fnmatch"):
-        """Looks up the string representation of all items in the list and finds the one that partially matches
-        the argument passed. This method is a short for ``self.filter(lambda x: string_ in str(x))`` If you need more
-        complicated logic in the search, revert to filter method.
+    def to_struct(self, key_val=None):
         """
-        if match == "string" or None:
-            for idx, item in enumerate(self.list):
-                if patt in str(item):
-                    return item
-        elif match == "fnmatch":
-            import fnmatch
-            for idx, item in enumerate(self.list):
-                if fnmatch.fnmatch(str(item), patt):
-                    return item
-        else:  # "regex"
-            # escaped = re.escape(string_)
-            compiled = re.compile(patt)
-            for idx, item in enumerate(self.list):
-                if compiled.search(str(item)) is not None:
-                    return item
-        return None
+        :param key_val: function that returns (key, value) pair.
+        :return:
+        """
+        if key_val is None:
+            def key_val(x):
+                return str(x), x
+        else:
+            key_val = self.evalstr(key_val)
+        return Struct.from_keys_values_pairs(self.apply(key_val))
 
-    def index_from_string(self, string_):
-        for idx, item in enumerate(self.list):
-            if string_ in str(item):
-                return idx
-        return None
+    # def find(self, patt, match="fnmatch"):
+    #     """Looks up the string representation of all items in the list and finds the one that partially matches
+    #     the argument passed. This method is a short for ``self.filter(lambda x: string_ in str(x))`` If you need more
+    #     complicated logic in the search, revert to filter method.
+    #     """
+    #
 
-    def index(self, item, **kwargs):
-        return self.list.index(item)
+        # if match == "string" or None:
+        #     for idx, item in enumerate(self.list):
+        #         if patt in str(item):
+        #             return item
+        # elif match == "fnmatch":
+        #     import fnmatch
+        #     for idx, item in enumerate(self.list):
+        #         if fnmatch.fnmatch(str(item), patt):
+        #             return item
+        # else:  # "regex"
+        #     # escaped = re.escape(string_)
+        #     compiled = re.compile(patt)
+        #     for idx, item in enumerate(self.list):
+        #         if compiled.search(str(item)) is not None:
+        #             return item
+        # return None
+
+    def index(self, func):
+        """ A generalization of the `.index` method of `list`. It takes in a function rather than an
+         item to find its index. Additionally, it returns full list of results, not just the first result.
+
+        :param func:
+        :return: List of indices of items where the function returns `True`.
+        """
+        func = self.evalstr(func)
+        res = []
+        for idx, x in enumerate(self.list):
+            if func(x):
+                res.append(idx)
+        return res
 
     # ======================= Modify Methods ===============================
     def combine(self):
@@ -941,14 +1029,9 @@ class List(list, Base):
 
     def __repr__(self):
         if len(self.list) > 0:
-            if len(self.list) > 50:
-                tmp1 = f"AlexList object with {len(self.list)} elements. One example of those elements: \n"
-                tmp2 = f"{self.list[0].__repr__()}"
-                return tmp1 + tmp2
-            else:
-                tmp1 = f"AlexList object with the following elements: \n"
-                tmp2 = "\n".join([repr(item) for item in self.list])
-                return tmp1 + tmp2
+            tmp1 = f"AlexList object with {len(self.list)} elements. One example of those elements: \n"
+            tmp2 = f"{self.list[0].__repr__()}"
+            return tmp1 + tmp2
         else:
             return f"An Empty AlexList []"
 
@@ -1040,10 +1123,12 @@ class List(list, Base):
             if sep:
                 print(sep * 100)
 
-    def to_dataframe(self, names=None):
+    def to_dataframe(self, names=None, minimal=True):
         DisplayData.set_display()
         columns = ['object'] + list(self.list[0].__dict__.keys())
         df = pd.DataFrame(columns=columns)
+        if minimal:
+            return df
         for i, obj in enumerate(self.list):
             if names is None:
                 name = [obj]
@@ -1104,33 +1189,15 @@ class Struct(Base):
         return mydict
 
     @classmethod
-    def defaultdict(cls, *args, default_=lambda: None, **kwargs):
-        """Returns default value if encoutered a new key."""
-        obj = cls(*args, **kwargs)
-        from collections import defaultdict
-        mydict = defaultdict(default_)
-        mydict.update(obj.__dict__)
-        obj.__dict__ = mydict
-        return obj
+    def from_keys_values(cls, keys: list, values: list):
+        return cls(dict(zip(keys, values)))
 
     @classmethod
-    def make_namedtuple(cls, *names, default_=None, **kwargs):
-        """Has preset keys with it upon construction. Throws error for any other key."""
-        args_struct = cls.from_names(*names, default_=default_)
-        _struct = cls(**kwargs).update(args_struct)
-
-        class NamedTuple(cls):
-            default_struct = _struct
-
-            def __init__(self, *args, **kw):
-                self.__dict__ = self.default_struct.__dict__
-                super(NamedTuple, self).__init__(*args, **kw)
-
-        return NamedTuple
-
-    @classmethod
-    def from_keys_values(cls, names, values):
-        return cls(dict(zip(names, values)))
+    def from_keys_values_pairs(cls, my_list):
+        res = dict()
+        for k, v in my_list:
+            res[k] = v
+        return cls(res)
 
     @classmethod
     def from_names(cls, *names, default_=None):  # Mimick NamedTuple and defaultdict
@@ -1138,7 +1205,7 @@ class Struct(Base):
             default_ = [None] * len(names)
         return cls.from_keys_values(names, values=default_)
 
-    def map(self, keys):
+    def get_values(self, keys):
         return List([self[key] for key in keys])
 
     @property
@@ -1169,11 +1236,11 @@ class Struct(Base):
         repr_string += "---" + " " * sep + "---------" + " " * sep + "------------\n"
         for key in self.keys().list:
             key_str = str(key)
-            type_str = str(type(self[key]))
+            type_str = str(type(self[key])).split("'")[1]
             val_str = DisplayData.get_repr(self[key])
-            repr_string += key_str + " " * abs(sep - len(key_str)) +\
-                           type_str + " " * abs(sep - len(type_str)) +\
-                           val_str + "\n"
+            repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
+            repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
+            repr_string += val_str + "\n"
         print(repr_string)
 
     def __str__(self):
@@ -1224,14 +1291,21 @@ class Struct(Base):
         self.__dict__.update(new_struct.__dict__)
         return self
 
+    def apply(self, func):
+        func = self.evalstr(func)
+        for key, val in self.items():
+            self[key] = func(val)
+        return self
+
     def inverse(self):
         return Struct({v: k for k, v in self.dict.items()})
 
-    def append(self, *others, **kwargs):
-        return Struct(self.concat_dicts_(*((self.dict,) + others), **kwargs))
+    def append_values(self, *others, **kwargs):
+        """ """
+        return Struct(self.concat_dicts(*((self.dict,) + others), **kwargs))
 
     @staticmethod
-    def concat_dicts_(*dicts, method=None, lenient=True, collect_items=False, clone=True):
+    def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
         if method is None:
             method = list.__add__
         if not lenient:
@@ -1372,6 +1446,8 @@ class Experimental:
         :param path: directory or file path.
         :param obj: Python module, class, method or function used to generate the result (not the result or an
             instance of any class)
+        :param meta:
+        :param save_source_code:
         """
         import inspect
         path = P(path)
@@ -1403,7 +1479,7 @@ class Experimental:
         * Loads the directory to the memroy.
         * Returns either the package or a piece of it as indicated by ``obj``
         """
-        P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / get_time_stamp("tmp_sourcecode"))
+        P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / get_time_stamp(name="tmp_sourcecode"))
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
         if obj is not None:
@@ -1506,10 +1582,10 @@ class Experimental:
         #     module = __import__(module)
         # import importlib
         # importlib.reload(module)
-        if type(module) is str:
-            sourcecells = P(module).read_text().split("#%%")
-        else:
-            sourcecells = P(module.__file__).read_text().split("#%%")
+        # if type(module) is str:
+        #     sourcecells = P(module).read_text().split("#%%")
+        # else:
+        sourcecells = P(module.__file__).read_text().split("#%%")
 
         for cell in sourcecells:
             if pointer in cell.split('\n')[0]:
@@ -1678,13 +1754,16 @@ class DisplayData:
         elif type(data) is str:
             return data
         elif type(data) is list:
-            return "list"
+            return f"length = {len(data)}. 1st item type = {type(data[0]) if len(data) > 0 else None}"
         else:
             return repr(data)
 
     @staticmethod
-    def describe(array):
-        pd.DataFrame(array).describe()
+    def outline(array, name="Array", imprint=True):
+        str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"
+        if imprint:
+            print(str_)
+        return str_
 
 
 # %% ========================== Plot Helper funcs ========================================
@@ -1696,9 +1775,12 @@ class FigurePolicy(enum.Enum):
     same = 'Grab the figure of the same name'
 
 
-def get_time_stamp(name=None):
+def get_time_stamp(ft=None, name=None):
+    if ft is None:  # this is better than putting the default non-None value above.
+        ft = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expise those kwarg
+        # then it has to worry about not sending None which will overwrite this defualt value.
     from datetime import datetime
-    _ = datetime.now().strftime('%Y-%m-%d-%I-%M-%S-%p-%f')
+    _ = datetime.now().strftime(ft)
     if name:
         name = name + '_' + _
     else:
@@ -2057,7 +2139,7 @@ class FigureManager:
             fig = plt.figure(num=figname, **kwargs)
         elif figpolicy is FigurePolicy.add_new:
             if exist:
-                new_name = get_time_stamp(figname) if suffix is None else figname + suffix
+                new_name = get_time_stamp(name=figname) if suffix is None else figname + suffix
             else:
                 new_name = figname
             fig = plt.figure(num=new_name, **kwargs)
@@ -2164,7 +2246,7 @@ class SaveType:
                     self.watch_figs = [plt.figure(num=afig) for afig in watch_figs]
 
             save_dir = save_dir or P.tmp().string
-            self.save_name = get_time_stamp(save_name)
+            self.save_name = get_time_stamp(name=save_name)
             self.save_dir = save_dir
             self.kwargs = kwargs
             self.counter = 0
@@ -2188,7 +2270,7 @@ class SaveType:
                     pass
 
             if names is None:  # individual save name, useful for PNG.
-                names = [get_time_stamp(a_figure.get_label()) for a_figure in self.watch_figs]
+                names = [get_time_stamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
 
             for afig, aname in zip(self.watch_figs, names):
                 self._save(afig, aname, **kwargs)

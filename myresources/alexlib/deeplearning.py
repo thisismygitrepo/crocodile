@@ -223,6 +223,10 @@ class DataReader(tb.Base):
             strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
+        self.data_specs.ip_shape = self.split.x_train.shape[1:]  # useful info for instantiating models.
+        self.data_specs.op_shape = self.split.y_train.shape[1:]  # useful info for instantiating models.
+        print(f"================== Training Data Split ===========================")
+        self.split.print()
 
     def get_data_tuple(self, aslice, dataset="test"):
         # returns a tuple containing a slice of data (x_test, x_test, names_test, index_test etc)
@@ -442,7 +446,8 @@ class BaseModel(ABC):
 
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
-        loss_dict['names'] = names_test
+        if loss_dict is not None:
+            loss_dict['names'] = names_test
         pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test,
@@ -594,7 +599,7 @@ class BaseModel(ABC):
         :return:
         """
         if shape is None:
-            shape = self.data.split.x_train[:2].shape[1:]
+            shape = self.data.data_specs.ip_shape
         if hasattr(self.hp, "precision"):
             dtype = self.hp.precision
         else:
