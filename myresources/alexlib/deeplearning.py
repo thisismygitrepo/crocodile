@@ -278,9 +278,10 @@ class DataReader(tb.Base):
         """
         if gt is None:
             labels = None
+            self.plotter = tb.ImShow(pred, labels=labels, sup_titles=names, origin='lower', **kwargs)
         else:
             labels = ['Reconstruction', 'Ground Truth']
-        self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
+            self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
         return None
@@ -309,7 +310,7 @@ class BaseModel(ABC):
         self.kwargs = None
         self.tmp = None
 
-    def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True):
+    def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True, **kwargs):
         """ Updates compiler attributes. This acts like a setter.
 
         .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
@@ -339,7 +340,7 @@ class BaseModel(ABC):
                 # import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
                 metrics = tb.List()  # [tmp.MeanSquareError()]
         # Create a new compiler object
-        self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics)
+        self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=tb.L(metrics), **kwargs)
 
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model:

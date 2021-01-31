@@ -266,7 +266,7 @@ class P(type(Path()), Path, Base):
 
     # ================================ String Nature management ====================================
     def __repr__(self):  # this is useful only for the console
-        return "AlexPath(" + self.__str__() + ")"
+        return "P: " + self.__str__()
 
     @property
     def string(self):  # this method is used by other functions to get string representation of path
@@ -325,7 +325,7 @@ class P(type(Path()), Path, Base):
     def copy(self, target_dir=None, target_name=None, contents=False, verbose=False):
         """
 
-        :param target_dir: copy the file to this directory.
+        :param target_dir: copy the file to this directory (filename remains the same).
         :param target_name: full path of destination (including -potentially different-  file name).
         :param contents: copy the parent directory or its contents (relevant only if copying a directory)
         :param verbose:
@@ -338,7 +338,7 @@ class P(type(Path()), Path, Base):
 
         if target_dir is not None:
             assert target_name is None, f"You can either pass target_dir or target_name but not both"
-            dest = P(target_dir).create()
+            dest = P(target_dir).create() / self.name
 
         if target_name is not None:
             assert target_dir is None, f"You can either pass target_dir or target_name but not both"
@@ -372,24 +372,35 @@ class P(type(Path()), Path, Base):
             self.joinpath(content).send2trash()
         return self
 
-    def readit(self, reader=None, notexist=None, **kwargs):
+    def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
+        """
+
+        :param reader: function that reads this file format, if not passed it will be inferred from extension.
+        :param notfound: behaviour when file ``self`` to be read doesn't actually exist. Default: throw an error.
+                can be set to return `False` or any other value that will be returned if file not found.
+        :param verbose:
+        :param kwargs:
+        :return:
+        """
         filename = self
         if '.zip' in str(self):
-            filename = self.unzip(op_path=tb.tmp("unzipped"))
+            filename = self.unzip(op_path=tmp("unzipped"))
+            if verbose:
+                print(f"File {self} was uncompressed to {filename}")
 
-        def func():
+        def apply_reader_or_infer_it():
             if reader is None:
                 return Read.read(filename, **kwargs)
             else:
                 return reader(str(filename), **kwargs)
 
-        if notexist is None:
-            return func()
-        else:
+        if notfound is FileNotFoundError:
+            return apply_reader_or_infer_it()
+        else:  # encapsulate the function within a try context manager.
             try:
-                return func()
+                return apply_reader_or_infer_it()
             except Exception:
-                return notexist
+                return notfound
 
     def explore(self):  # explore folders.
         # os.startfile(os.path.realpath(self))
@@ -419,7 +430,8 @@ class P(type(Path()), Path, Base):
     def browse(self):
         return self.search("*").to_struct(key_val=lambda x: ("qq_" + x.make_valid_filename(), x)).clean_view
 
-    def search(self, pattern='*', r=False, generator=False, files=True, folders=True, dotfiles=False,
+    def search(self, pattern='*', r=False, generator=False, files=True, folders=True, compressed=False,
+               dotfiles=False,
                absolute=True, filters: list = None, not_in: list = None, win_order=False):
         """
         :param pattern:  linux search pattern
@@ -465,6 +477,15 @@ class P(type(Path()), Path, Base):
             else:
                 path = self.joinpath(pattern)
                 raw = glob(str(path))
+
+
+        if compressed:
+            comp_files = L(raw).filter(lambda x: '.zip' in str(x))
+            for comp_file in comp_files:
+                raw += P(comp_file).search(pattern=pattern, r=r, generator=generator, files=files, folders=folders,
+                                           compressed=compressed,
+                                           dotfiles=dotfiles,
+                                           absolute=absolute, filters=filters, not_in=not_in, win_order=win_order)
 
             # if os.name == 'nt':
 
@@ -1007,7 +1028,7 @@ class List(list, Base):
         :param func:
         :return: List of indices of items where the function returns `True`.
         """
-        func = self.evalstr(func)
+        func = self.evalstr(func, expected='func')
         res = []
         for idx, x in enumerate(self.list):
             if func(x):
@@ -1029,11 +1050,11 @@ class List(list, Base):
 
     def __repr__(self):
         if len(self.list) > 0:
-            tmp1 = f"AlexList object with {len(self.list)} elements. One example of those elements: \n"
+            tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
             tmp2 = f"{self.list[0].__repr__()}"
             return tmp1 + tmp2
         else:
-            return f"An Empty AlexList []"
+            return f"An Empty List []"
 
     def __len__(self):
         return len(self.list)
@@ -1222,7 +1243,7 @@ class Struct(Base):
         repr_string = ""
         for key in self.keys().list:
             repr_string += str(key) + ", "
-        return "Structure, with following keys:\n" + repr_string
+        return "Struct: [" + repr_string + "]"
 
     def print(self, sep=20, yaml=False):
         if yaml:
