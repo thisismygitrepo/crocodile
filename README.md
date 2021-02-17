@@ -1,5 +1,5 @@
 
-# Welcome to alexlib
+# Welcome to crocodile
 
 Fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
 
@@ -33,7 +33,7 @@ Furthermore, those classes are inextricably connected. For example, globbing a p
 
 # Install
 In the commandline:
-`pip install alexlib`.
+`pip install crocodile`.
 
 Being a thin extension on top of almost pure Python, you need to worry **not** about your venv, the package is not aggressive in requirements, it installs itself peacefully, never interfere with your other packages. If you do not have `numpy`, `matplotlib` and `pandas`, it simply throws `ImportError` at runtime, that's it.
 
@@ -43,7 +43,7 @@ Being a thin extension on top of almost pure Python, you need to worry **not** a
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
 
 ```
-import alexlib.toolbox as tb
+import crocodile.toolbox as tb
 ```
 
 
@@ -66,10 +66,10 @@ How does this make perfect sense?
 Methods naming convention like `apply` and `to_numpy` are inspired from the popular `pandas` library, resulting in almost non-existing learning curve.
 
 # Friendly interactive tutorial.
-Please refer to [Here](<https://github.com/thisismygitrepo/alexlib/blob/master/tutorial.ipynb>) on the main git repo.
+Please refer to [Here](<https://github.com/thisismygitrepo/crocodile/blob/master/tutorial.ipynb>) on the main git repo.
 
 # Full docs:
-Click [Here](<https://alexlib.readthedocs.io/en/latest/>)
+Click [Here](<https://crocodile.readthedocs.io/en/latest/>)
 
 # Author
 Alex Al-Saffar. [email](mailto:programmer@usa.com)

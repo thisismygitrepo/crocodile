@@ -1,6 +1,6 @@
 
 from abc import ABC
-import alexlib.deeplearning as dl
+import crocodile.deeplearning as dl
 # import resources.toolbox as tb
 from collections import OrderedDict
 import torch as t

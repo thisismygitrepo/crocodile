@@ -1,16 +1,16 @@
 from setuptools import setup
-from myresources.alexlib import __version__
+from myresources.crocodile import __version__
 
 with open("README.md", "r") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
 setup(
-    name='alexlib',
+    name='crocodile',
     version=__version__,
-    packages=['alexlib'],
+    packages=['crocodile'],
     package_dir={'': 'myresources'},
     py_modules=['toolbox', "deeplearning", "deeplearning_torch"],
-    url='https://github.com/thisismygitrepo/alexlib',
+    url='https://github.com/thisismygitrepo/crocodile',
     license='Apache 2.0',
     author='Alex Al-Saffar',
     author_email='programmer@usa.com',

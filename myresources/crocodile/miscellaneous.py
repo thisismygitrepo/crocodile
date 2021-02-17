@@ -1,5 +1,5 @@
 
-import alexlib.toolbox as tb
+import crocodile.toolbox as tb
 import datetime
 import time
 import sys
@@ -38,14 +38,13 @@ class Pomodoro:
             time.sleep(2)
             print(f"{label} .... Time Left: {round(minutes - diff.seconds / 60)} minutes, "
                   f" Time now: {now.hour} : {now.minute}", end='\r')
+        Pomodoro.beep(5)
 
     def run(self):
         # Work
         self.loop(minutes=self.work, label="Work")
-        self.beep(5)
         # start the break
         self.loop(minutes=self.break_, label="Break")
-        self.beep(5)
         # repeat
         self.run()
 

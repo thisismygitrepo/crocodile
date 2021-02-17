@@ -1036,7 +1036,7 @@ class List(list, Base):
         return res
 
     # ======================= Modify Methods ===============================
-    def combine(self):
+    def flatten(self):
         res = self.list[0]
         for item in self.list[1:]:
             res = res + item
@@ -1046,7 +1046,15 @@ class List(list, Base):
         self.list.append(obj)
 
     def __add__(self, other):
-        return List(self.list + other.list)
+        # implement coersion
+        return List(self.list + list(other))
+
+    def __radd__(self, other):
+        return List(self.list + list(other))
+
+    def __iadd__(self, other):  # inplace add.
+        self.list += list(other)
+        return self
 
     def __repr__(self):
         if len(self.list) > 0:
@@ -1144,7 +1152,7 @@ class List(list, Base):
             if sep:
                 print(sep * 100)
 
-    def to_dataframe(self, names=None, minimal=True):
+    def to_dataframe(self, names=None, minimal=False):
         DisplayData.set_display()
         columns = ['object'] + list(self.list[0].__dict__.keys())
         df = pd.DataFrame(columns=columns)
@@ -1189,6 +1197,13 @@ class Struct(Base):
             final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
             final_dict.update(kwargs)
         self.__dict__ = final_dict
+
+    def to_default(self, default=lambda : None):
+        from collections import defaultdict
+        tmp2 = defaultdict(default)
+        tmp2.update(self.__dict__)
+        self.__dict__ = tmp2
+        return self
 
     def __bool__(self):
         return bool(self.__dict__)
