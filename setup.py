@@ -24,6 +24,9 @@ setup(
 
 # steps:
 # git push origin
+# populates build, dist and .egg directories:
 # python setup.py sdist bdist_wheel
 # twine upload dist/*
-#
+# Locally: (only once)
+# pip install -e .
+# The files backed up here OneDrive/AppData/home/.pypirc saves the credentials needed by Twine to uploade to pypi

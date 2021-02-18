@@ -65,8 +65,9 @@ class Base:
         Save.mat(path, self.__dict__, **kwargs)
         return self
 
-    def get_attributes(self):
+    def get_attributes(self, check_ownership=False):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
+        _ = check_ownership
         return attrs
         # [setattr(Path, name, getattr(MyPath, name)) for name in funcs]
 
@@ -194,30 +195,42 @@ class P(type(Path()), Path, Base):
             reference = P.cwd()[-1].string
         return P.cwd().split(at=reference)[0] / reference / self
 
-    def split(self, at : str =None, index : int =None, sep: int= 1):
+    def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
 
-        :param self:
-        :param at:
-        :param index:
+        :param at: string telling where to split.
+        :param index: integer telling at which index to split.
         :param sep: can be either [-1, 0, 1]. Determines where the separator is going to live with:
                left portion, none or right portion.
+        :param mode: "lenient" mode makes `split` method behaves like split method of string. This can produce
+            unwanted behaviour due to e.g. patial matches. 'strict' mode is the default which only splits
+             at exact match.
         :return: two paths
         """
-        if index is None:  # at is provided
-            items = str(self).split(sep=at)
-            one, two = items[0], items[1]
+        # ====================================   Splitting
+        if index is None and (at is not None):  # at is provided
 
-            one = one[:-1] if one.endswith("/") else one
-            two = two[1:] if two.startswith("/") else two
+            if mode == "lenient":
+                items = str(self).split(sep=at)
+                one, two = items[0], items[1]
+                one = one[:-1] if one.endswith("/") else one
+                two = two[1:] if two.startswith("/") else two
+
+            else:  # "strict"
+                index = self.parts.index(at)  # raises an error if exact match is not found.
+                one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
 
             one, two = P(one), P(two)
 
-        else:
+        elif index is not None and (at is None):  # index is provided
             one = self[:index]
             two = P(*self.parts[index + 1:])
+            at = self[index]  # this is needed below.
 
-        # appending `at` to one of the portions
+        else:
+            raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
+
+        # ================================  appending `at` to one of the portions
         if sep == 0:
             pass  # neither of the portions get the sperator appended to it.
         elif sep == 1:  # append it to right portion
@@ -439,6 +452,7 @@ class P(type(Path()), Path, Base):
         :param generator: output format, list or generator.
         :param files: include files in search.
         :param folders: include directories in search.
+        :param compressed: search inside compressed files.
         :param dotfiles: flag to indicate whether the search should include those or not.
         :param filters: list of filters
         :param absolute: return relative paths or abosolute ones.
@@ -477,7 +491,6 @@ class P(type(Path()), Path, Base):
             else:
                 path = self.joinpath(pattern)
                 raw = glob(str(path))
-
 
         if compressed:
             comp_files = L(raw).filter(lambda x: '.zip' in str(x))
@@ -769,10 +782,6 @@ class Read:
     def pkl(*args, **kwargs):
         return Read.pickle(*args, **kwargs)
 
-    @staticmethod
-    def csv(path, *args, **kwargs):
-        return pd.read_csv(path, *args, **kwargs)
-
 
 class Save:
     @staticmethod
@@ -1004,24 +1013,24 @@ class List(list, Base):
     #     """
     #
 
-        # if match == "string" or None:
-        #     for idx, item in enumerate(self.list):
-        #         if patt in str(item):
-        #             return item
-        # elif match == "fnmatch":
-        #     import fnmatch
-        #     for idx, item in enumerate(self.list):
-        #         if fnmatch.fnmatch(str(item), patt):
-        #             return item
-        # else:  # "regex"
-        #     # escaped = re.escape(string_)
-        #     compiled = re.compile(patt)
-        #     for idx, item in enumerate(self.list):
-        #         if compiled.search(str(item)) is not None:
-        #             return item
-        # return None
+    # if match == "string" or None:
+    #     for idx, item in enumerate(self.list):
+    #         if patt in str(item):
+    #             return item
+    # elif match == "fnmatch":
+    #     import fnmatch
+    #     for idx, item in enumerate(self.list):
+    #         if fnmatch.fnmatch(str(item), patt):
+    #             return item
+    # else:  # "regex"
+    #     # escaped = re.escape(string_)
+    #     compiled = re.compile(patt)
+    #     for idx, item in enumerate(self.list):
+    #         if compiled.search(str(item)) is not None:
+    #             return item
+    # return None
 
-    def index(self, func):
+    def index(self, func, *args, **kwargs):
         """ A generalization of the `.index` method of `list`. It takes in a function rather than an
          item to find its index. Additionally, it returns full list of results, not just the first result.
 
@@ -1053,7 +1062,7 @@ class List(list, Base):
         return List(self.list + list(other))
 
     def __iadd__(self, other):  # inplace add.
-        self.list += list(other)
+        self.list = self.list + list(other)
         return self
 
     def __repr__(self):
@@ -1198,7 +1207,7 @@ class Struct(Base):
             final_dict.update(kwargs)
         self.__dict__ = final_dict
 
-    def to_default(self, default=lambda : None):
+    def to_default(self, default=lambda: None):
         from collections import defaultdict
         tmp2 = defaultdict(default)
         tmp2.update(self.__dict__)
@@ -1236,7 +1245,7 @@ class Struct(Base):
         return cls(res)
 
     @classmethod
-    def from_names(cls, *names, default_=None):  # Mimick NamedTuple and defaultdict
+    def from_names(cls, names, default_=None):  # Mimick NamedTuple and defaultdict
         if default_ is None:
             default_ = [None] * len(names)
         return cls.from_keys_values(names, values=default_)
@@ -1260,7 +1269,7 @@ class Struct(Base):
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=20, yaml=False):
+    def print(self, sep=25, yaml=False):
         if yaml:
             self.save_yaml(P.tmp(fn="__tmp.yaml"))
             txt = P.tmp(fn="__tmp.yaml").read_text()
@@ -1298,7 +1307,7 @@ class Struct(Base):
             # super(Struct, self).__getattribute__(item)
             # object.__getattribute__(self, item)
             # except AttributeError:
-            raise AttributeError(f"Could not find the attribute `{item}` in object `{self.__class__}`")
+            raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
 
     def __getstate__(self):  # serialize
         return self.__dict__
