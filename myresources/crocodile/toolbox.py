@@ -28,6 +28,7 @@ class Base:
     def from_saved(cls, path, *args, reader=None, **kwargs):
         """Whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
         For best experience, make sure that your subclass can be initialized with no or only fake inputs.
+        This behaviour is sufficient to store classes when they're thought of as combination of functions and data.
         """
         inst = cls(*args, **kwargs)
         if reader is None:
@@ -39,27 +40,30 @@ class Base:
         inst.__dict__.update(new_data)
         return inst
 
-    def save_npy(self, path, **kwargs):
-        np.save(path, self.__dict__, **kwargs)
+    def save_npy(self, path=None, **kwargs):
+        Save.npy(path, self.__dict__, **kwargs)
 
-    def save_pickle(self, path, itself=False, **kwargs):
+    def save_pickle(self, path=None, itself=False, **kwargs):
         """
         :param path:
-        :param itself: determiens whether to save the weights only or the entire class.
+        :param itself: determiens whether to save the attributes only or the entire class. If the attributes are
+        the only saved ones (assuming it is pure data rather than code), then the class itself is required later
+        and the `from_saved` method should be used to reload the instance again. Alternatively, if the class itself is saved
+        the aforementioned process will not be required as the class will be loaded automatically.
         """
         if not itself:
             Save.pickle(path, self.__dict__, **kwargs)
         else:
             Save.pickle(path, self, **kwargs)
 
-    def save_json(self, path, *args, **kwargs):
+    def save_json(self, path=None, *args, **kwargs):
         """Use case: json is good for simple dicts, e.g. settings.
         Advantage: human-readable from file explorer."""
         _ = args
         Save.json(path, self.__dict__, **kwargs)
         return self
 
-    def save_mat(self, path, *args, **kwargs):
+    def save_mat(self, path=None, *args, **kwargs):
         """for Matlab compatibility."""
         _ = args
         Save.mat(path, self.__dict__, **kwargs)
@@ -291,6 +295,7 @@ class P(type(Path()), Path, Base):
         return int("".join(filter(str.isdigit, str(astring))))
 
     def make_valid_filename(self, replace='_'):
+        """Converts arbitrary filename into proper variable name as per Python."""
         return self.make_valid_filename_(self.trunk, replace=replace)
 
     @staticmethod
@@ -298,7 +303,7 @@ class P(type(Path()), Path, Base):
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
     @staticmethod
-    def get_random_string(length=10, pool=None):
+    def random(length=10, pool=None):
         if pool is None:
             pool = string.ascii_letters
         import random
@@ -401,19 +406,17 @@ class P(type(Path()), Path, Base):
             if verbose:
                 print(f"File {self} was uncompressed to {filename}")
 
-        def apply_reader_or_infer_it():
-            if reader is None:
+        try:
+            if reader is None:  # infer the reader
                 return Read.read(filename, **kwargs)
             else:
                 return reader(str(filename), **kwargs)
-
-        if notfound is FileNotFoundError:
-            return apply_reader_or_infer_it()
-        else:  # encapsulate the function within a try context manager.
-            try:
-                return apply_reader_or_infer_it()
-            except Exception:
+        except FileNotFoundError:
+            if notfound is FileNotFoundError:
+                raise notfound
+            else:
                 return notfound
+        # for other errors, we do not know how to handle them, thus, they will be raised automatically.
 
     def explore(self):  # explore folders.
         # os.startfile(os.path.realpath(self))
@@ -578,6 +581,10 @@ class P(type(Path()), Path, Base):
             path = path / fn
         return path
 
+    @staticmethod
+    def tmp_fname(name=None):
+        return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp())
+
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):
         """
@@ -711,7 +718,6 @@ class Compression:
 
 
 class Read:
-
     @staticmethod
     def read(path, **kwargs):
         suffix = P(path).suffix[1:]
@@ -733,13 +739,16 @@ class Read:
         return data
 
     @staticmethod
-    def mat(path, **kwargs):
+    def mat(path, remove_meta=False, **kwargs):
         """
         :param path:
         :return: Structure object
         """
         from scipy.io import loadmat
-        return Struct(loadmat(path, **kwargs))
+        res = Struct(loadmat(path, **kwargs))
+        if remove_meta:
+            res.keys().filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
+        return res
 
     @staticmethod
     def json(path, r=False, **kwargs):
@@ -764,9 +773,9 @@ class Read:
 
     @staticmethod
     def csv(path, **kwargs):
-        w = P(path).append(".dtypes").readit(reader=pd.read_csv, notexist=None)
-        w = dict(zip(w['index'], w['dtypes'])) if w else w
-        return pd.read_csv(path, dtypes=w, **kwargs)
+        # w = P(path).append(".dtypes").readit(reader=pd.read_csv, notexist=None)
+        # w = dict(zip(w['index'], w['dtypes'])) if w else w
+        return pd.read_csv(path, **kwargs)
 
     @staticmethod
     def pickle(path, **kwargs):
@@ -783,13 +792,40 @@ class Read:
         return Read.pickle(*args, **kwargs)
 
 
+def save_decorator(ext=""):
+    """Apply default paths, add extension to path, print the saved file path"""
+    def decorator(func):
+        def wrapper(path=None, obj=None, **kwargs):
+            if path is None:
+                path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + ext
+            else:
+                if not str(path).endswith(ext):
+                    path = P(str(path) + ext)
+
+            path.parent.mkdir(exist_ok=True, parents=True)
+            func(path, obj, **kwargs)
+            print(f"File saved @ ", path.absolute().as_uri())
+            print(f"Directory: ", path.parent.absolute().as_uri())
+            return path
+        return wrapper
+    return decorator
+
+
 class Save:
     @staticmethod
-    def csv(path, obj):
+    @save_decorator(".csv")
+    def csv(path=None, obj=None):
+        path = path or P.tmp_fname()
         obj.to_frame('dtypes').reset_index().to_csv(P(path).append(".dtypes").string)
 
     @staticmethod
-    def mat(path=P.tmp(), mdict=None, **kwargs):
+    @save_decorator(".npy")
+    def npy(path, obj, **kwargs):
+        np.save(path, obj, **kwargs)
+
+    @staticmethod
+    @save_decorator(".mat")
+    def mat(path=None, mdict=None, **kwargs):
         """
         .. note::
             Avoid using mat for saving results because of incompatiblity:
@@ -801,44 +837,45 @@ class Save:
             Unless you want to pass the results to Matlab animals, avoid this format.
         """
         from scipy.io import savemat
-        if '.mat' not in str(path):
-            path += '.mat'
-        path.parent.mkdir(exist_ok=True, parents=True)
         for key, value in mdict.items():
             if value is None:
                 mdict[key] = []
         savemat(str(path), mdict, **kwargs)
 
     @staticmethod
-    def json(path, obj, **kwargs):
+    @save_decorator(".json")
+    def json(path=None, obj=None, **kwargs):
         """This format is **compatible** with simple dictionaries that hold strings or numbers
          but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
         inspected using any text editor."""
         import json
-        if not str(path).endswith(".json"):
-            path = str(path) + ".json"
+
         with open(str(path), "w") as file:
             json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
     @staticmethod
+    @save_decorator
     def yaml(path, obj, **kwargs):
         import yaml
-        if not str(path).endswith(".yaml"):
-            path = str(path) + ".yaml"
         with open(str(path), "w") as file:
             yaml.dump(obj, file, **kwargs)
 
-    # @staticmethod
-    # def pickle(path, obj, **kwargs):
-    #     if ".pickle" not in str(path):
-    #         path = path + ".pickle"
-    #     import pickle
-    #     with open(str(path), 'wb') as file:
-    #         pickle.dump(obj, file, **kwargs)
+    @staticmethod
+    @save_decorator(".pkl")
+    def vanilla_pickle(path, obj, **kwargs):
+        import pickle
+        with open(str(path), 'wb') as file:
+            pickle.dump(obj, file, **kwargs)
 
     @staticmethod
-    def pickle(path, obj, **kwargs):
+    @save_decorator(".pkl")
+    def pickle(path=None, obj=None, **kwargs):
+        """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are
+        loaded up and it happens implicitly. It often fails at load time and requires same packages to be reloaded first
+        . Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to
+        dependency. Dill however, stores all the required packages for any attribute object, but not the class itself,
+        or the classes that it inherits (at least at with this version)."""
         dill = Experimental.assert_package_installed("dill")
         with open(str(path), 'wb') as file:
             dill.dump(obj, file, **kwargs)
@@ -1053,6 +1090,7 @@ class List(list, Base):
 
     def append(self, obj):
         self.list.append(obj)
+        return self
 
     def __add__(self, other):
         # implement coersion
@@ -1083,12 +1121,12 @@ class List(list, Base):
     def __iter__(self):
         return iter(self.list)
 
-    def apply(self, func, *args, lest=None, jobs=None, depth=1, verbose=False, **kwargs):
+    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, **kwargs):
         """
         :param jobs:
         :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
         :param args:
-        :param lest:
+        :param other: other list
         :param verbose:
         :param depth: apply the function to inner Lists
         :param kwargs: a list of outputs each time the function is called on elements of the list.
@@ -1097,7 +1135,7 @@ class List(list, Base):
         if depth > 1:
             depth -= 1
             # assert type(self.list[0]) == List, "items are not Lists".
-            self.apply(lambda x: x.apply(func, *args, lest=lest, jobs=jobs, depth=depth, **kwargs))
+            self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
 
@@ -1105,8 +1143,9 @@ class List(list, Base):
         if verbose or jobs:
             Experimental.assert_package_installed("tqdm")
             from tqdm import tqdm
+            # print(f"Applying {func} to elements in {self}")
 
-        if lest is None:
+        if other is None:
             if jobs:
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in tqdm(self.list)))
@@ -1116,9 +1155,9 @@ class List(list, Base):
         else:
             if jobs:
                 from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in tqdm(zip(self.list, lest))))
+                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in tqdm(zip(self.list, other))))
             else:
-                iterator = zip(self.list, lest) if not verbose else tqdm(zip(self.list, lest))
+                iterator = zip(self.list, other) if not verbose else tqdm(zip(self.list, other))
                 return List([func(x, y) for x, y in iterator])
 
     def modify(self, func, lest=None):
@@ -1282,7 +1321,7 @@ class Struct(Base):
         for key in self.keys().list:
             key_str = str(key)
             type_str = str(type(self[key])).split("'")[1]
-            val_str = DisplayData.get_repr(self[key])
+            val_str = DisplayData.get_repr(self[key]).replace("\n", " ")
             repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
             repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
@@ -1488,9 +1527,9 @@ class Experimental:
     def generate_readme(path, obj=None, meta=None, save_source_code=True):
         """Generates a readme file to contextualize any binary files.
 
-        :param path: directory or file path.
-        :param obj: Python module, class, method or function used to generate the result (not the result or an
-            instance of any class)
+        :param path: directory or file path. If directory is passed, README.md will be the filename.
+        :param obj: Python module, class, method or function used to generate the result data.
+         (dot not pass the data itself or an instance of any class)
         :param meta:
         :param save_source_code:
         """
@@ -1799,7 +1838,8 @@ class DisplayData:
         elif type(data) is str:
             return data
         elif type(data) is list:
-            return f"length = {len(data)}. 1st item type = {type(data[0]) if len(data) > 0 else None}"
+            example = ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
+            return f"length = {len(data)}." + example
         else:
             return repr(data)
 
@@ -2418,14 +2458,14 @@ class SaveType:
         def finish(self):
             print("Saving the GIF ....")
             import matplotlib.animation as animation
-            from matplotlib.animation import PillowWriter
+            from matplotlib.animation import MovieWriter  # PillowWriter
             for idx, a_fig in enumerate(self.watch_figs):
                 ims = self.container[a_fig.get_label()]
                 if ims:
                     ani = animation.ArtistAnimation(a_fig, ims,
                                                     interval=self.interval, blit=True, repeat_delay=1000)
                     self.fname = os.path.join(self.save_dir, f'{a_fig.get_label()}_{self.save_name}.gif')
-                    ani.save(self.fname, writer=PillowWriter(fps=4))
+                    ani.save(self.fname, writer=MovieWriter(fps=4))
                     # if you don't specify the writer, it goes to ffmpeg by default then try others if that is not
                     # available, resulting in behaviours that is not consistent across machines.
                     print(f"GIF Saved @", Path(self.fname).absolute().as_uri())
@@ -2972,6 +3012,12 @@ class ImShow(FigureManager):
         labels = np.array_split(styles, nrows * ncols)
         _ = ImShow(*splitted, nrows=nrows, ncols=ncols, sub_labels=labels, **kwargs)
         return colored
+
+    @staticmethod
+    def imagesc():
+        # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html
+        # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
+        pass
 
     @staticmethod
     def test():

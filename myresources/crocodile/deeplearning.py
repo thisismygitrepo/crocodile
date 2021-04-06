@@ -285,6 +285,7 @@ class DataReader(tb.Base):
             self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
+        _ = self, args, kwargs
         return None
 
 
@@ -382,7 +383,7 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == 'tensorflow':
             new_loss = self.hp.pkg.keras.losses.MeanAbsoluteError()
         else:
-            import myresources.alexlib.deeplearning_torch as tmp
+            import myresources.crocodile.deeplearning_torch as tmp
             new_loss = tmp.MeanAbsoluteError()
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
@@ -505,6 +506,7 @@ class BaseModel(ABC):
 
         :param version: Model version, up to the user.
         :param weights_only: self-explanatory
+        :param itself:
         :return:
 
         """
@@ -598,6 +600,7 @@ class BaseModel(ABC):
         * Sanity check about values and ranges when random normal input is fed.
 
         :param shape:
+        :param verbose:
         :return:
         """
         if shape is None:
@@ -681,6 +684,7 @@ class Losses:
     @staticmethod
     def get_log_square_loss_class():
         import tensorflow as tf
+
         class LogSquareLoss(tf.keras.losses.Loss):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
