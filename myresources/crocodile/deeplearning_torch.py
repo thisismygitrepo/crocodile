@@ -34,13 +34,16 @@ class TorchDataReader(dl.DataReader):
 
     @staticmethod
     def to_numpy(x):
-        return x.cpu().detach().numpy()
+        if type(x) is not np.ndarray:
+            return x.cpu().detach().numpy()
+        else:
+            return x
 
 
 class PTBaseModel(dl.BaseModel, dl.ABC):
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.odict = OrderedDict
 
     def summary(self):
@@ -79,21 +82,18 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         for an_epoch in range(epochs):
             # monitor training loss
             train_loss = 0.0
+            total_samples = 0
             self.model.train()  # Double checking
             for i, batch in enumerate(self.data.train_loader):
-                x, y = batch
-                self.compiler.optimizer.zero_grad()  # clear the gradients of all optimized variables
-                op = self.model(x)
-                loss = self.compiler.loss(op, y)
-                loss.backward()
-                self.compiler.optimizer.step()
+                _, loss, batch_length = self.train_step(batch)
                 loss_value = loss.item()
                 train_losses.append(loss_value)
-                train_loss += loss_value * x.size(0)
+                train_loss += loss_value * batch_length
+                total_samples += batch_length
                 if (i % 20) == 0:
                     print(f'Accumulative loss = {train_loss}', end='\r')
             # print avg training statistics
-            train_loss /= self.data.N
+            train_loss /= total_samples
             # writer.add_scalar('training loss', train_loss, next(epoch_c))
             test_loss = self.test(self.data.test_loader)
             test_losses.append(test_loss[0])
@@ -103,19 +103,36 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         if plot:
             self.plot_loss()
 
-    def test(self, loader):
-        self.model.eval()
-        losses = []
-        for i, batch in enumerate(loader):
+    def train_step(self, batch):
+        x, y = batch
+        self.compiler.optimizer.zero_grad()  # clear the gradients of all optimized variables
+        op = self.model(x)
+        loss = self.compiler.loss(op, y)
+        loss.backward()
+        self.compiler.optimizer.step()
+        return op, loss, len(x)
+
+    def test_step(self, batch):
+        with t.no_grad():
             x, y = batch
-            with t.no_grad():
-                prediction = self.model(x)
-                per_batch_losses = []
+            op = self.model(x)
+            loss = self.compiler.loss(op, y)
+            return op, loss, len(x)
+
+    def test(self, loader):
+        if loader:
+            self.model.eval()
+            losses = []
+            for i, batch in enumerate(loader):
+                prediction, loss, _ = self.test_step(batch)
+                per_batch_losses = [loss.item()]
                 for a_metric in self.compiler.metrics:
                     loss = a_metric(prediction, y)
                     per_batch_losses.append(loss.item())
-            losses.append(per_batch_losses)
-        return [np.mean(tmp) for tmp in zip(*losses)]
+                losses.append(per_batch_losses)
+            return [np.mean(tmp) for tmp in zip(*losses)]
+        else:
+            return None
 
     def deploy(self, dummy_ip=None):
         if not dummy_ip:

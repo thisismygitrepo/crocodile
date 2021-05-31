@@ -356,7 +356,7 @@ class P(type(Path()), Path, Base):
 
         if target_dir is not None:
             assert target_name is None, f"You can either pass target_dir or target_name but not both"
-            dest = P(target_dir).create() / self.name
+            dest = P(target_dir).create() # / self.name
 
         if target_name is not None:
             assert target_dir is None, f"You can either pass target_dir or target_name but not both"
@@ -377,11 +377,14 @@ class P(type(Path()), Path, Base):
             from distutils.dir_util import copy_tree
             if contents:
                 copy_tree(str(self), str(dest))
+                if verbose:
+                    print(f"Contents of \n{self}\ncopied successfully to: \n{dest}")
             else:
                 copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
         else:
-            print("Could not copy this thing. Not a file nor a folder.")
-        return dest
+            print(f"Could not copy this thing. {self}\n"
+                  f"Not a file nor a folder.")
+        return dest / self.name
 
     def clean(self):
         """removes contents on a folder, rather than deleting the folder."""
@@ -544,7 +547,13 @@ class P(type(Path()), Path, Base):
             return gen
         else:
             # unpack the generator and vet the items (the function also returns P objects)
-            processed = [result for item in raw if (result := do_screening(item))]
+            # processed = [result for item in raw if (result := do_screening(item))]
+            processed = []
+            for item in raw:
+                result = do_screening(item)
+                if result:
+                    processed.append(item)
+
             if not processed:  # if empty, don't proceeed
                 return List(processed)
             if win_order:  # this option only supported in non-generator mode.
@@ -725,7 +734,10 @@ class Read:
         #     # plt.gcf().canvas.get_supported_filetypes().keys():
         #     return plt.imread(path, **kwargs)
         # else:
-        reader = getattr(Read, suffix)
+        try:
+            reader = getattr(Read, suffix)
+        except AttributeError:
+            raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
         return reader(str(path), **kwargs)
 
     @staticmethod
@@ -801,6 +813,8 @@ def save_decorator(ext=""):
             else:
                 if not str(path).endswith(ext):
                     path = P(str(path) + ext)
+                else:
+                    path = P(path)
 
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path, obj, **kwargs)
@@ -1088,8 +1102,8 @@ class List(list, Base):
             res = res + item
         return res
 
-    def append(self, obj):
-        self.list.append(obj)
+    def append(self, item):  # add one item to the list object
+        self.list.append(item)
         return self
 
     def __add__(self, other):
@@ -1384,9 +1398,9 @@ class Struct(Base):
     def inverse(self):
         return Struct({v: k for k, v in self.dict.items()})
 
-    def append_values(self, *others, **kwargs):
-        """ """
-        return Struct(self.concat_dicts(*((self.dict,) + others), **kwargs))
+    # def append_values(self, *others, **kwargs):
+    #     """ """
+    #     return Struct(self.concat_dicts(*((self.dict,) + others), **kwargs))
 
     @staticmethod
     def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
@@ -1448,9 +1462,9 @@ class Struct(Base):
         if artist is None:
             artist = Artist(figname='Structure Plot')
         for key, val in self:
-            if xdata is None:
-                xdata = np.arange(len(val))
-            artist.plot(xdata, val, label=key)
+            # if xdata is None:
+            #     xdata = np.arange(len(val))
+            artist.plot(val, label=key)
         try:
             artist.fig.legend()
         except AttributeError:
@@ -1511,6 +1525,15 @@ class Experimental:
             print(f"Finished ... have a look @ \n {self.path}")
 
     @staticmethod
+    def try_this(func, exception=Exception, otherwise=None):
+        try:
+            res = func()
+        except exception:
+            res = None
+        # add other clauses.
+        return res
+
+    @staticmethod
     def assert_package_installed(package):
         try:
             pkg = __import__(package)
@@ -1563,7 +1586,8 @@ class Experimental:
         * Loads the directory to the memroy.
         * Returns either the package or a piece of it as indicated by ``obj``
         """
-        P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / get_time_stamp(name="tmp_sourcecode"))
+        tmpdir = P.tmp() / get_time_stamp(name="tmp_sourcecode")
+        P(directory).find("source_code*", r=True).unzip(tmpdir)
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
         if obj is not None:
@@ -1690,11 +1714,15 @@ class Manipulator:
         :param ax1:
         :param ax2:
         :return:
+        changed in April 2021
         """
         shape = array.shape
-        # order = len(shape)
         sz1, sz2 = shape[ax1], shape[ax2]
-        new_shape = shape[:ax1] + (sz1 * sz2,) + shape[ax2 + 1:]
+        new_shape = shape[:ax1] + (sz1 * sz2,)
+        if ax2 == -1 or ax2 == len(shape):
+            pass
+        else:
+            new_shape = new_shape + shape[ax2 + 1:]
         return array.reshape(new_shape)
 
     @staticmethod
@@ -1739,16 +1767,18 @@ class Manipulator:
     def indexer(axis, myslice, rank=None):
         """
         Returns a tuple of slicers.
+        changed in April 2021
         """
         everything = slice(None, None, None)  # `:`
-        if rank is not None:
-            indices = [everything] * rank
-            indices[axis] = myslice
-            return tuple(indices)
-        else:
-            indices = [everything] * (axis + 1)
-            indices[axis] = myslice
-            return tuple(indices)
+        if rank is None:
+            rank = axis + 1
+        indices = [everything] * rank
+        indices[axis] = myslice
+        indices.append(Ellipsis)  # never hurts to add this in the end.
+        return tuple(indices)
+
+
+M = Manipulator
 
 
 def batcher(func_type='function'):
@@ -1839,7 +1869,7 @@ class DisplayData:
             return data
         elif type(data) is list:
             example = ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
-            return f"length = {len(data)}." + example
+            return f"length = {len(data)}. " + example
         else:
             return repr(data)
 

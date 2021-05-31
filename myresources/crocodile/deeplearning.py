@@ -362,7 +362,7 @@ class BaseModel(ABC):
         return self
 
     def plot_loss(self):
-        total_hist = tb.Struct.concat_dicts_(*self.history)
+        total_hist = tb.Struct.concat_values(*self.history)
         total_hist.plot()
 
     def switch_to_sgd(self, epochs=10):
@@ -372,7 +372,7 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == 'tensorflow':
             new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.lr * 0.5)
         else:
-            new_optimizer = self.hp.pkg.optim.SGD(lr=self.hp.lr * 0.5)
+            new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.lr * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
@@ -383,12 +383,13 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == 'tensorflow':
             new_loss = self.hp.pkg.keras.losses.MeanAbsoluteError()
         else:
-            import myresources.crocodile.deeplearning_torch as tmp
+            import crocodile.deeplearning_torch as tmp
             new_loss = tmp.MeanAbsoluteError()
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
 
     def preprocess(self, *args, **kwargs):
+        """Converts an object to a numerical form consumable by the NN."""
         return self.data.preprocess(*args, **kwargs)
 
     def postprocess(self, *args, **kwargs):
@@ -413,7 +414,7 @@ class BaseModel(ABC):
 
     def deduce(self, obj, viz=True, **kwargs):
         """Assumes that contents of the object are in the form of a batch."""
-        preprocessed = self.preprocess(obj)
+        preprocessed = self.preprocess(obj, **kwargs)
         prediction = self.infer(preprocessed)
         postprocessed = self.postprocess(prediction, **kwargs)
         result = tb.Struct(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
@@ -469,10 +470,17 @@ class BaseModel(ABC):
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
         loss_dict = dict()
         for a_metric in metrics:
-            try:  # EAFP principle.
-                name = a_metric.name  # works for subclasses Metrics
-            except AttributeError:
-                name = a_metric.__name__  # works for functions.
+            if hasattr(a_metric, "name"):
+                name = a_metric.name
+            elif hasattr(a_metric, "__name__"):
+                name = a_metric.__name__
+            else:
+                name = "unknown"
+            # try:  # EAFP principle.
+            #     name = a_metric.name  # works for subclasses Metrics
+            # except AttributeError:
+            #
+            #     name = a_metric.__name__  # works for functions.
             loss_dict[name] = []
 
             for a_prediction, a_y_test in zip(prediction, groun_truth):
