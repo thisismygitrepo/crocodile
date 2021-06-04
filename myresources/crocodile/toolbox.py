@@ -552,7 +552,7 @@ class P(type(Path()), Path, Base):
             for item in raw:
                 result = do_screening(item)
                 if result:
-                    processed.append(item)
+                    processed.append(result)
 
             if not processed:  # if empty, don't proceeed
                 return List(processed)
