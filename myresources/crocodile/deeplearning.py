@@ -105,7 +105,11 @@ class HyperParam(tb.Struct):
                 chosen_device = self.device_name
 
             device_str = chosen_device.value if 1 > 0 else "haha"
-            assert device_str in device_dict.keys(), f"This machine has no such a device to be chosen! ({device_str})"
+            if device_str not in device_dict.keys():
+                for i in range(10):
+                    print(f"This machine has no such a device to be chosen! ({device_str})")
+                # Revert to cpu, keep going, instead of throwing an error.
+                device_str = "cpu"
 
             try:
                 device = device_dict[device_str]
@@ -170,6 +174,9 @@ class HyperParam(tb.Struct):
             print(f"Trying again with auto-device {Device.auto}")
             self.device_name = Device.auto
             self.config_device()
+
+        except ValueError:
+            print("Cannot set memory growth on non-GPU devices")
 
         except RuntimeError as e:
             print(e)

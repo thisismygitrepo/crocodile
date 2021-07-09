@@ -46,16 +46,36 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         super().__init__(*args, **kwargs)
         self.odict = OrderedDict
 
-    def summary(self):
+    @staticmethod
+    def check_childern_details(mod):
+        tot = 0
+        for name, layer in mod.named_children():
+            params = sum(p.numel() for p in layer.parameters())
+            print(f'Layer {name}. # Parameters = ', params)
+            tot += params
+        print(f"Total = {tot}")
+        print("-" * 20)
+
+    def summary(self, detailed=False):
         print(' Summary '.center(50, '='))
-        print('Number of weights in the NN = ', sum(p.numel() for p in self.model.parameters()))
-        print(''.center(57, '='))
+        if detailed:
+            self.check_childern_details(self.model)
+        else:
+            print('Number of weights in the NN = ', sum(p.numel() for p in self.model.parameters()))
+            print(''.center(57, '='))
 
     def save_weights(self, save_dir):
         t.save(self.model.state_dict(), save_dir.joinpath('saved_weights.pt'))
 
-    def load_weights(self, save_dir):
-        self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__()))
+    def load_weights(self, save_dir, map_location=None):
+        if map_location is None:  # auto location.
+            if t.cuda.is_available():
+                # load to where ever the model was saved from in the first place
+                self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__()))
+            else:  # we are restricted to CPU
+                self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location="cpu"))
+        else:
+            self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location=map_location))
         self.model.eval()
 
     def save_model(self, save_dir):
