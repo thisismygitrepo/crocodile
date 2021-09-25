@@ -30,6 +30,13 @@ This package extends many native Python classes to equip you with an uneasy-to-t
    
 Furthermore, those classes are inextricably connected. For example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.
 
+* Deep Learning Modules.
+  * A paradigm that facilitates working with deep learning models that is based on a tri-partite scheme:
+    * HyperParameters: facilitated through `HParams` class.
+    * Data: facilitated though `DataReader` class.
+    * `BaseModel` is a frontend for both `TensorFlow` & `Pytorch` backends. The wrapper worked in tandem.
+  * The aforementioned classes cooperate together to offer sealmess workflow during creation, training, and saving models.
+
 
 # Install
 In the commandline:

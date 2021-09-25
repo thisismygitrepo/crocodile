@@ -707,7 +707,7 @@ class Losses:
 
             def call(self, y_true, y_pred):
                 factor = (20 / tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype)))
-                return factor * tf.math.log(tf.reduce_mean(abs(y_true - y_pred)))
+                return factor * tf.math.log(tf.reduce_mean((y_true - y_pred)**2))
         return LogSquareLoss
 
     @staticmethod

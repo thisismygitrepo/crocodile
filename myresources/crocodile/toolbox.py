@@ -1,3 +1,4 @@
+
 """
 A collection of classes extending the functionality of Python's builtins.
 email programmer@usa.com
@@ -15,6 +16,7 @@ import copy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 # %% ========================== File Management  =========================================
@@ -140,8 +142,18 @@ class P(type(Path()), Path, Base):
         :return:
         """
         time = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
-        from datetime import datetime
         return datetime.fromtimestamp(time, **kwargs)
+
+    def stats(self):
+        """A variant of `stat` method that returns a structure with human-readable values."""
+        res = Struct(size=self.size(),
+                     content_mod_time=self.time(which="m"),
+                     attr_mod_time=self.time(which="c"),
+                     last_access_time=self.time(which="a"),
+                     group_id_owner=self.stat().st_gid,
+                     user_id_owner=self.stat().st_uid)
+        res.print()
+        return res
 
     # ================================ Path Object management ===========================================
     @property
@@ -825,6 +837,41 @@ def save_decorator(ext=""):
     return decorator
 
 
+class SaveDecorator(object):
+    def __init__(self, func, ext=""):
+        # TODO: migrate from save_decorator to SaveDecorator
+        # Called with func argumen when constructing the decorated function.
+        # func argument is passed implicitly by Python.
+        self.func = func
+        self.ext = ext
+
+    classmethod
+    def init(cls, func=None, **kwargs):
+        """Always use this method for construction."""
+        if func is None:  # User instantiated the class with no func argument and specified kwargs.
+            def wrapper(func):
+                return cls(func, **kwargs)
+            return wrapper  # a function ready to be used by Python (pass func to it to instantiate it)
+        else:  # called by Python with func passed and user did not specify non-default kwargs:
+            return cls(func)  # return instance of the class.
+
+    def __call__(self, path=None, obj=None, **kwargs):
+        # Called when calling the decorated function (instance of this called).
+        if path is None:
+            path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + self.ext
+        else:
+            if not str(path).endswith(ext):
+                path = P(str(path) + ext)
+            else:
+                path = P(path)
+
+        path.parent.mkdir(exist_ok=True, parents=True)
+        self.func(path, obj, **kwargs)
+        print(f"File saved @ ", path.absolute().as_uri())
+        print(f"Directory: ", path.parent.absolute().as_uri())
+        return path
+
+
 class Save:
     @staticmethod
     @save_decorator(".csv")
@@ -1214,18 +1261,32 @@ class List(list, Base):
             if sep:
                 print(sep * 100)
 
-    def to_dataframe(self, names=None, minimal=False):
+    def to_dataframe(self, names=None, minimal=False, obj_included=True):
+        """
+
+        :param names: name of each object.
+        :param minimal: Return Dataframe structure without contents.
+        :param obj: Include a colum for objects themselves.
+        :return:
+        """
         DisplayData.set_display()
-        columns = ['object'] + list(self.list[0].__dict__.keys())
+        columns = list(self.list[0].__dict__.keys())
+        if obj_included or names:
+            columns = ['object'] + columns
         df = pd.DataFrame(columns=columns)
         if minimal:
             return df
+
+        # Populate the dataframe:
         for i, obj in enumerate(self.list):
-            if names is None:
-                name = [obj]
+            if obj_included or names:
+                if names is None:
+                    name = [obj]
+                else:
+                    name = [names[i]]
+                df.loc[i] = name + list(self.list[i].__dict__.values())
             else:
-                name = [names[i]]
-            df.loc[i] = name + list(self.list[i].__dict__.values())
+                df.loc[i] = list(self.list[i].__dict__.values())
         return df
 
     def to_numpy(self):
@@ -1322,7 +1383,7 @@ class Struct(Base):
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=25, yaml=False):
+    def print(self, sep=25, yaml=False, typeinfo=True):
         if yaml:
             self.save_yaml(P.tmp(fn="__tmp.yaml"))
             txt = P.tmp(fn="__tmp.yaml").read_text()
@@ -1330,14 +1391,15 @@ class Struct(Base):
             return None
         repr_string = ""
         repr_string += "Structure, with following entries:\n"
-        repr_string += "Key" + " " * sep + "Item Type" + " " * sep + "Item Details\n"
-        repr_string += "---" + " " * sep + "---------" + " " * sep + "------------\n"
+        repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if typeinfo else "") + "Item Details\n"
+        repr_string += "---" + " " * sep + (("---------" + " " * sep) if typeinfo else "") + "------------\n"
         for key in self.keys().list:
             key_str = str(key)
             type_str = str(type(self[key])).split("'")[1]
             val_str = DisplayData.get_repr(self[key]).replace("\n", " ")
             repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
-            repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
+            if typeinfo:
+                repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
         print(repr_string)
 
@@ -1894,7 +1956,6 @@ def get_time_stamp(ft=None, name=None):
     if ft is None:  # this is better than putting the default non-None value above.
         ft = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expise those kwarg
         # then it has to worry about not sending None which will overwrite this defualt value.
-    from datetime import datetime
     _ = datetime.now().strftime(ft)
     if name:
         name = name + '_' + _
@@ -1945,6 +2006,15 @@ class FigureManager:
 
     @staticmethod
     def grid(ax, factor=5, x_or_y='both', color='gray', alpha1=0.5, alpha2=0.25):
+        """
+        :param ax: Axis object from matplotlib
+        :param factor: number of major divisions.
+        :param x_or_y: which axis to grid.
+        :param color: grid color
+        :param alpha1: transparancy for x axis grid.
+        :param alpha2: transparancy for y axis grid.
+        :return:
+        """
         if type(ax) in {list, List, np.ndarray}:
             for an_ax in ax:
                 FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2)
