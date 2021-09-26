@@ -168,9 +168,11 @@ class P(type(Path()), Path, Base):
         return self.name.split('.')[0]
 
     def __add__(self, name):
+        """Behaves like adding strings"""
         return self.parent.joinpath(self.stem + name)
 
     def __sub__(self, other):
+        """removes all similar characters from the string form of the path"""
         return P(str(self).replace(str(other), ""))
 
     # def __rtruediv__(self, other):
@@ -181,7 +183,8 @@ class P(type(Path()), Path, Base):
 
     def prepend(self, prefix, stem=False):
         """Add extra text before file name
-        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension
+        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
+        notice that `__add__` method removes the extension, while this one preserves it.
         """
         if stem:
             return self.parent.joinpath(prefix + self.stem)
@@ -263,7 +266,7 @@ class P(type(Path()), Path, Base):
 
         return one, two
 
-    def __getitem__(self, slici):
+    def __getitem__(self, slici):  # tested.
         if type(slici) is slice:
             return P(*self.parts[slici])
         elif type(slici) is list or type(slici) is np.ndarray:
