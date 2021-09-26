@@ -32,12 +32,16 @@ class Base:
         For best experience, make sure that your subclass can be initialized with no or only fake inputs.
         This behaviour is sufficient to store classes when they're thought of as combination of functions and data.
         """
-        inst = cls(*args, **kwargs)
+        if args is None and kwargs is None:
+            inst = object.__new__(cls=cls)
+        else:
+            inst = cls(*args, **kwargs)
+
         if reader is None:
             data = Read.read(path)
         else:
             data = reader(path)
-        # return inst, data
+
         new_data = data.dict if type(data) is Struct else data  # __setitem__ should be defined.
         inst.__dict__.update(new_data)
         return inst
@@ -50,7 +54,8 @@ class Base:
         :param path:
         :param itself: determiens whether to save the attributes only or the entire class. If the attributes are
         the only saved ones (assuming it is pure data rather than code), then the class itself is required later
-        and the `from_saved` method should be used to reload the instance again. Alternatively, if the class itself is saved
+        and the `from_saved` method should be used to reload the instance again. Alternatively, if the class itself
+        is saved
         the aforementioned process will not be required as the class will be loaded automatically.
         """
         if not itself:
@@ -261,10 +266,34 @@ class P(type(Path()), Path, Base):
     def __getitem__(self, slici):
         if type(slici) is slice:
             return P(*self.parts[slici])
-        elif type(slici) is list or type(slice) is np.ndarray:
+        elif type(slici) is list or type(slici) is np.ndarray:
             return P(*[self[item] for item in slici])
         else:
             return P(self.parts[slici])
+
+    def __setitem__(self, key: typing.Union[str, int, slice], value: typing.Union[str, Path]):
+        fullparts = list(self.parts)
+        new = list(P(value).parts)
+        if type(key) is str:
+            idx = fullparts.index(key)
+            fullparts.remove(key)
+            fullparts = fullparts[:idx] + new + fullparts[idx+1:]
+        elif type(key) is int or type(key) is slice:
+            if type(key) is int:  # replace this entry
+                fullparts = fullparts[:key] + new + fullparts[key+1:]
+            elif type(key) is slice:
+                if key.stop is None:
+                    key = slice(key.start, len(fullparts), key.step)
+                if key.start is None:
+                    key = slice(0, key.stop, key.step)
+                fullparts = fullparts[:key.start] + new + fullparts[key.stop:]
+        obj = P(*fullparts)
+        self._str = str(obj)
+        # TODO: Do we need to update those as well?
+        # self._parts
+        # self._pparts
+        # self._cparts
+        # self._cached_cparts
 
     def __len__(self):
         return len(self.parts)
@@ -273,16 +302,11 @@ class P(type(Path()), Path, Base):
     def len(self):
         return self.__len__()
 
-    def __setitem__(self, key, value):
-        fullparts = list(self.parts)
-        fullparts[key] = value
-        return P(*fullparts)  # TODO: how to change self[-1]
-
     def switch(self, key: str, val: str):
-        """Changes a given part of the path to another given one"""
+        """Changes a given part of the path to another given one. `replace` is an already defined method."""
         return P(str(self).replace(key, val))
 
-    def switch_index(self, key: int, val: str):
+    def switch_by_index(self, key: int, val: str):
         """Changes a given index of the path to another given one"""
         fullparts = list(self.parts)
         fullparts[key] = val
@@ -368,7 +392,7 @@ class P(type(Path()), Path, Base):
 
         if target_dir is not None:
             assert target_name is None, f"You can either pass target_dir or target_name but not both"
-            dest = P(target_dir).create() # / self.name
+            dest = P(target_dir).create()  # / self.name
 
         if target_name is not None:
             assert target_dir is None, f"You can either pass target_dir or target_name but not both"
@@ -527,23 +551,23 @@ class P(type(Path()), Path, Base):
         #         attribute = win32api.GetFileAttributes(p)
         #         return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
 
-        def run_filter(item):
+        def run_filter(item_):
             flags = [True]
             if not files:
-                flags.append(item.is_dir())
+                flags.append(item_.is_dir())
             if not folders:
-                flags.append(item.is_file())
+                flags.append(item_.is_file())
             for afilter in filters:
-                flags.append(afilter(item))
+                flags.append(afilter(item_))
             return all(flags)
 
-        def do_screening(item):
-            item = P(item)  # because some filters needs advanced functionalities of P objects.
+        def do_screening(item_):
+            item_ = P(item_)  # because some filters needs advanced functionalities of P objects.
             if absolute:
-                item = item.absolute()
+                item_ = item_.absolute()
 
-            if run_filter(item):
-                return item
+            if run_filter(item_):
+                return item_
             else:
                 return None
 
@@ -551,10 +575,10 @@ class P(type(Path()), Path, Base):
             def gen():
                 flag = False
                 while not flag:
-                    item = next(raw)
-                    flag = do_screening(item)
+                    item_ = next(raw)
+                    flag = do_screening(item_)
                     if flag:
-                        yield item
+                        yield item_
 
             return gen
         else:
@@ -765,6 +789,7 @@ class Read:
     @staticmethod
     def mat(path, remove_meta=False, **kwargs):
         """
+        :param remove_meta:
         :param path:
         :return: Structure object
         """
@@ -845,12 +870,12 @@ class SaveDecorator(object):
         self.func = func
         self.ext = ext
 
-    classmethod
+    @classmethod
     def init(cls, func=None, **kwargs):
         """Always use this method for construction."""
         if func is None:  # User instantiated the class with no func argument and specified kwargs.
-            def wrapper(func):
-                return cls(func, **kwargs)
+            def wrapper(func_):
+                return cls(func_, **kwargs)
             return wrapper  # a function ready to be used by Python (pass func to it to instantiate it)
         else:  # called by Python with func passed and user did not specify non-default kwargs:
             return cls(func)  # return instance of the class.
@@ -860,8 +885,8 @@ class SaveDecorator(object):
         if path is None:
             path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + self.ext
         else:
-            if not str(path).endswith(ext):
-                path = P(str(path) + ext)
+            if not str(path).endswith(self.ext):
+                path = P(str(path) + self.ext)
             else:
                 path = P(path)
 
@@ -1266,7 +1291,7 @@ class List(list, Base):
 
         :param names: name of each object.
         :param minimal: Return Dataframe structure without contents.
-        :param obj: Include a colum for objects themselves.
+        :param obj_included: Include a colum for objects themselves.
         :return:
         """
         DisplayData.set_display()
@@ -1433,8 +1458,9 @@ class Struct(Base):
     def __iter__(self):
         return iter(self.dict.items())
 
-    def save_yaml(self, path):
-        Save.yaml(path, self.recursive_dict(self))
+    @staticmethod
+    def save_yaml(path):
+        Save.yaml(path)
 
     @property
     def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
@@ -1520,7 +1546,7 @@ class Struct(Base):
         """From the same values, generate a new Struct with different keys passed."""
         return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
 
-    def plot(self, artist=None, xdata=None):
+    def plot(self, artist=None):
         if artist is None:
             artist = Artist(figname='Structure Plot')
         for key, val in self:
@@ -1588,6 +1614,8 @@ class Experimental:
 
     @staticmethod
     def try_this(func, exception=Exception, otherwise=None):
+        _ = otherwise
+        # noinspection PyBroadException
         try:
             res = func()
         except exception:
@@ -1836,6 +1864,7 @@ class Manipulator:
             rank = axis + 1
         indices = [everything] * rank
         indices[axis] = myslice
+        # noinspection PyTypeChecker
         indices.append(Ellipsis)  # never hurts to add this in the end.
         return tuple(indices)
 
@@ -2076,6 +2105,7 @@ class FigureManager:
 
     def save(self, event):
         _ = event
+        # noinspection PyTypeChecker
         Save.pickle('.', obj=self)
 
     def replay(self, event):
@@ -2509,7 +2539,7 @@ class SaveType:
             self.fname = self.save_dir
 
         def _save(self, afigure, aname, dpi=150, **kwargs):
-            aname = P(aname).make_python_name()
+            aname = P(aname).make_valid_filename()
             afigure.savefig(os.path.join(self.save_dir, aname), bbox_inches='tight', pad_inches=0.3,
                             dpi=dpi, **kwargs)
 
@@ -2664,6 +2694,7 @@ class SaveType:
             self.gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs)
             plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
+            # noinspection PyTypeChecker
             self.ani = animation.FuncAnimation(self.plotter.fig, self.plotter.animate, frames=self.gen,
                                                interval=interval, repeat_delay=1500, fargs=None,
                                                cache_frame_data=True, save_count=10000)
@@ -3131,6 +3162,7 @@ class ImShow(FigureManager):
 
     @staticmethod
     def resize(path, m, n):
+        # Experimental.assert_package_installed("skimage")
         from skimage.transform import resize
         image = plt.imread(path)
         image_resized = resize(image, (m, n), anti_aliasing=True)
