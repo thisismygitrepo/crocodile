@@ -61,6 +61,23 @@ class Pomodoro:
             winsound.Beep(frequency, duration)
 
 
+class Terminal:
+    def __init__(self):
+        import subprocess
+        self.subp = subprocess
+
+    def commit_all(self, repos=None):
+        return repos.search("*").apply(lambda x: self.commit_one(x))
+
+    def commit_one(self, path, mess="auto_commit_" + tb.P.random()):
+        return self.run_command(command=f'cd {path}; git commit -am "{mess}"; git push origin')
+
+    def run_command(self, command):
+        resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+        print(resp.stdout)
+        return resp
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         pass

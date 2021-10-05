@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+import datetime as dt
 
 
 # %% ========================== File Management  =========================================
@@ -32,24 +33,34 @@ class Base:
         For best experience, make sure that your subclass can be initialized with no or only fake inputs.
         This behaviour is sufficient to store classes when they're thought of as combination of functions and data.
         """
-        if args is None and kwargs is None:
-            inst = object.__new__(cls=cls)
-        else:
+        # step 1: load up the code (methods) (why not data first then class?)
+        if args == () and kwargs == {}:  # user did not feed any init args.
+            # Either because his/her design does not require them, or, they expect them to be loaded up.
+            # uninit_inst = cls.__new__(object)  # avoid the init method because it demands arguments.
+            # print("new method is used.")
+            inst = cls(*args, **kwargs)
+        else:  # some classes are written in a way that you must pass some args at init time.
+            # print(args, kwargs)
             inst = cls(*args, **kwargs)
 
+        # step 2: load up the data
         if reader is None:
             data = Read.read(path)
         else:
             data = reader(path)
 
+        # step 3: update / populate instance attributes with data.
         new_data = data.dict if type(data) is Struct else data  # __setitem__ should be defined.
         inst.__dict__.update(new_data)
+
+        # Return a ready instance the way it was saved.
         return inst
 
     def save_npy(self, path=None, **kwargs):
         Save.npy(path, self.__dict__, **kwargs)
+        return self
 
-    def save_pickle(self, path=None, itself=False, **kwargs):
+    def save_pickle(self, path=None, itself=False, exclude=None, **kwargs):
         """
         :param path:
         :param itself: determiens whether to save the attributes only or the entire class. If the attributes are
@@ -57,11 +68,20 @@ class Base:
         and the `from_saved` method should be used to reload the instance again. Alternatively, if the class itself
         is saved
         the aforementioned process will not be required as the class will be loaded automatically.
+        A usecase for the former is when the source code is continously changed and still you want to reload an old
+         version.
+        :param exclude: a list of expensive attributes that will not be saved.
         """
-        if not itself:
-            Save.pickle(path, self.__dict__, **kwargs)
-        else:
+        if not itself:  # default, works in all cases.
+            if exclude is not None:
+                cp = copy.copy(self.__dict__)  # cheap shallow copy.  # not_tested Oct 2021
+                cp.update({item: None for item in exclude})
+            else:
+                cp = self.__dict__
+            Save.pickle(path, cp, **kwargs)
+        else:  # does not work for all classes with whacky behaviours, no gaurantee.
             Save.pickle(path, self, **kwargs)
+        return self
 
     def save_json(self, path=None, *args, **kwargs):
         """Use case: json is good for simple dicts, e.g. settings.
@@ -118,8 +138,7 @@ class Base:
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
-
-    # ===================================== File Specs ================================================================
+    # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
         factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
@@ -374,8 +393,9 @@ class P(type(Path()), Path, Base):
         temp.rename(new_path.absolute() / temp.name)
         return new_path
 
-    def renameit(self, new_name):
-        new_path = self.parent / new_name
+    def renameit(self, new_file_name):
+        assert type(new_file_name) is str, "New new should be a string representing file name alone."
+        new_path = self.parent / new_file_name
         self.rename(new_path)
         return new_path
 
@@ -448,6 +468,10 @@ class P(type(Path()), Path, Base):
             if verbose:
                 print(f"File {self} was uncompressed to {filename}")
 
+        if str(filename).startswith("http") or str(filename).startswith("www"):
+            import webbrowser
+            webbrowser.open(str(filename))
+            return self
         try:
             if reader is None:  # infer the reader
                 return Read.read(filename, **kwargs)
@@ -1117,8 +1141,9 @@ class List(list, Base):
     def __setitem__(self, key, value):
         self.list[key] = value
 
-    def sample(self, size=1):
-        return self[np.random.choice(len(self), size)]
+    def sample(self, size=1, replace=False, p=None):
+        """Select at random"""
+        return self[np.random.choice(len(self), size, replace=replace, p=p)]
 
     def to_struct(self, key_val=None):
         """
@@ -1297,7 +1322,7 @@ class List(list, Base):
         :param obj_included: Include a colum for objects themselves.
         :return:
         """
-        DisplayData.set_display()
+        DisplayData.set_pandas_display()
         columns = list(self.list[0].__dict__.keys())
         if obj_included or names:
             columns = ['object'] + columns
@@ -1458,7 +1483,7 @@ class Struct(Base):
     def __setstate__(self, state):  # deserialize
         self.__dict__ = state
 
-    def __iter__(self):
+    def __iter__(self):  # used when list(~) is called or it is iterated over.
         return iter(self.dict.items())
 
     @staticmethod
@@ -1604,7 +1629,9 @@ class Cycle:
 
 
 class Experimental:
+    """Debugging and Meta programming tools"""
     class Log:
+        """Saves console output to a file."""
         def __init__(self, path=None):
             if path is None:
                 path = P('console_output')
@@ -1616,18 +1643,8 @@ class Experimental:
             print(f"Finished ... have a look @ \n {self.path}")
 
     @staticmethod
-    def try_this(func, exception=Exception, otherwise=None):
-        _ = otherwise
-        # noinspection PyBroadException
-        try:
-            res = func()
-        except exception:
-            res = None
-        # add other clauses.
-        return res
-
-    @staticmethod
     def assert_package_installed(package):
+        """imports a package and installs it if not."""
         try:
             pkg = __import__(package)
             return pkg
@@ -1691,12 +1708,25 @@ class Experimental:
 
     @staticmethod
     def get_locals(func):
+        """Captures the local variables inside a function"""
         exec(Experimental.convert_to_global(func))  # run the function here.
         return Struct(vars())
 
     @staticmethod
-    def update_globals(local_dict):
-        sys.modules['__main__'].__dict__.update(local_dict)
+    def update_globals(local_dict, globs=None):
+        # sys.modules['__main__'].__dict__.update(local_dict)
+        # if globs is None:
+        #     globals().update(local_dict)
+        # else:
+        #     globs().update(local_dict)
+        _ = globs
+        for key, val in local_dict.items():
+            exec(f"global {key}")
+            if type(val) is str:
+                temp = f"{key} = '{val}'"
+            else:
+                temp = f"{key} = {val}"
+            exec(temp)
 
     @staticmethod
     def in_main(func):  # a decorator
@@ -1708,8 +1738,22 @@ class Experimental:
 
     @staticmethod
     def run_globally(func):
+        """Run a function as if its content was written inside the main."""
         exec(Experimental.convert_to_global(func))
         globals().update(vars())
+
+    @staticmethod
+    def define_args_kwargs_globally(func, globs=None):
+        import inspect
+        ak = inspect.getfullargspec(func)
+        keys = ak.args
+        vals = ak.defaults
+        if keys[0] == "self":
+            keys.remove("self")
+        struct = Struct.from_keys_values(keys, vals)
+        struct.print(typeinfo=False)
+        Experimental.update_globals(struct.dict, globs=None)
+        return struct
 
     @staticmethod
     def convert_to_global(name):
@@ -1773,7 +1817,8 @@ class Experimental:
         return module
 
     @staticmethod
-    def monkey_patch(class_inst, func):  # lambda *args, **kwargs: func(class_inst, *args, **kwargs)
+    def monkey_patch(class_inst, func):
+        """On the fly, attach a function as a method of an instantiated class."""
         setattr(class_inst.__class__, func.__name__, func)
 
     @staticmethod
@@ -1830,10 +1875,14 @@ class Manipulator:
         return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
 
     @staticmethod
-    def expand_axis(array, ax_idx, factor):
+    def expand_axis(array, ax_idx, factor, curtail=False):
         """opposite functionality of merge_axes.
         While ``numpy.split`` requires the division number, this requies the split size.
         """
+        if curtail:  # if size at ax_idx doesn't divide evenly factor, it will be curtailed.
+            size_at_idx = array.shape[ax_idx]
+            extra = size_at_idx % factor
+            array = array[Manipulator.indexer(axis=ax_idx, myslice=slice(0, -extra))]
         total_shape = list(array.shape)
         size = total_shape.pop(ax_idx)
         new_shape = (int(size / factor), factor)
@@ -1844,9 +1893,10 @@ class Manipulator:
 
     @staticmethod
     def slicer(array, a_slice: slice, axis=0):
+        """Extends Numpy slicing by allowing rotation if index went beyond size."""
         lower_ = a_slice.start
         upper_ = a_slice.stop
-        n = len(array)
+        n = array.shape[axis]
         lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
         roll = lower_
         lower_ = lower_ - roll
@@ -1858,9 +1908,9 @@ class Manipulator:
 
     @staticmethod
     def indexer(axis, myslice, rank=None):
-        """
+        """Allows subseting an array of arbitrary shape, given which index to be subsetted and the range.
         Returns a tuple of slicers.
-        changed in April 2021
+        changed in April 2021 without testing.
         """
         everything = slice(None, None, None)  # `:`
         if rank is None:
@@ -1940,11 +1990,11 @@ class DisplayData:
         self.x = pd.DataFrame(x)
 
     @staticmethod
-    def set_display():
-        pd.set_option('display.width', 1000)
-        pd.set_option('display.max_columns', 200)
-        pd.set_option('display.max_colwidth', 40)
-        pd.set_option('display.max_rows', 1000)
+    def set_pandas_display(rows=1000, columns=1000, width=1000, colwidth=40):
+        pd.set_option('display.max_colwidth', colwidth)
+        pd.set_option('display.max_columns', columns)  # to avoid replacing them with ...
+        pd.set_option('display.width', width)  # to avoid wrapping the table.
+        pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
 
     @staticmethod
     def eng():
@@ -1973,6 +2023,21 @@ class DisplayData:
         if imprint:
             print(str_)
         return str_
+
+    @staticmethod
+    def print_string_list(mylist, char_per_row=125, sep=" "):
+        counter = 0
+        index = 0
+        while index < len(mylist):
+            item = mylist[index]
+            print(item, end=sep)
+            counter += len(item)
+            if counter <= char_per_row:
+                pass
+            else:
+                counter = 0
+                print("\n")
+            index += 1
 
 
 # %% ========================== Plot Helper funcs ========================================
@@ -2067,6 +2132,7 @@ class FigureManager:
             ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
 
     def maximize_fig(self):
+        """The command required is backend-dependent and also OS dependent."""
         _ = self
         # plt.get_current_fig_manager().window.state('zoom')
         plt.get_current_fig_manager().full_screen_toggle()

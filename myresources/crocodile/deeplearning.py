@@ -200,7 +200,7 @@ class DataReader(tb.Base):
         self.split = split
         self.plotter = None
 
-    def __getattr__(self, item):
+    def __getattr__(self, item):  # avoid using this method. Always refer explicitly to `.data_specs`
         try:
             return self.data_specs[item]
         except KeyError:
@@ -236,10 +236,25 @@ class DataReader(tb.Base):
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
-    def get_data_tuple(self, aslice, dataset="test"):
+    def sample_dataset(self, aslice=None, dataset="test"):
+        if aslice is None:
+            aslice = slice(0, self.hp.batch_size)
         # returns a tuple containing a slice of data (x_test, x_test, names_test, index_test etc)
         keys = self.split.keys().filter(f"'_{dataset}' in x")
         return tuple([self.split[key][aslice] for key in keys])
+
+    def get_random_input_output(self, ip_shape=None, op_shape=None):
+        if ip_shape is None:
+            ip_shape = self.data_specs.ip_shape
+        if op_shape is None:
+            op_shape = self.data_specs.op_shape
+        if hasattr(self.hp, "precision"):
+            dtype = self.hp.precision
+        else:
+            dtype = "float32"
+        ip = np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype)
+        op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
+        return ip, op
 
     def save_pickle(self, path=None, *names, **kwargs):
         """This differs from the standard save from `Base` class in that it only saved .data_specs attribute
@@ -292,6 +307,8 @@ class DataReader(tb.Base):
             self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
+        """Implement here how you would visualize a batch of input and ouput pair.
+        Assume Numpy arguments rather than tensors."""
         _ = self, args, kwargs
         return None
 
@@ -313,7 +330,7 @@ class BaseModel(ABC):
         self.hp = hp  # should be populated upon instantiation.
         self.model = model  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
-        self.compiler = compiler
+        self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = tb.List() if history is None else history  # should be populated in fit method, or loaded up.
         self.plotter = tb.SaveType.NullAuto
         self.kwargs = None
@@ -606,7 +623,7 @@ class BaseModel(ABC):
                                   dpi=150, **kwargs)
         print('Successfully plotted the model, check out \n', (self.hp.save_dir / 'model_plot.png').as_uri())
 
-    def build(self, shape=None, verbose=True):
+    def build(self, ip_shape=None, verbose=True):
         """ Building has two main uses.
 
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually
@@ -618,13 +635,7 @@ class BaseModel(ABC):
         :param verbose:
         :return:
         """
-        if shape is None:
-            shape = self.data.data_specs.ip_shape
-        if hasattr(self.hp, "precision"):
-            dtype = self.hp.precision
-        else:
-            dtype = "float32"
-        ip = np.random.randn(*((self.hp.batch_size,) + shape)).astype(dtype)
+        ip, _ = self.data.get_random_input_output(ip_shape=ip_shape)
         op = self.model(ip)
         self.tmp = op
         if verbose:
@@ -705,7 +716,9 @@ class Losses:
                 super().__init__(*args, **kwargs)
                 self.name = "LogSquareLoss"
 
+            # @staticmethod
             def call(self, y_true, y_pred):
+                _ = self
                 factor = (20 / tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype)))
                 return factor * tf.math.log(tf.reduce_mean((y_true - y_pred)**2))
         return LogSquareLoss

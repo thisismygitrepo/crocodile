@@ -8,6 +8,8 @@ class TestPath:
 
 
 def test_path_module():
+    # ===================================== File Specs ================================================================
+
     p = tb.P(r"dir1\\dir2\\dir3\\file.ext")
     assert p[0].string == "dir1"
     assert p[-1].string == "file.ext"
