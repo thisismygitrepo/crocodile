@@ -15,3 +15,7 @@ skimage
 twine
 torch
 pytest
+scikit-image
+pyyaml
+twine
+send2trash

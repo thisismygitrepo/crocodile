@@ -18,6 +18,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import datetime as dt
+_ = dt
 
 
 # %% ========================== File Management  =========================================
@@ -96,11 +97,18 @@ class Base:
         Save.mat(path, self.__dict__, **kwargs)
         return self
 
-    def get_attributes(self, check_ownership=False):
+    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
         _ = check_ownership
+        if remove_base_attrs:
+            pass
+            # [attrs.remove(x) for x in Base().get_attributes()]
+        # if exclude is not None:
+        #     [attrs.remove(x) for x in exlcude]
+        attrs = L(attrs)
+        if return_objects:
+            attrs = attrs.apply(lambda x: getattr(self, x))
         return attrs
-        # [setattr(Path, name, getattr(MyPath, name)) for name in funcs]
 
     # def get_methods(self):
 
@@ -133,6 +141,9 @@ class Base:
                     return string_
         else:
             return string_
+
+    def print(self, typeinfo=False):
+        Struct(self.__dict__).print(typeinfo=typeinfo)
 
 
 class P(type(Path()), Path, Base):
@@ -1028,6 +1039,24 @@ def accelerate(func, ip):
     return op
 
 
+class Terminal:
+    def __init__(self, stdout=None, stderr=None):
+        import subprocess
+        self.subp = subprocess
+        self.stdout = self.subp.DEVNULL if stdout is None else stdout
+        self.stderr = self.subp.DEVNULL if stderr is None else stderr
+
+    def run(self, command):
+        resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+        print(resp.stdout)
+        print(resp.stderr)
+        return resp
+
+    def run_async(self, command):
+        w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr)
+        return w
+
+
 # %% ========================== Object Management ==============================================
 
 
@@ -1707,66 +1736,25 @@ class Experimental:
             return sourcefile
 
     @staticmethod
-    def get_locals(func):
+    def capture_locals(func):
         """Captures the local variables inside a function"""
-        exec(Experimental.convert_to_global(func))  # run the function here.
-        return Struct(vars())
+        code = Experimental.extract_code(func, verbose=False)
+        res = Struct()
+        exec(code, res.dict)  # run the function here.
+        return res
 
     @staticmethod
-    def update_globals(local_dict, globs=None):
-        # sys.modules['__main__'].__dict__.update(local_dict)
-        # if globs is None:
-        #     globals().update(local_dict)
-        # else:
-        #     globs().update(local_dict)
-        _ = globs
-        for key, val in local_dict.items():
-            exec(f"global {key}")
-            if type(val) is str:
-                temp = f"{key} = '{val}'"
-            else:
-                temp = f"{key} = {val}"
-            exec(temp)
-
-    @staticmethod
-    def in_main(func):  # a decorator
-        def wrapper():  # a wrapper that remembers the function func because it was in the closure when construced.
-            local_dict = Experimental.get_locals(func)
-            Experimental.update_globals(local_dict)
-
-        return wrapper
-
-    @staticmethod
-    def run_globally(func):
-        """Run a function as if its content was written inside the main."""
-        exec(Experimental.convert_to_global(func))
-        globals().update(vars())
-
-    @staticmethod
-    def define_args_kwargs_globally(func, globs=None):
-        import inspect
-        ak = inspect.getfullargspec(func)
-        keys = ak.args
-        vals = ak.defaults
-        if keys[0] == "self":
-            keys.remove("self")
-        struct = Struct.from_keys_values(keys, vals)
-        struct.print(typeinfo=False)
-        Experimental.update_globals(struct.dict, globs=None)
-        return struct
-
-    @staticmethod
-    def convert_to_global(name):
+    def extract_code(func, verbose=True):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
+        Use: in the main: exec(extract_code(func))
         """
         import inspect
         import textwrap
 
-        codelines = inspect.getsource(name)
+        codelines = inspect.getsource(func)
         # remove def func_name() line from the list
         idx = codelines.find("):\n")
-        header = codelines[:idx]
         codelines = codelines[idx + 3:]
 
         # remove any indentation (4 for funcs and 8 for classes methods, etc)
@@ -1777,23 +1765,38 @@ class Experimental:
         codelines = [code + "\n" for code in codelines if not code.startswith("return ")]
 
         code_string = ''.join(codelines)  # convert list to string.
-
-        temp = inspect.getfullargspec(name)
-        arg_string = """"""
-        # if isinstance(type(name), types.MethodType) else tmp.args
-        if temp.defaults:  # not None
-            for key, val in zip(temp.args[1:], temp.defaults):
-                arg_string += f"{key} = {val}\n"
-        if "*args" in header:
-            arg_string += "args = (,)\n"
-        if "**kwargs" in header:
-            arg_string += "kwargs = {}\n"
-        result = arg_string + code_string
+        result = Experimental.extract_arguments(func, verbose=verbose) + code_string
 
         clipboard = Experimental.assert_package_installed("clipboard")
         clipboard.copy(result)
-        print("code to be run \n", result, "=" * 100)
+        if verbose:
+            print("code to be run \n", result, "=" * 100)
         return result  # ready to be run with exec()
+
+    @staticmethod
+    def extract_arguments(func, verbose=True):
+        """Get code to define the args and kwargs defined in the main. Works for funcs and methods."""
+        import inspect
+        ak = inspect.getfullargspec(func)
+        keys = ak.args
+        vals = ak.defaults
+        if keys[0] == "self":
+            keys.remove("self")
+        res = ""
+        for akey, aval in zip(keys, vals):
+            if type(aval) is str:
+                res += f"{akey} = '{aval}'\n"
+            else:
+                res += f"{akey} = {aval}\n"
+        if ak.varargs:
+            res += f"{ak.varargs} = (,)\n"
+        if ak.varkw:
+            res += f"{ak.varkw} = " + "{}\n"
+        clipboard = Experimental.assert_package_installed("clipboard")
+        clipboard.copy(res)
+        if verbose:
+            print("Finished. Paste code now.")
+        return res
 
     @staticmethod
     def edit_source(module, *edits):
