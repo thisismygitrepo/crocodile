@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-import datetime as dt
+import datetime as dt  # useful for deltatime and timezones.
 _ = dt
 
 
@@ -109,11 +109,6 @@ class Base:
         if return_objects:
             attrs = attrs.apply(lambda x: getattr(self, x))
         return attrs
-
-    # def get_methods(self):
-
-    # def get_dict(self):
-    #     return list(self.__dict__.keys())
 
     def __deepcopy__(self, *args, **kwargs):
         """Literally creates a new copy of values of old object, rather than referencing them.
@@ -1264,7 +1259,7 @@ class List(list, Base):
     def __iter__(self):
         return iter(self.list)
 
-    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, **kwargs):
+    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         """
         :param jobs:
         :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
@@ -1291,16 +1286,19 @@ class List(list, Base):
         if other is None:
             if jobs:
                 from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in tqdm(self.list)))
+                return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in
+                                                  tqdm(self.list, desc=desc)))
             else:
                 iterator = self.list if not verbose else tqdm(self.list)
                 return List([func(x, *args, **kwargs) for x in iterator])
         else:
             if jobs:
                 from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in tqdm(zip(self.list, other))))
+                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in
+                                                  tqdm(zip(self.list, other), desc=desc)))
             else:
-                iterator = zip(self.list, other) if not verbose else tqdm(zip(self.list, other))
+                iterator = zip(self.list, other) if not verbose else \
+                tqdm(zip(self.list, other), desc=desc)
                 return List([func(x, y) for x, y in iterator])
 
     def modify(self, func, lest=None):
