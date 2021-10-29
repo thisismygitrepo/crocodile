@@ -1,5 +1,5 @@
 
-from crocodile.core import np, get_time_stamp
+from crocodile.core import np, os, get_time_stamp
 from crocodile.file_management import sys, P, Struct
 
 
@@ -419,3 +419,56 @@ def batcherv2(func_type='function', order=1):
                 return np.array(output)
 
         return Batch
+
+
+class Terminal:
+    def __init__(self, stdout=None, stderr=None):
+        import subprocess
+        self.subp = subprocess
+        self.stdout = self.subp.DEVNULL if stdout is None else stdout
+        self.stderr = self.subp.DEVNULL if stderr is None else stderr
+
+    def run(self, command):
+        resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+        print(resp.stdout)
+        print(resp.stderr)
+        return resp
+
+    def run_async(self, command):
+        w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr)
+        return w
+
+
+def accelerate(func, ip):
+    """ Conditions for this to work:
+    * Must run under __main__ context
+    * func must be defined outside that context.
+
+
+    To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
+    but takes a long time to be obtained like a request from server. For this, multithreading launches all threads
+    together, then process them in an interleaved fashion as they arrive, all will line-up for same processor,
+    if it happens that they arrived quickly.
+
+    To accelerate processing-bound process use multiprocessing, even better, use Numba.
+    Method1 use: multiprocessing / multithreading.
+    Method2: using joblib (still based on multiprocessing)
+    from joblib import Parallel, delayed
+    Fast method using Concurrent module
+    """
+    split = np.array_split(ip, os.cpu_count())
+    # make each thread process multiple inputs to avoid having obscene number of threads with simple fast
+    # operations
+
+    # vectorize the function so that it now accepts lists of ips.
+    # def my_func(ip):
+    #     return [func(tmp) for tmp in ip]
+
+    import concurrent.futures
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        op = executor.map(func, split)
+        op = list(op)  # convert generator to list
+    op = np.concatenate(op, axis=0)
+    # op = self.reader.assign_resize(op, f=0.8, nrp=56, ncp=47, interpolation=True)
+    return op
+
