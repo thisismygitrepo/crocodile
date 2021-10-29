@@ -1,0 +1,975 @@
+
+"""
+A collection of classes extending the functionality of Python's builtins.
+email programmer@usa.com
+"""
+
+# Typing
+# Path
+import os
+# Numerical
+import numpy as np
+import pandas as pd
+# Meta
+import copy
+from datetime import datetime
+import datetime as dt  # useful for deltatime and timezones.
+
+
+_ = dt
+
+
+def get_time_stamp(ft=None, name=None):
+    if ft is None:  # this is better than putting the default non-None value above.
+        ft = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expise those kwarg
+        # then it has to worry about not sending None which will overwrite this defualt value.
+    _ = datetime.now().strftime(ft)
+    if name:
+        name = name + '_' + _
+    else:
+        name = _
+    return name
+
+
+class SaveDecorator(object):
+    def __init__(self, func, ext=""):
+        # TODO: migrate from save_decorator to SaveDecorator
+        # Called with func argumen when constructing the decorated function.
+        # func argument is passed implicitly by Python.
+        self.func = func
+        self.ext = ext
+
+    @classmethod
+    def init(cls, func=None, **kwargs):
+        """Always use this method for construction."""
+        if func is None:  # User instantiated the class with no func argument and specified kwargs.
+            def wrapper(func_):
+                return cls(func_, **kwargs)
+
+            return wrapper  # a function ready to be used by Python (pass func to it to instantiate it)
+        else:  # called by Python with func passed and user did not specify non-default kwargs:
+            return cls(func)  # return instance of the class.
+
+    def __call__(self, path=None, obj=None, **kwargs):
+        # Called when calling the decorated function (instance of this called).
+        if path is None:
+            # path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + self.ext
+            raise ValueError
+        else:
+            if not str(path).endswith(self.ext):
+                # path = P(str(path) + self.ext)
+                raise ValueError
+            else:
+                # path = P(path)
+                raise ValueError
+
+        # noinspection PyUnreachableCode
+        path.parent.mkdir(exist_ok=True, parents=True)
+        self.func(path, obj, **kwargs)
+        print(f"File saved @ ", path.absolute().as_uri())
+        print(f"Directory: ", path.parent.absolute().as_uri())
+        return path
+
+
+def save_decorator(ext=""):
+    """Apply default paths, add extension to path, print the saved file path"""
+
+    def decorator(func):
+        def wrapper(path=None, obj=None, **kwargs):
+            if path is None:
+                # path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + ext  # removed for disentanglement.
+                raise ValueError
+            else:
+                if not str(path).endswith(ext):
+                    # path = P(str(path) + ext)   # removed for disentanglement
+                    path = str(path) + ext   # removed for disentanglement
+                else:
+                    # path = P(path)  # removed for disentanglement
+                    pass
+
+            path.parent.mkdir(exist_ok=True, parents=True)
+            func(path, obj, **kwargs)
+            print(f"File saved @ ", path.absolute().as_uri())
+            print(f"Directory: ", path.parent.absolute().as_uri())
+            return path
+
+        return wrapper
+
+    return decorator
+
+
+class Save:
+    @staticmethod
+    @save_decorator(".csv")
+    def csv(path=None, obj=None):
+        # removed for disentanglement
+        # path = path or P.tmp_fname()
+        # obj.to_frame('dtypes').reset_index().to_csv(P(path).append(".dtypes").string)
+        obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
+
+    @staticmethod
+    @save_decorator(".npy")
+    def npy(path, obj, **kwargs):
+        np.save(path, obj, **kwargs)
+
+    @staticmethod
+    @save_decorator(".mat")
+    def mat(path=None, mdict=None, **kwargs):
+        """
+        .. note::
+            Avoid using mat for saving results because of incompatiblity:
+
+            * `None` type is not accepted.
+            * Scalars are conveteed to [1 x 1] arrays.
+            * etc. As such, there is no gaurantee that you restore what you saved.
+
+            Unless you want to pass the results to Matlab animals, avoid this format.
+        """
+        from scipy.io import savemat
+        for key, value in mdict.items():
+            if value is None:
+                mdict[key] = []
+        savemat(str(path), mdict, **kwargs)
+
+    @staticmethod
+    @save_decorator(".json")
+    def json(path=None, obj=None, **kwargs):
+        """This format is **compatible** with simple dictionaries that hold strings or numbers
+         but nothing more than that.
+        E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
+        inspected using any text editor."""
+        import json
+
+        with open(str(path), "w") as file:
+            json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
+
+    @staticmethod
+    @save_decorator
+    def yaml(path, obj, **kwargs):
+        import yaml
+        with open(str(path), "w") as file:
+            yaml.dump(obj, file, **kwargs)
+
+    @staticmethod
+    @save_decorator(".pkl")
+    def vanilla_pickle(path, obj, **kwargs):
+        import pickle
+        with open(str(path), 'wb') as file:
+            pickle.dump(obj, file, **kwargs)
+
+    @staticmethod
+    @save_decorator(".pkl")
+    def pickle(path=None, obj=None, **kwargs):
+        """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are
+        loaded up and it happens implicitly. It often fails at load time and requires same packages to be reloaded first
+        . Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to
+        dependency. Dill however, stores all the required packages for any attribute object, but not the class itself,
+        or the classes that it inherits (at least at with this version)."""
+        # dill = Experimental.assert_package_installed("dill")
+        import dill  # removed for disentanglement
+        with open(str(path), 'wb') as file:
+            dill.dump(obj, file, **kwargs)
+
+
+class Base:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    @classmethod
+    def from_saved(cls, path, *args, reader=None, **kwargs):
+        """Whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
+        For best experience, make sure that your subclass can be initialized with no or only fake inputs.
+        This behaviour is sufficient to store classes when they're thought of as combination of functions and data.
+        """
+        # step 1: load up the code (methods) (why not data first then class?)
+        if args == () and kwargs == {}:  # user did not feed any init args.
+            # Either because his/her design does not require them, or, they expect them to be loaded up.
+            # uninit_inst = cls.__new__(object)  # avoid the init method because it demands arguments.
+            # print("new method is used.")
+            inst = cls(*args, **kwargs)
+        else:  # some classes are written in a way that you must pass some args at init time.
+            # print(args, kwargs)
+            inst = cls(*args, **kwargs)
+
+        # step 2: load up the data
+        if reader is None:
+            # data = Read.read(path)  # removed for disentanglement
+            data = path.readit()
+        else:
+            data = reader(path)
+
+        # step 3: update / populate instance attributes with data.
+        # __setitem__ should be defined.
+        inst.__dict__.update(dict(data))
+
+        # Return a ready instance the way it was saved.
+        return inst
+
+    def save_npy(self, path=None, **kwargs):
+        Save.npy(path, self.__dict__, **kwargs)
+        return self
+
+    def save_pickle(self, path=None, itself=False, exclude=None, **kwargs):
+        """
+        :param path:
+        :param itself: determiens whether to save the attributes only or the entire class. If the attributes are
+        the only saved ones (assuming it is pure data rather than code), then the class itself is required later
+        and the `from_saved` method should be used to reload the instance again. Alternatively, if the class itself
+        is saved
+        the aforementioned process will not be required as the class will be loaded automatically.
+        A usecase for the former is when the source code is continously changed and still you want to reload an old
+         version.
+        :param exclude: a list of expensive attributes that will not be saved.
+        """
+        if not itself:  # default, works in all cases.
+            if exclude is not None:
+                cp = copy.copy(self.__dict__)  # cheap shallow copy.  # not_tested Oct 2021
+                cp.update({item: None for item in exclude})
+            else:
+                cp = self.__dict__
+            Save.pickle(path, cp, **kwargs)
+        else:  # does not work for all classes with whacky behaviours, no gaurantee.
+            Save.pickle(path, self, **kwargs)
+        return self
+
+    def save_json(self, path=None, *args, **kwargs):
+        """Use case: json is good for simple dicts, e.g. settings.
+        Advantage: human-readable from file explorer."""
+        _ = args
+        Save.json(path, self.__dict__, **kwargs)
+        return self
+
+    def save_mat(self, path=None, *args, **kwargs):
+        """for Matlab compatibility."""
+        _ = args
+        Save.mat(path, self.__dict__, **kwargs)
+        return self
+
+    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False):
+        attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
+        _ = check_ownership
+        if remove_base_attrs:
+            pass
+            # [attrs.remove(x) for x in Base().get_attributes()]
+        # if exclude is not None:
+        #     [attrs.remove(x) for x in exlcude]
+        if return_objects:
+            # attrs = attrs.apply(lambda x: getattr(self, x))
+            attrs = [getattr(self, x) for x in attrs]
+        return attrs
+
+    def __deepcopy__(self, *args, **kwargs):
+        """Literally creates a new copy of values of old object, rather than referencing them.
+        similar to copy.deepcopy()"""
+        obj = self.__class__(*args, **kwargs)
+        obj.__dict__.update(copy.deepcopy(self.__dict__))
+        return obj
+
+    def __copy__(self, *args, **kwargs):
+        """Shallow copy. New object, but the keys of which are referencing the values from the old object.
+        Does similar functionality to copy.copy"""
+        obj = self.__class__(*args, **kwargs)
+        obj.__dict__.update(self.__dict__.copy())
+        return obj
+
+    def evalstr(self, string_, expected='self'):
+        _ = self
+        if type(string_) is str:
+            if expected == 'func':
+                return eval("lambda x: " + string_)
+            elif expected == 'self':
+                if "self" in string_:
+                    return eval(string_)
+                else:
+                    return string_
+        else:
+            return string_
+
+    def print(self, typeinfo=False):
+        pass
+
+
+class Terminal:
+    def __init__(self, stdout=None, stderr=None):
+        import subprocess
+        self.subp = subprocess
+        self.stdout = self.subp.DEVNULL if stdout is None else stdout
+        self.stderr = self.subp.DEVNULL if stderr is None else stderr
+
+    def run(self, command):
+        resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+        print(resp.stdout)
+        print(resp.stderr)
+        return resp
+
+    def run_async(self, command):
+        w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr)
+        return w
+
+
+def accelerate(func, ip):
+    """ Conditions for this to work:
+    * Must run under __main__ context
+    * func must be defined outside that context.
+
+
+    To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
+    but takes a long time to be obtained like a request from server. For this, multithreading launches all threads
+    together, then process them in an interleaved fashion as they arrive, all will line-up for same processor,
+    if it happens that they arrived quickly.
+
+    To accelerate processing-bound process use multiprocessing, even better, use Numba.
+    Method1 use: multiprocessing / multithreading.
+    Method2: using joblib (still based on multiprocessing)
+    from joblib import Parallel, delayed
+    Fast method using Concurrent module
+    """
+    split = np.array_split(ip, os.cpu_count())
+    # make each thread process multiple inputs to avoid having obscene number of threads with simple fast
+    # operations
+
+    # vectorize the function so that it now accepts lists of ips.
+    # def my_func(ip):
+    #     return [func(tmp) for tmp in ip]
+
+    import concurrent.futures
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        op = executor.map(func, split)
+        op = list(op)  # convert generator to list
+    op = np.concatenate(op, axis=0)
+    # op = self.reader.assign_resize(op, f=0.8, nrp=56, ncp=47, interpolation=True)
+    return op
+
+
+class List(list, Base):
+    """Use this class to keep items of the same type.
+    """
+
+    # =============================== Constructor Methods ====================
+    def __init__(self, obj_list=None):
+        super().__init__()
+        self.list = list(obj_list) if obj_list is not None else []
+
+    def insert(self, __index: int, __object):
+        self.list.insert(__index, __object)
+        return self
+
+    def __bool__(self):
+        return bool(self.list)
+
+    @classmethod
+    def from_copies(cls, obj, count):
+        return cls([copy.deepcopy(obj) for _ in range(count)])
+
+    @classmethod
+    def from_replicating(cls, func, *args, replicas=None, **kwargs):
+        """
+        :param args: could be one item repeated for all instances, or iterable. If iterable, it can by a Cycle object.
+        :param kwargs: those could be structures:
+        :param replicas:
+        :param func:
+
+        """
+        if not args and not kwargs:  # empty args list and kwargs list
+            return cls([func() for _ in range(replicas)])
+        else:
+            result = []
+            for params in zip(*(args + tuple(kwargs.values()))):
+                an_arg = params[:len(args)]
+                a_val = params[len(args):]
+                a_kwarg = dict(zip(kwargs.keys(), a_val))
+                result.append(func(*an_arg, **a_kwarg))
+            return cls(result)
+
+    def save_items(self, directory, names=None, saver=None):
+        if saver is None:
+            saver = Save.pickle
+        if names is None:
+            names = range(len(self))
+        for name, item in zip(names, self.list):
+            saver(path=directory / name, obj=item)
+
+    def __deepcopy__(self, memodict=None):
+        if memodict is None:
+            memodict = {}
+            _ = memodict
+        return List([copy.deepcopy(i) for i in self.list])
+
+    def __copy__(self):
+        return List(self.list.copy())
+
+    def __getstate__(self):
+        return self.list
+
+    def __setstate__(self, state):
+        self.list = state
+
+    # ================= call methods =====================================
+    def method(self, name, *args, **kwargs):
+        return List([getattr(i, name)(*args, **kwargs) for i in self.list])
+
+    def attr(self, name):
+        return List([getattr(i, name) for i in self.list])
+
+    # def __getattribute__(self, item):
+    #     # you can dispense with this method. Its only purpose is to make eaisr experience qwith the linter
+    #     # obj = object.__getattribute__(self, "list")[0]
+    #     # try:
+    #     #     attr = object.__getattribute__(self, item)
+    #     #     if hasattr(obj, item):
+    #     #         return self.__getattr__(item)
+    #     #     else:
+    #     #         return attr
+    #     # except AttributeError:
+    #     #     return self.__getattr__(item)
+    #     if item == "list":  # grant special access to this attribute.
+    #         return object.__getattribute__(self, "list")
+    #     if item in object.__getattribute__(self, "__dict__").keys():
+    #         return self.__getattr__(item)
+    #     else:
+    #         return object.__getattribute__(self, item)
+
+    def __getattr__(self, name):  # fallback position when normal mechanism fails.
+        # this is called when __getattribute__ raises an error or call this explicitly.
+        result = List([getattr(i, name) for i in self.list])
+        return result
+
+    def __call__(self, *args, lest=True, **kwargs):
+        if lest:
+            return List([i(*args, **kwargs) for i in self.list])
+        else:
+            return [i(*args, **kwargs) for i in self.list]
+
+    # ======================== Access Methods ==========================================
+    def __getitem__(self, key):
+        if type(key) is list or type(key) is np.ndarray:  # to allow fancy indexing like List[1, 5, 6]
+            return List([self[item] for item in key])
+
+        # behaves similarly to Numpy A[1] vs A[1:2]
+        result = self.list[key]  # return the required item only (not a List)
+        if type(key) is not slice:
+            return result  # choose one item
+        else:
+            return List(result)
+
+    def __setitem__(self, key, value):
+        self.list[key] = value
+
+    def sample(self, size=1, replace=False, p=None):
+        """Select at random"""
+        return self[np.random.choice(len(self), size, replace=replace, p=p)]
+
+    def to_struct(self, key_val=None):
+        """
+        :param key_val: function that returns (key, value) pair.
+        :return:
+        """
+        if key_val is None:
+            def key_val(x):
+                return str(x), x
+        else:
+            key_val = self.evalstr(key_val)
+        # return Struct.from_keys_values_pairs(self.apply(key_val))
+        # removed for disentanglement
+        return dict(self.apply(key_val))
+
+    # def find(self, patt, match="fnmatch"):
+    #     """Looks up the string representation of all items in the list and finds the one that partially matches
+    #     the argument passed. This method is a short for ``self.filter(lambda x: string_ in str(x))`` If you need more
+    #     complicated logic in the search, revert to filter method.
+    #     """
+    #
+
+    # if match == "string" or None:
+    #     for idx, item in enumerate(self.list):
+    #         if patt in str(item):
+    #             return item
+    # elif match == "fnmatch":
+    #     import fnmatch
+    #     for idx, item in enumerate(self.list):
+    #         if fnmatch.fnmatch(str(item), patt):
+    #             return item
+    # else:  # "regex"
+    #     # escaped = re.escape(string_)
+    #     compiled = re.compile(patt)
+    #     for idx, item in enumerate(self.list):
+    #         if compiled.search(str(item)) is not None:
+    #             return item
+    # return None
+
+    def index(self, func, *args, **kwargs):
+        """ A generalization of the `.index` method of `list`. It takes in a function rather than an
+         item to find its index. Additionally, it returns full list of results, not just the first result.
+
+        :param func:
+        :return: List of indices of items where the function returns `True`.
+        """
+        func = self.evalstr(func, expected='func')
+        res = []
+        for idx, x in enumerate(self.list):
+            if func(x):
+                res.append(idx)
+        return res
+
+    # ======================= Modify Methods ===============================
+    def flatten(self):
+        res = self.list[0]
+        for item in self.list[1:]:
+            res = res + item
+        return res
+
+    def append(self, item):  # add one item to the list object
+        self.list.append(item)
+        return self
+
+    def __add__(self, other):
+        # implement coersion
+        return List(self.list + list(other))
+
+    def __radd__(self, other):
+        return List(self.list + list(other))
+
+    def __iadd__(self, other):  # inplace add.
+        self.list = self.list + list(other)
+        return self
+
+    def __repr__(self):
+        if len(self.list) > 0:
+            tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
+            tmp2 = f"{self.list[0].__repr__()}"
+            return tmp1 + tmp2
+        else:
+            return f"An Empty List []"
+
+    def __len__(self):
+        return len(self.list)
+
+    @property
+    def len(self):
+        return self.list.__len__()
+
+    def __iter__(self):
+        return iter(self.list)
+
+    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
+        """
+        :param jobs:
+        :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
+        :param args:
+        :param other: other list
+        :param verbose:
+        :param desc:
+        :param depth: apply the function to inner Lists
+        :param kwargs: a list of outputs each time the function is called on elements of the list.
+        :return:
+        """
+        if depth > 1:
+            depth -= 1
+            # assert type(self.list[0]) == List, "items are not Lists".
+            self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
+
+        func = self.evalstr(func, expected='func')
+
+        tqdm = 0
+        if verbose or jobs:
+            # Experimental.assert_package_installed("tqdm")  # removed for disentanglement
+            from tqdm import tqdm
+            # print(f"Applying {func} to elements in {self}")
+
+        if other is None:
+            if jobs:
+                from joblib import Parallel, delayed
+                return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in
+                                                  tqdm(self.list, desc=desc)))
+            else:
+                iterator = self.list if not verbose else tqdm(self.list)
+                return List([func(x, *args, **kwargs) for x in iterator])
+        else:
+            if jobs:
+                from joblib import Parallel, delayed
+                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in
+                                                  tqdm(zip(self.list, other), desc=desc)))
+            else:
+                iterator = zip(self.list, other) if not verbose else \
+                    tqdm(zip(self.list, other), desc=desc)
+                return List([func(x, y) for x, y in iterator])
+
+    def modify(self, func, lest=None):
+        """Modifies objects rather than returning new list of objects, hence the name of the method.
+        :param func: a string that will be executed, assuming idx, x and y are given.
+        :param lest:
+        :return:
+        """
+        if lest is None:
+            for x in self.list:
+                _ = x
+                exec(func)
+        else:
+            for idx, (x, y) in enumerate(zip(self.list, lest)):
+                _ = idx, x, y
+                exec(func)
+        return self
+
+    def sort(self, *args, **kwargs):
+        self.list.sort(*args, **kwargs)
+        return self
+
+    def sorted(self, *args, **kwargs):
+        return List(sorted(self.list, *args, **kwargs))
+
+    def filter(self, func):
+        if type(func) is str:
+            func = eval("lambda x: " + func)
+        result = List()
+        for item in self.list:
+            if func(item):
+                result.append(item)
+        return result
+
+    def print(self, nl=1, sep=False, style=repr):
+        for idx, item in enumerate(self.list):
+            print(f"{idx:2}- {style(item)}", end=' ')
+            for _ in range(nl):
+                print('', end='\n')
+            if sep:
+                print(sep * 100)
+
+    def to_dataframe(self, names=None, minimal=False, obj_included=True):
+        """
+
+        :param names: name of each object.
+        :param minimal: Return Dataframe structure without contents.
+        :param obj_included: Include a colum for objects themselves.
+        :return:
+        """
+        # DisplayData.set_pandas_display()  # removed for disentanglement
+        columns = list(self.list[0].__dict__.keys())
+        if obj_included or names:
+            columns = ['object'] + columns
+        df = pd.DataFrame(columns=columns)
+        if minimal:
+            return df
+
+        # Populate the dataframe:
+        for i, obj in enumerate(self.list):
+            if obj_included or names:
+                if names is None:
+                    name = [obj]
+                else:
+                    name = [names[i]]
+                df.loc[i] = name + list(self.list[i].__dict__.values())
+            else:
+                df.loc[i] = list(self.list[i].__dict__.values())
+        return df
+
+    def to_numpy(self):
+        return self.np
+
+    @property
+    def np(self):
+        return np.array(self.list)
+
+
+class Struct(Base, dict):  # inheriting from dict gives `get` method.
+    """Use this class to keep bits and sundry items.
+    Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
+    """
+
+    def __init__(self, dictionary=None, **kwargs):
+        """
+        :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
+        """
+        super(Struct, self).__init__()
+        if type(dictionary) is Struct:
+            dictionary = dictionary.dict
+        if dictionary is None:  # only kwargs were passed
+            final_dict = kwargs
+        elif not kwargs:  # only dictionary was passed
+            if type(dictionary) is dict:
+                final_dict = dictionary
+            elif type(dictionary) == "mappingproxy":
+                final_dict = dict(dictionary)
+            else:
+                final_dict = dictionary.__dict__
+        else:  # both were passed
+            final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
+            final_dict.update(kwargs)
+        self.__dict__ = final_dict
+
+    def to_default(self, default=lambda: None):
+        from collections import defaultdict
+        tmp2 = defaultdict(default)
+        tmp2.update(self.__dict__)
+        self.__dict__ = tmp2
+        return self
+
+    def __bool__(self):
+        return bool(self.__dict__)
+
+    @staticmethod
+    def recursive_struct(mydict):
+        struct = Struct(mydict)
+        for key, val in struct.items():
+            if type(val) is dict:
+                struct[key] = Struct.recursive_struct(val)
+        return struct
+
+    @staticmethod
+    def recursive_dict(struct):
+        mydict = struct.dict
+        for key, val in mydict.items():
+            if type(val) is Struct:
+                mydict[key] = Struct.recursive_dict(val)
+        return mydict
+
+    @classmethod
+    def from_keys_values(cls, keys: list, values: list):
+        return cls(dict(zip(keys, values)))
+
+    @classmethod
+    def from_keys_values_pairs(cls, my_list):
+        res = dict()
+        for k, v in my_list:
+            res[k] = v
+        return cls(res)
+
+    @classmethod
+    def from_names(cls, names, default_=None):  # Mimick NamedTuple and defaultdict
+        if default_ is None:
+            default_ = [None] * len(names)
+        return cls.from_keys_values(names, values=default_)
+
+    def get_values(self, keys):
+        return List([self[key] for key in keys])
+
+    @property
+    def clean_view(self):
+
+        class Temp:
+            pass
+
+        temp = Temp()
+        temp.__dict__ = self.__dict__
+        return temp
+
+    def __repr__(self):
+        repr_string = ""
+        for key in self.keys().list:
+            repr_string += str(key) + ", "
+        return "Struct: [" + repr_string + "]"
+
+    def print(self, sep=None, yaml=False, typeinfo=True):
+        if yaml:
+            # removed for disentanglement
+            # self.save_yaml(P.tmp(fn="__tmp.yaml"))
+            # txt = P.tmp(fn="__tmp.yaml").read_text()
+            # print(txt)
+            return None
+        if sep is None:
+            sep = 5 + max(self.keys().apply(str).apply(len).list)
+        repr_string = ""
+        repr_string += "Structure, with following entries:\n"
+        repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if typeinfo else "") + "Item Details\n"
+        repr_string += "---" + " " * sep + (("---------" + " " * sep) if typeinfo else "") + "------------\n"
+        for key in self.keys().list:
+            key_str = str(key)
+            type_str = str(type(self[key])).split("'")[1]
+            val_str = DisplayData.get_repr(self[key]).replace("\n", " ")
+            repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
+            if typeinfo:
+                repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
+            repr_string += val_str + "\n"
+        print(repr_string)
+
+    def __str__(self, sep=","):
+        mystr = str(self.__dict__)
+        mystr = mystr[1:-1].replace(":", " =").replace("'", "").replace(",", sep)
+        return mystr
+
+    def __getitem__(self, item):  # allows indexing into entries of __dict__ attribute
+        return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+    def __getattr__(self, item):  # this works better with the linter.
+        try:
+            return self.__dict__[item]
+        except KeyError:
+            # try:
+            # super(Struct, self).__getattribute__(item)
+            # object.__getattribute__(self, item)
+            # except AttributeError:
+            raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
+
+    def __getstate__(self):  # serialize
+        return self.__dict__
+
+    def __setstate__(self, state):  # deserialize
+        self.__dict__ = state
+
+    def __iter__(self):  # used when list(~) is called or it is iterated over.
+        return iter(self.dict.items())
+
+    @staticmethod
+    def save_yaml(path):
+        Save.yaml(path)
+
+    @property
+    def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
+        return self.__dict__
+
+    @dict.setter
+    def dict(self, adict):
+        self.__dict__ = adict
+
+    def update(self, *args, **kwargs):
+        """Accepts dicts and keyworded args
+        """
+        new_struct = Struct(*args, **kwargs)
+        self.__dict__.update(new_struct.__dict__)
+        return self
+
+    def apply(self, func):
+        func = self.evalstr(func)
+        for key, val in self.items():
+            self[key] = func(val)
+        return self
+
+    def inverse(self):
+        return Struct({v: k for k, v in self.dict.items()})
+
+    # def append_values(self, *others, **kwargs):
+    #     """ """
+    #     return Struct(self.concat_dicts(*((self.dict,) + others), **kwargs))
+
+    @staticmethod
+    def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
+        if method is None:
+            method = list.__add__
+        if not lenient:
+            keys = dicts[0].keys()
+            for i in dicts[1:]:
+                assert i.keys() == keys
+        # else if lenient, take the union
+        if clone:
+            total_dict = copy.deepcopy(dicts[0])  # take first dict in the tuple
+        else:
+            total_dict = dicts[0]  # take first dict in the tuple
+        if collect_items:
+            for key, val in total_dict.item():
+                total_dict[key] = [val]
+
+            def method(tmp1, tmp2):
+                return tmp1 + [tmp2]
+
+        if len(dicts) > 1:  # are there more dicts?
+            for adict in dicts[1:]:
+                for key in adict.keys():  # get everything from this dict
+                    try:  # may be the key exists in the total dict already.
+                        total_dict[key] = method(total_dict[key], adict[key])
+                    except KeyError:  # key does not exist in total dict
+                        if collect_items:
+                            total_dict[key] = [adict[key]]
+                        else:
+                            total_dict[key] = adict[key]
+        return Struct(total_dict)
+
+    def keys(self):
+        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
+        return List(self.dict.keys())
+
+    def values(self):
+        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
+        return List(self.dict.values())
+
+    def items(self):
+        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
+        return List(self.dict.items())
+
+    def to_dataframe(self, *args, **kwargs):
+        # return self.values().to_dataframe(names=self.keys())
+        return pd.DataFrame(self.__dict__, *args, **kwargs)
+
+    def spawn_from_values(self, values):
+        """From the same keys, generate a new Struct with different values passed."""
+        return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
+
+    def spawn_from_keys(self, keys):
+        """From the same values, generate a new Struct with different keys passed."""
+        return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
+
+    def plot(self, artist=None):
+        if artist is None:
+            # artist = Artist(figname='Structure Plot')
+            # removed for disentanglement
+            import matplotlib.pyplot as plt
+            fig, artist = plt.subplots()
+        for key, val in self:
+            # if xdata is None:
+            #     xdata = np.arange(len(val))
+            artist.plot(val, label=key)
+        try:
+            artist.fig.legend()
+        except AttributeError:
+            pass
+        return artist
+
+
+class DisplayData:
+    def __init__(self, x):
+        self.x = pd.DataFrame(x)
+
+    @staticmethod
+    def set_pandas_display(rows=1000, columns=1000, width=1000, colwidth=40):
+        pd.set_option('display.max_colwidth', colwidth)
+        pd.set_option('display.max_columns', columns)  # to avoid replacing them with ...
+        pd.set_option('display.width', width)  # to avoid wrapping the table.
+        pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
+
+    @staticmethod
+    def eng():
+        pd.set_eng_float_format(accuracy=3, use_eng_prefix=True)
+        pd.options.display.float_format = '{:, .5f}'.format
+        pd.set_option('precision', 7)
+        # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+
+    @staticmethod
+    def get_repr(data):
+        """A well-behaved repr function for all data types."""
+        if type(data) is np.ndarray:
+            string_ = f"shape = {data.shape}, dtype = {data.dtype}."
+            return string_
+        elif type(data) is str:
+            return data
+        elif type(data) is list:
+            example = ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
+            return f"length = {len(data)}. " + example
+        else:
+            return repr(data)
+
+    @staticmethod
+    def outline(array, name="Array", imprint=True):
+        str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"
+        if imprint:
+            print(str_)
+        return str_
+
+    @staticmethod
+    def print_string_list(mylist, char_per_row=125, sep=" "):
+        counter = 0
+        index = 0
+        while index < len(mylist):
+            item = mylist[index]
+            print(item, end=sep)
+            counter += len(item)
+            if counter <= char_per_row:
+                pass
+            else:
+                counter = 0
+                print("\n")
+            index += 1
+
+
+if __name__ == '__main__':
+    pass

@@ -1,4 +1,4 @@
-yaml
+
 numpy
 scipy
 pandas
@@ -19,3 +19,5 @@ scikit-image
 pyyaml
 twine
 send2trash
+dill
+scikit-image

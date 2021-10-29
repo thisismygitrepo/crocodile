@@ -17,6 +17,8 @@ setup(
     description='Making Python even more convenient by extending list and dict and pathlib and more.',
     long_description=long_desc,
     long_description_content_type="text/markdown",
+    install_requires=[
+        'numpy', 'scipy', 'pandas', 'matplotlib']
 )
 
 # useful webiste: gitignore.io
