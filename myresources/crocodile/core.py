@@ -171,6 +171,7 @@ class Save:
 
 
 class Base:
+    tst = 1
     def __init__(self, *args, **kwargs):
         pass
 
@@ -670,7 +671,10 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
         return mydict
 
     @classmethod
-    def from_keys_values(cls, keys: list, values: list):
+    def from_keys_values(cls, keys, values) -> object:
+        """
+        :rtype: object
+        """
         return cls(dict(zip(keys, values)))
 
     @classmethod
@@ -706,6 +710,9 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
         return "Struct: [" + repr_string + "]"
 
     def print(self, sep=None, yaml=False, typeinfo=True):
+        if bool(self) is False:
+            print(f"Empty Struct.")
+            return None  # break out of the function.
         if yaml:
             # removed for disentanglement
             # self.save_yaml(P.tmp(fn="__tmp.yaml"))
@@ -728,9 +735,14 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
             repr_string += val_str + "\n"
         print(repr_string)
 
-    def __str__(self, sep=","):
+    def __str__(self, sep=",", newline="\n", breaklines=None):
         mystr = str(self.__dict__)
         mystr = mystr[1:-1].replace(":", " =").replace("'", "").replace(",", sep)
+        if breaklines:
+            res = np.array(mystr.split(sep))
+            res = List(np.array_split(res, int(np.ceil((len(res) / breaklines))))).apply(lambda x: sep.join(x))
+            import functools
+            mystr = functools.reduce(lambda a, b: a + newline + b, res) if len(res) > 1 else res[0]
         return mystr
 
     def __getitem__(self, item):  # allows indexing into entries of __dict__ attribute

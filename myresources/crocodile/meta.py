@@ -4,8 +4,8 @@ from crocodile.file_management import sys, P, Struct
 
 
 class Cycle:
-    def __init__(self, c, name=''):
-        self.c = c
+    def __init__(self, c=None, name=''):
+        self.c = c  # a list of values.
         self.index = -1
         self.name = name
 
@@ -43,8 +43,26 @@ class Cycle:
         pass  # see behviour of matplotlib cyclers.
 
 
+class DictCycle(Cycle):
+    def __init__(self, strct, **kwargs):
+        strct = Struct(strct)
+        super(DictCycle, self).__init__(c=strct.items(), **kwargs)
+        self.keys = strct.keys()
+
+    def set_key(self, key):
+        self.index = self.keys.list.index(key)
+
+
 class Experimental:
     """Debugging and Meta programming tools"""
+
+    @staticmethod
+    def try_this(func, otherwise=None):
+        try:
+            return func()
+        except BaseException as e:
+            _ = e
+            return otherwise
 
     class Log:
         """Saves console output to a file."""
@@ -155,19 +173,18 @@ class Experimental:
         return Experimental.capture_locals(func=func, globs=globs, args=args, self=self, update_globs=True)
 
     @staticmethod
-    def extract_code(func, args=None, self=None, include_args=True, verbose=True):
+    def extract_code(func, args: Struct = None, code: str = None, include_args=True, verbose=True, **kwargs):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
+        TODO: how to handle decorated functions.
         """
-        if type(func) is str:
-            self = ".".join(func.split(".")[:-1])
-            func = eval(func)
 
         import inspect
         import textwrap
 
         codelines = textwrap.dedent(inspect.getsource(func))
+        if codelines.startswith("@staticmethod\n"): codelines = codelines[14:]
         assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
         # remove def func_name() line from the list
         idx = codelines.find("):\n")
@@ -186,8 +203,13 @@ class Experimental:
                 codelines.append(aline.replace("return ", "return_ = ") + "\n")
 
         code_string = ''.join(codelines)  # convert list to string.
+        args_kwargs = ""
         if include_args:
-            code_string = Experimental.extract_arguments(func, args=args, self=self, verbose=verbose) + code_string
+            args_kwargs = Experimental.extract_arguments(func, args=args, verbose=verbose, **kwargs)
+        if code is not None:
+            args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
+        if include_args or code:
+            code_string = args_kwargs + code_string
 
         clipboard = Experimental.assert_package_installed("clipboard")
         clipboard.copy(code_string)
@@ -196,28 +218,32 @@ class Experimental:
         return code_string  # ready to be run with exec()
 
     @staticmethod
-    def extract_arguments(func, self=None, args=None, globs=None, verbose=True):
+    def extract_arguments(func, globs=None, exclude_args=True, verbose=True, **kwargs):
         """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
         """
-        if type(func) is str:
+        if type(func) is str:  # will not work because once a string is passed, this method won't be able
+            # to interpret it, at least not without the globals passed.
             self = ".".join(func.split(".")[:-1])
+            _ = self
             func = eval(func, globs)
 
         import inspect
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default)
-        if args is not None:
-            ak = ak.update(args)
+        ak = ak.update(kwargs)
 
-        res = ""
+        res = """"""
         for key, val in ak.items():
             if key != "args" and key != "kwargs":
+                flag = False
                 if val is inspect._empty:  # not passed argument.
-                    val = None
-                    print(f'tb.Experimental Warning: arg {key} has no value. Now replaced with None.')
-                res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
-        if self and inspect.ismethod(func):
-            res += f"self = {self}\n"  # don't put string version of it.
+                    if exclude_args:
+                        flag = True
+                    else:
+                        val = None
+                        print(f'tb.Experimental Warning: arg {key} has no value. Now replaced with None.')
+                if not flag:
+                    res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
 
         ak = inspect.getfullargspec(func)
         if ak.varargs:
@@ -422,14 +448,25 @@ def batcherv2(func_type='function', order=1):
 
 
 class Terminal:
-    def __init__(self, stdout=None, stderr=None):
+    def __init__(self, stdout=None, stderr=None, elevated=False):
         import subprocess
         self.subp = subprocess
         self.stdout = self.subp.DEVNULL if stdout is None else stdout
         self.stderr = self.subp.DEVNULL if stderr is None else stderr
+        self.elevated = elevated
+        # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
+
+    @staticmethod
+    def is_admin():
+        import ctypes
+        return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
     def run(self, command):
-        resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+        if self.elevated is False or self.is_admin():
+            resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+        else:
+            import ctypes
+            resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         print(resp.stdout)
         print(resp.stderr)
         return resp
@@ -472,3 +509,6 @@ def accelerate(func, ip):
     # op = self.reader.assign_resize(op, f=0.8, nrp=56, ncp=47, interpolation=True)
     return op
 
+
+if __name__ == '__main__':
+    pass
