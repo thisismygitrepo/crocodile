@@ -671,9 +671,9 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
         return mydict
 
     @classmethod
-    def from_keys_values(cls, keys, values) -> object:
+    def from_keys_values(cls, keys, values):
         """
-        :rtype: object
+        :rtype: Struct
         """
         return cls(dict(zip(keys, values)))
 

@@ -1,6 +1,14 @@
-
 from crocodile.core import np, os, get_time_stamp
 from crocodile.file_management import sys, P, Struct
+
+
+class Null:
+    def __repr__(self):
+        return "Maze!"
+
+    def __getattr__(self, item):
+        _ = item
+        return Null()
 
 
 class Cycle:
