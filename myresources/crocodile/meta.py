@@ -475,8 +475,7 @@ class Terminal:
         else:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        print(resp.stdout)
-        print(resp.stderr)
+        print(f"Crocodile: meta: Terminal: command execution response: {resp}")
         return resp
 
     def run_async(self, command):
