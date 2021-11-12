@@ -436,19 +436,18 @@ class P(type(Path()), Path, Base):
         if self.is_file():
 
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
-            if verbose:
-                print(f"File \n{self}\ncopied successfully to: \n{dest}")
+            if verbose: print(f"File \n{self}\ncopied successfully to: \n{dest}")
         elif self.is_dir():
             from distutils.dir_util import copy_tree
             if contents:
                 copy_tree(str(self), str(dest))
-                if verbose:
-                    print(f"Contents of \n{self}\ncopied successfully to: \n{dest}")
             else:
                 copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
+            if verbose:
+                preface = "Contents of " if contents else ""
+                print(f"{preface}\n{self.as_uri()}\ncopied successfully to: \n{dest.as_uri()}")
         else:
-            print(f"Could not copy this thing. {self}\n"
-                  f"Not a file nor a folder.")
+            print(f"Could not copy this thing. {self.as_uri()}. Not a file nor a folder.")
         return dest / self.name
 
     def clean(self):
@@ -644,7 +643,7 @@ class P(type(Path()), Path, Base):
     #     self.explore()  # if it is a file, it will be opened with its default program.
 
     @staticmethod
-    def tmp(folder=None, fn=None, path="home"):
+    def tmp(folder=None, fn=None, path="home", ex=False):
         """
         folder is created.
         file name is not created, only appended.
@@ -657,6 +656,9 @@ class P(type(Path()), Path, Base):
             path.mkdir(exist_ok=True, parents=True)
         if fn is not None:
             path = path / fn
+        if ex:
+            print(path.as_uri())
+            print(path.parent.as_uri())
         return path
 
     @staticmethod

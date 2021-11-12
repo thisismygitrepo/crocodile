@@ -4,11 +4,18 @@ from crocodile.file_management import sys, P, Struct
 
 class Null:
     def __repr__(self):
-        return "Maze!"
+        return "Welcome to the labyrinth!"
 
     def __getattr__(self, item):
         _ = item
-        return Null()
+        return self
+
+    def __getitem__(self, item):
+        _ = item
+        return self
+
+    def __call__(self, *args, **kwargs):
+        return self
 
 
 class Cycle:
