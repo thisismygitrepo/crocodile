@@ -24,7 +24,7 @@ Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImSho
 VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
 
 Cycle, Experimental, Terminal, Manipulator = meta.Cycle, meta.Experimental, meta.Terminal, meta.Manipulator
-batcher, batcherv2, accelerate, Null = meta.batcher, meta.batcherv2, meta.accelerate, meta.Null
+batcher, batcherv2, get_logger, accelerate, Null = meta.batcher, meta.batcherv2, meta.get_logger, meta.accelerate, meta.Null
 
 
 L = List

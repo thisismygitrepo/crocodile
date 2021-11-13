@@ -709,7 +709,7 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=None, yaml=False, typeinfo=True):
+    def print(self, sep=None, yaml=False, typeinfo=True, logger=False):
         if bool(self) is False:
             print(f"Empty Struct.")
             return None  # break out of the function.
@@ -733,7 +733,11 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
             if typeinfo:
                 repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
-        print(repr_string)
+        if logger:
+            return repr_string
+        else:
+            print(repr_string)
+            return self
 
     def __str__(self, sep=",", newline="\n", breaklines=None):
         mystr = str(self.__dict__)

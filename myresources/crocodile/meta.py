@@ -1,3 +1,5 @@
+import logging
+
 from crocodile.core import np, os, get_time_stamp
 from crocodile.file_management import sys, P, Struct
 
@@ -78,19 +80,6 @@ class Experimental:
         except BaseException as e:
             _ = e
             return otherwise
-
-    class Log:
-        """Saves console output to a file."""
-
-        def __init__(self, path=None):
-            if path is None:
-                path = P('console_output')
-            self.path = path + '.log'
-            sys.stdout = open(self.path, 'w')
-
-        def finish(self):
-            sys.stdout.close()
-            print(f"Finished ... have a look @ \n {self.path}")
 
     @staticmethod
     def show_globals(globs):
@@ -488,6 +477,43 @@ class Terminal:
     def run_async(self, command):
         w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr)
         return w
+
+
+def get_logger(file_path=None, file=False, stream=True, name=None, format=None,
+               s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
+    """This class is needed once a project grows beyond simple work. Simple print statements from
+    dozens of objects will not be useful as the programmer will not easily recognize who (which function or object)
+     is printing this message, in addition to many other concerns."""
+    logger = logging.getLogger(name=name or P.random())
+    logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+
+    # https://docs.python.org/3/library/logging.html#logrecord-attributes
+    sep = "--"
+    fmt = f"%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+          f"{sep}%(message)s{sep}%(asctime)s"
+    fmt = logging.Formatter(format or fmt)
+
+    if file or file_path:  # ==> create file handler for the logger.
+        if file_path is None:
+            file_path = P.tmp_fname("logger", ".log")
+        fhandler = logging.FileHandler(filename=str(file_path))
+        fhandler.setFormatter(fmt=fmt)
+        logger.addHandler(fhandler)
+        fhandler.setLevel(level=f_level)
+    if stream:  # ==> create stream handler for the logger.
+        shandler = logging.StreamHandler()
+        shandler.setLevel(level=s_level)
+        shandler.setFormatter(fmt=fmt)
+    return logger
+
+    # def config_root_logger(self):
+    #     import logging
+    #     logging.basicConfig(filename=None, filemode="w", level=None, format=None)
+    #
+    # def manual_degug(self):  # man
+    #     sys.stdout = open(self.path, 'w')  # all print statements will write to this file.
+    #     sys.stdout.close()
+    #     print(f"Finished ... have a look @ \n {self.path}")
 
 
 def accelerate(func, ip):

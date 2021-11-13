@@ -662,8 +662,8 @@ class P(type(Path()), Path, Base):
         return path
 
     @staticmethod
-    def tmp_fname(name=None):
-        return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp())
+    def tmp_fname(name=None, suffix=""):
+        return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp() + suffix)
 
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):
