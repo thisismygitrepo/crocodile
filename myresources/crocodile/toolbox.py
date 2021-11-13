@@ -10,9 +10,11 @@ from crocodile.core import datetime, dt, os, np, pd, copy
 from crocodile import file_management as _fm
 from crocodile.file_management import re, typing, string, sys, shutil, glob  # Path
 
-from crocodile.plot_management import plt, enum, FigureManager
 from crocodile import plot_management as _pm
+from crocodile.plot_management import plt, enum, FigureManager
+
 from crocodile import meta
+from crocodile.meta import logging
 
 
 Base, get_time_stamp, Save, List = core.Base, core.get_time_stamp, core.Save, core.List
@@ -24,7 +26,7 @@ Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImSho
 VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
 
 Cycle, Experimental, Terminal, Manipulator = meta.Cycle, meta.Experimental, meta.Terminal, meta.Manipulator
-batcher, batcherv2, get_logger, accelerate, Null = meta.batcher, meta.batcherv2, meta.get_logger, meta.accelerate, meta.Null
+batcher, batcherv2, Log, accelerate, Null = meta.batcher, meta.batcherv2, meta.Log, meta.accelerate, meta.Null
 
 
 L = List

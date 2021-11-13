@@ -1,5 +1,5 @@
-import logging
 
+import logging
 from crocodile.core import np, os, get_time_stamp
 from crocodile.file_management import sys, P, Struct
 
@@ -479,48 +479,115 @@ class Terminal:
         return w
 
 
-def get_logger(file_path=None, file=False, stream=True, name=None, format=None,
-               s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
-    """This class is needed once a project grows beyond simple work. Simple print statements from
-    dozens of objects will not be useful as the programmer will not easily recognize who (which function or object)
-     is printing this message, in addition to many other concerns."""
-    logger = logging.getLogger(name=name or P.random())
-    logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+class Log:
+    @staticmethod
+    def get_coloredlogs(file_path=None, file=False, stream=True, name=None, format=None, sep=" | ",
+                        s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
+                        ):
 
-    # https://docs.python.org/3/library/logging.html#logrecord-attributes
-    sep = "--"
-    fmt = f"%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
-          f"{sep}%(message)s{sep}%(asctime)s"
-    fmt = logging.Formatter(format or fmt)
+        module = Experimental.assert_package_installed("coloredlogs")
+        # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
+        style = {'spam': {'color': 'green', 'faint': True},
+                 'debug': {'color': 'white'},
+                 'verbose': {'color': 'blue'},
+                 'info': {'color': "green"},
+                 'notice': {'color': 'magenta'},
+                 'warning': {'color': 'yellow'},
+                 'success': {'color': 'green', 'bold': True},
+                 'error': {'color': 'red', "faint": True},
+                 'critical': {'color': 'red', 'bold': True, "inverse": True}}
+        module.install(logger=logger)
+        return logger
 
-    if file or file_path:  # ==> create file handler for the logger.
+    @staticmethod
+    def get_colorlog(file_path=None, file=False, stream=True, name=None, format=None, sep=" | ",
+                     s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
+                     ):
+        # https://pypi.org/project/colorlog/
+        log_colors={'DEBUG': 'bold_cyan',
+                    'INFO': 'green',
+                    'WARNING': 'yellow',
+                    'ERROR': 'thin_red',
+                    'CRITICAL': 'bold_red,bg_white',
+                   },
+        colorlog = Experimental.assert_package_installed("colorlog")
+
+        logger = colorlog.getLogger(name=name or P.random())
+        logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+
+        # https://docs.python.org/3/library/logging.html#logrecord-attributes
+        fmt = f"'%(log_color)s%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+              f"{sep}%(message)s{sep}"
+        if default:
+            format = '%(message)s'
+        fmt = colorlog.ColoredFormatter(format or fmt)
+
+        if file or file_path:  # ==> create file handler for the logger.
+            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
+        if stream:  # ==> create stream handler for the logger.
+            shandler = colorlog.StreamHandler()
+            shandler.setLevel(level=s_level)
+            shandler.setFormatter(fmt=fmt)
+            logger.addHandler(shandler)
+        return logger
+
+    @staticmethod
+    def get_logger(file_path=None, file=False, stream=True, name=None, format=None, sep=" | ",
+                   s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
+                   ):
+        """This class is needed once a project grows beyond simple work. Simple print statements from
+        dozens of objects will not be useful as the programmer will not easily recognize who (which function or object)
+         is printing this message, in addition to many other concerns."""
+
+        logger = logging.getLogger(name=name or P.random())
+        logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+
+        # https://docs.python.org/3/library/logging.html#logrecord-attributes
+        fmt = f"%(asctime)s{sept}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+              f"{sep}%(message)s{sep}"
+        if default:
+            format = '%(message)s'
+        fmt = logging.Formatter(format or fmt)
+
+        if file or file_path:  # ==> create file handler for the logger.
+            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
+        if stream:  # ==> create stream handler for the logger.
+            shandler = logging.StreamHandler()
+            shandler.setLevel(level=s_level)
+            shandler.setFormatter(fmt=fmt)
+            logger.addHandler(shandler)
+        return logger
+
+    @staticmethod
+    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG):
         if file_path is None:
             file_path = P.tmp_fname("logger", ".log")
         fhandler = logging.FileHandler(filename=str(file_path))
         fhandler.setFormatter(fmt=fmt)
-        logger.addHandler(fhandler)
         fhandler.setLevel(level=f_level)
-    if stream:  # ==> create stream handler for the logger.
-        shandler = logging.StreamHandler()
-        shandler.setLevel(level=s_level)
-        shandler.setFormatter(fmt=fmt)
-    return logger
+        logger.addHandler(fhandler)
 
-    # def config_root_logger(self):
-    #     import logging
-    #     logging.basicConfig(filename=None, filemode="w", level=None, format=None)
-    #
-    # def manual_degug(self):  # man
-    #     sys.stdout = open(self.path, 'w')  # all print statements will write to this file.
-    #     sys.stdout.close()
-    #     print(f"Finished ... have a look @ \n {self.path}")
+    @staticmethod
+    def test_logger(logger):
+        logger.debug("this is a debugging message")
+        logger.info("this is an informational message")
+        logger.warning("this is a warning message")
+        logger.error("this is an error message")
+        logger.critical("this is a critical message")
+
+    def config_root_logger(self):
+        logging.basicConfig(filename=None, filemode="w", level=None, format=None)
+
+    def manual_degug(self):  # man
+        sys.stdout = open(self.path, 'w')  # all print statements will write to this file.
+        sys.stdout.close()
+        print(f"Finished ... have a look @ \n {self.path}")
 
 
 def accelerate(func, ip):
     """ Conditions for this to work:
     * Must run under __main__ context
     * func must be defined outside that context.
-
 
     To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
     but takes a long time to be obtained like a request from server. For this, multithreading launches all threads
