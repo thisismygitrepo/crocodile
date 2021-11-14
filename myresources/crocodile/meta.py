@@ -173,7 +173,7 @@ class Experimental:
         return res
 
     @staticmethod
-    def run_globaly(func, globs, args=None, self: str = None):
+    def run_globally(func, globs, args=None, self: str = None):
         return Experimental.capture_locals(func=func, globs=globs, args=args, self=self, update_globs=True)
 
     @staticmethod
@@ -485,7 +485,7 @@ class Log:
                         s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
                         ):
 
-        module = Experimental.assert_package_installed("coloredlogs")
+        coloredlogs = Experimental.assert_package_installed("coloredlogs")
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         style = {'spam': {'color': 'green', 'faint': True},
                  'debug': {'color': 'white'},
@@ -496,7 +496,7 @@ class Log:
                  'success': {'color': 'green', 'bold': True},
                  'error': {'color': 'red', "faint": True},
                  'critical': {'color': 'red', 'bold': True, "inverse": True}}
-        module.install(logger=logger)
+        coloredlogs.install(logger=logger)
         return logger
 
     @staticmethod
@@ -562,6 +562,7 @@ class Log:
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
         if file_path is None:
             file_path = P.tmp_fname("logger", ".log")
+            print("Logger file created @ ", file_path.as_uri())
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)
