@@ -559,12 +559,13 @@ class Log:
         return logger
 
     @staticmethod
-    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG):
+    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
         if file_path is None:
             file_path = P.tmp_fname("logger", ".log")
-        fhandler = logging.FileHandler(filename=str(file_path))
+        fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)
+        fhandler.set_name(name)
         logger.addHandler(fhandler)
 
     @staticmethod
