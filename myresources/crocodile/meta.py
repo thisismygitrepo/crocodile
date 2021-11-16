@@ -135,7 +135,7 @@ class Experimental:
 
         if save_source_code:
             P(inspect.getmodule(obj).__file__).zip(op_path=readmepath.with_name("source_code.zip"))
-            print(readmepath.with_name("source_code.zip").as_uri())
+            print("Source code saved @ " + readmepath.with_name("source_code.zip").as_uri())
 
     @staticmethod
     def load_from_source_code(directory, obj=None):

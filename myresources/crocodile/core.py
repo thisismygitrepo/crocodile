@@ -7,6 +7,7 @@ email programmer@usa.com
 # Typing
 # Path
 import os
+from pathlib import Path
 # Numerical
 import numpy as np
 import pandas as pd
@@ -76,14 +77,13 @@ def save_decorator(ext=""):
     def decorator(func):
         def wrapper(path=None, obj=None, **kwargs):
             if path is None:
-                # path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + ext  # removed for disentanglement.
-                raise ValueError
+                path = Path.home().joinpath("tmp_results").joinpath(get_time_stamp() + ext)
+                # raise ValueError
             else:
                 if not str(path).endswith(ext):
-                    path = path + ext   # removed for disentanglement
+                    path = Path(str(path) + ext)
                 else:
-                    # path = P(path)  # removed for disentanglement
-                    pass
+                    path = Path(path)
 
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path, obj, **kwargs)
@@ -100,8 +100,6 @@ class Save:
     @staticmethod
     @save_decorator(".csv")
     def csv(path=None, obj=None):
-        # removed for disentanglement
-        # path = path or P.tmp_fname()
         # obj.to_frame('dtypes').reset_index().to_csv(P(path).append(".dtypes").string)
         obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
 
@@ -188,10 +186,10 @@ class Base(object):
         return self.__dict__
 
     def __setstate__(self, state):
-        self.__dict__.update(dict(state))
+        self.__dict__.update(state)
 
     @classmethod
-    def from_saved(cls, path, *args, reader=None, **kwargs):
+    def from_saved(cls, path=None, *args, reader=None, recursive=False, **kwargs):
         """The method thinks of class as a combination of data and functionality. Thus, to load up and instance
          of a class, this method, obviously, requires the class to be loadded up first then this method is used.
 
@@ -200,7 +198,7 @@ class Base(object):
         or saved attributes which require this method to load up the instance.
         A naming protocal for distinguishing is due.
 
-        It is vital that __init__ method of class is well behaved. I.e. class instance can be initialized
+        It is vital that __init__ method of class is well behaved.  That is, class instance can be initialized
         with no or only fake inputs (use default args to achieve this behaviour), so that a skeleton instance
         can be easily made then attributes are updated from the data loaded from disc. A good practice is to add
         a flag (e.g. from_saved) to init method to require the special behaviour indicated above when it is raised, e.g. do NOT
@@ -219,13 +217,19 @@ class Base(object):
         # step 2: load up the data
         if reader is None:
             # data = Read.read(path)  # removed for disentanglement
-            data = path.readit()
+            data = path.readit() if path is not None else dict()
             # TODO: add recursive save_pickle for compositioned classes.
         else:
-            data = reader(path)
+            data = reader(path) if path is not None else dict()
+
+        if recursive:
+            for key, val in data.items():
+                import dill
+                if type(val) is bytes:
+                    data[key] = dill.loads(val)
 
         # step 3: update / populate instance attributes with data.
-        inst.__setstate__(data)
+        inst.__setstate__(dict(data))
 
         # Return a ready instance the way it was saved.
         return inst
@@ -234,7 +238,65 @@ class Base(object):
         Save.npy(path, self.__dict__, **kwargs)
         return self
 
-    def save_pickle(self, path=None, itself=False, **kwargs):
+    def save_data_and_class(self, path):
+        path = Path(path)
+        import tempfile
+        temp_path = Path(tempfile.gettempdir()).joinpath(get_time_stamp(name="data_class"))
+        temp_path.mkdir()
+        self.save_code(temp_path.joinpath("source_code.py"))
+        self.save_pickle(temp_path.joinpath("data.pkl"))
+        import shutil
+        result_path = shutil.make_archive(base_name=path, format="zip",
+                                          root_dir=str(temp_path), base_dir=".")
+        result_path = Path(result_path)
+        print(f"Class and data saved @ {result_path.as_uri()}")
+        return result_path
+
+    def save_code(self, file_path):
+        import inspect
+        file = Path(inspect.getmodule(self).__file__)
+        class_name = self.__class__.__name__
+        source_code = file.read_text()
+        injected_code = f"""\n\ndef get_instance(path=None, *args, **kwargs):
+        instance = {class_name}.from_saved(*args, path=path, **kwargs)
+        return instance"""
+        source_code += injected_code
+        file_path = Path(file_path)
+        file_path.write_text(data=source_code)
+        return file_path
+
+    @classmethod
+    def from_source_code_and_data(cls, source_code_path, data_path=None):
+        return cls.from_source_code_and_data_auto(source_code_path, data_path, class_name=cls.__name__)
+
+    @staticmethod
+    def from_source_code_and_data_auto(source_code_path, data_path=None, class_name=None):
+        import sys
+        source_code_path = Path(source_code_path)
+        sys.path.insert(0, str(source_code_path.parent))
+        sourcefile = __import__(source_code_path.stem)
+        if class_name is None:  # use cls
+            instance = getattr(sourcefile, "get_instance")()
+            return instance
+        else:
+            return getattr(sourcefile, class_name).from_saved(data_path)
+
+    @classmethod
+    def from_zipped_code_and_class(cls, path):
+        return cls.from_zipped_code_and_class_auto(path, class_name=cls.__name__)
+
+    @staticmethod
+    def from_zipped_code_and_class_auto(path, class_name=None):
+        import tempfile
+        temp_path = Path(tempfile.gettempdir()).joinpath(get_time_stamp(name="data_class"))
+        from zipfile import ZipFile
+        with ZipFile(str(path), 'r') as zipObj:
+            zipObj.extractall(temp_path)
+        return Base.from_source_code_and_data_auto(source_code_path=temp_path.joinpath("source_code.py"),
+                                                   data_path=temp_path.joinpath("data.pkl"),
+                                                   class_name=class_name)
+
+    def save_pickle(self, path=None, itself=False, recursive=False, s=False, **kwargs):
         """ TODO: add support for saving code.
         :param path:
         :param itself: determiens whether to save the __dict__ only or the entire class instance (code + data).
@@ -257,10 +319,23 @@ class Base(object):
         passwords. The best practice is to pass them again at load time.
         """
         if not itself:  # default, works in all cases.
-            cp = self.__getstate__()
-            Save.pickle(path, cp, **kwargs)
+            obj = self.__getstate__()
         else:  # does not work for all classes with whacky behaviours, no gaurantee.
-            Save.pickle(path, self, **kwargs)
+            obj = self
+
+        if not recursive:
+            Save.pickle(path, obj, **kwargs)
+        else:
+            obj = obj.copy()
+            for key, val in obj.items():
+                if Base in val.__class__.__mro__:  # a class instance rather than pure data
+                    obj[key] = val.save_pickle(recursive=True, s=True)  # replace with pickleable bytes object.
+                else:
+                    pass  # leave this object as is.
+            if s is True:
+                return obj
+            else:
+                Save.pickle(path, obj, **kwargs)
         return self
 
     def save_json(self, path=None, *args, **kwargs):
@@ -317,7 +392,7 @@ class Base(object):
             return string_
 
     def print(self, typeinfo=False):
-        pass
+        Struct(self.__dict__).print(typeinfo=typeinfo)
 
 
 class List(list, Base):
