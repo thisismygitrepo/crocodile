@@ -80,8 +80,7 @@ def save_decorator(ext=""):
                 raise ValueError
             else:
                 if not str(path).endswith(ext):
-                    # path = P(str(path) + ext)   # removed for disentanglement
-                    path = str(path) + ext   # removed for disentanglement
+                    path = path + ext   # removed for disentanglement
                 else:
                     # path = P(path)  # removed for disentanglement
                     pass
@@ -169,17 +168,43 @@ class Save:
         with open(str(path), 'wb') as file:
             dill.dump(obj, file, **kwargs)
 
+    @staticmethod
+    def pickle_s(obj):
+        import dill
+        binary = dill.dumps(obj)
+        return binary
 
-class Base:
-    tst = 1
+
+class Base(object):
     def __init__(self, *args, **kwargs):
         pass
 
+    def __getstate__(self):
+        """This method is used by Python internally when an instance of the class is pickled. (itself=True)
+        Additionally, it is used by `save_pickle` to determine which attributes should be saved.
+        Best practice here is to delete attributes that are not pickleable, as opposed to setting them to None.
+        Setting them to None means that at load time, they will be set to None which is not required.
+        Those attributes will be passed from user at construction time."""
+        return self.__dict__
+
+    def __setstate__(self, state):
+        self.__dict__.update(dict(state))
+
     @classmethod
     def from_saved(cls, path, *args, reader=None, **kwargs):
-        """Whether the save format is .json, .mat, .pickle or .npy, Reader returns Structure
-        For best experience, make sure that your subclass can be initialized with no or only fake inputs.
-        This behaviour is sufficient to store classes when they're thought of as combination of functions and data.
+        """The method thinks of class as a combination of data and functionality. Thus, to load up and instance
+         of a class, this method, obviously, requires the class to be loadded up first then this method is used.
+
+        If, at save time, the class itself was saved, then, the path to it is sufficient to load it up.
+        It is the responsibility of the user to determine whether the path is pointing to a saved instance
+        or saved attributes which require this method to load up the instance.
+        A naming protocal for distinguishing is due.
+
+        It is vital that __init__ method of class is well behaved. I.e. class instance can be initialized
+        with no or only fake inputs (use default args to achieve this behaviour), so that a skeleton instance
+        can be easily made then attributes are updated from the data loaded from disc. A good practice is to add
+        a flag (e.g. from_saved) to init method to require the special behaviour indicated above when it is raised, e.g. do NOT
+        create some expensive attribute is this flag is raised because it will be obtained later.
         """
         # step 1: load up the code (methods) (why not data first then class?)
         if args == () and kwargs == {}:  # user did not feed any init args.
@@ -195,12 +220,12 @@ class Base:
         if reader is None:
             # data = Read.read(path)  # removed for disentanglement
             data = path.readit()
+            # TODO: add recursive save_pickle for compositioned classes.
         else:
             data = reader(path)
 
         # step 3: update / populate instance attributes with data.
-        # __setitem__ should be defined.
-        inst.__dict__.update(dict(data))
+        inst.__setstate__(data)
 
         # Return a ready instance the way it was saved.
         return inst
@@ -209,24 +234,30 @@ class Base:
         Save.npy(path, self.__dict__, **kwargs)
         return self
 
-    def save_pickle(self, path=None, itself=False, exclude=None, **kwargs):
-        """
+    def save_pickle(self, path=None, itself=False, **kwargs):
+        """ TODO: add support for saving code.
         :param path:
-        :param itself: determiens whether to save the attributes only or the entire class. If the attributes are
-        the only saved ones (assuming it is pure data rather than code), then the class itself is required later
-        and the `from_saved` method should be used to reload the instance again. Alternatively, if the class itself
-        is saved
-        the aforementioned process will not be required as the class will be loaded automatically.
+        :param itself: determiens whether to save the __dict__ only or the entire class instance (code + data).
+        If __dict__ is only to be saved (assuming it is pure data rather than code),
+        then the class itself is required later and the `from_saved` method should be used to reload the instance again.
+
+        Alternatively, if the `itself` flag is raised, then, at load time, no reference to the class is needed as it is
+        stored already. In a word, pickling requirements must be present in mind while writing __init__ method.
+
         A usecase for the former is when the source code is continously changed and still you want to reload an old
-         version.
-        :param exclude: a list of expensive attributes that will not be saved.
+        version.
+
+        Depending on complexity of the class written, it might not be possible to pickle the entire instance.
+
+        A caveat arises when design of class favours composition over inheritence. Then, even with attempting to save
+        the data itself rather than class, then it fails because __dict__ contains other classes (code) rather than data
+        i.e. the first problem with (itself = True) catches up.
+
+        Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
+        passwords. The best practice is to pass them again at load time.
         """
         if not itself:  # default, works in all cases.
-            if exclude is not None:
-                cp = copy.copy(self.__dict__)  # cheap shallow copy.  # not_tested Oct 2021
-                cp.update({item: None for item in exclude})
-            else:
-                cp = self.__dict__
+            cp = self.__getstate__()
             Save.pickle(path, cp, **kwargs)
         else:  # does not work for all classes with whacky behaviours, no gaurantee.
             Save.pickle(path, self, **kwargs)

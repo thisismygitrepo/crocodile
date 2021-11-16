@@ -177,12 +177,28 @@ class Experimental:
         return Experimental.capture_locals(func=func, globs=globs, args=args, self=self, update_globs=True)
 
     @staticmethod
-    def extract_code(func, args: Struct = None, code: str = None, include_args=True, verbose=True, **kwargs):
+    def extract_code(func, args: Struct = None, code: str = None, include_args=True, globs=None,
+                     verbose=True, **kwargs):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
         TODO: how to handle decorated functions.
         """
+        if type(func) is str:
+            assert globs is not None, f"If you pass a string, you must pass globals to contextualize it."
+            tmp = func
+            first_parenth = func.find("(")
+            last_parenth = -1
+            func = eval(tmp[:first_parenth])
+            args_kwargs = tmp[first_parenth + 1: last_parenth]
+            # what is self? only for methods:
+            tmp2 = tmp[:first_parenth]
+            idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
+            self = ".".join(func.split(".")[:-1])
+            _ = self
+            func = eval(func, globs)
+
+        # TODO: add support for lambda functions.
 
         import inspect
         import textwrap
@@ -209,7 +225,7 @@ class Experimental:
         code_string = ''.join(codelines)  # convert list to string.
         args_kwargs = ""
         if include_args:
-            args_kwargs = Experimental.extract_arguments(func, args=args, verbose=verbose, **kwargs)
+            args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
         if code is not None:
             args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
         if include_args or code:
@@ -523,7 +539,7 @@ class Log:
         fmt = colorlog.ColoredFormatter(format or fmt)
 
         if file or file_path:  # ==> create file handler for the logger.
-            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
+            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level, logger_name=logger.name)
         if stream:  # ==> create stream handler for the logger.
             shandler = colorlog.StreamHandler()
             shandler.setLevel(level=s_level)
@@ -543,7 +559,7 @@ class Log:
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
-        fmt = f"%(asctime)s{sept}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+        fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
               f"{sep}%(message)s{sep}"
         if default:
             format = '%(message)s'
@@ -559,10 +575,11 @@ class Log:
         return logger
 
     @staticmethod
-    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
+    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler",
+                        logger_name=None):
         if file_path is None:
             file_path = P.tmp_fname("logger", ".log")
-            print("Logger file created @ ", file_path.as_uri())
+        print(f"Logger file handler for {logger_name} is created @ " + file_path.as_uri())
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)

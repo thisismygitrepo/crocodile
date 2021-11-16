@@ -91,6 +91,11 @@ class Read(object):
     def pkl(*args, **kwargs):
         return Read.pickle(*args, **kwargs)
 
+    @staticmethod
+    def pickle_s(bytes_obj):
+        import dill
+        return dill.loads(bytes_obj)
+
 
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
