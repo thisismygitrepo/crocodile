@@ -79,8 +79,7 @@ class SaveDecorator(object):
         # noinspection PyUnreachableCode
         path.parent.mkdir(exist_ok=True, parents=True)
         self.func(path, obj, **kwargs)
-        print(f"File saved @ ", path.absolute().as_uri())
-        print(f"Directory: ", path.parent.absolute().as_uri())
+        print(f"File {obj} saved @ ", path.absolute().as_uri(), ". Directory: ", path.parent.absolute().as_uri())
         return path
 
 
@@ -100,8 +99,7 @@ def save_decorator(ext=""):
 
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path, obj, **kwargs)
-            print(f"File saved @ ", path.absolute().as_uri())
-            print(f"Directory: ", path.parent.absolute().as_uri())
+            print(f"File saved @ ", path.absolute().as_uri(), ". Directory: ", path.parent.absolute().as_uri())
             return path
         return wrapper
     return decorator
@@ -197,7 +195,7 @@ class Base(object):
         self.__dict__.update(state)
 
     @classmethod
-    def from_saved(cls, path=None, *args, reader=None, r=False, globs=None, load_kwargs={}, **kwargs):
+    def from_saved(cls, path=None, *args, reader=None, r=False, globs=None, **kwargs):
         """Works in conjuction with save_pickle.
         The method thinks of class as a combination of data and functionality. Thus, to load up and instance
          of a class, this method, obviously, requires the class to be loadded up first then this method is used.
@@ -235,8 +233,8 @@ class Base(object):
             contents = [item.stem for item in Path(path).parent.glob("*.zip")]
             for key, _ in data.items():  # val is probably None (if init was written properly)
                 if key in contents:
-                    setattr(inst, key, Base.from_zipped_code_and_class_auto(path=Path(path).parent.joinpath(key + ".zip"),
-                                                                     r=True, globs=globs, **load_kwargs))
+                    setattr(inst, key, Base.from_zipped_codata(path=Path(path).parent.joinpath(key + ".zip"),
+                                                                     r=True, globs=globs, **kwargs))
         # =========================== Return a ready instance the way it was saved.
         return inst
 
@@ -244,7 +242,7 @@ class Base(object):
         Save.npy(path, self.__dict__, **kwargs)
         return self
 
-    def save_data_and_class(self, path, r=False):
+    def save_codata(self, path, r=False):
         """In contrast difference to save_pickle, this method saves code and data and produce a zip file.
         save_pikle only saves data, or the entire object (almost always not possible).
         To recover data from this method, treat the zip files with from_zipped_code_and_class.
@@ -284,7 +282,7 @@ class Base(object):
     #     return cls.from_zipped_code_and_class_auto(path, *args, class_name=cls.__name__, r=r, **kwargs)
 
     @staticmethod
-    def from_source_code_and_data(source_code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
+    def from_codata(source_code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
         import sys
         source_code_path = Path(source_code_path)
         sys.path.insert(0, str(source_code_path.parent))
@@ -300,7 +298,7 @@ class Base(object):
         return getattr(sourcefile, class_name).from_saved(data_path, *args, r=r, **kwargs)
 
     @staticmethod
-    def from_zipped_code_and_class_auto(path, *args, class_name=None, r=False, globs=None, **kwargs):
+    def from_zipped_codata(path, *args, class_name=None, r=False, globs=None, **kwargs):
         # TODO make this a class method.
         fname = Path(path).name.split(".zip")[1]
         temp_path = Path.home().joinpath(f"temp_results/unzipped/{fname}_{get_random_string()}")
@@ -311,7 +309,7 @@ class Base(object):
         data_path = list(temp_path.glob("class_data*"))[0]
         class_name = class_name or str(data_path).split(".")[1]
         if globs is None:  # load from source code
-            return Base.from_source_code_and_data(*args, source_code_path=source_code_path,
+            return Base.from_codata(*args, source_code_path=source_code_path,
                                                        data_path=data_path,
                                                        class_name=class_name, r=r, **kwargs)
         else:
@@ -348,7 +346,7 @@ class Base(object):
                 obj = obj.copy()  # do not mess with original __dict__
                 for key, val in obj.items():
                     if Base in val.__class__.__mro__:  # a class instance rather than pure data
-                        val.save_data_and_class(path=path.parent.joinpath(key), r=True)
+                        val.save_codata(path=path.parent.joinpath(key), r=True)
                         obj[key] = None  # this tough object is finished, the rest should be easy.
                     else:
                         pass  # leave this object as is.

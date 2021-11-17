@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, pd, np, os, List, datetime, get_time_stamp, Base
+from crocodile.core import Struct, pd, np, os, List, datetime, get_time_stamp, get_random_string, Base
 # Typing
 import re
 import typing
@@ -675,7 +675,7 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmp_fname(name=None, suffix="", folder=None):
-        return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp() + suffix, folder=folder)
+        return P.tmp(fn=(name or get_random_string()) + "-" + get_time_stamp() + suffix, folder=folder)
 
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):
