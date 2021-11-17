@@ -5,10 +5,10 @@ email programmer@usa.com
 """
 
 from crocodile import core
-from crocodile.core import datetime, dt, os, np, pd, copy
+from crocodile.core import datetime, dt, os, string, random, np, pd, copy, dill
 
 from crocodile import file_management as _fm
-from crocodile.file_management import re, typing, string, sys, shutil, glob  # Path
+from crocodile.file_management import re, typing, sys, shutil, glob, tempfile  # Path
 
 from crocodile import plot_management as _pm
 from crocodile.plot_management import plt, enum, FigureManager
@@ -17,7 +17,7 @@ from crocodile import meta
 from crocodile.meta import logging
 
 
-Base, get_time_stamp, Save, List = core.Base, core.get_time_stamp, core.Save, core.List
+Base, get_time_stamp, get_random_string, Save, List = core.Base, core.get_time_stamp, core.get_random_string, core.Save, core.List
 Struct, DisplayData = core.Struct, core.DisplayData
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression

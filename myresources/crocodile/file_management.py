@@ -3,10 +3,10 @@ from crocodile.core import Struct, pd, np, os, List, datetime, get_time_stamp, B
 # Typing
 import re
 import typing
-import string
 # Path
 import sys
 import shutil
+import tempfile
 from glob import glob
 from pathlib import Path
 
@@ -97,7 +97,7 @@ class Read(object):
         return dill.loads(bytes_obj)
 
 
-class P(type(Path()), Path, Base):
+class P(type(Path()), Path):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
 
@@ -353,6 +353,12 @@ class P(type(Path()), Path, Base):
     def __repr__(self):  # this is useful only for the console
         return "P: " + self.__str__()
 
+    def __getstate__(self):
+        return str(self)
+
+    def __setstate__(self, state):
+        self._str = str(state)
+
     @property
     def string(self):  # this method is used by other functions to get string representation of path
         return str(self)
@@ -369,14 +375,6 @@ class P(type(Path()), Path, Base):
     @staticmethod
     def make_valid_filename_(astring, replace='_'):
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
-
-    @staticmethod
-    def random(length=10, pool=None):
-        if pool is None:
-            pool = string.ascii_letters
-        import random
-        result_str = ''.join(random.choice(pool) for _ in range(length))
-        return result_str
 
     def as_unix(self):
         return P(str(self).replace('\\', '/').replace('//', '/'))
@@ -648,6 +646,15 @@ class P(type(Path()), Path, Base):
     #     self.explore()  # if it is a file, it will be opened with its default program.
 
     @staticmethod
+    def temp():
+        """`temp` refers to system temporary directory (deleted after restart)."""
+        return P(tempfile.gettempdir())
+
+    @staticmethod
+    def tempdir():
+        return P(tempfile.mktemp())
+
+    @staticmethod
     def tmp(folder=None, fn=None, path="home", ex=False):
         """
         folder is created.
@@ -667,8 +674,8 @@ class P(type(Path()), Path, Base):
         return path
 
     @staticmethod
-    def tmp_fname(name=None, suffix=""):
-        return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp() + suffix)
+    def tmp_fname(name=None, suffix="", folder=None):
+        return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp() + suffix, folder=folder)
 
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):

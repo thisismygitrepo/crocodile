@@ -1,6 +1,6 @@
 
 import logging
-from crocodile.core import np, os, get_time_stamp
+from crocodile.core import np, os, get_time_stamp, get_random_string
 from crocodile.file_management import sys, P, Struct
 
 
@@ -528,7 +528,7 @@ class Log:
                    },
         colorlog = Experimental.assert_package_installed("colorlog")
 
-        logger = colorlog.getLogger(name=name or P.random())
+        logger = colorlog.getLogger(name=name or get_random_string())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -555,7 +555,7 @@ class Log:
         dozens of objects will not be useful as the programmer will not easily recognize who (which function or object)
          is printing this message, in addition to many other concerns."""
 
-        logger = logging.getLogger(name=name or P.random())
+        logger = logging.getLogger(name=name or get_random_string())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -578,7 +578,7 @@ class Log:
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler",
                         logger_name=None):
         if file_path is None:
-            file_path = P.tmp_fname("logger", ".log")
+            file_path = P.tmp_fname(name="logger", suffix=".log", folder="loggers")
         print(f"Logger file handler for {logger_name} is created @ " + file_path.as_uri())
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
