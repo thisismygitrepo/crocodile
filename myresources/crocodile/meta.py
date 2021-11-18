@@ -491,8 +491,23 @@ class Terminal:
         return resp
 
     def run_async(self, command):
-        w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr)
+        w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr,
+                            shell=True)
         return w
+
+    def open_console(self, command):
+        self.subp.call(f'start {command}', shell=True)
+
+    def run_python_script(self, script):
+        header = f"""
+import crocodile.toolbox as tb
+tb.sys.path.insert(0, r'{P.cwd()}')
+        """
+        script = header + "\n" + script
+        file = P.tmp_fname(name="tmp_python_script", suffix=".py")
+        file.write_text(script)
+        print(f"Script to be executed asyncronously: ", file.as_uri())
+        self.open_console(f"ipython -i {file}")
 
 
 class Log:

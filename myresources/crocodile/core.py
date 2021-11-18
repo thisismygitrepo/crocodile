@@ -25,7 +25,8 @@ _ = dt
 
 
 def get_time_stamp(fmt=None, name=None):
-    """tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
+    """isoformat is not compatible with file naming convention, this function provides compatible fmt
+    tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
     if fmt is None:
         fmt = '%Y-%m-%d-%I-%M-%S-%p-%f'
     _ = datetime.now().strftime(fmt)
@@ -34,6 +35,21 @@ def get_time_stamp(fmt=None, name=None):
     else:
         name = _
     return name
+
+
+def str2timedelta(past):
+    """Converts a human readable string like '1m' or '1d' to a timedate object.
+    In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
+    sc = {"m": "minutes", "h": "hours", "d": "days", "w": "weeks",
+          "M": "months", "y": "years"}
+    key, val = sc[past[-1]], eval(past[:-1])
+    if key == "months":
+        key = "days"
+        val = val * 30
+    elif key == "years":
+        key = "weeks"
+        val = val * 52
+    return dt.timedelta(**{key: val})
 
 
 def get_random_string(length=10, pool=None):

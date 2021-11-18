@@ -17,8 +17,8 @@ from crocodile import meta
 from crocodile.meta import logging
 
 
-Base, get_time_stamp, get_random_string, Save, List = core.Base, core.get_time_stamp, core.get_random_string, core.Save, core.List
-Struct, DisplayData = core.Struct, core.DisplayData
+Base, get_time_stamp, get_random_string = core.Base, core.get_time_stamp, core.get_random_string
+Struct, DisplayData, str2timedelta, Save, List = core.Struct, core.DisplayData, core.str2timedelta, core.Save, core.List
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
 
