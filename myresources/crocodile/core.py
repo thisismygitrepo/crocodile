@@ -26,9 +26,8 @@ _ = dt
 
 def get_time_stamp(fmt=None, name=None):
     """tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
-    if fmt is None:  # this is better than putting the default non-None value above.
-        fmt = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expose those kwarg
-        # then it has to worry about not sending None which will overwrite this defualt value.
+    if fmt is None:
+        fmt = '%Y-%m-%d-%I-%M-%S-%p-%f'
     _ = datetime.now().strftime(fmt)
     if name:
         name = name + '_' + _
@@ -195,7 +194,7 @@ class Base(object):
         self.__dict__.update(state)
 
     @classmethod
-    def from_saved(cls, path=None, *args, reader=None, r=False, globs=None, **kwargs):
+    def from_saved(cls, path=None, *args, reader=None, r=False, modules=None, **kwargs):
         """Works in conjuction with save_pickle.
         The method thinks of class as a combination of data and functionality. Thus, to load up and instance
          of a class, this method, obviously, requires the class to be loadded up first then this method is used.
@@ -234,7 +233,7 @@ class Base(object):
             for key, _ in data.items():  # val is probably None (if init was written properly)
                 if key in contents:
                     setattr(inst, key, Base.from_zipped_codata(path=Path(path).parent.joinpath(key + ".zip"),
-                                                                     r=True, globs=globs, **kwargs))
+                                                                     r=True, modules=modules, **kwargs))
         # =========================== Return a ready instance the way it was saved.
         return inst
 
@@ -298,7 +297,7 @@ class Base(object):
         return getattr(sourcefile, class_name).from_saved(data_path, *args, r=r, **kwargs)
 
     @staticmethod
-    def from_zipped_codata(path, *args, class_name=None, r=False, globs=None, **kwargs):
+    def from_zipped_codata(path, *args, class_name=None, r=False, modules=None, **kwargs):
         # TODO make this a class method.
         fname = Path(path).name.split(".zip")[1]
         temp_path = Path.home().joinpath(f"temp_results/unzipped/{fname}_{get_random_string()}")
@@ -308,12 +307,12 @@ class Base(object):
         source_code_path = list(temp_path.glob("source_code*"))[0]
         data_path = list(temp_path.glob("class_data*"))[0]
         class_name = class_name or str(data_path).split(".")[1]
-        if globs is None:  # load from source code
+        if modules is None:  # load from source code
             return Base.from_codata(*args, source_code_path=source_code_path,
                                                        data_path=data_path,
                                                        class_name=class_name, r=r, **kwargs)
         else:
-            return globs[class_name].from_saved(data_path, *args, r=r, globs=globs, **kwargs)
+            return modulse[class_name].from_saved(data_path, *args, r=r, modules=modules, **kwargs)
 
     def save_pickle(self, path=None, itself=False, r=False, **kwargs):
         """works in conjunction with from_saved.
@@ -410,6 +409,16 @@ class Base(object):
 
     def print(self, typeinfo=False):
         Struct(self.__dict__).print(typeinfo=typeinfo)
+
+    def viz(self, depth=3, obj=None, filter=None):
+        import objgraph
+        import tempfile
+        filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + get_random_string() + ".png")
+        objgraph.show_refs(self if obj is None else obj, max_depth=depth, filename=str(filename), filter=filter)
+        import sys
+        if sys.platform == "win32":
+            os.startfile(str(filename.absolute()))  # works for files and folders alike
+        return filename
 
 
 class List(list, Base):

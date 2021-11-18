@@ -82,10 +82,10 @@ class Experimental:
             return otherwise
 
     @staticmethod
-    def show_globals(globs):
+    def show_globals(modules):
         """Returns a struct with variables that are defined in the globals passed."""
-        res = Struct(globs).spawn_from_keys(
-            Struct(globs).keys().
+        res = Struct(modules).spawn_from_keys(
+            Struct(modules).keys().
                 filter(lambda x: "__" not in x).
                 filter(lambda x: not x.startswith("_")).
                 filter(lambda x: x not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}))
@@ -141,7 +141,7 @@ class Experimental:
     def load_from_source_code(directory, obj=None):
         """Does the following:
 
-        * Globs directory passed for ``source_code`` module.
+        * modules directory passed for ``source_code`` module.
         * Loads the directory to the memroy.
         * Returns either the package or a piece of it as indicated by ``obj``
         """
@@ -156,28 +156,28 @@ class Experimental:
             return sourcefile
 
     @staticmethod
-    def capture_locals(func, globs, args=None, self: str = None, update_globs=False):
+    def capture_locals(func, modules, args=None, self: str = None, update_modules=False):
         """Captures the local variables inside a function.
         :param func:
-        :param globs: `globals()` executed in the main scope. This provides the function with modules defined in main.
+        :param modules: `globals()` executed in the main scope. This provides the function with modules defined in main.
         :param args: dict of what you would like to pass to the function as arguments.
         :param self: relevant only if the function is a method of a class. self refers to the name of the instance
-        :param update_globs: binary flag refers to whether you want the result in a struct or update main."""
+        :param update_modules: binary flag refers to whether you want the result in a struct or update main."""
         code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
 
         print(code)
         res = Struct()
-        exec(code, globs, res.dict)  # run the function within the scope `res`
-        if update_globs:
-            globs.update(res.dict)
+        exec(code, modules, res.dict)  # run the function within the scope `res`
+        if update_modules:
+            modules.update(res.dict)
         return res
 
     @staticmethod
-    def run_globally(func, globs, args=None, self: str = None):
-        return Experimental.capture_locals(func=func, globs=globs, args=args, self=self, update_globs=True)
+    def run_globally(func, modules, args=None, self: str = None):
+        return Experimental.capture_locals(func=func, modules=modules, args=args, self=self, update_modules=True)
 
     @staticmethod
-    def extract_code(func, args: Struct = None, code: str = None, include_args=True, globs=None,
+    def extract_code(func, args: Struct = None, code: str = None, include_args=True, modules=None,
                      verbose=True, **kwargs):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
@@ -185,7 +185,7 @@ class Experimental:
         TODO: how to handle decorated functions.
         """
         if type(func) is str:
-            assert globs is not None, f"If you pass a string, you must pass globals to contextualize it."
+            assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
             tmp = func
             first_parenth = func.find("(")
             last_parenth = -1
@@ -196,7 +196,7 @@ class Experimental:
             idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
             self = ".".join(func.split(".")[:-1])
             _ = self
-            func = eval(func, globs)
+            func = eval(func, modules)
 
         # TODO: add support for lambda functions.
 
@@ -238,14 +238,14 @@ class Experimental:
         return code_string  # ready to be run with exec()
 
     @staticmethod
-    def extract_arguments(func, globs=None, exclude_args=True, verbose=True, **kwargs):
+    def extract_arguments(func, modules=None, exclude_args=True, verbose=True, **kwargs):
         """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
         """
         if type(func) is str:  # will not work because once a string is passed, this method won't be able
             # to interpret it, at least not without the globals passed.
             self = ".".join(func.split(".")[:-1])
             _ = self
-            func = eval(func, globs)
+            func = eval(func, modules)
 
         import inspect
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.

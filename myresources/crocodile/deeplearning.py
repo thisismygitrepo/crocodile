@@ -53,7 +53,7 @@ class HyperParam(tb.Struct):
         # self.save_code()
         # self.config_device()
 
-    def save_code(self):
+    def save_code(self, *args):
         import inspect
         self._code = ''.join(inspect.getsourcelines(self.__class__)[0])
 
@@ -187,24 +187,24 @@ class DataReader(tb.Base):
     subpath = "metadata/DataReader.pkl"
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
-    at save time, this class only remember the attributes inside `.data_specs` `Struct`. Thus, whenever encountering
+    at save time, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
     such type of data, make sure to keep them inside that `Struct`. Lastly, for convenience purpose, the class has
     implemented a fallback `getattr` method that allows accessing those attributes from the class itself, without the 
     need to reference `.dataspects`.
     """
 
-    def __init__(self, hp=None, data_specs=None, split=None, *args, **kwargs):
+    def __init__(self, hp=None, specs=None, split=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hp = hp
-        self.data_specs = data_specs if data_specs else tb.Struct()  # Summary of data to be memorized by model
+        self.specs = specs if specs else tb.Struct()  # Summary of data to be memorized by model
         self.split = split
         self.plotter = None
 
-    def __getattr__(self, item):  # avoid using this method. Always refer explicitly to `.data_specs`
-        try:
-            return self.data_specs[item]
-        except KeyError:
-            raise KeyError(f"The item `{item}` not found in {self.__class__.__name__} attributes.")
+    # def __getattr__(self, item):  # avoid using this method. Always refer explicitly to `.specs`
+    #     try:
+    #         return self.specs[item]
+    #     except KeyError:
+    #         raise KeyError(f"The item `{item}` not found in {self.__class__.__name__} attributes.")
 
     def __str__(self):
         return f"DataReader Object with these keys: \n{self.__dict__.keys()}"
@@ -231,8 +231,8 @@ class DataReader(tb.Base):
             strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        self.data_specs.ip_shape = self.split.x_train.shape[1:]  # useful info for instantiating models.
-        self.data_specs.op_shape = self.split.y_train.shape[1:]  # useful info for instantiating models.
+        self.specs.ip_shape = self.split.x_train.shape[1:]  # useful info for instantiating models.
+        self.specs.op_shape = self.split.y_train.shape[1:]  # useful info for instantiating models.
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
@@ -245,9 +245,9 @@ class DataReader(tb.Base):
 
     def get_random_input_output(self, ip_shape=None, op_shape=None):
         if ip_shape is None:
-            ip_shape = self.data_specs.ip_shape
+            ip_shape = self.specs.ip_shape
         if op_shape is None:
-            op_shape = self.data_specs.op_shape
+            op_shape = self.specs.op_shape
         if hasattr(self.hp, "precision"):
             dtype = self.hp.precision
         else:
@@ -257,16 +257,16 @@ class DataReader(tb.Base):
         return ip, op
 
     def save_pickle(self, path=None, *names, **kwargs):
-        """This differs from the standard save from `Base` class in that it only saved .data_specs attribute
+        """This differs from the standard save from `Base` class in that it only saved .specs attribute
         and loads up with them only. This is reasonable as saving an entire dataset is not feasible."""
         if names:
             self.relay_to_specs(*names)
         if path is None:
             path = self.hp.save_dir.joinpath(self.subpath).create(parent_only=True)
-        self.data_specs.save_pickle(path=path, **kwargs)
+        self.specs.save_pickle(path=path, **kwargs)
 
     def relay_to_specs(self, *names):
-        self.data_specs.update({name: self.__dict__[name] for name in names})
+        self.specs.update({name: self.__dict__[name] for name in names})
 
     @classmethod
     def from_saved(cls, path, *args, **kwargs):
@@ -281,10 +281,10 @@ class DataReader(tb.Base):
         path = (tb.P(path) / cls.subpath).parent.find("DataReader*")
         if path is None:
             # raise FileNotFoundError(f"Could not find the required file {path / cls.subpath}")
-            print("DataReader file was not found, ignoring data_specs.")
+            print("DataReader file was not found, ignoring specs.")
         else:
-            data_specs = tb.Read.read(path)
-            instance.data_specs = data_specs
+            specs = tb.Read.read(path)
+            instance.specs = specs
         return instance
 
     def preprocess(self, *args, **kwargs):
@@ -631,7 +631,7 @@ class BaseModel(ABC):
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
 
-        :param shape:
+        :param ip_shape:
         :param verbose:
         :return:
         """
