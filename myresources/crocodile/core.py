@@ -7,6 +7,7 @@ email programmer@usa.com
 # Typing
 # Path
 import os
+import tempfile
 from pathlib import Path
 import string
 import random
@@ -81,8 +82,8 @@ class SaveDecorator(object):
     def __call__(self, path=None, obj=None, **kwargs):
         # Called when calling the decorated function (instance of this called).
         if path is None:
-            # path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + self.ext
-            raise ValueError
+            path = Path(tempfile.mkdtemp() + "-" + get_time_stamp() + self.ext)
+            # raise ValueError
         else:
             if not str(path).endswith(self.ext):
                 # path = P(str(path) + self.ext)
@@ -271,7 +272,7 @@ class Base(object):
         result_path = shutil.make_archive(base_name=path, format="zip",
                                           root_dir=str(temp_path), base_dir=".")
         result_path = Path(result_path)
-        print(f"Class and data saved @ {result_path.as_uri()}")
+        print(f"Class and data saved @ {result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
         return result_path
 
     def save_code(self, file_path):
@@ -426,11 +427,11 @@ class Base(object):
     def print(self, typeinfo=False):
         Struct(self.__dict__).print(typeinfo=typeinfo)
 
-    def viz(self, depth=3, obj=None, filter=None):
+    def viz_heirarchy(self, depth=3, obj=None, filter=None):
         import objgraph
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + get_random_string() + ".png")
-        objgraph.show_refs(self if obj is None else obj, max_depth=depth, filename=str(filename), filter=filter)
+        objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filter)
         import sys
         if sys.platform == "win32":
             os.startfile(str(filename.absolute()))  # works for files and folders alike

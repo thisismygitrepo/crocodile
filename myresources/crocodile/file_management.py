@@ -380,16 +380,15 @@ class P(type(Path()), Path):
         return P(str(self).replace('\\', '/').replace('//', '/'))
 
     # ==================================== File management =========================================
-    def delete(self, are_you_sure=False):
+    def delete(self, are_you_sure=False, verbose=True):
         if are_you_sure:
-            if self.is_file():
-                self.unlink()  # missing_ok=True added in 3.8
+            if self.is_file(): self.unlink()  # missing_ok=True added in 3.8
             else:
-
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
+            if verbose: print(f"File {self} deleted.")
         else:
-            print("File not deleted because user is not sure.")
+            if verbose: print(f"File {self} not deleted because user is not sure.")
 
     def send2trash(self):
         # send2trash = Experimental.assert_package_installed("send2trash")
@@ -646,13 +645,17 @@ class P(type(Path()), Path):
     #     self.explore()  # if it is a file, it will be opened with its default program.
 
     @staticmethod
-    def temp():
-        """`temp` refers to system temporary directory (deleted after restart)."""
-        return P(tempfile.gettempdir())
-
-    @staticmethod
     def tempdir():
         return P(tempfile.mktemp())
+
+    @staticmethod
+    def tmpdir():
+        return P.tmp(folder=get_random_string())
+
+    @staticmethod
+    def temp(*arg, **kwargs):
+        """`temp` refers to system temporary directory (deleted after restart)."""
+        return self.tmp(*args, **kwargs)
 
     @staticmethod
     def tmp(folder=None, fn=None, path="home", ex=False):

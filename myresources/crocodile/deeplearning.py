@@ -819,3 +819,7 @@ class KerasOptimizer:
                                   factor=3,
                                   directory=tb.P.tmp('my_dir'),
                                   project_name='intro_to_kt')
+
+
+if __name__ == '__main__':
+    pass

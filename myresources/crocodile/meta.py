@@ -1,5 +1,7 @@
 
 import logging
+
+import dill
 from crocodile.core import np, os, get_time_stamp, get_random_string
 from crocodile.file_management import sys, P, Struct
 
@@ -138,7 +140,7 @@ class Experimental:
             print("Source code saved @ " + readmepath.with_name("source_code.zip").as_uri())
 
     @staticmethod
-    def load_from_source_code(directory, obj=None):
+    def load_from_source_code(directory, obj=None, delete=False):
         """Does the following:
 
         * modules directory passed for ``source_code`` module.
@@ -149,6 +151,7 @@ class Experimental:
         P(directory).find("source_code*", r=True).unzip(tmpdir)
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
+        tmpdir.delete(are_you_sure=delete, verbose=False)
         if obj is not None:
             loaded = getattr(sourcefile, obj)
             return loaded
@@ -495,19 +498,39 @@ class Terminal:
                             shell=True)
         return w
 
-    def open_console(self, command):
-        self.subp.call(f'start {command}', shell=True)
+    def open_console(self, command, shell=True):
+        self.subp.call(f'start {command}', shell=shell)
 
-    def run_python_script(self, script):
+    def run_python_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
+        wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
-tb.sys.path.insert(0, r'{P.cwd()}')
-        """
+tb.sys.path.insert(0, r'{wdir}')
+        """  # header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header + "\n" + script
-        file = P.tmp_fname(name="tmp_python_script", suffix=".py")
+        file = P.tmp_fname(name="tmp_python_script", suffix=".py", folder="tmpfiles")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        self.open_console(f"ipython -i {file}")
+        self.open_console(f"ipython {'-i' if interactive else ''} {file}", shell=shell)
+        # python will use the same dir as the one from which this method is called.
+        file.delete(are_you_sure=delete, verbose=False)
+        # TODO: add return option (asynchronous programming)
+
+    def run_function(self, func):
+        """Python brachnes off to a new window and execute the function passed.
+        context can be either a pickled session or the current file __file__"""
+        # step 1: pickle the function
+        # step 2: create a script that unpickles it.
+        # step 3: run the script that runs the function.
+        # TODO complete this
+        fname = P.tmp_fname()
+        dill.dump(obj=func, file=fname)
+        script = f"""
+import crocodile.toolbox as tb
+func = tb.dill.unpickle({fname})
+func()
+"""
+        # TODO: make sure that pickling function that serialize to tmp location delete this location afterwards
 
 
 class Log:
@@ -542,7 +565,7 @@ class Log:
                     'CRITICAL': 'bold_red,bg_white',
                    },
         colorlog = Experimental.assert_package_installed("colorlog")
-
+        if name is None: print(f"Logger name not passed. It is prefferable to pass a name indicates the owner.")
         logger = colorlog.getLogger(name=name or get_random_string())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
@@ -554,12 +577,13 @@ class Log:
         fmt = colorlog.ColoredFormatter(format or fmt)
 
         if file or file_path:  # ==> create file handler for the logger.
-            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level, logger_name=logger.name)
+            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
         if stream:  # ==> create stream handler for the logger.
             shandler = colorlog.StreamHandler()
             shandler.setLevel(level=s_level)
             shandler.setFormatter(fmt=fmt)
             logger.addHandler(shandler)
+            print(f"Logger stream handler for {logger.name} is created.")
         return logger
 
     @staticmethod
@@ -587,14 +611,15 @@ class Log:
             shandler.setLevel(level=s_level)
             shandler.setFormatter(fmt=fmt)
             logger.addHandler(shandler)
+            print(f"Logger stream handler for {logger.name} is created.")
+
         return logger
 
     @staticmethod
-    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler",
-                        logger_name=None):
+    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
         if file_path is None:
             file_path = P.tmp_fname(name="logger", suffix=".log", folder="loggers")
-        print(f"Logger file handler for {logger_name} is created @ " + file_path.as_uri())
+        print(f"Logger file handler for {logger.name} is created @ " + file_path.as_uri())
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)
