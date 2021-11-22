@@ -484,7 +484,7 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run(self, command):
+    def run_command(self, command):
         if self.elevated is False or self.is_admin():
             resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
         else:
@@ -501,7 +501,7 @@ class Terminal:
     def open_console(self, command, shell=True):
         self.subp.call(f'start {command}', shell=shell)
 
-    def run_python_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
+    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
@@ -515,6 +515,9 @@ tb.sys.path.insert(0, r'{wdir}')
         # python will use the same dir as the one from which this method is called.
         file.delete(are_you_sure=delete, verbose=False)
         # TODO: add return option (asynchronous programming)
+        command = f'ipython {"-i" if interactive else ""} -c "{script}"'
+        # print("Command to be executed = ", command)
+        # self.open_console(command=command, shell=shell)
 
     def run_function(self, func):
         """Python brachnes off to a new window and execute the function passed.

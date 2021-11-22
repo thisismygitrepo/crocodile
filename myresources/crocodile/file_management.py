@@ -436,9 +436,8 @@ class P(type(Path()), Path):
             dest = self.append(f"_copy__{get_time_stamp()}")
 
         if self.is_file():
-
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
-            if verbose: print(f"File \n{self}\ncopied successfully to: \n{dest}")
+            if verbose: print(f"File {self} copied successfully to: {dest}")
         elif self.is_dir():
             from distutils.dir_util import copy_tree
             if contents:
@@ -447,9 +446,9 @@ class P(type(Path()), Path):
                 copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
             if verbose:
                 preface = "Contents of " if contents else ""
-                print(f"{preface}\n{self.as_uri()}\ncopied successfully to: \n{dest.as_uri()}")
+                print(f"{preface} {self.as_uri()} copied successfully to: {dest.as_uri()}")
         else:
-            print(f"Could not copy this thing. {self.as_uri()}. Not a file nor a folder.")
+            print(f"Could not copy this thing: {self.as_uri()}. Not a file nor a folder.")
         return dest / self.name
 
     def clean(self):

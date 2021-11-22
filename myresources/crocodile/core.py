@@ -1,4 +1,3 @@
-
 """
 A collection of classes extending the functionality of Python's builtins.
 email programmer@usa.com
@@ -20,7 +19,6 @@ import dill
 import copy
 from datetime import datetime
 import datetime as dt  # useful for deltatime and timezones.
-
 
 _ = dt
 
@@ -117,7 +115,9 @@ def save_decorator(ext=""):
             func(path, obj, **kwargs)
             print(f"File saved @ ", path.absolute().as_uri(), ". Directory: ", path.parent.absolute().as_uri())
             return path
+
         return wrapper
+
     return decorator
 
 
@@ -180,14 +180,14 @@ class Save:
 
     @staticmethod
     @save_decorator(".pkl")
-    def pickle(path=None, obj=None, recurse=False, **kwargs):
+    def pickle(path=None, obj=None, r=False, **kwargs):
         """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are
         loaded up and it happens implicitly. It often fails at load time and requires same packages to be reloaded first
         . Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to
         dependency. Dill however, stores all the required packages for any attribute object, but not the class itself,
         or the classes that it inherits (at least at with this version)."""
         with open(str(path), 'wb') as file:
-            dill.dump(obj, file, recurse=recurse, **kwargs)
+            dill.dump(obj, file, recurse=r, **kwargs)
 
     @staticmethod
     def pickle_s(obj):
@@ -200,105 +200,74 @@ class Base(object):
         pass
 
     def __getstate__(self):
-        """This method is used by Python internally when an instance of the class is pickled. (itself=True)
-        Additionally, it is used by `save_pickle` to determine which attributes should be saved.
-        Best practice here is to delete attributes that are not pickleable, as opposed to setting them to None.
-        Setting them to None means that at load time, they will be set to None which is not required.
-        Those attributes will be passed from user at construction time."""
+        """This method is used by Python internally when an instance of the class is pickled.
+        attributes that you do not want to be pickled for one reason or the other, should be omitted from the
+        returned dictionary (as opposed to setting them to None)."""
         return self.__dict__.copy()
 
     def __setstate__(self, state):
+        """The solution to recover missing objects from state, is dependent on where it came from.
+        If the attribute was instantiated by the class itself, then, similar thing should happen here.
+        If the object was passed to the __init__ by the caller, it should be passed again. For the meanwhile it should
+        be set to None."""
         self.__dict__.update(state)
 
     @classmethod
-    def from_saved(cls, path=None, *args, reader=None, r=False, modules=None, **kwargs):
-        """Works in conjuction with save_pickle.
-        The method thinks of class as a combination of data and functionality. Thus, to load up and instance
-         of a class, this method, obviously, requires the class to be loadded up first then this method is used.
+    def from_pickled_state(cls, path=None, *args, reader=None, r=False, modules=None, **kwargs):
+        """Works in conjuction with save_pickle when `itself`=False, i.e. only state of object is pickled.
 
-        If, at save time, the class itself was saved, then, the path to it is sufficient to load it up.
-        It is the responsibility of the user to determine whether the path is pointing to a saved instance
-        or saved attributes which require this method to load up the instance.
-        A naming protocal for distinguishing is due.
+        :param path: points to where the `data` of this class is saved
+        :param r: recursive flag. If set to True, then, the directory containing the file `path` will be searched for
+        files of certain extension (.pkl or .zip) and will be loaded up in similar fashion and added as attributes
+        (to be implemented).
+        :param reader: default is dill unpikler.
+        :param modules: dict of classes that are themselves attributes of the object to be loaded (will be loaded
+        in as similar fashion to this method, if `r` is set to True). If modules are not passed and `r` is True,
+        then, the classes will be assumed in [global scope, loaded from code].
 
-        It is vital that __init__ method of class is well behaved.  That is, class instance can be initialized
+        It is vital that __init__ method of the class is well behaved.  That is, class instance can be initialized
         with no or only fake inputs (use default args to achieve this behaviour), so that a skeleton instance
         can be easily made then attributes are updated from the data loaded from disc. A good practice is to add
-        a flag (e.g. from_saved) to init method to require the special behaviour indicated above when it is raised, e.g. do NOT
-        create some expensive attribute is this flag is raised because it will be obtained later.
+        a flag (e.g. from_saved) to init method to require the special behaviour indicated above when it is raised,
+         e.g. do NOT create some expensive attribute is this flag is raised because it will be obtained later.
         """
-        # ============================ step 1: load up the code (methods) (why not data first then class?)
-        if args == () and kwargs == {}:  # user did not feed any init args.
-            # Either because his/her design does not require them, or, they expect them to be loaded up.
-            # uninit_inst = cls.__new__(object)  # avoid the init method because it demands arguments.
-            # print("new method is used.")
-            inst = cls(*args, **kwargs)
-        else:  # some classes are written in a way that you must pass some args at init time.
-            # print(args, kwargs)
-            inst = cls(*args, **kwargs)
-        # ============================= step 2: load up the data
+
+        # ============================= step 1: load up the data
+        assert ".dat." in str(path), f"Are you sure the path {path} is pointing to pickeld state of {cls}?"
         if path is not None:
-            with open(str(path), 'rb') as file:
-                data = dill.load(file)
-        else:
+            if reader is None:
+                with open(str(path), 'rb') as file:
+                    data = dill.load(file)
+            else:
+                data = reader(path)
+        else:  # no data
             data = dict()
+        # ============================= step 2: initialize the class
+        inst = cls(*args, **kwargs, **data)
         # ============================= step 3: update / populate instance attributes with data.
         inst.__setstate__(dict(data))
         # ============================= step 4: check for saved attributes.
-        if r:
+        if r:  # add further attributes to `inst`, if any.
             contents = [item.stem for item in Path(path).parent.glob("*.zip")]
             for key, _ in data.items():  # val is probably None (if init was written properly)
-                if key in contents:
-                    setattr(inst, key, Base.from_zipped_codata(path=Path(path).parent.joinpath(key + ".zip"),
-                                                                     r=True, modules=modules, **kwargs))
+                if key in contents:  # if key is not an attribute of the object, skip it.
+                    setattr(inst, key, Base.from_zipped_code_data(path=Path(path).parent.joinpath(key + ".zip"),
+                                                                  r=True, modules=modules, **kwargs))
         # =========================== Return a ready instance the way it was saved.
         return inst
 
-    def save_npy(self, path=None, **kwargs):
-        Save.npy(path, self.__dict__, **kwargs)
-        return self
-
-    def save_codata(self, path, r=False):
-        """In contrast difference to save_pickle, this method saves code and data and produce a zip file.
-        save_pikle only saves data, or the entire object (almost always not possible).
-        To recover data from this method, treat the zip files with from_zipped_code_and_class.
-        Internally, the method uses save_pickle and from_saved methods to handle pickled data."""
-        path = Path(path)
-        temp_path = Path().home().joinpath(f"tmp_results/zipping/{get_random_string()}")
-        temp_path.mkdir(parents=True, exist_ok=True)
-        self.save_code(temp_path.joinpath(f"source_code_{get_random_string()}.py"))
-        self.save_pickle(path=temp_path.joinpath("class_data"), r=r)
-        import shutil
-        result_path = shutil.make_archive(base_name=path, format="zip",
-                                          root_dir=str(temp_path), base_dir=".")
-        result_path = Path(result_path)
-        print(f"Class and data saved @ {result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
-        return result_path
-
-    def save_code(self, file_path):
-        import inspect
-        file = Path(inspect.getmodule(self).__file__)
-        class_name = self.__class__.__name__
-        source_code = file.read_text()
-        # injected_code = f"""\n\ndef get_instance(path=None, *args, **kwargs):
-        # instance = {class_name}.from_saved(path=tb.P(path), *args, **kwargs)
-        # return instance"""
-        # source_code += injected_code
-        file_path = Path(file_path)
-        file_path.write_text(data=source_code)
-        return file_path
-
-    # @classmethod
-    # def from_class_source_code_and_data(cls, source_code_path, *args, data_path=None, r=False, **kwargs):
-    #     return cls.from_source_code_and_data(source_code_path, data_path, *args, class_name=cls.__name__,
-    #                                          r=r, **kwargs)
-
-    # @classmethod
-    # def from_zipped_code_and_class(cls, path, *args, r=False, **kwargs):
-    #     return cls.from_zipped_code_and_class_auto(path, *args, class_name=cls.__name__, r=r, **kwargs)
-
     @staticmethod
-    def from_codata(source_code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
+    def from_source_code_and_pickled_state(source_code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
+        """A simple wrapper on tops of the class method `from_pickled_state`, where the class is to be loaded from
+        a source code file.
+        :param source_code_path:
+        :param data_path:
+        :param class_name: Assumed to inherit from `Base`, so it has mthod `from_pickled_state`.
+        :param r:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         import sys
         source_code_path = Path(source_code_path)
         sys.path.insert(0, str(source_code_path.parent))
@@ -311,11 +280,27 @@ class Base(object):
         # if class_name is None:
         #     instance = getattr(sourcefile, "get_instance")(data_path, *args, r=r, **kwargs)
         #     return instance
-        return getattr(sourcefile, class_name).from_saved(data_path, *args, r=r, **kwargs)
+        return getattr(sourcefile, class_name).from_pickled_state(data_path, *args, r=r, **kwargs)
+
+    def save_code(self, file_path):
+        import inspect
+        module = inspect.getmodule(self)
+        if hasattr(module, "__file__"):
+            file = Path(module.__file__)
+        else:
+            file = Path(__file__)
+        source_code = file.read_text()
+        # class_name = self.__class__.__name__
+        # injected_code = f"""\n\ndef get_instance(path=None, *args, **kwargs):
+        # instance = {class_name}.from_saved(path=tb.P(path), *args, **kwargs)
+        # return instance"""
+        # source_code += injected_code
+        fp = Path(file_path)
+        fp.write_text(data=source_code)
+        return fp if type(file_path) is str else file_path
 
     @staticmethod
-    def from_zipped_codata(path, *args, class_name=None, r=False, modules=None, **kwargs):
-        # TODO make this a class method.
+    def from_zipped_code_data(path, *args, class_name=None, r=False, modules=None, **kwargs):
         fname = Path(path).name.split(".zip")[1]
         temp_path = Path.home().joinpath(f"temp_results/unzipped/{fname}_{get_random_string()}")
         from zipfile import ZipFile
@@ -323,40 +308,54 @@ class Base(object):
             zipObj.extractall(temp_path)
         source_code_path = list(temp_path.glob("source_code*"))[0]
         data_path = list(temp_path.glob("class_data*"))[0]
-        class_name = class_name or str(data_path).split(".")[1]
-        if modules is None:  # load from source code
-            return Base.from_codata(*args, source_code_path=source_code_path,
-                                                       data_path=data_path,
-                                                       class_name=class_name, r=r, **kwargs)
-        else:
-            return modulse[class_name].from_saved(data_path, *args, r=r, modules=modules, **kwargs)
 
-    def save_pickle(self, path=None, itself=False, r=False, **kwargs):
-        """works in conjunction with from_saved.
-        :param path:
-        :param itself: determiens whether to save the __dict__ only or the entire class instance (code + data).
-        If __dict__ is only to be saved (assuming it is pure data rather than code),
-        then the class itself is required later and the `from_saved` method should be used to reload the instance again.
+        if ".dat." in str(data_path):  # loading the state and initializing the class
+            class_name = class_name or str(data_path).split(".")[1]
+            if modules is None:  # load from source code
+                return Base.from_source_code_and_pickled_state(*args, source_code_path=source_code_path,
+                                                               data_path=data_path,
+                                                               class_name=class_name, r=r, **kwargs)
+            else:  # use fresh modules passed.
+                return modules[class_name].from_saved(data_path, *args, r=r, modules=modules, **kwargs)
 
-        Alternatively, if the `itself` flag is raised, then, at load time, no reference to the class is needed as it is
-        stored already. In a word, pickling requirements must be present in mind while writing __init__ method.
+        else:  # file points to pickled object:
+            if modules:
+                import runpy
+                mods = runpy.run_path(source_code_path)
+                print(f"Warning: global scope has been contaminated by loaded modules {source_code_path}!")
+                modules.update(mods)  # Dill will no longer complain.
+            obj = dill.loads(data_path.read_bytes())
+            return obj
+
+    def save_pickle(self, path=None, itself=True, r=False, include_code=False, **kwargs):
+        """
+        :param include_code:
+        :param path: destination file.
+        :param r: recursive flag.
+        :param itself: `itself` means the object (self) will be pickled straight away. This is the default behaviour,
+        however, it requires (in case of composed objects) that every sub-object is well-behaved and has the appropriate
+        state methods implemented. The alternative to this option (itself=False) is to save __dict__ only
+         (assuming it is pure data rather than code, otherwise recusive flag must be set), then the class itself is
+          required later and the `from_saved` method should be used to reload the instance again. The disadvantage
+          of this method is that __init__ method will be used again at reconstruction time of the object before the
+          attributes are monkey-patched. It is very arduous to design __init__ method that is convenient
+          (uses plethora of
+          default arguments) and works at the same time with no input at reconstruction time.
 
         A usecase for the former is when the source code is continously changed and still you want to reload an old
         version.
 
-        Depending on complexity of the class written, it might not be possible to pickle the entire instance.
-
-        A caveat arises when design of class favours composition over inheritence. Then, even with attempting to save
-        the data itself rather than class, then it fails because __dict__ contains other classes (code) rather than data
-        i.e. the first problem with (itself = True) catches up.
-
         Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
         passwords. The best practice is to pass them again at load time.
         """
+        path = Path(str(path) + "." + self.__class__.__name__ + "." + ("dat" if include_code is False else ""))
+        # Fruthermore, .zip or .pkl will be added later depending on `itself` value.
 
-        ext = self.__class__.__name__
-        path = Path(str(path) + "." + ext)
-        if not itself:  # default, works in all cases.
+        # Choosing what to pickle:
+        if itself:
+            obj = self
+        else:  # Nuclear Option: use for classes whacky behaviours or too expensive to redesign
+            # methodology: 1- Save state, 2- save code. 3- initialize from __init__, 4- populate __dict__
             obj = self.__getstate__()
             if r:
                 obj = obj.copy()  # do not mess with original __dict__
@@ -366,16 +365,31 @@ class Base(object):
                         obj[key] = None  # this tough object is finished, the rest should be easy.
                     else:
                         pass  # leave this object as is.
-        else:  # does not work for all classes with whacky behaviours, no gaurantee.
-            obj = self
-        Save.pickle(path, obj, **kwargs)
-        return self
+
+        if include_code is True:
+            temp_path = Path().home().joinpath(f"tmp_results/zipping/{get_random_string()}")
+            temp_path.mkdir(parents=True, exist_ok=True)
+            self.save_code(temp_path.joinpath(f"source_code_{get_random_string()}.py"))
+            Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, **kwargs)
+            import shutil
+            result_path = shutil.make_archive(base_name=str(path), format="zip",
+                                              root_dir=str(temp_path), base_dir=".")
+            path = Path(result_path)
+        else:
+            Save.pickle(path, obj, r=r, **kwargs)
+
+        print(f"Class and data saved @ {path.as_uri()}, Directory: {path.parent.as_uri()}")
+        return path
 
     def save_json(self, path=None, *args, **kwargs):
         """Use case: json is good for simple dicts, e.g. settings.
         Advantage: human-readable from file explorer."""
         _ = args
         Save.json(path, self.__dict__, **kwargs)
+        return self
+
+    def save_npy(self, path=None, **kwargs):
+        Save.npy(path, self.__dict__, **kwargs)
         return self
 
     def save_mat(self, path=None, *args, **kwargs):
@@ -427,11 +441,11 @@ class Base(object):
     def print(self, typeinfo=False):
         Struct(self.__dict__).print(typeinfo=typeinfo)
 
-    def viz_heirarchy(self, depth=3, obj=None, filter=None):
+    def viz_heirarchy(self, depth=3, obj=None, filt=None):
         import objgraph
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + get_random_string() + ".png")
-        objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filter)
+        objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
         import sys
         if sys.platform == "win32":
             os.startfile(str(filename.absolute()))  # works for files and folders alike
@@ -666,29 +680,22 @@ class List(list, Base):
             self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
-
-        tqdm = 0
-        if verbose or jobs:
-            # Experimental.assert_package_installed("tqdm")  # removed for disentanglement
-            from tqdm import tqdm
-            # print(f"Applying {func} to elements in {self}")
-
+        # tqdm = 0
+        # Experimental.assert_package_installed("tqdm")  # removed for disentanglement
+        from tqdm import tqdm
         if other is None:
+            iterator = self.list if not verbose else tqdm(self.list, desc=desc)
             if jobs:
                 from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in
-                                                  tqdm(self.list, desc=desc)))
+                return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in iterator))
             else:
-                iterator = self.list if not verbose else tqdm(self.list)
                 return List([func(x, *args, **kwargs) for x in iterator])
         else:
+            iterator = zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc)
             if jobs:
                 from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in
-                                                  tqdm(zip(self.list, other), desc=desc)))
+                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
             else:
-                iterator = zip(self.list, other) if not verbose else \
-                    tqdm(zip(self.list, other), desc=desc)
                 return List([func(x, y) for x, y in iterator])
 
     def modify(self, func, lest=None):
