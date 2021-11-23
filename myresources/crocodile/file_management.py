@@ -470,7 +470,7 @@ class P(type(Path()), Path):
         """
         filename = self
         if '.zip' in str(self):
-            filename = self.unzip(op_path=self.tmp("unzipped"))
+            filename = self.unzip(op_path=self.tmp(folder="unzipped"))
             if verbose:
                 print(f"File {self} was uncompressed to {filename}")
 
@@ -707,7 +707,7 @@ class P(type(Path()), Path):
         if op_path is None:
             op_path = zipfile.parent / zipfile.stem
         else:
-            op_path = P(self.evalstr(op_path, expected="self"))
+            op_path = P(op_path)
         return Compression.unzip(zipfile, op_path, fname, **kwargs)
 
     def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):

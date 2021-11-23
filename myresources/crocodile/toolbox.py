@@ -1,7 +1,8 @@
+
 """
 A collection of classes extending the functionality of Python's builtins.
-
-email programmer@usa.com
+author: Alex Al-Saffar
+email: programmer@usa.com
 """
 
 from crocodile import core
@@ -42,10 +43,20 @@ _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, 
 
 
 def reload():
-    import importlib
-    return importlib.__import__(__file__)
+    import runpy
+    mod = runpy.run_path(__file__)
+    # globals().update(mod)
+    current_module = sys.modules[__name__]
+    current_module.__dict__.update(mod)
+
+
+def get_parser():
+    import argparse
+    parser = argparse.ArgumentParser(description="Crocodile toolbox parser")
+    parser.add_argument()
+    args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        exec(sys.argv[1])
+    # get_parser()
+    pass

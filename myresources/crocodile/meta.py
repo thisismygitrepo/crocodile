@@ -1,4 +1,3 @@
-
 import logging
 
 import dill
@@ -84,14 +83,12 @@ class Experimental:
             return otherwise
 
     @staticmethod
-    def show_globals(modules):
+    def show_globals(modules, **kwargs):
         """Returns a struct with variables that are defined in the globals passed."""
-        res = Struct(modules).spawn_from_keys(
-            Struct(modules).keys().
-                filter(lambda x: "__" not in x).
-                filter(lambda x: not x.startswith("_")).
-                filter(lambda x: x not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}))
-        res.print()
+        res = Struct(modules).spawn_from_keys(Struct(modules).keys())
+        res = res.filter(lambda x: "__" not in x).filter(lambda x: not x.startswith("_"))
+        res = res.filter(lambda x: x not in {"In", "Out", "get_ipython", "quit", "exit", "sys"})
+        res.print(**kwargs)
 
     @staticmethod
     def assert_package_installed(package):
@@ -180,7 +177,7 @@ class Experimental:
         return Experimental.capture_locals(func=func, modules=modules, args=args, self=self, update_modules=True)
 
     @staticmethod
-    def extract_code(func, args: Struct = None, code: str = None, include_args=True, modules=None,
+    def extract_code(func, code: str = None, include_args=True, modules=None,
                      verbose=True, **kwargs):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
@@ -191,18 +188,17 @@ class Experimental:
             assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
             tmp = func
             first_parenth = func.find("(")
-            last_parenth = -1
+            # last_parenth = -1
             func = eval(tmp[:first_parenth])
-            args_kwargs = tmp[first_parenth + 1: last_parenth]
+            # args_kwargs = tmp[first_parenth + 1: last_parenth]
             # what is self? only for methods:
-            tmp2 = tmp[:first_parenth]
-            idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
+            # tmp2 = tmp[:first_parenth]
+            # idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
             self = ".".join(func.split(".")[:-1])
             _ = self
             func = eval(func, modules)
 
-        # TODO: add support for lambda functions.
-
+        # TODO: add support for lambda functions.  ==> use dill for powerfull inspection
         import inspect
         import textwrap
 
@@ -493,7 +489,7 @@ class Terminal:
         print(f"Crocodile: meta: Terminal: command execution response: {resp}")
         return resp
 
-    def run_async(self, command):
+    def run_command_async(self, command):
         w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr,
                             shell=True)
         return w
@@ -506,8 +502,9 @@ class Terminal:
         header = f"""
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir}')
-        """  # header is necessary so import statements in the script passed are identified relevant to wdir.
-        script = header + "\n" + script
+"""  # header is necessary so import statements in the script passed are identified relevant to wdir.
+        script = header + script
+        script = f"""print(r'''{script}''')""" + "\n" + script
         file = P.tmp_fname(name="tmp_python_script", suffix=".py", folder="tmpfiles")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
@@ -516,8 +513,6 @@ tb.sys.path.insert(0, r'{wdir}')
         file.delete(are_you_sure=delete, verbose=False)
         # TODO: add return option (asynchronous programming)
         command = f'ipython {"-i" if interactive else ""} -c "{script}"'
-        # print("Command to be executed = ", command)
-        # self.open_console(command=command, shell=shell)
 
     def run_function(self, func):
         """Python brachnes off to a new window and execute the function passed.
@@ -534,14 +529,12 @@ func = tb.dill.unpickle({fname})
 func()
 """
         # TODO: make sure that pickling function that serialize to tmp location delete this location afterwards
+        self.run_script(script)
 
 
 class Log:
     @staticmethod
-    def get_coloredlogs(file_path=None, file=False, stream=True, name=None, format=None, sep=" | ",
-                        s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
-                        ):
-
+    def get_coloredlogs(*args, **kwargs):
         coloredlogs = Experimental.assert_package_installed("coloredlogs")
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         style = {'spam': {'color': 'green', 'faint': True},
@@ -553,31 +546,33 @@ class Log:
                  'success': {'color': 'green', 'bold': True},
                  'error': {'color': 'red', "faint": True},
                  'critical': {'color': 'red', 'bold': True, "inverse": True}}
+        _ = style
+        logger = Log.get_logger(*args, **kwargs)
         coloredlogs.install(logger=logger)
         return logger
 
     @staticmethod
-    def get_colorlog(file_path=None, file=False, stream=True, name=None, format=None, sep=" | ",
+    def get_colorlog(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
                      s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
                      ):
         # https://pypi.org/project/colorlog/
-        log_colors={'DEBUG': 'bold_cyan',
-                    'INFO': 'green',
-                    'WARNING': 'yellow',
-                    'ERROR': 'thin_red',
-                    'CRITICAL': 'bold_red,bg_white',
-                   },
+        log_colors = {'DEBUG': 'bold_cyan',
+                      'INFO': 'green',
+                      'WARNING': 'yellow',
+                      'ERROR': 'thin_red',
+                      'CRITICAL': 'bold_red,bg_white',
+                      }
+        _ = log_colors
         colorlog = Experimental.assert_package_installed("colorlog")
         if name is None: print(f"Logger name not passed. It is prefferable to pass a name indicates the owner.")
         logger = colorlog.getLogger(name=name or get_random_string())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
-        fmt = f"'%(log_color)s%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
-              f"{sep}%(message)s{sep}"
-        if default:
-            format = '%(message)s'
-        fmt = colorlog.ColoredFormatter(format or fmt)
+        fmt = fmt or f"'%(log_color)s%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s" \
+                     f"{sep}%(levelno)s{sep}%(message)s{sep}"
+        # fmt = '%(message)s'  # default
+        fmt = colorlog.ColoredFormatter(fmt)
 
         if file or file_path:  # ==> create file handler for the logger.
             Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
@@ -590,8 +585,8 @@ class Log:
         return logger
 
     @staticmethod
-    def get_logger(file_path=None, file=False, stream=True, name=None, format=None, sep=" | ",
-                   s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
+    def get_logger(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
+                   s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                    ):
         """This class is needed once a project grows beyond simple work. Simple print statements from
         dozens of objects will not be useful as the programmer will not easily recognize who (which function or object)
@@ -601,14 +596,14 @@ class Log:
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
-        fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
-              f"{sep}%(message)s{sep}"
-        if default:
-            format = '%(message)s'
-        fmt = logging.Formatter(format or fmt)
+        fmt = fmt or f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+                     f"{sep}%(message)s{sep}"
+        # format = '%(message)s'  # default format
+        fmt = logging.Formatter(fmt)
 
         if file or file_path:  # ==> create file handler for the logger.
             Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
+
         if stream:  # ==> create stream handler for the logger.
             shandler = logging.StreamHandler()
             shandler.setLevel(level=s_level)
@@ -637,13 +632,14 @@ class Log:
         logger.error("this is an error message")
         logger.critical("this is a critical message")
 
-    def config_root_logger(self):
-        logging.basicConfig(filename=None, filemode="w", level=None, format=None)
+    # def config_root_logger(self):
+    #     logging.basicConfig(filename=None, filemode="w", level=None, format=None)
 
-    def manual_degug(self):  # man
-        sys.stdout = open(self.path, 'w')  # all print statements will write to this file.
+    @staticmethod
+    def manual_degug(path):  # man
+        sys.stdout = open(path, 'w')  # all print statements will write to this file.
         sys.stdout.close()
-        print(f"Finished ... have a look @ \n {self.path}")
+        print(f"Finished ... have a look @ \n {path}")
 
 
 def accelerate(func, ip):

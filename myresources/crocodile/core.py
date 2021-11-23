@@ -101,9 +101,10 @@ def save_decorator(ext=""):
     """Apply default paths, add extension to path, print the saved file path"""
 
     def decorator(func):
-        def wrapper(path=None, obj=None, **kwargs):
+        def wrapper(path=None, obj=None, verbose=True, **kwargs):
             if path is None:
-                path = Path.home().joinpath("tmp_results").joinpath(get_time_stamp() + ext)
+                path = Path.home().joinpath("tmp_results").joinpath(get_random_string() + ext)
+                print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}")
                 # raise ValueError
             else:
                 if not str(path).endswith(ext):
@@ -113,7 +114,11 @@ def save_decorator(ext=""):
 
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path, obj, **kwargs)
-            print(f"File saved @ ", path.absolute().as_uri(), ". Directory: ", path.parent.absolute().as_uri())
+            if verbose:
+                rep = repr(obj)
+                rep = rep if len(rep) < 50 else ""
+                print(f"Object {rep} saved @ ", path.absolute().as_uri(),
+                      " |  Directory: ", path.parent.absolute().as_uri())
             return path
 
         return wrapper
@@ -282,33 +287,35 @@ class Base(object):
         #     return instance
         return getattr(sourcefile, class_name).from_pickled_state(data_path, *args, r=r, **kwargs)
 
-    def save_code(self, file_path):
+    def save_code(self, path):
         import inspect
         module = inspect.getmodule(self)
         if hasattr(module, "__file__"):
             file = Path(module.__file__)
         else:
-            file = Path(__file__)
+            file = Path(input(f"Attempted to save code from a script running in interactive session! "
+                         f"module should be imported instead. Please enter path: "))
+            # Still better, is to know which exact classes from __main__ are required to pick them up.
+            # same story at dill.loads, you only need to contaminate global scope with relevant classes to the load.
         source_code = file.read_text()
         # class_name = self.__class__.__name__
         # injected_code = f"""\n\ndef get_instance(path=None, *args, **kwargs):
         # instance = {class_name}.from_saved(path=tb.P(path), *args, **kwargs)
         # return instance"""
         # source_code += injected_code
-        fp = Path(file_path)
+        fp = Path(path)
         fp.write_text(data=source_code)
-        return fp if type(file_path) is str else file_path
+        return fp if type(path) is str else path  # path could be tb.P, better than Path
 
     @staticmethod
     def from_zipped_code_data(path, *args, class_name=None, r=False, modules=None, **kwargs):
         fname = Path(path).name.split(".zip")[1]
-        temp_path = Path.home().joinpath(f"temp_results/unzipped/{fname}_{get_random_string()}")
+        temp_path = Path.home().joinpath(f"tmp_results/unzipped/{fname}_{get_random_string()}")
         from zipfile import ZipFile
         with ZipFile(str(path), 'r') as zipObj:
             zipObj.extractall(temp_path)
         source_code_path = list(temp_path.glob("source_code*"))[0]
         data_path = list(temp_path.glob("class_data*"))[0]
-
         if ".dat." in str(data_path):  # loading the state and initializing the class
             class_name = class_name or str(data_path).split(".")[1]
             if modules is None:  # load from source code
@@ -322,13 +329,15 @@ class Base(object):
             if modules:
                 import runpy
                 mods = runpy.run_path(source_code_path)
-                print(f"Warning: global scope has been contaminated by loaded modules {source_code_path}!")
+                print(f"Warning: global scope has been contaminated by loaded modules {source_code_path} !!")
                 modules.update(mods)  # Dill will no longer complain.
             obj = dill.loads(data_path.read_bytes())
             return obj
 
     def save_pickle(self, path=None, itself=True, r=False, include_code=False, **kwargs):
-        """
+        """Tip: if object is restored while cwd is @ the same location object was created, no need for saving code or
+        even reloading it.
+
         :param include_code:
         :param path: destination file.
         :param r: recursive flag.
@@ -348,8 +357,8 @@ class Base(object):
         Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
         passwords. The best practice is to pass them again at load time.
         """
-        path = Path(str(path) + "." + self.__class__.__name__ + "." + ("dat" if include_code is False else ""))
-        # Fruthermore, .zip or .pkl will be added later depending on `itself` value.
+        save_path = Path(str(path or Path.home().joinpath(f"tmp_results/{get_random_string()}")) + "." + self.__class__.__name__ + ("" if itself else ".dat"))
+        # Fruthermore, .zip or .pkl will be added later depending on `include_code` value.
 
         # Choosing what to pickle:
         if itself:
@@ -369,17 +378,19 @@ class Base(object):
         if include_code is True:
             temp_path = Path().home().joinpath(f"tmp_results/zipping/{get_random_string()}")
             temp_path.mkdir(parents=True, exist_ok=True)
-            self.save_code(temp_path.joinpath(f"source_code_{get_random_string()}.py"))
-            Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, **kwargs)
+            self.save_code(path=temp_path.joinpath(f"source_code_{get_random_string()}.py"))
+            Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, verbose=False, **kwargs)
             import shutil
-            result_path = shutil.make_archive(base_name=str(path), format="zip",
+            result_path = shutil.make_archive(base_name=str(save_path), format="zip",
                                               root_dir=str(temp_path), base_dir=".")
-            path = Path(result_path)
+            result_path = Path(result_path)
+            print(f"Code and data for the object ({repr(obj)}) saved @ "
+                  f"{result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
         else:
-            Save.pickle(path, obj, r=r, **kwargs)
-
-        print(f"Class and data saved @ {path.as_uri()}, Directory: {path.parent.as_uri()}")
-        return path
+            result_path = Save.pickle(save_path, obj, r=r, verbose=False, **kwargs)
+            print(f"{'Data of ' if itself else ''}Object ({repr(obj)}) saved @ "
+                  f"{result_path.absolute().as_uri()}, Directory: {result_path.parent.absolute().as_uri()}")
+        return result_path
 
     def save_json(self, path=None, *args, **kwargs):
         """Use case: json is good for simple dicts, e.g. settings.
