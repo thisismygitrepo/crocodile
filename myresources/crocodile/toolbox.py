@@ -4,6 +4,8 @@ A collection of classes extending the functionality of Python's builtins.
 author: Alex Al-Saffar
 email: programmer@usa.com
 """
+import importlib
+import inspect
 
 from crocodile import core
 from crocodile.core import datetime, dt, os, string, random, np, pd, copy, dill
@@ -18,7 +20,7 @@ from crocodile import meta
 from crocodile.meta import logging
 
 
-Base, get_time_stamp, get_random_string = core.Base, core.get_time_stamp, core.get_random_string
+Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
 Struct, DisplayData, str2timedelta, Save, List = core.Struct, core.DisplayData, core.str2timedelta, core.Save, core.List
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
@@ -34,27 +36,37 @@ L = List
 tmp = P.tmp
 E = Experimental
 
-_ = Base, get_time_stamp, Save, Terminal, List, Struct, DisplayData
-_ = datetime, dt, os, np, pd, copy
+_ = Base, timestamp, Save, Terminal, List, Struct, DisplayData
+_ = datetime, dt, os, np, pd, copy, random, dill
 
-_ = P, Read, Compression, re, typing, string, sys, shutil, glob  # , Path
+_ = P, Read, Compression, re, typing, string, sys, shutil, glob, tempfile  # , Path
 _ = Experimental, Cycle, batcher, batcherv2, accelerate
 _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
+_ = logging
 
 
-def reload():
-    import runpy
-    mod = runpy.run_path(__file__)
-    # globals().update(mod)
-    current_module = sys.modules[__name__]
-    current_module.__dict__.update(mod)
+def reload(verbose=True):
+    tb = current_module = sys.modules["crocodile.toolbox"]
+    for val in tb.__dict__.values():
+        if inspect.ismodule(val):
+            importlib.reload(val)
+            if verbose: print(f"Reloading {val}")
+    # importlib.reload(tb)
+    # # import runpy
+    # # mod = runpy.run_path(__file__)
+    # # # globals().update(mod)
+    # # print(f"{__file__=},  {__name__=}")
+    # # current_module = sys.modules["crocodile.toolbox"]
+    # # current_module.__dict__.update(mod)
 
 
 def get_parser():
+    # TODO: has no purpose so far.
     import argparse
     parser = argparse.ArgumentParser(description="Crocodile toolbox parser")
     parser.add_argument()
     args = parser.parse_args()
+    return args
 
 
 if __name__ == '__main__':

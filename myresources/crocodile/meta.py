@@ -1,7 +1,7 @@
 import logging
 
 import dill
-from crocodile.core import np, os, get_time_stamp, get_random_string
+from crocodile.core import np, os, timestamp, randstr
 from crocodile.file_management import sys, P, Struct
 
 
@@ -83,9 +83,9 @@ class Experimental:
             return otherwise
 
     @staticmethod
-    def show_globals(modules, **kwargs):
+    def show_globals(scope, **kwargs):
         """Returns a struct with variables that are defined in the globals passed."""
-        res = Struct(modules).spawn_from_keys(Struct(modules).keys())
+        res = Struct(scope).spawn_from_keys(Struct(scope).keys())
         res = res.filter(lambda x: "__" not in x).filter(lambda x: not x.startswith("_"))
         res = res.filter(lambda x: x not in {"In", "Out", "get_ipython", "quit", "exit", "sys"})
         res.print(**kwargs)
@@ -140,11 +140,11 @@ class Experimental:
     def load_from_source_code(directory, obj=None, delete=False):
         """Does the following:
 
-        * modules directory passed for ``source_code`` module.
+        * scope directory passed for ``source_code`` module.
         * Loads the directory to the memroy.
         * Returns either the package or a piece of it as indicated by ``obj``
         """
-        tmpdir = P.tmp() / get_time_stamp(name="tmp_sourcecode")
+        tmpdir = P.tmp() / timestamp(name="tmp_sourcecode")
         P(directory).find("source_code*", r=True).unzip(tmpdir)
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
@@ -156,25 +156,25 @@ class Experimental:
             return sourcefile
 
     @staticmethod
-    def capture_locals(func, modules, args=None, self: str = None, update_modules=False):
+    def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
         """Captures the local variables inside a function.
         :param func:
-        :param modules: `globals()` executed in the main scope. This provides the function with modules defined in main.
+        :param scope: `globals()` executed in the main scope. This provides the function with scope defined in main.
         :param args: dict of what you would like to pass to the function as arguments.
         :param self: relevant only if the function is a method of a class. self refers to the name of the instance
-        :param update_modules: binary flag refers to whether you want the result in a struct or update main."""
+        :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
         code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
 
         print(code)
         res = Struct()
-        exec(code, modules, res.dict)  # run the function within the scope `res`
-        if update_modules:
-            modules.update(res.dict)
+        exec(code, scope, res.dict)  # run the function within the scope `res`
+        if update_scope:
+            scope.update(res.dict)
         return res
 
     @staticmethod
-    def run_globally(func, modules, args=None, self: str = None):
-        return Experimental.capture_locals(func=func, modules=modules, args=args, self=self, update_modules=True)
+    def run_globally(func, scope, args=None, self: str = None):
+        return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
 
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None,
@@ -389,7 +389,7 @@ class Manipulator:
 
     @staticmethod
     def indexer(axis, myslice, rank=None):
-        """Allows subseting an array of arbitrary shape, given which index to be subsetted and the range.
+        """Allows subseting an array of arbitrary shape, given console index to be subsetted and the range.
         Returns a tuple of slicers.
         changed in April 2021 without testing.
         """
@@ -494,10 +494,11 @@ class Terminal:
                             shell=True)
         return w
 
-    def open_console(self, command, shell=True):
-        self.subp.call(f'start {command}', shell=shell)
+    def open_console(self, command, shell=True, console=["cmd", "wt", "ps"][0]):
+        launch = {"cmd": "start", "wt": "wt.exe", "ps": "powershell"}[console]
+        self.subp.call(f'{launch} {command}', shell=shell)
 
-    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
+    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console="cmd"):
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
@@ -505,14 +506,15 @@ tb.sys.path.insert(0, r'{wdir}')
 """  # header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header + script
         script = f"""print(r'''{script}''')""" + "\n" + script
-        file = P.tmp_fname(name="tmp_python_script", suffix=".py", folder="tmpfiles")
+        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        self.open_console(f"ipython {'-i' if interactive else ''} {file}", shell=shell)
-        # python will use the same dir as the one from which this method is called.
-        file.delete(are_you_sure=delete, verbose=False)
+        self.open_console(f"ipython {'-i' if interactive else ''} {file}", shell=shell, console=console)
+        # python will use the same dir as the one from console this method is called.
+        # file.delete(are_you_sure=delete, verbose=False)
+        _ = delete
         # TODO: add return option (asynchronous programming)
-        command = f'ipython {"-i" if interactive else ""} -c "{script}"'
+        # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
     def run_function(self, func):
         """Python brachnes off to a new window and execute the function passed.
@@ -521,7 +523,7 @@ tb.sys.path.insert(0, r'{wdir}')
         # step 2: create a script that unpickles it.
         # step 3: run the script that runs the function.
         # TODO complete this
-        fname = P.tmp_fname()
+        fname = P.tmpfile()
         dill.dump(obj=func, file=fname)
         script = f"""
 import crocodile.toolbox as tb
@@ -553,7 +555,7 @@ class Log:
 
     @staticmethod
     def get_colorlog(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
-                     s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, default=False,
+                     s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                      ):
         # https://pypi.org/project/colorlog/
         log_colors = {'DEBUG': 'bold_cyan',
@@ -565,7 +567,7 @@ class Log:
         _ = log_colors
         colorlog = Experimental.assert_package_installed("colorlog")
         if name is None: print(f"Logger name not passed. It is prefferable to pass a name indicates the owner.")
-        logger = colorlog.getLogger(name=name or get_random_string())
+        logger = colorlog.getLogger(name=name or randstr())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -577,11 +579,7 @@ class Log:
         if file or file_path:  # ==> create file handler for the logger.
             Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
         if stream:  # ==> create stream handler for the logger.
-            shandler = colorlog.StreamHandler()
-            shandler.setLevel(level=s_level)
-            shandler.setFormatter(fmt=fmt)
-            logger.addHandler(shandler)
-            print(f"Logger stream handler for {logger.name} is created.")
+            Log.add_streamhandler(logger, s_level, fmt, module=colorlog)
         return logger
 
     @staticmethod
@@ -589,10 +587,11 @@ class Log:
                    s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                    ):
         """This class is needed once a project grows beyond simple work. Simple print statements from
-        dozens of objects will not be useful as the programmer will not easily recognize who (which function or object)
+        dozens of objects will not be useful as the programmer will not easily recognize who
+        (console function or object)
          is printing this message, in addition to many other concerns."""
 
-        logger = logging.getLogger(name=name or get_random_string())
+        logger = logging.getLogger(name=name or randstr())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
 
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -605,24 +604,28 @@ class Log:
             Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
 
         if stream:  # ==> create stream handler for the logger.
-            shandler = logging.StreamHandler()
-            shandler.setLevel(level=s_level)
-            shandler.setFormatter(fmt=fmt)
-            logger.addHandler(shandler)
-            print(f"Logger stream handler for {logger.name} is created.")
+            Log.add_streamhandler(logger, s_level, fmt, module=logging)
 
         return logger
 
     @staticmethod
+    def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging):
+        shandler = module.StreamHandler()
+        shandler.setLevel(level=s_level)
+        shandler.setFormatter(fmt=fmt)
+        logger.addHandler(shandler)
+        print(f"Stream handler for Logger `{logger.name}` is created.")
+
+    @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
         if file_path is None:
-            file_path = P.tmp_fname(name="logger", suffix=".log", folder="loggers")
-        print(f"Logger file handler for {logger.name} is created @ " + file_path.as_uri())
+            file_path = P.tmpfile(name="logger", suffix=".log", folder="loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)
         fhandler.set_name(name)
         logger.addHandler(fhandler)
+        print(f"File handler for Logger `{logger.name}` is created @ " + file_path.as_uri())
 
     @staticmethod
     def test_logger(logger):

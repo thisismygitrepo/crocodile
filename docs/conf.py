@@ -6,23 +6,23 @@
 
 # -- Path setup --------------------------------------------------------------
 
-# If extensions (or modules to document with autodoc) are in another directory,
+# If extensions (or scope to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../myresources/alexlib'))  # for importing modules
+sys.path.insert(0, os.path.abspath('../myresources/crocodile'))  # for importing scope
 # sys.path.insert(0, os.path.abspath('..'))  # for importing version
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'alexlib'
+project = 'crocodile'
 copyright = '2020, Alex Al-Saffar'
 author = 'Alex Al-Saffar'
 
-from alexlib import __version__
+from crocodile import __version__
 version = __version__  # simple X.Y.Z
 release = __version__  # full anem with alpha beta rc etc tags.
 

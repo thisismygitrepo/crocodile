@@ -23,7 +23,7 @@ import datetime as dt  # useful for deltatime and timezones.
 _ = dt
 
 
-def get_time_stamp(fmt=None, name=None):
+def timestamp(fmt=None, name=None):
     """isoformat is not compatible with file naming convention, this function provides compatible fmt
     tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
     if fmt is None:
@@ -51,7 +51,7 @@ def str2timedelta(past):
     return dt.timedelta(**{key: val})
 
 
-def get_random_string(length=10, pool=None):
+def randstr(length=10, pool=None):
     if pool is None:
         pool = string.ascii_letters
     result_str = ''.join(random.choice(pool) for _ in range(length))
@@ -80,7 +80,7 @@ class SaveDecorator(object):
     def __call__(self, path=None, obj=None, **kwargs):
         # Called when calling the decorated function (instance of this called).
         if path is None:
-            path = Path(tempfile.mkdtemp() + "-" + get_time_stamp() + self.ext)
+            path = Path(tempfile.mkdtemp() + "-" + timestamp() + self.ext)
             # raise ValueError
         else:
             if not str(path).endswith(self.ext):
@@ -103,8 +103,9 @@ def save_decorator(ext=""):
     def decorator(func):
         def wrapper(path=None, obj=None, verbose=True, **kwargs):
             if path is None:
-                path = Path.home().joinpath("tmp_results").joinpath(get_random_string() + ext)
-                print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}")
+                path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext)
+                print(f"tb.core: Warning: Path not passed to {func}. "
+                      f"A default path has been chosen: {path.absolute().as_uri()}")
                 # raise ValueError
             else:
                 if not str(path).endswith(ext):
@@ -227,7 +228,7 @@ class Base(object):
         (to be implemented).
         :param reader: default is dill unpikler.
         :param modules: dict of classes that are themselves attributes of the object to be loaded (will be loaded
-        in as similar fashion to this method, if `r` is set to True). If modules are not passed and `r` is True,
+        in as similar fashion to this method, if `r` is set to True). If scope are not passed and `r` is True,
         then, the classes will be assumed in [global scope, loaded from code].
 
         It is vital that __init__ method of the class is well behaved.  That is, class instance can be initialized
@@ -280,7 +281,7 @@ class Base(object):
         sourcefile = importlib.import_module(source_code_path.stem)
         # importlib.invalidate_caches()
         # sys.path.remove(str(source_code_path.parent))  # otherwise, the first one will mask the subsequents
-        # sys.modules.__delitem__("source_code")
+        # sys.scope.__delitem__("source_code")
         # removing the source_code means you can no longer save objects as their module is missing.
         # if class_name is None:
         #     instance = getattr(sourcefile, "get_instance")(data_path, *args, r=r, **kwargs)
@@ -294,7 +295,7 @@ class Base(object):
             file = Path(module.__file__)
         else:
             file = Path(input(f"Attempted to save code from a script running in interactive session! "
-                         f"module should be imported instead. Please enter path: "))
+                              f"module should be imported instead. Please enter path: "))
             # Still better, is to know which exact classes from __main__ are required to pick them up.
             # same story at dill.loads, you only need to contaminate global scope with relevant classes to the load.
         source_code = file.read_text()
@@ -310,7 +311,7 @@ class Base(object):
     @staticmethod
     def from_zipped_code_data(path, *args, class_name=None, r=False, modules=None, **kwargs):
         fname = Path(path).name.split(".zip")[1]
-        temp_path = Path.home().joinpath(f"tmp_results/unzipped/{fname}_{get_random_string()}")
+        temp_path = Path.home().joinpath(f"tmp_results/unzipped/{fname}_{randstr()}")
         from zipfile import ZipFile
         with ZipFile(str(path), 'r') as zipObj:
             zipObj.extractall(temp_path)
@@ -322,14 +323,14 @@ class Base(object):
                 return Base.from_source_code_and_pickled_state(*args, source_code_path=source_code_path,
                                                                data_path=data_path,
                                                                class_name=class_name, r=r, **kwargs)
-            else:  # use fresh modules passed.
+            else:  # use fresh scope passed.
                 return modules[class_name].from_saved(data_path, *args, r=r, modules=modules, **kwargs)
 
         else:  # file points to pickled object:
             if modules:
                 import runpy
                 mods = runpy.run_path(source_code_path)
-                print(f"Warning: global scope has been contaminated by loaded modules {source_code_path} !!")
+                print(f"Warning: global scope has been contaminated by loaded scope {source_code_path} !!")
                 modules.update(mods)  # Dill will no longer complain.
             obj = dill.loads(data_path.read_bytes())
             return obj
@@ -357,7 +358,8 @@ class Base(object):
         Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
         passwords. The best practice is to pass them again at load time.
         """
-        save_path = Path(str(path or Path.home().joinpath(f"tmp_results/{get_random_string()}")) + "." + self.__class__.__name__ + ("" if itself else ".dat"))
+        tmp = str(path or Path.home().joinpath(f"tmp_results/{randstr()}"))
+        save_path = Path(tmp + "." + self.__class__.__name__ + ("" if itself else ".dat"))
         # Fruthermore, .zip or .pkl will be added later depending on `include_code` value.
 
         # Choosing what to pickle:
@@ -376,9 +378,9 @@ class Base(object):
                         pass  # leave this object as is.
 
         if include_code is True:
-            temp_path = Path().home().joinpath(f"tmp_results/zipping/{get_random_string()}")
+            temp_path = Path().home().joinpath(f"tmp_results/zipping/{randstr()}")
             temp_path.mkdir(parents=True, exist_ok=True)
-            self.save_code(path=temp_path.joinpath(f"source_code_{get_random_string()}.py"))
+            self.save_code(path=temp_path.joinpath(f"source_code_{randstr()}.py"))
             Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, verbose=False, **kwargs)
             import shutil
             result_path = shutil.make_archive(base_name=str(save_path), format="zip",
@@ -409,18 +411,25 @@ class Base(object):
         Save.mat(path, self.__dict__, **kwargs)
         return self
 
-    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False):
+    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False,
+                       fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
         _ = check_ownership
         if remove_base_attrs:
-            pass
-            # [attrs.remove(x) for x in Base().get_attributes()]
+            [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
         # if exclude is not None:
         #     [attrs.remove(x) for x in exlcude]
+        import inspect
+        if not fields:  # logic (questionable): anything that is not a method is a field
+            attrs = list(filter(lambda x: inspect.ismethod(getattr(self, x)), attrs))
+        
+        if not methods:
+            attrs = list(filter(lambda x: not inspect.ismethod(getattr(self, x)), attrs))
+
         if return_objects:
             # attrs = attrs.apply(lambda x: getattr(self, x))
             attrs = [getattr(self, x) for x in attrs]
-        return attrs
+        return List(attrs)
 
     def __deepcopy__(self, *args, **kwargs):
         """Literally creates a new copy of values of old object, rather than referencing them.
@@ -455,7 +464,7 @@ class Base(object):
     def viz_heirarchy(self, depth=3, obj=None, filt=None):
         import objgraph
         import tempfile
-        filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + get_random_string() + ".png")
+        filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
         import sys
         if sys.platform == "win32":
@@ -618,6 +627,9 @@ class List(list, Base):
     #         if compiled.search(str(item)) is not None:
     #             return item
     # return None
+
+    def index_items(self, idx):
+        return List([item[idx] for item in self.list])
 
     def index(self, func, *args, **kwargs):
         """ A generalization of the `.index` method of `list`. It takes in a function rather than an
@@ -882,8 +894,8 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method.
             return None  # break out of the function.
         if yaml:
             # removed for disentanglement
-            # self.save_yaml(P.tmp(fn="__tmp.yaml"))
-            # txt = P.tmp(fn="__tmp.yaml").read_text()
+            # self.save_yaml(P.tmp(file="__tmp.yaml"))
+            # txt = P.tmp(file="__tmp.yaml").read_text()
             # print(txt)
             return None
         if sep is None:

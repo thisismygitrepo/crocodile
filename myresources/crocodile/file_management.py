@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, pd, np, os, List, datetime, get_time_stamp, get_random_string, Base
+from crocodile.core import Struct, pd, np, os, List, datetime, timestamp, randstr, Base
 # Typing
 import re
 import typing
@@ -97,7 +97,7 @@ class Read(object):
         return dill.loads(bytes_obj)
 
 
-class P(type(Path()), Path):
+class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
 
@@ -196,6 +196,11 @@ class P(type(Path()), Path):
         """
         return self.name.split('.')[0]
 
+    @property
+    def items(self):
+        """Behaves like `.parts` but returns a List."""
+        return List(self.parts)
+
     def __add__(self, name):
         """Behaves like adding strings"""
         return self.parent.joinpath(self.stem + name)
@@ -228,8 +233,8 @@ class P(type(Path()), Path):
             suffix = ''.join(self.suffixes)
         return self.parent.joinpath(self.stem + name + suffix)
 
-    def append_time_stamp(self, ft=None):
-        return self.append(name="-" + get_time_stamp(ft=ft))
+    def append_time_stamp(self, fmt=None):
+        return self.append(name="-" + timestamp(fmt=fmt))
 
     def absolute_from(self, reference=None):
         """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
@@ -433,7 +438,7 @@ class P(type(Path()), Path):
             dest = target_name
 
         if dest is None:
-            dest = self.append(f"_copy__{get_time_stamp()}")
+            dest = self.append(f"_copy__{timestamp()}")
 
         if self.is_file():
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
@@ -490,7 +495,7 @@ class P(type(Path()), Path):
                 return notfound
         # for other errors, we do not know how to handle them, thus, they will be raised automatically.
 
-    def explore(self):  # explore folders.
+    def start(self):  # explore folders.
         # os.startfile(os.path.realpath(self))
         filename = self.absolute().string
         if sys.platform == "win32":
@@ -649,18 +654,21 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmpdir():
-        return P.tmp(folder=get_random_string())
+        return P.tmp(folder=rf"tmpdirs/{randstr()}")
 
     @staticmethod
-    def temp(*arg, **kwargs):
+    def temp(*args, **kwargs):
         """`temp` refers to system temporary directory (deleted after restart)."""
-        return self.tmp(*args, **kwargs)
+        return P.tmp(*args, **kwargs)
 
     @staticmethod
-    def tmp(folder=None, fn=None, path="home", ex=False):
+    def tmp(folder=None, file=None, path="home", verbose=False):
         """
-        folder is created.
-        file name is not created, only appended.
+        :param folder: this param is created automatically.
+        :param file: this param is appended to path, but not created.
+        :param path:
+        :param verbose:
+        :return:
         """
         if str(path) == "home":
             path = P.home() / f"tmp_results"
@@ -668,16 +676,16 @@ class P(type(Path()), Path):
         if folder is not None:
             path = path / folder
             path.mkdir(exist_ok=True, parents=True)
-        if fn is not None:
-            path = path / fn
-        if ex:
+        if file is not None:
+            path = path / file
+        if verbose:
             print(path.as_uri())
             print(path.parent.as_uri())
         return path
 
     @staticmethod
-    def tmp_fname(name=None, suffix="", folder=None):
-        return P.tmp(fn=(name or get_random_string()) + "-" + get_time_stamp() + suffix, folder=folder)
+    def tmpfile(name=None, suffix="", folder=None):
+        return P.tmp(file=(name or randstr()) + "-" + timestamp() + suffix, folder="tmpfiles/" + folder)
 
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):

@@ -253,7 +253,7 @@
 #         return self.parent.joinpath(self.stem + name + suffix)
 #
 #     def append_time_stamp(self, ft=None):
-#         return self.append(name="-" + get_time_stamp(ft=ft))
+#         return self.append(name="-" + timestamp(ft=ft))
 #
 #     def absolute_from(self, reference=None):
 #         """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
@@ -458,7 +458,7 @@
 #             dest = target_name
 #
 #         if dest is None:
-#             dest = self.append(f"_copy__{get_time_stamp()}")
+#             dest = self.append(f"_copy__{timestamp()}")
 #
 #         if self.is_file():
 #
@@ -671,7 +671,7 @@
 #     #     self.explore()  # if it is a file, it will be opened with its default program.
 #
 #     @staticmethod
-#     def tmp(folder=None, fn=None, path="home"):
+#     def tmp(folder=None, file=None, path="home"):
 #         """
 #         folder is created.
 #         file name is not created, only appended.
@@ -682,13 +682,13 @@
 #         if folder is not None:
 #             path = path / folder
 #             path.mkdir(exist_ok=True, parents=True)
-#         if fn is not None:
-#             path = path / fn
+#         if file is not None:
+#             path = path / file
 #         return path
 #
 #     @staticmethod
 #     def tmp_fname(name=None):
-#         return P.tmp(fn=(name or P.random()) + "-" + get_time_stamp())
+#         return P.tmp(file=(name or P.random()) + "-" + timestamp())
 #
 #     # ====================================== Compression ===========================================
 #     def zip(self, op_path=None, arcname=None, **kwargs):
@@ -793,9 +793,9 @@
 #     @staticmethod
 #     def ungz(self, op_path=None):
 #         import gzip
-#         fn = str(self)
+#         file = str(self)
 #         op_path = op_path or self.parent / self.stem
-#         with gzip.open(fn, 'r') as f_in, open(op_path, 'wb') as f_out:
+#         with gzip.open(file, 'r') as f_in, open(op_path, 'wb') as f_out:
 #             shutil.copyfileobj(f_in, f_out)
 #         return P(op_path)
 #
@@ -901,7 +901,7 @@
 #     def decorator(func):
 #         def wrapper(path=None, obj=None, **kwargs):
 #             if path is None:
-#                 path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + ext
+#                 path = P.tmp(file=P.random() + "-" + timestamp()) + ext
 #             else:
 #                 if not str(path).endswith(ext):
 #                     path = P(str(path) + ext)
@@ -941,7 +941,7 @@
 #     def __call__(self, path=None, obj=None, **kwargs):
 #         # Called when calling the decorated function (instance of this called).
 #         if path is None:
-#             path = P.tmp(fn=P.random() + "-" + get_time_stamp()) + self.ext
+#             path = P.tmp(file=P.random() + "-" + timestamp()) + self.ext
 #         else:
 #             if not str(path).endswith(self.ext):
 #                 path = P(str(path) + self.ext)
@@ -1497,8 +1497,8 @@
 #
 #     def print(self, sep=None, yaml=False, typeinfo=True):
 #         if yaml:
-#             self.save_yaml(P.tmp(fn="__tmp.yaml"))
-#             txt = P.tmp(fn="__tmp.yaml").read_text()
+#             self.save_yaml(P.tmp(file="__tmp.yaml"))
+#             txt = P.tmp(file="__tmp.yaml").read_text()
 #             print(txt)
 #             return None
 #         if sep is None:
@@ -1769,7 +1769,7 @@
 #         * Loads the directory to the memroy.
 #         * Returns either the package or a piece of it as indicated by ``obj``
 #         """
-#         tmpdir = P.tmp() / get_time_stamp(name="tmp_sourcecode")
+#         tmpdir = P.tmp() / timestamp(name="tmp_sourcecode")
 #         P(directory).find("source_code*", r=True).unzip(tmpdir)
 #         sys.path.insert(0, str(tmpdir))
 #         sourcefile = __import__(tmpdir.find("*").stem)
@@ -1783,7 +1783,7 @@
 #     def capture_locals(func, globs, args=None, self: str = None, update_globs=False):
 #         """Captures the local variables inside a function.
 #         :param func:
-#         :param globs: `globals()` executed in the main scope. This provides the function with modules defined in main.
+#         :param globs: `globals()` executed in the main scope. This provides the function with scope defined in main.
 #         :param args: dict of what you would like to pass to the function as arguments.
 #         :param self: relevant only if the function is a method of a class. self refers to the name of the instance
 #         :param update_globs: binary flag refers to whether you want the result in a struct or update main."""
@@ -1904,7 +1904,7 @@
 #         setattr(class_inst.__class__, func.__name__, func)
 #
 #     @staticmethod
-#     def run_cell(pointer, module=sys.modules[__name__]):
+#     def run_cell(pointer, module=sys.scope[__name__]):
 #         # update the module by reading it again.
 #         # if type(module) is str:
 #         #     module = __import__(module)
@@ -2131,7 +2131,7 @@
 #     same = 'Grab the figure of the same name'
 #
 #
-# # def get_time_stamp(ft=None, name=None):
+# # def timestamp(ft=None, name=None):
 # #     if ft is None:  # this is better than putting the default non-None value above.
 # #         ft = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expise those kwarg
 # #         # then it has to worry about not sending None which will overwrite this defualt value.
@@ -2505,7 +2505,7 @@
 #             fig = plt.figure(num=figname, **kwargs)
 #         elif figpolicy is FigurePolicy.add_new:
 #             if exist:
-#                 new_name = get_time_stamp(name=figname) if suffix is None else figname + suffix
+#                 new_name = timestamp(name=figname) if suffix is None else figname + suffix
 #             else:
 #                 new_name = figname
 #             fig = plt.figure(num=new_name, **kwargs)
@@ -2612,7 +2612,7 @@
 #                     self.watch_figs = [plt.figure(num=afig) for afig in watch_figs]
 #
 #             save_dir = save_dir or P.tmp().string
-#             self.save_name = get_time_stamp(name=save_name)
+#             self.save_name = timestamp(name=save_name)
 #             self.save_dir = save_dir
 #             self.kwargs = kwargs
 #             self.counter = 0
@@ -2636,7 +2636,7 @@
 #                     pass
 #
 #             if names is None:  # individual save name, useful for PNG.
-#                 names = [get_time_stamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
+#                 names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
 #
 #             for afig, aname in zip(self.watch_figs, names):
 #                 self._save(afig, aname, **kwargs)

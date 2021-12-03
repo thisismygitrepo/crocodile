@@ -2,7 +2,7 @@
 import enum
 import matplotlib.pyplot as plt
 
-from crocodile.core import np, List, pd, get_time_stamp, os, Save
+from crocodile.core import np, List, pd, timestamp, os, Save
 from crocodile.file_management import P, typing
 from crocodile.meta import Cycle, Experimental
 
@@ -13,7 +13,7 @@ class FigurePolicy(enum.Enum):
     same = 'Grab the figure of the same name'
 
 
-# def get_time_stamp(ft=None, name=None):
+# def timestamp(ft=None, name=None):
 #     if ft is None:  # this is better than putting the default non-None value above.
 #         ft = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expise those kwarg
 #         # then it has to worry about not sending None which will overwrite this defualt value.
@@ -387,7 +387,7 @@ class FigureManager:
             fig = plt.figure(num=figname, **kwargs)
         elif figpolicy is FigurePolicy.add_new:
             if exist:
-                new_name = get_time_stamp(name=figname) if suffix is None else figname + suffix
+                new_name = timestamp(name=figname) if suffix is None else figname + suffix
             else:
                 new_name = figname
             fig = plt.figure(num=new_name, **kwargs)
@@ -494,7 +494,7 @@ class SaveType:
                     self.watch_figs = [plt.figure(num=afig) for afig in watch_figs]
 
             save_dir = save_dir or P.tmp().string
-            self.save_name = get_time_stamp(name=save_name)
+            self.save_name = timestamp(name=save_name)
             self.save_dir = save_dir
             self.kwargs = kwargs
             self.counter = 0
@@ -518,7 +518,7 @@ class SaveType:
                     pass
 
             if names is None:  # individual save name, useful for PNG.
-                names = [get_time_stamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
+                names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
 
             for afig, aname in zip(self.watch_figs, names):
                 self._save(afig, aname, **kwargs)
