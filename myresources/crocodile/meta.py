@@ -6,6 +6,9 @@ from crocodile.file_management import sys, P, Struct
 
 
 class Null:
+    def __init__(self):
+        pass
+
     def __repr__(self):
         return "Welcome to the labyrinth!"
 
@@ -467,8 +470,15 @@ def batcherv2(func_type='function', order=1):
 
 
 class Terminal:
-    def __init__(self, stdout=None, stderr=None, elevated=False):
+    def __init__(self, stdout=None, stderr=None, elevated=False, console=["cmd", "wt", "ps"][0]):
+        """
+        Console
+        Terminal
+        Bash
+        Shell
+        """
         import subprocess
+        self.console = {"cmd": "cmd", "wt": "wt.exe", "ps": "powershell", "wsl": "wsl", "linux": "ubuntu", "pwsh": "pwsh"}[console]
         self.subp = subprocess
         self.stdout = self.subp.DEVNULL if stdout is None else stdout
         self.stderr = self.subp.DEVNULL if stderr is None else stderr
@@ -482,7 +492,7 @@ class Terminal:
 
     def run_command(self, command):
         if self.elevated is False or self.is_admin():
-            resp = self.subp.run(["powershell", "-Command", command], capture_output=True, text=True)
+            resp = self.subp.run([self.console, "-Command" ,command], capture_output=True, text=True, shell=True)
         else:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
@@ -494,11 +504,10 @@ class Terminal:
                             shell=True)
         return w
 
-    def open_console(self, command, shell=True, console=["cmd", "wt", "ps"][0]):
-        launch = {"cmd": "start", "wt": "wt.exe", "ps": "powershell"}[console]
-        self.subp.call(f'{launch} {command}', shell=shell)
+    def open_console(self, command, shell=True):
+        self.subp.call(f'{self.console} {command}', shell=shell)
 
-    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console="cmd"):
+    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
@@ -509,7 +518,7 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        self.open_console(f"ipython {'-i' if interactive else ''} {file}", shell=shell, console=console)
+        self.open_console(f"ipython {'-i' if interactive else ''} {file}", shell=shell)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete
