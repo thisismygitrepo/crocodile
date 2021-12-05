@@ -36,6 +36,12 @@ class Read(object):
         return data
 
     @staticmethod
+    def py(path):
+        import runpy
+        my_dict = runpy.run_path(path)
+        return Struct(my_dict)
+
+    @staticmethod
     def mat(path, remove_meta=False, **kwargs):
         """
         :param remove_meta:
