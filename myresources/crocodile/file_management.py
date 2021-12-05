@@ -107,6 +107,20 @@ class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
 
+    def as_url(self):
+        string_ = self.as_posix()
+        string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
+        return string_
+
+    def download(self, directory=None):
+        import requests
+        if directory is None:
+            directory = P.home().joinpath("Downloads")
+        obj = requests.get(self.as_url())
+        directory = directory.joinpath(self.name)
+        P(directory).write_bytes(obj.content)
+        return directory
+
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
@@ -692,7 +706,8 @@ class P(type(Path()), Path, Base):
 
     @staticmethod
     def tmpfile(name=None, suffix="", folder=None):
-        return P.tmp(file=(name or randstr()) + "-" + timestamp() + suffix, folder="tmpfiles/" + folder)
+        return P.tmp(file=(name or randstr()) + "-" + timestamp() + suffix,
+                     folder="tmpfiles/" if folder is None else folder)
 
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):

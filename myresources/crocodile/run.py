@@ -27,7 +27,8 @@ def build_parser():
     # OPTIONAL KEYWORD
     parser.add_argument("--func", "-f", dest="func", help=f"function to be run after import", default="")
     # default is running as module, unless indicated by --main flag, which runs the script as main
-    parser.add_argument("--console", "-c", dest="console", help=f"function to be run after import", default="cmd")
+    parser.add_argument("--console", "-c", dest="console",
+                        help=f"function to be run after import", default="ps")
 
     # If the file is to be loaded as a module (-m), then it will be `imported` into a script, rather than being
     # executed by itself, in which case the file itself will be __main__.
@@ -54,7 +55,7 @@ from {path} import *
 """
         if args.func != "":
             script += f"tb.E.run_globally({args.func}, globals())"
-        tb.Terminal().run_script(script=script, console=args.console)
+        tb.Terminal(console=args.console).run_script(script=script)
 
 
 if __name__ == "__main__":

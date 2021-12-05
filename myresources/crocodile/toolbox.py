@@ -58,6 +58,7 @@ def reload(verbose=True):
     # # print(f"{__file__=},  {__name__=}")
     # # current_module = sys.modules["crocodile.toolbox"]
     # # current_module.__dict__.update(mod)
+    return tb
 
 
 def get_parser():
