@@ -479,10 +479,6 @@ class P(type(Path()), Path, Base):
             if verbose:
                 print(f"File {self} was uncompressed to {filename}")
 
-        if str(filename).startswith("http") or str(filename).startswith("www"):
-            import webbrowser
-            webbrowser.open(str(filename))
-            return self
         try:
             if reader is None:  # infer the reader
                 return Read.read(filename, **kwargs)
@@ -496,6 +492,11 @@ class P(type(Path()), Path, Base):
         # for other errors, we do not know how to handle them, thus, they will be raised automatically.
 
     def start(self):  # explore folders.
+        if str(filename).startswith("http") or str(filename).startswith("www"):
+            import webbrowser
+            webbrowser.open(str(filename))
+            return self
+
         # os.startfile(os.path.realpath(self))
         filename = self.absolute().string
         if sys.platform == "win32":
