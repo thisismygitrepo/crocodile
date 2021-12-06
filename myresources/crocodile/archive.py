@@ -704,7 +704,7 @@
 #             op_path = Compression.zip_file(ip_path=self, op_path=op_path, arcname=arcname, **kwargs)
 #         else:
 #             op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
-#                                                   arcname=arcname, format_='zip', **kwargs)
+#                                                   arcname=arcname, fmt='zip', **kwargs)
 #         return op_path
 #
 #     def unzip(self, op_path=None, fname=None, **kwargs):
@@ -721,9 +721,9 @@
 #             op_path = P(self.evalstr(op_path, expected="self"))
 #         return Compression.unzip(zipfile, op_path, fname, **kwargs)
 #
-#     def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):
+#     def compress(self, op_path=None, base_dir=None, fmt="zip", **kwargs):
 #         formats = ["zip", "tar", "gzip"]
-#         assert format_ in formats, f"Unsupported format {format_}. The supported formats are {formats}"
+#         assert fmt in formats, f"Unsupported format {fmt}. The supported formats are {formats}"
 #         _ = self, op_path, base_dir, kwargs
 #         pass
 #
@@ -739,7 +739,7 @@
 #         pass
 #
 #     @staticmethod
-#     def compress_folder(ip_path, op_path, arcname, format_='zip', **kwargs):
+#     def compress_folder(ip_path, op_path, arcname, fmt='zip', **kwargs):
 #         """Explanation of Shutil parameters:
 #
 #         * ``base_dir`` (here referred to as ``ip_path``) is what is going to be acturally archived.
@@ -750,10 +750,10 @@
 #             Then, say that your rootdir is where you want the archive structure to include,
 #             then mention the folder you want to actually archive relatively to that root.
 #
-#         .. note:: ``format_`` can only be one of ``zip, tar, gztar, bztar, xztar``.
+#         .. note:: ``fmt`` can only be one of ``zip, tar, gztar, bztar, xztar``.
 #         """
 #         root_dir = ip_path.split(at=arcname[0])[0]  # shutil works with folders nicely (recursion is done interally)
-#         result_path = shutil.make_archive(base_name=op_path, format=format_,
+#         result_path = shutil.make_archive(base_name=op_path, format=fmt,
 #                                           root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
 #         return P(result_path)  # same as op_path but (possibly) with format extension
 #

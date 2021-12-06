@@ -289,13 +289,13 @@ class P(type(Path()), Path, Base):
         if index is None and (at is not None):  # at is provided
 
             if mode == "lenient":
-                items = str(self).split(sep=at)
+                items = str(self).split(sep=str(at))
                 one, two = items[0], items[1]
                 one = one[:-1] if one.endswith("/") else one
                 two = two[1:] if two.startswith("/") else two
 
             else:  # "strict"
-                index = self.parts.index(at)  # raises an error if exact match is not found.
+                index = self.parts.index(str(at))  # raises an error if exact match is not found.
                 one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
 
             one, two = P(one), P(two)
@@ -411,9 +411,9 @@ class P(type(Path()), Path, Base):
             else:
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
-            if verbose: print(f"File {self} deleted.")
+            if verbose: print(f"File {self.as_uri()} deleted.")
         else:
-            if verbose: print(f"File {self} not deleted because user is not sure.")
+            if verbose: print(f"File {self.as_uri()} not deleted because user is not sure.")
 
     def send2trash(self):
         # send2trash = Experimental.assert_package_installed("send2trash")
@@ -723,7 +723,7 @@ class P(type(Path()), Path, Base):
             op_path = Compression.zip_file(ip_path=self, op_path=op_path, arcname=arcname, **kwargs)
         else:
             op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
-                                                  arcname=arcname, format_='zip', **kwargs)
+                                                  arcname=arcname, fmt='zip', **kwargs)
         return op_path
 
     def unzip(self, op_path=None, fname=None, **kwargs):
@@ -749,6 +749,40 @@ class P(type(Path()), Path, Base):
     def decompress(self):
         pass
 
+    def encrypt(self, password=None, path=None, random_bytes_key=False):
+        from cryptography.fernet import Fernet
+        import base64
+
+        if random_bytes_key is False:
+            if password is None:
+                password = randstr(length=32, punctuation=True)
+
+            key = bytes(password, encoding="utf-8")
+            key = base64.b64encode(key)
+        else:
+            key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
+            # TODO: how to return password.
+        fernet = Fernet(key)
+        data = self.read_bytes()
+        encrypted = fernet.encrypt(data)
+        if path is None:
+            path = self.append(name="_encrypted")
+        path.write_bytes(encrypted)
+        return path, password
+
+    def decrypt(self, password, path=None):
+        key = bytes(password, encoding="utf-8")
+        import base64
+        key = base64.b64encode(key)
+        from cryptography.fernet import Fernet
+        fernet = Fernet(key)
+        data = self.read_bytes()
+        encrypted = fernet.decrypt(data)
+        if path is None:
+            path = self.append(name="_decrypted")
+        path.write_bytes(encrypted)
+        return path
+
 
 class Compression(object):
     """Provides consistent behaviour across all methods ...
@@ -758,7 +792,7 @@ class Compression(object):
         pass
 
     @staticmethod
-    def compress_folder(ip_path, op_path, arcname, format_='zip', **kwargs):
+    def compress_folder(ip_path, op_path, arcname, fmt='zip', **kwargs):
         """Explanation of Shutil parameters:
 
         * ``base_dir`` (here referred to as ``ip_path``) is what is going to be acturally archived.
@@ -769,15 +803,15 @@ class Compression(object):
             Then, say that your rootdir is where you want the archive structure to include,
             then mention the folder you want to actually archive relatively to that root.
 
-        .. note:: ``format_`` can only be one of ``zip, tar, gztar, bztar, xztar``.
+        .. note:: ``fmt`` can only be one of ``zip, tar, gztar, bztar, xztar``.
         """
         root_dir = ip_path.split(at=arcname[0])[0]  # shutil works with folders nicely (recursion is done interally)
-        result_path = shutil.make_archive(base_name=op_path, format=format_,
+        result_path = shutil.make_archive(base_name=op_path, format=fmt,
                                           root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
         return P(result_path)  # same as op_path but (possibly) with format extension
 
     @staticmethod
-    def zip_file(ip_path, op_path, arcname, **kwargs):
+    def zip_file(ip_path, op_path, arcname, password=None, **kwargs):
         """
         arcname determines the directory of the file being archived inside the archive. Defaults to same
         as original directory except for drive. When changed, it should still include the file name in its end.
@@ -787,18 +821,20 @@ class Compression(object):
         if op_path.suffix != ".zip":
             op_path = op_path + f".zip"
         jungle_zip = zipfile.ZipFile(str(op_path), 'w')
+        if password is not None:
+            jungle_zip.setpassword(pwd=password)
         jungle_zip.write(filename=str(ip_path), arcname=str(arcname), compress_type=zipfile.ZIP_DEFLATED, **kwargs)
         jungle_zip.close()
         return op_path
 
     @staticmethod
-    def unzip(ip_path, op_path, fname=None, **kwargs):
+    def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
         from zipfile import ZipFile
         with ZipFile(str(ip_path), 'r') as zipObj:
             if fname is None:  # extract all:
-                zipObj.extractall(op_path, **kwargs)
+                zipObj.extractall(op_path, pwd=password, **kwargs)
             else:
-                zipObj.extract(str(fname), str(op_path), **kwargs)
+                zipObj.extract(str(fname), str(op_path), pwd=password)
                 op_path = P(op_path) / fname
         return P(op_path)
 

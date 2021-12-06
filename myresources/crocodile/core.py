@@ -448,6 +448,11 @@ class Base(object):
         return obj
 
     def evalstr(self, string_, expected='self'):
+        """This method allows other methods to parse strings that refer to the object themselves via `self`.
+        This is a next level walrus operator where you can always refer to the object on the fly visa `self`
+        string. It comes particularly handy during chaining in one-liners. There is no need to break chaining to
+        get a handle of the latest object to reference it in a subsequent method."""
+        # be wary of unintended behaciour if a string had `self` in it by coincidence.
         _ = self
         if type(string_) is str:
             if expected == 'func':
