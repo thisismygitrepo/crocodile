@@ -329,7 +329,7 @@ class Base(object):
         else:  # file points to pickled object:
             if modules:
                 import runpy
-                mods = runpy.run_path(source_code_path)
+                mods = runpy.run_path(str(source_code_path))
                 print(f"Warning: global scope has been contaminated by loaded scope {source_code_path} !!")
                 modules.update(mods)  # Dill will no longer complain.
             obj = dill.loads(data_path.read_bytes())
@@ -797,7 +797,7 @@ class List(list, Base):
         return np.array(self.list)
 
 
-class Struct(Base, dict):  # inheriting from dict gives `get` method.
+class Struct(Base):  # inheriting from dict gives `get` method.
     """Use this class to keep bits and sundry items.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     """

@@ -17,7 +17,7 @@ from crocodile import plot_management as _pm
 from crocodile.plot_management import plt, enum, FigureManager
 
 from crocodile import meta
-from crocodile.meta import logging
+from crocodile.meta import logging, subprocess
 
 
 Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
@@ -42,11 +42,11 @@ _ = datetime, dt, os, np, pd, copy, random, dill
 _ = P, Read, Compression, re, typing, string, sys, shutil, glob, tempfile  # , Path
 _ = Experimental, Cycle, batcher, batcherv2, accelerate
 _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
-_ = logging
+_ = logging, subprocess
 
 
 def reload(verbose=True):
-    tb = current_module = sys.modules["crocodile.toolbox"]
+    tb = sys.modules["crocodile.toolbox"]
     for val in tb.__dict__.values():
         if inspect.ismodule(val):
             importlib.reload(val)

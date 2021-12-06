@@ -1,6 +1,7 @@
 import logging
 
 import dill
+import subprocess
 from crocodile.core import np, os, timestamp, randstr
 from crocodile.file_management import sys, P, Struct
 
@@ -102,7 +103,6 @@ class Experimental:
         except ImportError:
             # import pip
             # pip.main(['install', package])
-            import subprocess
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
         pkg = __import__(package)
         return pkg
@@ -470,18 +470,19 @@ def batcherv2(func_type='function', order=1):
 
 
 class Terminal:
-    def __init__(self, stdout=None, stderr=None, elevated=False, console=["cmd", "wt", "ps"][0]):
+    def __init__(self, stdout=None, stderr=None, elevated=False):
         """
         Console
         Terminal
         Bash
         Shell
+        Host
+        * adding console to the begining of the command results in launching a new console that will not
+        inherent from the console python was launched from (e.g. conda enviroment), unlike when console name is ignored.
         """
-        import subprocess
-        self.console = {"cmd": "cmd", "wt": "wt.exe", "ps": "powershell", "wsl": "wsl", "linux": "ubuntu", "pwsh": "pwsh"}[console]
-        self.subp = subprocess
-        self.stdout = self.subp.DEVNULL if stdout is None else stdout
-        self.stderr = self.subp.DEVNULL if stderr is None else stderr
+        self.available_consoles = ["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
+        self.stdout = subprocess.DEVNULL if stdout is None else stdout
+        self.stderr = subprocess.DEVNULL if stderr is None else stderr
         self.elevated = elevated
         # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
 
@@ -490,22 +491,26 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run_command(self, command):
+    def run_command(self, command, console=None):
+        my_list = [console, "-Command"] if console is not None else []
+        my_list.append(command)
         if self.elevated is False or self.is_admin():
-            resp = self.subp.run([self.console, "-Command" ,command], capture_output=True, text=True, shell=True)
+            resp = subprocess.run(my_list, capture_output=True, text=True, shell=True)
         else:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         print(f"Crocodile: meta: Terminal: command execution response: {resp}")
         return resp
 
-    def run_command_async(self, command):
-        w = self.subp.Popen(["powershell", "-Command", f"{command}"], stdout=self.stdout, stderr=self.stderr,
-                            shell=True)
+    def run_command_async(self, command, console=None):
+        my_list = [console, "-Command"] if console is not None else []
+        my_list.append(command)
+        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, shell=True)
         return w
 
-    def open_console(self, command, shell=True):
-        self.subp.call(f'{self.console} {command}', shell=shell)
+    @staticmethod
+    def open_console(command, shell=True):
+        return subprocess.call(f'{command}', shell=shell)
 
     def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
         wdir = wdir or P.cwd()

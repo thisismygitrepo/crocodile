@@ -512,9 +512,9 @@ class P(type(Path()), Path, Base):
         # for other errors, we do not know how to handle them, thus, they will be raised automatically.
 
     def start(self):  # explore folders.
-        if str(filename).startswith("http") or str(filename).startswith("www"):
+        if str(self).startswith("http") or str(self).startswith("www"):
             import webbrowser
-            webbrowser.open(str(filename))
+            webbrowser.open(str(self))
             return self
 
         # os.startfile(os.path.realpath(self))
