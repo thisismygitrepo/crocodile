@@ -487,7 +487,7 @@ class Terminal:
         e.g. `start` or `conda`.
         * To launch a new window, either use
         """
-        self.available_consoles = ["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
+        self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.stdout = subprocess.DEVNULL if stdout is None else stdout
         self.stderr = subprocess.DEVNULL if stderr is None else stderr
         self.elevated = elevated
@@ -499,7 +499,7 @@ class Terminal:
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
     def run_command(self, command, console="powershell"):
-        # alternative: subprocess.run("powershell -ls; dir", capture_output=True, shell=True)
+        # alternative: res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
         if self.elevated is False or self.is_admin():
@@ -529,12 +529,13 @@ class Terminal:
         """
         # This does not inherit from the from the shell launched python.
         if new_context:
-            return subprocess.Popen(f'start {console} {command}', shell=shell,
+            return subprocess.Popen(f'{"start" if new_window else ""} {console} {command}', shell=shell,
                                     creationflags=subprocess.CREATE_NEW_CONSOLE)
         else:  # this way, the new console inherits from its current context.
-            return os.system(fr"start {console} {command} \K")  # /K remains the window, /C executes and dies (popup)
+            return os.system(fr'{"start" if new_window else ""} {console} {command} \K')
+            # /K remains the window, /C executes and dies (popup)
 
-    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console=""):
+    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console="", new_window=True):
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
@@ -545,7 +546,8 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        self.open_console(console=console, command=f"ipython {'-i' if interactive else ''} {file}", shell=shell)
+        self.open_console(console=console, command=f"ipython {'-i' if interactive else ''} {file}",
+                          shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete

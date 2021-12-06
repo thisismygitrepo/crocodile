@@ -13,7 +13,7 @@ send2trash
 clipboard
 skimage
 twine
-torch
+# torch
 pytest
 scikit-image
 pyyaml
