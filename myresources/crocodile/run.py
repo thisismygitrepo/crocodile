@@ -28,14 +28,14 @@ def build_parser():
     parser.add_argument("--func", "-f", dest="func", help=f"function to be run after import", default="")
     # default is running as module, unless indicated by --main flag, which runs the script as main
     parser.add_argument("--console", "-c", dest="console",
-                        help=f"function to be run after import", default="pwsh")
+                        help=f"function to be run after import", default="")
 
     # If the file is to be loaded as a module (-m), then it will be `imported` into a script, rather than being
     # executed by itself, in which case the file itself will be __main__.
     # The advantage of running it as a module is having reference to the file from which classes came.
     args = parser.parse_args()
     if args.main is True:
-        tb.Terminal().open_console(f"ipython -i {args.fname}")
+        tb.Terminal().open_console(command=f"ipython -i {args.fname}", console=args.console)
     else:  # run as a module (i.e. import it)
 
         path = tb.P(args.fname)
@@ -54,7 +54,7 @@ from {path} import *
 """
         if args.func != "":
             script += f"tb.E.run_globally({args.func}, globals())"
-        tb.Terminal().run_script(script=script)
+        tb.Terminal().run_script(script=script, console=args.console)
 
 
 if __name__ == "__main__":

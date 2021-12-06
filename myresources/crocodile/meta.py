@@ -479,6 +479,13 @@ class Terminal:
         Host
         * adding console to the begining of the command results in launching a new console that will not
         inherent from the console python was launched from (e.g. conda enviroment), unlike when console name is ignored.
+
+        * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
+        * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
+        * `suprocess.call` is an archaic command for pre-Python-3.5.
+        * In both `Popen` and `run`, the (shell=True) argument, implies that shell-specific commands are loaded up,
+        e.g. `start` or `conda`.
+        * To launch a new window, either use
         """
         self.available_consoles = ["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.stdout = subprocess.DEVNULL if stdout is None else stdout
@@ -491,7 +498,8 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run_command(self, command, console=None):
+    def run_command(self, command, console="powershell"):
+        # alternative: subprocess.run("powershell -ls; dir", capture_output=True, shell=True)
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
         if self.elevated is False or self.is_admin():
@@ -509,10 +517,24 @@ class Terminal:
         return w
 
     @staticmethod
-    def open_console(command, shell=True):
-        return subprocess.call(f'{command}', shell=shell)
+    def open_console(console="", command="", shell=True, new_window=True, new_context=True):
+        """
+        :param console: default is same as the launching console. `cmd` doesn't recieve command, spoiler: not easy.
+         `powershell` doesn't inherit venv. `wt` and `` works.
+        :param command:
+        :param shell:
+        :param new_window:
+        :param new_context:
+        :return:
+        """
+        # This does not inherit from the from the shell launched python.
+        if new_context:
+            return subprocess.Popen(f'start {console} {command}', shell=shell,
+                                    creationflags=subprocess.CREATE_NEW_CONSOLE)
+        else:  # this way, the new console inherits from its current context.
+            return os.system(fr"start {console} {command} \K")  # /K remains the window, /C executes and dies (popup)
 
-    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False):
+    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console=""):
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
@@ -523,7 +545,7 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        self.open_console(f"ipython {'-i' if interactive else ''} {file}", shell=shell)
+        self.open_console(console=console, command=f"ipython {'-i' if interactive else ''} {file}", shell=shell)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete
