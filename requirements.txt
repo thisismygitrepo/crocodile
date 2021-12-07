@@ -21,3 +21,5 @@ twine
 send2trash
 dill
 scikit-image
+cryptography
+requests

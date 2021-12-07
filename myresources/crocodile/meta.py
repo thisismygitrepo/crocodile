@@ -3,7 +3,7 @@ import logging
 import dill
 import subprocess
 from crocodile.core import np, os, timestamp, randstr
-from crocodile.file_management import sys, P, Struct
+from crocodile.file_management import sys, P
 
 
 class Null:
@@ -67,12 +67,12 @@ class Cycle:
 
 class DictCycle(Cycle):
     def __init__(self, strct, **kwargs):
-        strct = Struct(strct)
+        strct = dict(strct)
         super(DictCycle, self).__init__(c=strct.items(), **kwargs)
         self.keys = strct.keys()
 
     def set_key(self, key):
-        self.index = self.keys.list.index(key)
+        self.index = list(self.keys).index(key)
 
 
 class Experimental:
@@ -89,7 +89,7 @@ class Experimental:
     @staticmethod
     def show_globals(scope, **kwargs):
         """Returns a struct with variables that are defined in the globals passed."""
-        res = Struct(scope).spawn_from_keys(Struct(scope).keys())
+        res = scope.keys()
         res = res.filter(lambda x: "__" not in x).filter(lambda x: not x.startswith("_"))
         res = res.filter(lambda x: x not in {"In", "Out", "get_ipython", "quit", "exit", "sys"})
         res.print(**kwargs)
@@ -167,12 +167,11 @@ class Experimental:
         :param self: relevant only if the function is a method of a class. self refers to the name of the instance
         :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
         code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
-
         print(code)
-        res = Struct()
-        exec(code, scope, res.dict)  # run the function within the scope `res`
+        res = dict()
+        exec(code, scope, res)  # run the function within the scope `res`
         if update_scope:
-            scope.update(res.dict)
+            scope.update(res)
         return res
 
     @staticmethod
@@ -250,6 +249,7 @@ class Experimental:
             func = eval(func, modules)
 
         import inspect
+        from file_management import Struct
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default)
         ak = ak.update(kwargs)
@@ -589,8 +589,7 @@ class Log:
         return logging.BASIC_FORMAT
 
     @staticmethod
-    def get_coloredlogs(name=None, l_level=0, fmt=None, sep=" | "):
-        coloredlogs = Experimental.assert_package_installed("coloredlogs")
+    def get_coloredlogs(name=None, l_level=0, fmt=None, sep=" | ", verbose=False):
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         level_styles = {'spam': {'color': 'green', 'faint': True},
                         'debug': {'color': 'white'},
@@ -607,7 +606,15 @@ class Log:
                         'name': {'color': 'blue'},
                         'programname': {'color': 'cyan'},
                         'username': {'color': 'yellow'}}
-        logger = Log.get_base_logger(logging, name=name, l_level=l_level)
+        coloredlogs = Experimental.assert_package_installed("coloredlogs")
+        if verbose:
+            verboselogs = Experimental.assert_package_installed("verboselogs")
+            # https://github.com/xolox/python-verboselogs
+            # verboselogs.install()  # hooks into logging module.
+            logger = verboselogs.VerboseLogger(name=name)
+            logger.setLevel(l_level)
+        else:
+            logger = Log.get_base_logger(logging, name=name, l_level=l_level)
         coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET,
                             level_styles=level_styles, field_styles=field_styles,
                             fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
