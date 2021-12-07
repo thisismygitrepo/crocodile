@@ -576,6 +576,7 @@ class Log:
     """This class is needed once a project grows beyond simple work. Simple print statements from
     dozens of objects will not be useful as the programmer will not easily recognize who
      is printing this message, in addition to many other concerns."""
+
     @staticmethod
     def get_format(sep):
         fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
@@ -588,21 +589,28 @@ class Log:
         return logging.BASIC_FORMAT
 
     @staticmethod
-    def get_coloredlogs(name=None, l_level=0):
+    def get_coloredlogs(name=None, l_level=0, fmt=None, sep=" | "):
         coloredlogs = Experimental.assert_package_installed("coloredlogs")
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
-        style = {'spam': {'color': 'green', 'faint': True},
-                 'debug': {'color': 'white'},
-                 'verbose': {'color': 'blue'},
-                 'info': {'color': "green"},
-                 'notice': {'color': 'magenta'},
-                 'warning': {'color': 'yellow'},
-                 'success': {'color': 'green', 'bold': True},
-                 'error': {'color': 'red', "faint": True},
-                 'critical': {'color': 'red', 'bold': True, "inverse": True}}
-        _ = style
-        logger = Log.get_base_logger(module=logging, name=name, l_level=l_level)
-        coloredlogs.install(logger=logger, name="lol_different_name", level=5, milliseconds=True)
+        level_styles = {'spam': {'color': 'green', 'faint': True},
+                        'debug': {'color': 'white'},
+                        'verbose': {'color': 'blue'},
+                        'info': {'color': "green"},
+                        'notice': {'color': 'magenta'},
+                        'warning': {'color': 'yellow'},
+                        'success': {'color': 'green', 'bold': True},
+                        'error': {'color': 'red', "faint": True},
+                        'critical': {'color': 'red', 'bold': True, "inverse": True}}
+        field_styles = {'asctime': {'color': 'green'},
+                        'hostname': {'color': 'magenta'},
+                        'levelname': {'color': 'black', 'bold': True},
+                        'name': {'color': 'blue'},
+                        'programname': {'color': 'cyan'},
+                        'username': {'color': 'yellow'}}
+        logger = Log.get_base_logger(logging, name=name, l_level=l_level)
+        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET,
+                            level_styles=level_styles, field_styles=field_styles,
+                            fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
         return logger
 
     @staticmethod
@@ -617,10 +625,9 @@ class Log:
                           'ERROR': 'thin_red',
                           'CRITICAL': 'bold_red,bg_white',
                           }  # see here for format: https://pypi.org/project/colorlog/
-            _ = log_colors  # to be passed to the formatter of each handler.
         colorlog = Experimental.assert_package_installed("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
-        fmt = colorlog.ColoredFormatter(fmt or Log.get_format(sep))
+        fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
         return logger
 
@@ -635,7 +642,7 @@ class Log:
 
     @staticmethod
     def get_base_logger(module, name, l_level):
-        if name is None: print(f"Logger name not passed. It is prefferable to pass a name indicates the owner.")
+        if name is None: print(f"Logger name not passed. It is preferable to pass a name indicates the owner.")
         logger = module.getLogger(name=name or randstr())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
         return logger
@@ -653,7 +660,7 @@ class Log:
         shandler.setLevel(level=s_level)
         shandler.setFormatter(fmt=fmt)
         logger.addHandler(shandler)
-        print(f"Stream handler for Logger `{logger.name}` is created.")
+        print(f"Stream handler for Logger ({module})`{logger.name}` is created.")
 
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
@@ -726,4 +733,5 @@ def accelerate(func, ip):
 
 
 if __name__ == '__main__':
+    # Log.get_colorlog()
     pass
