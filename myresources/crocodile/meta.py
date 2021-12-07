@@ -1,5 +1,5 @@
-import logging
 
+import logging
 import dill
 import subprocess
 from crocodile.core import np, os, timestamp, randstr
@@ -573,8 +573,22 @@ func()
 
 
 class Log:
+    """This class is needed once a project grows beyond simple work. Simple print statements from
+    dozens of objects will not be useful as the programmer will not easily recognize who
+     is printing this message, in addition to many other concerns."""
     @staticmethod
-    def get_coloredlogs(*args, **kwargs):
+    def get_format(sep):
+        fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+              f"{sep}%(message)s{sep}"
+        # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
+        return fmt
+
+    @staticmethod
+    def get_basic_format():
+        return logging.BASIC_FORMAT
+
+    @staticmethod
+    def get_coloredlogs(name=None, l_level=0):
         coloredlogs = Experimental.assert_package_installed("coloredlogs")
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         style = {'spam': {'color': 'green', 'faint': True},
@@ -587,64 +601,51 @@ class Log:
                  'error': {'color': 'red', "faint": True},
                  'critical': {'color': 'red', 'bold': True, "inverse": True}}
         _ = style
-        logger = Log.get_logger(*args, **kwargs)
-        coloredlogs.install(logger=logger)
+        logger = Log.get_base_logger(module=logging, name=name, l_level=l_level)
+        coloredlogs.install(logger=logger, name="lol_different_name", level=5, milliseconds=True)
         return logger
 
     @staticmethod
     def get_colorlog(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
                      s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
+                     log_colors=None,
                      ):
-        # https://pypi.org/project/colorlog/
-        log_colors = {'DEBUG': 'bold_cyan',
-                      'INFO': 'green',
-                      'WARNING': 'yellow',
-                      'ERROR': 'thin_red',
-                      'CRITICAL': 'bold_red,bg_white',
-                      }
-        _ = log_colors
+        if log_colors is None:
+            log_colors = {'DEBUG': 'bold_cyan',
+                          'INFO': 'green',
+                          'WARNING': 'yellow',
+                          'ERROR': 'thin_red',
+                          'CRITICAL': 'bold_red,bg_white',
+                          }  # see here for format: https://pypi.org/project/colorlog/
+            _ = log_colors  # to be passed to the formatter of each handler.
         colorlog = Experimental.assert_package_installed("colorlog")
-        if name is None: print(f"Logger name not passed. It is prefferable to pass a name indicates the owner.")
-        logger = colorlog.getLogger(name=name or randstr())
-        logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
-
-        # https://docs.python.org/3/library/logging.html#logrecord-attributes
-        fmt = fmt or f"'%(log_color)s%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s" \
-                     f"{sep}%(levelno)s{sep}%(message)s{sep}"
-        # fmt = '%(message)s'  # default
-        fmt = colorlog.ColoredFormatter(fmt)
-
-        if file or file_path:  # ==> create file handler for the logger.
-            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
-        if stream:  # ==> create stream handler for the logger.
-            Log.add_streamhandler(logger, s_level, fmt, module=colorlog)
+        logger = Log.get_base_logger(colorlog, name, l_level)
+        fmt = colorlog.ColoredFormatter(fmt or Log.get_format(sep))
+        Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
         return logger
 
     @staticmethod
     def get_logger(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
-                   s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
-                   ):
-        """This class is needed once a project grows beyond simple work. Simple print statements from
-        dozens of objects will not be useful as the programmer will not easily recognize who
-        (console function or object)
-         is printing this message, in addition to many other concerns."""
+                   s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
+        """Basic Python logger."""
+        logger = Log.get_base_logger(logging, name, l_level)
+        fmt = logging.Formatter(fmt or Log.get_format(sep))
+        Log.add_handlers(logger, logging, file, f_level, file_path, fmt, stream, s_level)
+        return logger
 
-        logger = logging.getLogger(name=name or randstr())
+    @staticmethod
+    def get_base_logger(module, name, l_level):
+        if name is None: print(f"Logger name not passed. It is prefferable to pass a name indicates the owner.")
+        logger = module.getLogger(name=name or randstr())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+        return logger
 
-        # https://docs.python.org/3/library/logging.html#logrecord-attributes
-        fmt = fmt or f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
-                     f"{sep}%(message)s{sep}"
-        # format = '%(message)s'  # default format
-        fmt = logging.Formatter(fmt)
-
+    @staticmethod
+    def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
         if file or file_path:  # ==> create file handler for the logger.
             Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
-
         if stream:  # ==> create stream handler for the logger.
-            Log.add_streamhandler(logger, s_level, fmt, module=logging)
-
-        return logger
+            Log.add_streamhandler(logger, s_level, fmt, module=module)
 
     @staticmethod
     def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging):
@@ -672,6 +673,14 @@ class Log:
         logger.warning("this is a warning message")
         logger.error("this is an error message")
         logger.critical("this is a critical message")
+        for level in range(0, 60, 5):
+            logger.log(msg=f"This is a message of level {level}", level=level)
+
+    @staticmethod
+    def test_all():
+        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]:
+            Log.test_logger(logger)
+            print("=" * 100)
 
     # def config_root_logger(self):
     #     logging.basicConfig(filename=None, filemode="w", level=None, format=None)

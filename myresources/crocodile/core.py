@@ -51,9 +51,9 @@ def str2timedelta(past):
     return dt.timedelta(**{key: val})
 
 
-def randstr(length=10, lowercase=True, uppercase=True, digits=True, punctuation=False):
-    pool = "" + (string.ascii_lowercase if lowercase else "")
-    pool = pool + (string.ascii_uppercase if uppercase else "")
+def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False):
+    pool = "" + (string.ascii_lowercase if lower else "")
+    pool = pool + (string.ascii_uppercase if upper else "")
     pool = pool + (string.digits if digits else "")
     pool = pool + (string.punctuation if punctuation else "")
     result_str = ''.join(random.choice(pool) for _ in range(length))
