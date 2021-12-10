@@ -408,6 +408,9 @@ class P(type(Path()), Path, Base):
     # ==================================== File management =========================================
     def delete(self, are_you_sure=False, verbose=True):
         if are_you_sure:
+            if not self.exists():
+                if verbose: print(f"File does not exist. No deletion perfored.")
+                return None  # terminate the function.
             if self.is_file(): self.unlink()  # missing_ok=True added in 3.8
             else:
                 shutil.rmtree(self, ignore_errors=True)
@@ -422,9 +425,11 @@ class P(type(Path()), Path, Base):
         import send2trash
         send2trash.send2trash(self.string)
 
-    def move(self, new_path):
+    def move(self, new_path, replace=False):
         new_path = P(new_path)
         temp = self.absolute()
+        if replace:
+            (new_path.absolute() / temp.name).delete(are_you_sure=True, verbose=False)
         temp.rename(new_path.absolute() / temp.name)
         return new_path
 
@@ -751,6 +756,9 @@ class P(type(Path()), Path, Base):
         pass
 
     def encrypt(self, password=None, path=None, random_bytes_key=False):
+        """
+        * Be careful of password being stored unintendedly in IPython history.
+        """
         from cryptography.fernet import Fernet
         import base64
 
