@@ -119,6 +119,7 @@ class P(type(Path()), Path, Base):
         obj = requests.get(self.as_url())
         directory = directory.joinpath(self.name)
         P(directory).write_bytes(obj.content)
+        # try: urllib.urlopen(url).read()
         return directory
 
     # %% ===================================== File Specs =============================================================
@@ -705,9 +706,9 @@ class P(type(Path()), Path, Base):
         return path
 
     @staticmethod
-    def tmpfile(name=None, suffix="", folder=None):
-        return P.tmp(file=(name or randstr()) + "-" + timestamp() + suffix,
-                     folder="tmpfiles/" if folder is None else folder)
+    def tmpfile(name=None, suffix="", folder=None, tstamp=True):
+        return P.tmp(file=(name or randstr()) + "-" + (timestamp() if tstamp else "") + suffix,
+                     folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================
     def zip(self, op_path=None, arcname=None, **kwargs):

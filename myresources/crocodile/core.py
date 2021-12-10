@@ -103,7 +103,7 @@ def save_decorator(ext=""):
     """Apply default paths, add extension to path, print the saved file path"""
 
     def decorator(func):
-        def wrapper(path=None, obj=None, verbose=True, **kwargs):
+        def wrapper(obj, path=None, verbose=True, **kwargs):
             if path is None:
                 path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext)
                 print(f"tb.core: Warning: Path not passed to {func}. "
@@ -116,7 +116,7 @@ def save_decorator(ext=""):
                     path = Path(path)
 
             path.parent.mkdir(exist_ok=True, parents=True)
-            func(path, obj, **kwargs)
+            func(path=path, obj=obj, **kwargs)
             if verbose:
                 rep = repr(obj)
                 rep = rep if len(rep) < 50 else ""
@@ -132,18 +132,18 @@ def save_decorator(ext=""):
 class Save:
     @staticmethod
     @save_decorator(".csv")
-    def csv(path=None, obj=None):
+    def csv(obj, path=None):
         # obj.to_frame('dtypes').reset_index().to_csv(P(path).append(".dtypes").string)
         obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
 
     @staticmethod
     @save_decorator(".npy")
-    def npy(path, obj, **kwargs):
+    def npy(obj, path, **kwargs):
         np.save(path, obj, **kwargs)
 
     @staticmethod
     @save_decorator(".mat")
-    def mat(path=None, mdict=None, **kwargs):
+    def mat(mdict, path=None, **kwargs):
         """
         .. note::
             Avoid using mat for saving results because of incompatiblity:
@@ -162,7 +162,7 @@ class Save:
 
     @staticmethod
     @save_decorator(".json")
-    def json(path=None, obj=None, **kwargs):
+    def json(obj, path=None, **kwargs):
         """This format is **compatible** with simple dictionaries that hold strings or numbers
          but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary. It is useful because it can be
@@ -174,21 +174,21 @@ class Save:
 
     @staticmethod
     @save_decorator
-    def yaml(path, obj, **kwargs):
+    def yaml(obj, path, **kwargs):
         import yaml
         with open(str(path), "w") as file:
             yaml.dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
-    def vanilla_pickle(path, obj, **kwargs):
+    def vanilla_pickle(obj, path, **kwargs):
         import pickle
         with open(str(path), 'wb') as file:
             pickle.dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
-    def pickle(path=None, obj=None, r=False, **kwargs):
+    def pickle(obj=None, path=None, r=False, **kwargs):
         """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are
         loaded up and it happens implicitly. It often fails at load time and requires same packages to be reloaded first
         . Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to
@@ -338,26 +338,26 @@ class Base(object):
             return obj
 
     def save_pickle(self, path=None, itself=True, r=False, include_code=False, **kwargs):
-        """Tip: if object is restored while cwd is @ the same location object was created, no need for saving code or
-        even reloading it.
+        """Almost always, you want to use this method.
 
-        :param include_code:
         :param path: destination file.
-        :param r: recursive flag.
         :param itself: `itself` means the object (self) will be pickled straight away. This is the default behaviour,
         however, it requires (in case of composed objects) that every sub-object is well-behaved and has the appropriate
         state methods implemented. The alternative to this option (itself=False) is to save __dict__ only
          (assuming it is pure data rather than code, otherwise recusive flag must be set), then the class itself is
-          required later and the `from_saved` method should be used to reload the instance again. The disadvantage
-          of this method is that __init__ method will be used again at reconstruction time of the object before the
-          attributes are monkey-patched. It is very arduous to design __init__ method that is convenient
-          (uses plethora of
+          required later and the `from_pickled_state` method should be used to reload the instance again.
+          The disadvantage of this method is that __init__ method will be used again at reconstruction time
+           of the object before the attributes are monkey-patched.
+           It is very arduous to design __init__ method that is convenient (uses plethora of
           default arguments) and works at the same time with no input at reconstruction time.
+        :param include_code: a usecase for including code in the save is when the source code is continously
+         changing and still you want to reload an old version.
+        :param r: recursive flag.
 
-        A usecase for the former is when the source code is continously changed and still you want to reload an old
-        version.
-
-        Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
+        * Dill package manages to resconstruct the object by loading up all the appropriate libraries again
+        IF the object is restored while directory is @ the same location object was created, thus,
+        no need for saving code or even reloading it.
+        * Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
         passwords. The best practice is to pass them again at load time.
         """
         tmp = str(path or Path.home().joinpath(f"tmp_results/{randstr()}"))
@@ -391,8 +391,8 @@ class Base(object):
             print(f"Code and data for the object ({repr(obj)}) saved @ "
                   f"{result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
         else:
-            result_path = Save.pickle(save_path, obj, r=r, verbose=False, **kwargs)
-            print(f"{'Data of ' if itself else ''}Object ({repr(obj)}) saved @ "
+            result_path = Save.pickle(obj=obj, path=save_path, r=r, verbose=False, **kwargs)
+            print(f"{'Data of' if itself else ''} Object ({repr(obj)}) saved @ "
                   f"{result_path.absolute().as_uri()}, Directory: {result_path.parent.absolute().as_uri()}")
         return result_path
 
@@ -400,17 +400,17 @@ class Base(object):
         """Use case: json is good for simple dicts, e.g. settings.
         Advantage: human-readable from file explorer."""
         _ = args
-        Save.json(path, self.__dict__, **kwargs)
+        Save.json(path=path, obj=self.__dict__, **kwargs)
         return self
 
     def save_npy(self, path=None, **kwargs):
-        Save.npy(path, self.__dict__, **kwargs)
+        Save.npy(path=path, obj=self.__dict__, **kwargs)
         return self
 
     def save_mat(self, path=None, *args, **kwargs):
         """for Matlab compatibility."""
         _ = args
-        Save.mat(path, self.__dict__, **kwargs)
+        Save.mat(path=path, obj=self.__dict__, **kwargs)
         return self
 
     def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False,
@@ -638,9 +638,10 @@ class List(list, Base):
     def index_items(self, idx):
         return List([item[idx] for item in self.list])
 
-    def index(self, func, *args, **kwargs):
+    def index(self, func, *args, **kwargs) -> list:
         """ A generalization of the `.index` method of `list`. It takes in a function rather than an
          item to find its index. Additionally, it returns full list of results, not just the first result.
+        If you wanted the original index method, refer to .list attribute to use it.
 
         :param func:
         :return: List of indices of items where the function returns `True`.
@@ -1075,6 +1076,11 @@ class DisplayData:
         pd.set_option('display.max_columns', columns)  # to avoid replacing them with ...
         pd.set_option('display.width', width)  # to avoid wrapping the table.
         pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
+
+    @staticmethod
+    def set_pandas_fixed_width():
+        """For fixed width host windows, this is recommended to avoid chaos due to line-wrapping."""
+        pd.options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
 
     @staticmethod
     def eng():

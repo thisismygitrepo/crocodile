@@ -24,6 +24,8 @@ def build_parser():
     # A FLAG:
     parser.add_argument("--main", help="Flag tells to run the file as main.", action="store_true")  # default is False
     parser.add_argument("--here", help="Flag for running in this window.", action="store_false")  # default is True
+    parser.add_argument("-i", "--interactive",
+                        help="Flag to indicate launching IPython.", action="store_false")  # default is True
 
     # OPTIONAL KEYWORD
     parser.add_argument("--func", "-f", dest="func", help=f"function to be run after import", default="")
@@ -54,7 +56,8 @@ from {path} import *
 """
         if args.func != "":
             script += f"tb.E.run_globally({args.func}, globals())"
-        tb.Terminal().run_script(script=script, console=args.console, new_window=args.here)
+        tb.Terminal().run_script(script=script, console=args.console, new_window=args.here,
+                                 interactive=args.interactive)
 
 
 if __name__ == "__main__":

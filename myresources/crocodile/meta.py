@@ -536,6 +536,9 @@ class Terminal:
             # /K remains the window, /C executes and dies (popup)
 
     def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console="", new_window=True):
+        """
+        * Regular Python is much lighter than IPython. Consider using it while not debugging.
+        """
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
@@ -572,10 +575,78 @@ func()
         self.run_script(script)
 
 
-class Log:
+class Log(object):
     """This class is needed once a project grows beyond simple work. Simple print statements from
     dozens of objects will not be useful as the programmer will not easily recognize who
-     is printing this message, in addition to many other concerns."""
+     is printing this message, in addition to many other concerns.
+
+     Advantages of using instances of this class: You do not need to worry about object pickling process by modifing
+     the __getstate__ method of the class that will own the logger. This is the case because loggers lose access
+     to the file logger when unpickled, so it is better to instantiate them again.
+     Logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
+     Additionally, this class keeps track of log files used, append to them if they still exist.
+
+     Implementation detail: the design favours composition over inheritence. To counter the inconvenience
+      of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
+
+    def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
+                 name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
+                 s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
+                 verbose=False, log_colors=None):
+        # save speces that are essential to re-create the object at
+        self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep,
+                          s_level=s_level, f_level=f_level, l_level=l_level)
+        self.dialect = dialect  # specific to this class
+        self.verbose = verbose  # specific to coloredlogs dialect
+        self.log_colors = log_colors  # specific kwarg to colorlog dialect
+        if file is False and stream is False:
+            self.logger = Null()
+        else:
+            self.logger = None  # to be populated by `_install`
+            self._install()
+            # update specs.
+            self.specs["name"] = self.logger.name
+            if file:  # first handler is a file handler
+                self.specs["file_path"] = self.logger.handlers[0].baseFilename
+
+    def __getattr__(self, item):  # makes it twice as slower as direct access 300 ns vs 600 ns
+        return getattr(self.logger, item)
+
+    def debug(self, msg):
+        return self.logger.debug(msg)
+
+    def warn(self, msg):
+        return self.logger.warn(msg)
+
+    def info(self, msg):
+        return self.logger.info(msg)
+
+    def critical(self, msg):
+        return self.logger.critical(msg)
+
+    def _install(self):  # populates self.logger attribute according to specs and dielect.
+        if self.dialect == "colorlog":
+            self.specs["log_colors"] = self.log_colors
+            self.logger = Log.get_colorlog(**self.specs)
+        elif self.dialect == "logging":
+            self.logger = Log.get_logger(**self.specs)
+        elif self.dialect == "coloredlogs":
+            self.specs["verbose"] = self.verbose
+            self.logger = Log.get_coloredlogs(**self.specs)
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        print(state)
+        self._install()
+
+    def __getstate__(self):
+        # logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
+        state = self.__dict__.copy()
+        del state["logger"]
+        return state
+
+    def __repr__(self):
+        return fr"{self.logger} with handlers: \n {self.logger.handlers}"
 
     @staticmethod
     def get_format(sep):
@@ -589,7 +660,9 @@ class Log:
         return logging.BASIC_FORMAT
 
     @staticmethod
-    def get_coloredlogs(name=None, l_level=0, fmt=None, sep=" | ", verbose=False):
+    def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
+                        s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
+                        verbose=False):
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         level_styles = {'spam': {'color': 'green', 'faint': True},
                         'debug': {'color': 'white'},
@@ -615,13 +688,16 @@ class Log:
             logger.setLevel(l_level)
         else:
             logger = Log.get_base_logger(logging, name=name, l_level=l_level)
+            # new step, not tested:
+            Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path,
+                             fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)
         coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET,
                             level_styles=level_styles, field_styles=field_styles,
                             fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
         return logger
 
     @staticmethod
-    def get_colorlog(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
+    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
                      s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                      log_colors=None,
                      ):
@@ -630,7 +706,7 @@ class Log:
                           'INFO': 'green',
                           'WARNING': 'yellow',
                           'ERROR': 'thin_red',
-                          'CRITICAL': 'bold_red,bg_white',
+                          'CRITICAL': 'bold_red,bg_blue',
                           }  # see here for format: https://pypi.org/project/colorlog/
         colorlog = Experimental.assert_package_installed("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
@@ -639,7 +715,7 @@ class Log:
         return logger
 
     @staticmethod
-    def get_logger(file_path=None, file=False, stream=True, name=None, fmt=None, sep=" | ",
+    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
                    s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
         """Basic Python logger."""
         logger = Log.get_base_logger(logging, name, l_level)
@@ -649,7 +725,10 @@ class Log:
 
     @staticmethod
     def get_base_logger(module, name, l_level):
-        if name is None: print(f"Logger name not passed. It is preferable to pass a name indicates the owner.")
+        if name is None:
+            print(f"Logger name not passed. It is preferable to pass a name indicates the owner.")
+        else:
+            print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
         logger = module.getLogger(name=name or randstr())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
         return logger
@@ -667,7 +746,7 @@ class Log:
         shandler.setLevel(level=s_level)
         shandler.setFormatter(fmt=fmt)
         logger.addHandler(shandler)
-        print(f"Stream handler for Logger ({module})`{logger.name}` is created.")
+        print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
 
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
@@ -678,7 +757,7 @@ class Log:
         fhandler.setLevel(level=f_level)
         fhandler.set_name(name)
         logger.addHandler(fhandler)
-        print(f"File handler for Logger `{logger.name}` is created @ " + file_path.as_uri())
+        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).as_uri())
 
     @staticmethod
     def test_logger(logger):
