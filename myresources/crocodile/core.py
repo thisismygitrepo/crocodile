@@ -1078,7 +1078,7 @@ class DisplayData:
         pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
 
     @staticmethod
-    def set_pandas_fixed_width():
+    def set_pandas_auto_width():
         """For fixed width host windows, this is recommended to avoid chaos due to line-wrapping."""
         pd.options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
 

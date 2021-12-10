@@ -25,7 +25,7 @@ This package extends many native Python classes to equip you with an uneasy-to-t
      ```
      This and much more, is only on top of the indespensible `pathlib.Path` functionalities.
         
-   * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensible support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and loading in one line.
+   * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensive support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and loading in one line.
 
    
 Furthermore, those classes are inextricably connected. For example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.

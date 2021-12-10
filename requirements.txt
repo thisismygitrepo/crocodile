@@ -2,24 +2,26 @@
 numpy
 scipy
 pandas
-h5py
 matplotlib
-cycler
+
+h5py
 joblib
 pip
-tqdm
 setuptools
+twine
+pytest
+
+cycler
+tqdm
 send2trash
 clipboard
-skimage
-twine
-# torch
-pytest
+
 scikit-image
 pyyaml
-twine
 send2trash
 dill
-scikit-image
 cryptography
 requests
+
+# torch
+# tensorflow

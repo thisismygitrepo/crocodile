@@ -136,7 +136,7 @@ class P(type(Path()), Path, Base):
                 if item.is_file():
                     total_size += item.stat().st_size
         else:
-            raise TypeError("This thing is not a file nor a folder.")
+            raise FileNotFoundError(self.as_uri())
         return round(total_size / factor, 1)
 
     def time(self, which="m", **kwargs):
@@ -152,7 +152,7 @@ class P(type(Path()), Path, Base):
         time = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
         return datetime.fromtimestamp(time, **kwargs)
 
-    def stats(self, printit=True):
+    def stats(self):
         """A variant of `stat` method that returns a structure with human-readable values."""
         res = Struct(size=self.size(),
                      content_mod_time=self.time(which="m"),
@@ -160,8 +160,6 @@ class P(type(Path()), Path, Base):
                      last_access_time=self.time(which="a"),
                      group_id_owner=self.stat().st_gid,
                      user_id_owner=self.stat().st_uid)
-        if printit:
-            res.print()
         return res
 
     def tree(self, level: int = -1, limit_to_directories: bool = False,
@@ -425,12 +423,12 @@ class P(type(Path()), Path, Base):
         import send2trash
         send2trash.send2trash(self.string)
 
-    def move(self, new_path, replace=False):
-        new_path = P(new_path)
+    def move(self, new_path, replace=False, verbose=True):
         temp = self.absolute()
-        if replace:
-            (new_path.absolute() / temp.name).delete(are_you_sure=True, verbose=False)
-        temp.rename(new_path.absolute() / temp.name)
+        new_path = P(new_path).absolute() / temp.name
+        if replace: new_path.delete(are_you_sure=True, verbose=False)
+        temp.rename(new_path)
+        if verbose: print(f"{self.as_uri()} MOVED TO {new_path.as_uri()}")
         return new_path
 
     def renameit(self, new_file_name):

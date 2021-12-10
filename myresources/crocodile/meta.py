@@ -101,8 +101,6 @@ class Experimental:
             pkg = __import__(package)
             return pkg
         except ImportError:
-            # import pip
-            # pip.main(['install', package])
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
         pkg = __import__(package)
         return pkg
@@ -636,7 +634,6 @@ class Log(object):
 
     def __setstate__(self, state):
         self.__dict__ = state
-        print(state)
         self._install()
 
     def __getstate__(self):
