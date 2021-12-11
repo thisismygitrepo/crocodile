@@ -39,7 +39,7 @@ def timestamp(fmt=None, name=None):
 def str2timedelta(past):
     """Converts a human readable string like '1m' or '1d' to a timedate object.
     In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
-    sc = {"m": "minutes", "h": "hours", "d": "days", "w": "weeks",
+    sc = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks",
           "M": "months", "y": "years"}
     key, val = sc[past[-1]], eval(past[:-1])
     if key == "months":
@@ -112,6 +112,7 @@ def save_decorator(ext=""):
             else:
                 if not str(path).endswith(ext):
                     path = Path(str(path) + ext)
+                    print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}")
                 else:
                     path = Path(path)
 
@@ -119,7 +120,7 @@ def save_decorator(ext=""):
             func(path=path, obj=obj, **kwargs)
             if verbose:
                 rep = repr(obj)
-                rep = rep if len(rep) < 50 else ""
+                rep = rep if len(rep) < 50 else rep[:10] + "... "
                 print(f"Object {rep} saved @ ", path.absolute().as_uri(),
                       " |  Directory: ", path.parent.absolute().as_uri())
             return path
@@ -362,7 +363,7 @@ class Base(object):
         """
         tmp = str(path or Path.home().joinpath(f"tmp_results/{randstr()}"))
         save_path = Path(tmp + "." + self.__class__.__name__ + ("" if itself else ".dat"))
-        # Fruthermore, .zip or .pkl will be added later depending on `include_code` value.
+        # Fruthermore, .zip or .pkl will be added later depending on `include_code` value, warning will be raised.
 
         # Choosing what to pickle:
         if itself:
@@ -809,7 +810,6 @@ class Struct(Base):  # inheriting from dict gives `get` method.
     """Use this class to keep bits and sundry items.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     """
-
     def __len__(self):
         return len(self.keys())
 

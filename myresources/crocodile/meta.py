@@ -547,7 +547,7 @@ class Terminal:
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
-sys.path.insert(0, r'{wdir}')
+tb.sys.path.insert(0, r'{wdir}')
 """  # header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header + script
         script = f"""print(r'''{script}''')""" + "\n" + script

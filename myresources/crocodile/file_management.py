@@ -122,13 +122,9 @@ class P(type(Path()), Path, Base):
         # try: urllib.urlopen(url).read()
         return directory
 
-    def read_refresh(self, refresh_func, expire="1w", save=Save.pickle, read=Read.read, fresh=False):
-        path = self
-        if fresh or not path.exists() or path.stats().content_mod_time < (pd.Timestamp.now() - str2timedelta(expire)):
-            print(f"Saving / Updating {path} ...")
-            dat = refresh_func()
-            save(obj=dat, path=path)
-        return read(path)
+    def read_refresh(self, refresh, expire="1w", save=Save.pickle, read=Read.read):
+        return Fridge(refresh=refresh, path=self, expire=expire, save=save, read=read)
+
 
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
@@ -903,29 +899,50 @@ class MemoryDB:
 
 
 class Fridge:
-    """Like `read_refresh` from Path, this is the memory-based variant to that disk-based function.
-    This is to accelrate access to latest data coming from a rather expensive function,
-    Thus, if multiple methods from superior classses requested this within 0.1 seconds,
-    there will be no problem of API being a bottleneck reducing running time to few seconds.
     """
-    def __init__(self, fresh_func, expire="1m", logger=None):
+    This class helps to accelrate access to latest data coming from a rather expensive function,
+    Thus, if multiple methods from superior classses requested this within 0.1 seconds,
+    there will be no problem of API being a bottleneck reducing running time to few seconds
+    The class has two flavours, memory-based and disk-based variants.
+    """
+    def __init__(self, refresh, expire="1m", logger=None, path=None, save=Save.pickle, read=Read.read):
         self.cache = None
         self.time = None
         self.expire = expire
-        self.fresh_func = fresh_func
+        self.refresh = refresh
         self.logger = logger
+        self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
+        self.save = save
+        self.read = read
+
+    @property
+    def age(self):
+        if self.path is None:
+            return pd.Timestamp.now() - self.time
+        else:
+            return pd.Timestamp.now() - self.path.stats().content_mod_time
 
     def __call__(self, fresh=False):
-        lag = (pd.Timestamp.now() - self.time)
-        if self.cache is None or fresh is True or lag > str2timedelta(self.expire):
-            self.cache = self.fresh_func()
-            self.time = pd.Timestamp.now()
-            if self.logger:
-                self.logger.debug(f"Updating / Saving data from {self.fresh_func}")
-        else:
-            if self.logger:
-                self.logger.debug(f"Using cached values. Lag = {lag}.")
-        return self.cache
+        if self.path is None:  # Memory Fridge
+            if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
+                self.cache = self.refresh()
+                self.time = pd.Timestamp.now()
+                if self.logger: self.logger.debug(f"Updating / Saving data from {self.fresh_func}")
+            else:
+                if self.logger: self.logger.debug(f"Using cached values. Lag = {age}.")
+            return self.cache
+        else:  # disk fridge
+            if fresh or not self.path.exists() or self.age > str2timedelta(self.expire):
+                if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
+                # print(pd.Timestamp.now() - self.path.stats().content_mod_time, str2timedelta(self.expire))
+                self.cache = self.refresh()  # fresh order, never existed or exists but expired.
+                self.save(obj=self.cache, path=self.path)
+            elif self.age < str2timedelta(self.expire):
+                if self.cache is None:  # this implementation favours reading over pulling fresh at instantiation.
+                    self.cache = self.read(self.path)  # exists and not expired.
+                else:  # use the one in memory self.cache
+                    pass
+            return self.cache
 
 
 if __name__ == '__main__':

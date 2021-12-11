@@ -16,11 +16,11 @@ from crocodile.core import datetime, dt, os, string, random, np, pd, copy, dill
 from crocodile import file_management as _fm
 from crocodile.file_management import re, typing, sys, shutil, glob, tempfile  # Path
 
-from crocodile import plot_management as _pm
-from crocodile.plot_management import plt, enum, FigureManager
-
 from crocodile import meta
 from crocodile.meta import logging, subprocess, time
+
+from crocodile import plot_management as _pm
+from crocodile.plot_management import plt, enum, FigureManager
 
 
 Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
