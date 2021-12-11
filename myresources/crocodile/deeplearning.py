@@ -25,7 +25,7 @@ class HyperParam(tb.Struct):
     * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
     * Ease of saving settings of experiments! and also replicating it later.
     """
-    subpath = 'metadata/HyperParam.pkl'
+    subpath = 'metadata/hyper_params'
 
     def __init__(self, *args, **kwargs):
         super().__init__(
@@ -52,10 +52,6 @@ class HyperParam(tb.Struct):
         self.update(*args, **kwargs)
         # self.save_code()
         # self.config_device()
-
-    def save_code(self, *args):
-        import inspect
-        self._code = ''.join(inspect.getsourcelines(self.__class__)[0])
 
     @property
     def save_dir(self):
@@ -184,7 +180,7 @@ class HyperParam(tb.Struct):
 
 
 class DataReader(tb.Base):
-    subpath = "metadata/DataReader.pkl"
+    subpath = "metadata/data_reader"
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
     at save time, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
@@ -199,12 +195,6 @@ class DataReader(tb.Base):
         self.specs = specs if specs else tb.Struct()  # Summary of data to be memorized by model
         self.split = split
         self.plotter = None
-
-    # def __getattr__(self, item):  # avoid using this method. Always refer explicitly to `.specs`
-    #     try:
-    #         return self.specs[item]
-    #     except KeyError:
-    #         raise KeyError(f"The item `{item}` not found in {self.__class__.__name__} attributes.")
 
     def __str__(self):
         return f"DataReader Object with these keys: \n{self.__dict__.keys()}"
@@ -812,7 +802,7 @@ class KerasOptimizer:
         pass
 
     def tune(self):
-        import kerastuner as kt
+        kt = tb.E.assert_package_installed("kerastuner")
         self.tuner = kt.Hyperband(self,
                                   objective='loss',
                                   max_epochs=10,

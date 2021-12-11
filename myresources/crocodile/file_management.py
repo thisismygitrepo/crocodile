@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, pd, np, os, List, datetime, timestamp, randstr, Base
+from crocodile.core import Struct, pd, np, os, List, datetime, timestamp, randstr, str2timedelta, Base, Save
 # Typing
 import re
 import typing
@@ -121,6 +121,14 @@ class P(type(Path()), Path, Base):
         P(directory).write_bytes(obj.content)
         # try: urllib.urlopen(url).read()
         return directory
+
+    def read_refresh(self, refresh_func, expire="1w", save=Save.pickle, read=Read.read, fresh=False):
+        path = self
+        if fresh or not path.exists() or path.stats().content_mod_time < (pd.Timestamp.now() - str2timedelta(expire)):
+            print(f"Saving / Updating {path} ...")
+            dat = refresh_func()
+            save(obj=dat, path=path)
+        return read(path)
 
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
@@ -407,7 +415,7 @@ class P(type(Path()), Path, Base):
     def delete(self, are_you_sure=False, verbose=True):
         if are_you_sure:
             if not self.exists():
-                if verbose: print(f"File does not exist. No deletion perfored.")
+                if verbose: print(f"File {self.as_uri()} does not exist. No deletion performed.")
                 return None  # terminate the function.
             if self.is_file(): self.unlink()  # missing_ok=True added in 3.8
             else:
@@ -423,10 +431,10 @@ class P(type(Path()), Path, Base):
         import send2trash
         send2trash.send2trash(self.string)
 
-    def move(self, new_path, replace=False, verbose=True):
+    def move(self, new_path, overwrite=False, verbose=True):
         temp = self.absolute()
         new_path = P(new_path).absolute() / temp.name
-        if replace: new_path.delete(are_you_sure=True, verbose=False)
+        if overwrite: new_path.delete(are_you_sure=True, verbose=False)
         temp.rename(new_path)
         if verbose: print(f"{self.as_uri()} MOVED TO {new_path.as_uri()}")
         return new_path
@@ -753,34 +761,27 @@ class P(type(Path()), Path, Base):
     def decompress(self):
         pass
 
-    def encrypt(self, password=None, path=None, random_bytes_key=False):
+    def encrypt(self, path=None, key=None):
+        """Supports either password in the form of a string, or a key in the form of 32 random bytes.
         """
-        * Be careful of password being stored unintendedly in IPython history.
-        """
+        print(f"Encryption Warning: Be careful of key being stored unintendedly in console or terminal history.")
         from cryptography.fernet import Fernet
-        import base64
-
-        if random_bytes_key is False:
-            if password is None:
-                password = randstr(length=32, punctuation=True)
-
-            key = bytes(password, encoding="utf-8")
-            key = base64.b64encode(key)
-        else:
+        # import base64
+        # if key is None:
+        #     password = randstr(length=32, punctuation=True)
+        #     key = base64.b64encode(bytes(password, encoding="utf-8"))
+        if key is None:
             key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
-            # TODO: how to return password.
         fernet = Fernet(key)
         data = self.read_bytes()
         encrypted = fernet.encrypt(data)
         if path is None:
             path = self.append(name="_encrypted")
         path.write_bytes(encrypted)
-        return path, password
+        return path, key
 
-    def decrypt(self, password, path=None):
-        key = bytes(password, encoding="utf-8")
-        import base64
-        key = base64.b64encode(key)
+    def decrypt(self, key, path=None):
+        print(f"Decryption Warning: Be wary of key being stored unintendedly in console or terminal history.")
         from cryptography.fernet import Fernet
         fernet = Fernet(key)
         data = self.read_bytes()
@@ -876,6 +877,55 @@ class Compression(object):
             file.extract(fname, **kwargs)
         file.close()
         return fname
+
+
+class MemoryDB:
+    """This class holds the historical data. It acts like a database, except that is memory based."""
+
+    def __init__(self, min_num=60, ):
+        self.min_num = min_num
+        self.max_num = self.min_num * 10
+        # self.min_time = "1h"
+        # self.max_time = "24h"
+        self.data = List()
+
+    def append(self, df):
+        self.data.append(df)
+        if self.len > self.max_num:
+            self.data = self.data[-self.max_num:]  # take latest frames and drop the older ones.
+
+    @property
+    def len(self):
+        return len(self.data)
+
+    def detect_market_correction(self):
+        """Market correction is when there is a 10% movement in prices of all tickers."""
+
+
+class Fridge:
+    """Like `read_refresh` from Path, this is the memory-based variant to that disk-based function.
+    This is to accelrate access to latest data coming from a rather expensive function,
+    Thus, if multiple methods from superior classses requested this within 0.1 seconds,
+    there will be no problem of API being a bottleneck reducing running time to few seconds.
+    """
+    def __init__(self, fresh_func, expire="1m", logger=None):
+        self.cache = None
+        self.time = None
+        self.expire = expire
+        self.fresh_func = fresh_func
+        self.logger = logger
+
+    def __call__(self, fresh=False):
+        lag = (pd.Timestamp.now() - self.time)
+        if self.cache is None or fresh is True or lag > str2timedelta(self.expire):
+            self.cache = self.fresh_func()
+            self.time = pd.Timestamp.now()
+            if self.logger:
+                self.logger.debug(f"Updating / Saving data from {self.fresh_func}")
+        else:
+            if self.logger:
+                self.logger.debug(f"Using cached values. Lag = {lag}.")
+        return self.cache
 
 
 if __name__ == '__main__':

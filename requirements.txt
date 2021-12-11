@@ -10,6 +10,7 @@ pip
 setuptools
 twine
 pytest
+ipython
 
 cycler
 tqdm

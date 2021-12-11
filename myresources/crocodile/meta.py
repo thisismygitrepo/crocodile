@@ -2,7 +2,8 @@
 import logging
 import dill
 import subprocess
-from crocodile.core import np, os, timestamp, randstr
+import time
+from crocodile.core import np, os, timestamp, randstr, str2timedelta, datetime, pd
 from crocodile.file_management import sys, P
 
 
@@ -23,6 +24,9 @@ class Null:
 
     def __call__(self, *args, **kwargs):
         return self
+
+    def __len__(self):
+        return 0
 
 
 class Cycle:
@@ -164,7 +168,8 @@ class Experimental:
         :param args: dict of what you would like to pass to the function as arguments.
         :param self: relevant only if the function is a method of a class. self refers to the name of the instance
         :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
-        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
+        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False,
+                                         )
         print(code)
         res = dict()
         exec(code, scope, res)  # run the function within the scope `res`
@@ -178,7 +183,7 @@ class Experimental:
 
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None,
-                     verbose=True, **kwargs):
+                     verbose=True, copy2clipboard=False, **kwargs):
         """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
@@ -230,14 +235,15 @@ class Experimental:
         if include_args or code:
             code_string = args_kwargs + code_string
 
-        clipboard = Experimental.assert_package_installed("clipboard")
-        clipboard.copy(code_string)
+        if copy2clipboard:
+            clipboard = Experimental.assert_package_installed("clipboard")
+            clipboard.copy(code_string)
         if verbose:
             print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
         return code_string  # ready to be run with exec()
 
     @staticmethod
-    def extract_arguments(func, modules=None, exclude_args=True, verbose=True, **kwargs):
+    def extract_arguments(func, modules=None, exclude_args=True, verbose=True, copy2clipboard=False, **kwargs):
         """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
         """
         if type(func) is str:  # will not work because once a string is passed, this method won't be able
@@ -261,7 +267,7 @@ class Experimental:
                         flag = True
                     else:
                         val = None
-                        print(f'tb.Experimental Warning: arg {key} has no value. Now replaced with None.')
+                        print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
                 if not flag:
                     res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
 
@@ -271,8 +277,9 @@ class Experimental:
         if ak.varkw:
             res += f"{ak.varkw} = " + "{}\n"
 
-        clipboard = Experimental.assert_package_installed("clipboard")
-        clipboard.copy(res)
+        if copy2clipboard:
+            clipboard = Experimental.assert_package_installed("clipboard")
+            clipboard.copy(res)
         if verbose:
             print("Finished. Paste code now.")
         return res
@@ -540,7 +547,7 @@ class Terminal:
         wdir = wdir or P.cwd()
         header = f"""
 import crocodile.toolbox as tb
-tb.sys.path.insert(0, r'{wdir}')
+sys.path.insert(0, r'{wdir}')
 """  # header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header + script
         script = f"""print(r'''{script}''')""" + "\n" + script
@@ -566,7 +573,7 @@ tb.sys.path.insert(0, r'{wdir}')
         dill.dump(obj=func, file=fname)
         script = f"""
 import crocodile.toolbox as tb
-func = tb.dill.unpickle({fname})
+func = dill.unpickle({fname})
 func()
 """
         # TODO: make sure that pickling function that serialize to tmp location delete this location afterwards
@@ -600,9 +607,9 @@ class Log(object):
         if file is False and stream is False:
             self.logger = Null()
         else:
-            self.logger = None  # to be populated by `_install`
+            self.logger = Null()  # to be populated by `_install`
             self._install()
-            # update specs.
+            # update specs after intallation.
             self.specs["name"] = self.logger.name
             if file:  # first handler is a file handler
                 self.specs["file_path"] = self.logger.handlers[0].baseFilename
@@ -631,6 +638,8 @@ class Log(object):
         elif self.dialect == "coloredlogs":
             self.specs["verbose"] = self.verbose
             self.logger = Log.get_coloredlogs(**self.specs)
+        else:
+            self.logger = Log.get_colorlog(**self.specs)
 
     def __setstate__(self, state):
         self.__dict__ = state
@@ -813,6 +822,129 @@ def accelerate(func, ip):
     op = np.concatenate(op, axis=0)
     # op = self.reader.assign_resize(op, f=0.8, nrp=56, ncp=47, interpolation=True)
     return op
+
+
+class Scheduler:
+    def __init__(self, routine=lambda: None, occasional=lambda: None,
+                 exception=None, wind_down=None,
+                 other: int = 10, wait: str = "2m", runs=float("inf"), logger=None):
+        """
+        :param wait: repeat the cycle every this many minutes.
+        """
+        self.routine = routine  # main routine to be repeated every `wait` time.
+        self.occasional = occasional  # routine to be repeated every `other` time.
+        self.exception_handler = exception
+        self.wind_down = wind_down
+        # routine to be run_command when an error occurs, e.g. save object.
+        self.wait = wait  # wait period between routine cycles.
+        self.other = other  # number of routine cycles before `occasional` get executed once.
+        self.cycles = runs  # how many times to run_command the routine. defaults to infinite.
+        self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
+        self.history = []
+        self._start_time = None  # begining of a session (local time)
+        self.count = 0
+
+    def run(self, until="2050-01-01", cycles=None):
+        self.cycles = cycles or self.cycles
+        self.count = 0
+        self._start_time = datetime.now()
+        wait_time = str2timedelta(self.wait).total_seconds()
+        until = pd.to_datetime(until)  # (local time)
+
+        while datetime.now() < until and self.count < self.cycles:
+            # Status ==============================================================
+            time1 = datetime.now()  # time before calcs started
+            self.logger.info(
+                f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}."
+                f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")  # , end="\n"
+            # consider using  fstring format {x:<10}
+
+            # Perform logic ======================================================
+            try:  # run_command it under this context to make it suitable for commandline
+                self.routine()
+            except Exception as ex:
+                self.handle_exceptions(ex)
+
+            # Optional logic every while ======================================================
+            if self.count % self.other == 0:
+                try:  # run_command it under this context to make it suitable for commandline
+                    self.occasional()
+                except Exception as ex:
+                    self.handle_exceptions(ex)
+                    # TODO: save session with dill, or save object, or open console using interactive run_command.
+                    # the way Pycharm executes in a console, is: open console > run_command program
+                    # runfile('C:/Users/Alex/code/crypto/utils/asset_management.py', wdir='C:/Users/Alex/utils')
+                    # try:
+                    #     main()
+                    # except Exception:
+                    #     import traceback
+                    #     traceback.print_exc()
+                    #     raw_input("Program crashed; press Enter to exit")
+                    raise ex
+
+            # Conclude ========================================================
+            self.count += 1
+            time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time.
+            time_left = time_left if time_left > 0 else 1
+            self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. "
+                             f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
+
+            try:
+                time.sleep(time_left)
+            except KeyboardInterrupt as ki:
+                self.record_session_end(reason=f"Keyboard Interrupt.")
+                """This is vital for retrospect analysis,
+                    e.g. was the bot working when there was an upmarket? hence explaining the performance?
+                    TODO: print market status (e.g. BTC perfmance during the session)."""
+                _ = ki
+                return None  # break peacefully.
+        else:
+            if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
+            else: stop_reason = f"Reached due stop time ({until})"
+            self.record_session_end(reason=stop_reason)
+
+    def record_session_end(self, reason="Unknown"):
+        end_time = datetime.now()  # end of a session.
+        time_run = end_time - self._start_time
+        self.history.append([self._start_time, end_time, time_run, self.count])
+
+        self.logger.critical(f"\nScheduler has finished running a session. \n"
+                             f"start  time: {str(self._start_time)}\n"
+                             f"finish time: {str(end_time)} .\n"
+                             f"time    ran: {str(time_run)}\n"
+                             f"cycles  ran: {self.count}  |  wait time {self.wait}  \n"
+                             f"termination: {reason} \n" + "-" * 100)
+
+    def exception_func(self, ex):
+        """Default function to be used if user did not pass any."""
+        if ex is KeyboardInterrupt:
+            self.record_session_end(reason=ex)
+            raise ex
+        else:
+            self.record_session_end(reason=ex)
+            raise RuntimeError
+
+    def handle_exceptions(self, ex):
+        """One can implement a handler that raises an error, which terminates the program, or handle
+        it in some fashion, in which case the cycles continue."""
+        if self.exception_handler is None:
+            self.exception_func(ex)
+        else:
+            self.exception_handler(ex)
+
+    # def terminate(self):
+    #     if self.wind_down is None:
+    #         raise KeyboardInterrupt  # default wind_down mechanism
+    #     else:
+    #         self.wind_down()
+    # import signal
+    #
+    #
+    # def keyboard_interrupt_handler(signum, frame):
+    #     print(signum, frame)
+    #     raise KeyboardInterrupt
+    #
+    # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 
 if __name__ == '__main__':

@@ -3,7 +3,10 @@
 A collection of classes extending the functionality of Python's builtins.
 author: Alex Al-Saffar
 email: programmer@usa.com
+
+This is `export file` while one can dictate what will be exposed with toolbox
 """
+
 import importlib
 import inspect
 
@@ -17,20 +20,21 @@ from crocodile import plot_management as _pm
 from crocodile.plot_management import plt, enum, FigureManager
 
 from crocodile import meta
-from crocodile.meta import logging, subprocess
+from crocodile.meta import logging, subprocess, time
 
 
 Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
 Struct, DisplayData, str2timedelta, Save, List = core.Struct, core.DisplayData, core.str2timedelta, core.Save, core.List
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
+Fridge, MemoryDB = _fm.Fridge, _fm.MemoryDB
 
 Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImShow, _pm.SaveType
 VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
 
 Cycle, Experimental, Terminal, Manipulator = meta.Cycle, meta.Experimental, meta.Terminal, meta.Manipulator
 batcher, batcherv2, Log, accelerate, Null = meta.batcher, meta.batcherv2, meta.Log, meta.accelerate, meta.Null
-
+Scheduler = meta.Scheduler
 
 L = List
 tmp = P.tmp
@@ -42,7 +46,7 @@ _ = datetime, dt, os, np, pd, copy, random, dill
 _ = P, Read, Compression, re, typing, string, sys, shutil, glob, tempfile  # , Path
 _ = Experimental, Cycle, batcher, batcherv2, accelerate
 _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
-_ = logging, subprocess
+_ = logging, subprocess, time
 
 
 def reload(verbose=True):

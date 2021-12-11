@@ -810,6 +810,9 @@ class Struct(Base):  # inheriting from dict gives `get` method.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     """
 
+    def __len__(self):
+        return len(self.keys())
+
     def __init__(self, dictionary=None, **kwargs):
         """
         :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
