@@ -715,7 +715,7 @@ class Log(object):
                           'INFO': 'green',
                           'WARNING': 'yellow',
                           'ERROR': 'thin_red',
-                          'CRITICAL': 'bold_red,bg_blue',
+                          'CRITICAL': 'fg_bold_red,bg_white',
                           }  # see here for format: https://pypi.org/project/colorlog/
         colorlog = Experimental.assert_package_installed("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
@@ -836,7 +836,7 @@ class Scheduler:
         """
         self.routine = routine  # main routine to be repeated every `wait` time.
         self.occasional = occasional  # routine to be repeated every `other` time.
-        self.exception_handler = exception if exception is not None else lambda: None
+        self.exception_handler = exception if exception is not None else lambda ex: None
         self.wind_down = wind_down
         # routine to be run_command when an error occurs, e.g. save object.
         self.wait = wait  # wait period between routine cycles.
@@ -879,7 +879,7 @@ class Scheduler:
 
             # 5- Sleep ===============================================================
             try: time.sleep(time_left)  # consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ki: self.record_session_end(reason=ki)
+            except KeyboardInterrupt as ki: self.handle_exceptions(ex)
 
         else:  # while loop finished due to condition satisfaction (rather than breaking)
             if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"

@@ -583,13 +583,15 @@ class List(list, Base):
     def __getitem__(self, key):
         if type(key) is list or type(key) is np.ndarray:  # to allow fancy indexing like List[1, 5, 6]
             return List([self[item] for item in key])
-
-        # behaves similarly to Numpy A[1] vs A[1:2]
-        result = self.list[key]  # return the required item only (not a List)
-        if type(key) is not slice:
-            return result  # choose one item
-        else:
-            return List(result)
+        elif type(key) is str:  # access keys like dictionaries.
+            return List(item[key] for item in self.list)
+        else:  # must be an integer or slice
+            # behaves similarly to Numpy A[1] vs A[1:2]
+            result = self.list[key]  # return the required item only (not a List)
+            if type(key) is not slice:
+                return result  # choose one item
+            else:
+                return List(result)
 
     def __setitem__(self, key, value):
         self.list[key] = value
