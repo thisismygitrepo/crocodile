@@ -1,10 +1,9 @@
 
-from crocodile.core import Struct, pd, np, os, List, datetime, timestamp, randstr, str2timedelta, Base, Save
+from crocodile.core import Struct, pd, np, os, sys, List, datetime, timestamp, randstr, str2timedelta, Base, Save
 # Typing
 import re
 import typing
 # Path
-import sys
 import shutil
 import tempfile
 from glob import glob
@@ -124,7 +123,6 @@ class P(type(Path()), Path, Base):
 
     def read_refresh(self, refresh, expire="1w", save=Save.pickle, read=Read.read):
         return Fridge(refresh=refresh, path=self, expire=expire, save=save, read=read)
-
 
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
@@ -496,8 +494,7 @@ class P(type(Path()), Path, Base):
         filename = self
         if '.zip' in str(self):
             filename = self.unzip(op_path=self.tmp(folder="unzipped"))
-            if verbose:
-                print(f"File {self} was uncompressed to {filename}")
+            if verbose: print(f"File {self} was uncompressed to {filename}")
 
         try:
             if reader is None:  # infer the reader
@@ -696,9 +693,7 @@ class P(type(Path()), Path, Base):
             path.mkdir(exist_ok=True, parents=True)
         if file is not None:
             path = path / file
-        if verbose:
-            print(path.as_uri())
-            print(path.parent.as_uri())
+        if verbose: print(path.as_uri(), "\n", path.parent.as_uri())
         return path
 
     @staticmethod
@@ -916,9 +911,9 @@ class Fridge:
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
                 self.cache = self.refresh()
                 self.time = pd.Timestamp.now()
-                if self.logger: self.logger.debug(f"Updating / Saving data from {self.fresh_func}")
+                if self.logger: self.logger.debug(f"Updating / Saving data from {self.refresh}")
             else:
-                if self.logger: self.logger.debug(f"Using cached values. Lag = {age}.")
+                if self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
             return self.cache
         else:  # disk fridge
             if fresh or not self.path.exists() or self.age > str2timedelta(self.expire):

@@ -7,14 +7,11 @@ email: programmer@usa.com
 This is `export file` while one can dictate what will be exposed with toolbox
 """
 
-import importlib
-import inspect
-
 from crocodile import core
-from crocodile.core import datetime, dt, os, string, random, np, pd, copy, dill
+from crocodile.core import datetime, dt, os, sys, string, random, np, pd, copy, dill, inspect, importlib
 
 from crocodile import file_management as _fm
-from crocodile.file_management import re, typing, sys, shutil, glob, tempfile  # Path
+from crocodile.file_management import re, typing, shutil, glob, tempfile  # Path
 
 from crocodile import meta
 from crocodile.meta import logging, subprocess, time
@@ -41,7 +38,7 @@ tmp = P.tmp
 E = Experimental
 
 _ = Base, timestamp, Save, Terminal, List, Struct, DisplayData
-_ = datetime, dt, os, np, pd, copy, random, dill
+_ = datetime, dt, os, sys, np, pd, copy, random, dill, importlib, inspect
 
 _ = P, Read, Compression, re, typing, string, sys, shutil, glob, tempfile  # , Path
 _ = Experimental, Cycle, batcher, batcherv2, accelerate

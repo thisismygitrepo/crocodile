@@ -65,7 +65,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
             print(''.center(57, '='))
 
     def save_weights(self, save_dir):
-        t.save(self.model.state_dict(), save_dir.joinpath('saved_weights.pt'))
+        t.save()
 
     def load_weights(self, save_dir, map_location=None):
         if map_location is None:  # auto location.
@@ -79,7 +79,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         self.model.eval()
 
     def save_model(self, save_dir):
-        t.save(self.model, save_dir.joinpath(f'save_model.pt'))
+        t.save()
 
     def load_model(self, save_dir):  # Model class must be defined somewhere
         self.model = t.load(self, save_dir.glob('*.pt').__next__())

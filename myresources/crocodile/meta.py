@@ -1,10 +1,9 @@
-
 import logging
 import dill
 import subprocess
 import time
-from crocodile.core import np, os, timestamp, randstr, str2timedelta, datetime, pd
-from crocodile.file_management import sys, P
+from crocodile.core import np, os, sys, inspect, importlib, timestamp, randstr, str2timedelta, datetime, pd
+from crocodile.file_management import P
 
 
 class Null:
@@ -119,7 +118,6 @@ class Experimental:
         :param meta:
         :param save_source_code:
         """
-        import inspect
         path = P(path)
         readmepath = path / f"README.md" if path.is_dir() else path
 
@@ -238,8 +236,7 @@ class Experimental:
         if copy2clipboard:
             clipboard = Experimental.assert_package_installed("clipboard")
             clipboard.copy(code_string)
-        if verbose:
-            print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
+        if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
         return code_string  # ready to be run with exec()
 
     @staticmethod
@@ -252,7 +249,6 @@ class Experimental:
             _ = self
             func = eval(func, modules)
 
-        import inspect
         from file_management import Struct
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default)
@@ -262,9 +258,8 @@ class Experimental:
         for key, val in ak.items():
             if key != "args" and key != "kwargs":
                 flag = False
-                if val is inspect._empty:  # not passed argument.
-                    if exclude_args:
-                        flag = True
+                if val.default is val.empty:  # not passed argument.
+                    if exclude_args: flag = True
                     else:
                         val = None
                         print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
@@ -280,8 +275,7 @@ class Experimental:
         if copy2clipboard:
             clipboard = Experimental.assert_package_installed("clipboard")
             clipboard.copy(res)
-        if verbose:
-            print("Finished. Paste code now.")
+        if verbose: print("Finished. Paste code now.")
         return res
 
     @staticmethod
@@ -301,7 +295,6 @@ class Experimental:
                 raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
         newsource = "\n".join(sourcelines)
         P(module.__file__).write_text(newsource)
-        import importlib
         importlib.reload(module)
         return module
 
@@ -315,7 +308,6 @@ class Experimental:
         # update the module by reading it again.
         # if type(module) is str:
         #     module = __import__(module)
-        # import importlib
         # importlib.reload(module)
         # if type(module) is str:
         #     sourcecells = P(module).read_text().split("#%%")
@@ -595,7 +587,7 @@ class Log(object):
       of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
 
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
-                 name=None, file: bool=False, file_path=None, stream=True, fmt=None, sep=" | ",
+                 name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                  verbose=False, log_colors=None):
         # save speces that are essential to re-create the object at
@@ -862,13 +854,17 @@ class Scheduler:
             self.logger.info(msg + f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
 
             # 2- Perform logic ======================================================
-            try: self.routine()
-            except Exception as ex: self.handle_exceptions(ex)
+            try:
+                self.routine()
+            except Exception as ex:
+                self.handle_exceptions(ex)
 
             # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
-                try: self.occasional()
-                except Exception as ex: self.handle_exceptions(ex)
+                try:
+                    self.occasional()
+                except Exception as ex:
+                    self.handle_exceptions(ex)
 
             # 4- Conclude Message ============================================================
             self.count += 1
@@ -878,12 +874,16 @@ class Scheduler:
                              f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
 
             # 5- Sleep ===============================================================
-            try: time.sleep(time_left)  # consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex: self.handle_exceptions(ex)
+            try:
+                time.sleep(time_left)  # consider replacing by Asyncio.sleep
+            except KeyboardInterrupt as ex:
+                self.handle_exceptions(ex)
 
         else:  # while loop finished due to condition satisfaction (rather than breaking)
-            if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
-            else: stop_reason = f"Reached due stop time ({until})"
+            if self.count >= self.cycles:
+                stop_reason = f"Reached maximum number of cycles ({self.cycles})"
+            else:
+                stop_reason = f"Reached due stop time ({until})"
             self.record_session_end(reason=stop_reason)
 
     def record_session_end(self, reason="Unknown"):

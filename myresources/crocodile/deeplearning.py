@@ -20,18 +20,17 @@ class Device(enum.Enum):
 class HyperParam(tb.Struct):
     """
     Benefits of this way of organizing the hyperparameters:
-
-    * one place to control everything.
+    * one place to control everything: a control panel.
     * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
     * Ease of saving settings of experiments! and also replicating it later.
     """
-    subpath = 'metadata/hyper_params'
+    subpath = tb.P('metadata/hyper_params')
 
     def __init__(self, *args, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
             exp_name='default',
-            root='tmp',
+            root=tb.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=Device.gpu0,
             # ===================== Data ==============================
@@ -45,40 +44,36 @@ class HyperParam(tb.Struct):
             batch_size=32,
             epochs=30,
         )
-        self._code = None
         self._configured = False
-        self.root = None
         self.device_name = None
-        self.update(*args, **kwargs)
+        # self.update(*args, **kwargs)
         # self.save_code()
         # self.config_device()
 
     @property
     def save_dir(self):
-        """Ensures that the folder created is directly under deephead root, no matter what directory
-         the run was done from. This is especially useful during imports, resulting in predicted behaviour.
-        """
-        self.root = tb.P(self.root)
-        abs_full_path = tb.P.tmp() / self.root / self.exp_name
-        return abs_full_path.create()
+        return (self.root / self.exp_name).create()
 
-    def save_pickle(self, path=None, **kwargs):
-        if path is None:
-            path = self.save_dir.joinpath(self.subpath).create(parent_only=True)
-        (path.parent / 'HyperParam.txt').write_text(data=str(self))
-        super(HyperParam, self).save_pickle(path, **kwargs)
+    def save(self, **kwargs):
+        self.save_dir.joinpath(self.subpath / '.txt').write_text(data=str(self))
+        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath))
 
     @classmethod
-    def from_saved(cls, path, *args, **kwargs):
-        path2 = tb.P(path) / cls.subpath
-        path3 = path2 if path2.exists() else path2.with_suffix("")
-        return super(HyperParam, cls).from_saved(path3, reader=tb.Read.pickle)
+    def from_saved(cls, path, **kwargs):
+        return (tb.P(path) / HyperParam.subpath / ".pkl").readit()
 
     def __repr__(self):
-        if self._code:
-            return self._code
+        self.print()
+
+    @property
+    def pkg(self):
+        if self.pkg_name == "tensorflow":
+            handle = __import__("tensorflow")
+        elif self.pkg_name == "torch":
+            handle = __import__("torch")
         else:
-            return super(HyperParam, self).__repr__()
+            raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
+        return handle
 
     @property
     def device(self):
@@ -131,15 +126,6 @@ class HyperParam(tb.Struct):
         else:
             raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
 
-    @property
-    def pkg(self):
-        handle = None
-        if self.pkg_name == "tensorflow":
-            handle = __import__("tensorflow")
-        elif self.pkg_name == "torch":
-            handle = __import__("torch")
-        return handle
-
     def config_device(self):
         """
         """
@@ -148,7 +134,6 @@ class HyperParam(tb.Struct):
         device = self.device
         if handle.__name__ == 'torch':
             return None
-
         try:
             # Now we want only one device to be seen:
             if device_str in ['gpu0', 'gpu1']:
@@ -179,8 +164,8 @@ class HyperParam(tb.Struct):
             print(f"Device already configured, skipping ... ")
 
 
-class DataReader(tb.Base):
-    subpath = "metadata/data_reader"
+class DataReader(object):
+    subpath = tb.P("metadata/data_reader")
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
     at save time, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
@@ -188,8 +173,7 @@ class DataReader(tb.Base):
     implemented a fallback `getattr` method that allows accessing those attributes from the class itself, without the 
     need to reference `.dataspects`.
     """
-
-    def __init__(self, hp=None, specs=None, split=None, *args, **kwargs):
+    def __init__(self, hp: HyperParam = None, specs=None, split=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hp = hp
         self.specs = specs if specs else tb.Struct()  # Summary of data to be memorized by model
@@ -198,12 +182,6 @@ class DataReader(tb.Base):
 
     def __str__(self):
         return f"DataReader Object with these keys: \n{self.__dict__.keys()}"
-
-    def __setstate__(self, state):
-        self.__dict__ = state
-
-    def __getstate__(self):
-        return self.__dict__
 
     def data_split(self, *args, strings=None, **kwargs):
         """
@@ -246,35 +224,13 @@ class DataReader(tb.Base):
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
 
-    def save_pickle(self, path=None, *names, **kwargs):
-        """This differs from the standard save from `Base` class in that it only saved .specs attribute
-        and loads up with them only. This is reasonable as saving an entire dataset is not feasible."""
-        if names:
-            self.relay_to_specs(*names)
-        if path is None:
-            path = self.hp.save_dir.joinpath(self.subpath).create(parent_only=True)
-        self.specs.save_pickle(path=path, **kwargs)
-
-    def relay_to_specs(self, *names):
-        self.specs.update({name: self.__dict__[name] for name in names})
+    def save(self):
+        tb.Save.pickle(self.specs, path=self.hp.save_dir.joinpath(self.subpath / "data_reader.pkl"))
 
     @classmethod
     def from_saved(cls, path, *args, **kwargs):
-        """ This method offers an alternative constructer for DataReader class. It is a thin wrapper around `Base`
-        equivalent that is being overriden.
-        Use this when loading training data is not required. It requires saved essential parameters to be stored.
-        Those parameters are required by models to work.
-        :param path: full path to the saved .npy file containing a dictionary of attributes names and values.
-        :return: An object with attributes similar to keys and values as in dictionary loaded.
-        """
         instance = cls(*args, **kwargs)
-        path = (tb.P(path) / cls.subpath).parent.find("DataReader*")
-        if path is None:
-            # raise FileNotFoundError(f"Could not find the required file {path / cls.subpath}")
-            print("DataReader file was not found, ignoring specs.")
-        else:
-            specs = tb.Read.read(path)
-            instance.specs = specs
+        instance.specs = (tb.P(path) / cls.subpath / "data_reader.pkl").readit()
         return instance
 
     def preprocess(self, *args, **kwargs):
@@ -353,7 +309,6 @@ class BaseModel(ABC):
             if optimizer is None:
                 optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.lr)
             if metrics is None:
-                # import myresources.alexlib.deeplearning_torch as tmp  # TODO: this is cyclic import.
                 metrics = tb.List()  # [tmp.MeanSquareError()]
         # Create a new compiler object
         self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=tb.L(metrics), **kwargs)
@@ -505,10 +460,10 @@ class BaseModel(ABC):
         return tb.pd.DataFrame(loss_dict)
 
     def save_model(self, directory):
-        self.model.save(directory, include_optimizer=False)  # send only folder name. Save name is saved_model.pb
+        self.model.save(directory)  # In TF: send only folder name. Save name is saved_model.pb
 
     def save_weights(self, directory):
-        self.model.save_weights(directory.joinpath(f'{self.model.name}'))  # last part of path is file name.
+        self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file name.
 
     @staticmethod
     def load_model(directory):
@@ -519,7 +474,7 @@ class BaseModel(ABC):
         name = directory.glob('*.data*').__next__().__str__().split('.data')[0]
         self.model.load_weights(name)  # requires path to file name.
 
-    def save_class(self, weights_only=True, version='0', itself=False, **kwargs):
+    def save_class(self, weights_only=True, version='0', **kwargs):
         """Simply saves everything:
 
         1. Hparams
@@ -528,49 +483,29 @@ class BaseModel(ABC):
 
         :param version: Model version, up to the user.
         :param weights_only: self-explanatory
-        :param itself:
         :return:
 
         """
-        self.hp.save_pickle(itself=itself)  # goes into the meta folder.
-        self.data.save_pickle(itself=itself)  # goes into the meta folder.
-        self.history.save_pickle(path=self.hp.save_dir / 'metadata/history.npy', itself=True)  # goes to meta folder
-
+        self.hp.save()  # goes into the meta folder.
+        self.data.save()  # goes into the meta folder.
+        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl')  # goes into the meta folder.
         # model save goes into data folder.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
-        if weights_only:
-            self.save_weights(save_dir)
-        else:
-            self.save_model(save_dir)
-
+        if weights_only: self.save_weights(save_dir)
+        else: self.save_model(save_dir)
         # Saving wrapper_class and model architecture in the main folder:
         tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
-        print(f'Model class saved successfully!, check out: \n {self.hp.save_dir.as_uri()}')
+        print(f'Model class saved successfully!, check out: {self.hp.save_dir.as_uri()}')
 
     @classmethod
-    def from_class_weights(cls, path, hp_class=None, data_class=None, device_name=None):
+    def from_class_weights(cls, path, hparam_class, data_class, device_name=None):
         path = tb.P(path)
-
-        if hp_class:
-            hp_obj = hp_class.from_saved(path)
-        else:
-            print("<" * 1000, f"HParam class not passed to constructor, assuming it is a self-contained save.",
-                  "<" * 1000)
-            hp_obj = tb.Read.pickle(path / HyperParam.subpath)
-        if device_name:
-            hp_obj.device_name = device_name
-
-        if data_class:
-            data_obj = data_class.from_saved(path, hp_obj) if path.exists() else None
-        else:
-            print("<" * 1000, f"Data class not passed to constructor, assuming it is a self-contained save.",
-                  "<" * 1000)
-            data_path = path / DataReader.subpath
-            data_obj = tb.Read.pickle(data_path) if data_path.exists() else None
-        model_obj = cls(hp_obj, data_obj)
+        hp_obj = hparam_class.from_saved(path)
+        if device_name: hp_obj.device_name = device_name
+        d_obj = data_class.from_saved(path, hp=hp_obj)
+        model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
-        history = path / "metadata/history.pkl"
-        model_obj.history = history.readit() if history.exists() else tb.List()
+        model_obj.history = (path / "metadata/history.pkl").readit(notfound=tb.L())
         print(f"Class {model_obj.__class__} Loaded Successfully.")
         return model_obj
 
@@ -580,16 +515,7 @@ class BaseModel(ABC):
         data_obj = DataReader.from_saved(path)
         hp_obj = HyperParam.from_saved(path)
         model_obj = cls.load_model(path.search('*_save_*')[0])  # static method.
-        tmp = cls.__init__
-
-        def initializer(self, hp_object, data_object, model_object_):
-            self.hp = hp_object
-            self.data = data_object
-            self.model = model_object_
-
-        cls.__init__ = initializer
         wrapper_class = cls(hp_obj, data_obj, model_obj)
-        cls.__init__ = tmp
         return wrapper_class
 
     def summary(self):
