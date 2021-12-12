@@ -674,9 +674,6 @@ class P(type(Path()), Path, Base):
         results = self.search(*args, r=r, **kwargs)
         return results[0] if len(results) > 0 else None
 
-    # def open_with_system(self):
-    #     self.explore()  # if it is a file, it will be opened with its default program.
-
     @staticmethod
     def tempdir():
         return P(tempfile.mktemp())

@@ -595,7 +595,7 @@ class Log(object):
       of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
 
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
-                 name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
+                 name=None, file: bool=False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                  verbose=False, log_colors=None):
         # save speces that are essential to re-create the object at
@@ -630,15 +630,18 @@ class Log(object):
         return self.logger.critical(msg)
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
+        if self.specs["file"] is True and self.specs["file_path"] is not None:
+            try:
+                P(self.specs["file_path"]).touch()
+            except FileNotFoundError:  # e.g. loading up on a different machine.
+                self.specs["file_path"] = P.tmpfile()
         if self.dialect == "colorlog":
-            self.specs["log_colors"] = self.log_colors
-            self.logger = Log.get_colorlog(**self.specs)
+            self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
         elif self.dialect == "logging":
             self.logger = Log.get_logger(**self.specs)
         elif self.dialect == "coloredlogs":
-            self.specs["verbose"] = self.verbose
-            self.logger = Log.get_coloredlogs(**self.specs)
-        else:
+            self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
+        else:  # default
             self.logger = Log.get_colorlog(**self.specs)
 
     def __setstate__(self, state):
@@ -842,6 +845,7 @@ class Scheduler:
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
         self.history = []
         self._start_time = None  # begining of a session (local time)
+        self.total_count = 0
         self.count = 0
 
     def run(self, until="2050-01-01", cycles=None):
@@ -852,99 +856,60 @@ class Scheduler:
         until = pd.to_datetime(until)  # (local time)
 
         while datetime.now() < until and self.count < self.cycles:
-            # Status ==============================================================
-            time1 = datetime.now()  # time before calcs started
-            self.logger.info(
-                f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}."
-                f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")  # , end="\n"
-            # consider using  fstring format {x:<10}
+            # 1- Opening Message ==============================================================
+            time1 = datetime.now()  # time before calcs started.  # use  fstring format {x:<10}
+            msg = f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}."
+            self.logger.info(msg + f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
 
-            # Perform logic ======================================================
-            try:  # run_command it under this context to make it suitable for commandline
-                self.routine()
-            except Exception as ex:
-                self.handle_exceptions(ex)
+            # 2- Perform logic ======================================================
+            try: self.routine()
+            except Exception as ex: self.handle_exceptions(ex)
 
-            # Optional logic every while ======================================================
+            # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
-                try:  # run_command it under this context to make it suitable for commandline
-                    self.occasional()
-                except Exception as ex:
-                    self.handle_exceptions(ex)
-                    # TODO: save session with dill, or save object, or open console using interactive run_command.
-                    # the way Pycharm executes in a console, is: open console > run_command program
-                    # runfile('C:/Users/Alex/code/crypto/utils/asset_management.py', wdir='C:/Users/Alex/utils')
-                    # try:
-                    #     main()
-                    # except Exception:
-                    #     import traceback
-                    #     traceback.print_exc()
-                    #     raw_input("Program crashed; press Enter to exit")
-                    raise ex
+                try: self.occasional()
+                except Exception as ex: self.handle_exceptions(ex)
 
-            # Conclude ========================================================
+            # 4- Conclude Message ============================================================
             self.count += 1
             time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time.
             time_left = time_left if time_left > 0 else 1
             self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. "
                              f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
 
-            try:
-                time.sleep(time_left)
-            except KeyboardInterrupt as ki:
-                self.record_session_end(reason=f"Keyboard Interrupt.")
-                """This is vital for retrospect analysis,
-                    e.g. was the bot working when there was an upmarket? hence explaining the performance?
-                    TODO: print market status (e.g. BTC perfmance during the session)."""
-                _ = ki
-                return None  # break peacefully.
-        else:
+            # 5- Sleep ===============================================================
+            try: time.sleep(time_left)  # consider replacing by Asyncio.sleep
+            except KeyboardInterrupt as ki: self.record_session_end(reason=ki)
+
+        else:  # while loop finished due to condition satisfaction (rather than breaking)
             if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
             else: stop_reason = f"Reached due stop time ({until})"
             self.record_session_end(reason=stop_reason)
 
     def record_session_end(self, reason="Unknown"):
+        """It is vital to record operation time to retrospectively inspect market status at session time."""
+        self.total_count += self.count
         end_time = datetime.now()  # end of a session.
         time_run = end_time - self._start_time
         self.history.append([self._start_time, end_time, time_run, self.count])
-
         self.logger.critical(f"\nScheduler has finished running a session. \n"
                              f"start  time: {str(self._start_time)}\n"
                              f"finish time: {str(end_time)} .\n"
-                             f"time    ran: {str(time_run)}\n"
-                             f"cycles  ran: {self.count}  |  wait time {self.wait}  \n"
+                             f"time    ran: {str(time_run)} | wait time {self.wait}  \n"
+                             f"cycles  ran: {self.count}  |  Lifetime cycles: {self.total_count} \n"
                              f"termination: {reason} \n" + "-" * 100)
-
-    def exception_func(self, ex):
-        """Default function to be used if user did not pass any."""
-        if ex is KeyboardInterrupt:
-            self.record_session_end(reason=ex)
-            raise ex
-        else:
-            self.record_session_end(reason=ex)
-            raise RuntimeError
 
     def handle_exceptions(self, ex):
         """One can implement a handler that raises an error, which terminates the program, or handle
         it in some fashion, in which case the cycles continue."""
-        if self.exception_handler is None:
-            self.exception_func(ex)
-        else:
-            self.exception_handler(ex)
-
-    # def terminate(self):
-    #     if self.wind_down is None:
-    #         raise KeyboardInterrupt  # default wind_down mechanism
-    #     else:
-    #         self.wind_down()
-    # import signal
-    #
-    #
-    # def keyboard_interrupt_handler(signum, frame):
-    #     print(signum, frame)
-    #     raise KeyboardInterrupt
-    #
-    # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+        self.record_session_end(reason=ex)
+        if self.exception_handler is not None: self.exception_handler(ex)
+        else: raise ex
+        # import signal
+        # def keyboard_interrupt_handler(signum, frame):
+        #     print(signum, frame)
+        #     raise KeyboardInterrupt
+        # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 
 if __name__ == '__main__':
