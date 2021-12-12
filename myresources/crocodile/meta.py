@@ -879,7 +879,7 @@ class Scheduler:
 
             # 5- Sleep ===============================================================
             try: time.sleep(time_left)  # consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ki: self.handle_exceptions(ex)
+            except KeyboardInterrupt as ex: self.handle_exceptions(ex)
 
         else:  # while loop finished due to condition satisfaction (rather than breaking)
             if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
