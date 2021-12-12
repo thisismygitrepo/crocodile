@@ -259,22 +259,14 @@ class P(type(Path()), Path, Base):
     def append_time_stamp(self, fmt=None):
         return self.append(name="-" + timestamp(fmt=fmt))
 
-    def absolute_from(self, reference=None):
-        """As opposed to ``relative_to`` which takes two abolsute paths and make ``self`` relative to ``reference``,
-        this one takes in two relative paths, and return an absolute version of `self` the reference
-        for which is ``reference``.
+    def rel2home(self):
+        return P(self.relative_to(Path.home()))
 
-        :param reference: a directory `name` from which the current relative path ``self`` is defined.
-            Default value of reference is current directory name, making the method act like ``absolute`` method
+    def rel2cwd(self):
+        return P(self.relative_to(Path.cwd()))
 
-        .. warning:: ``reference`` should be within working directory, otherwise it raises an error.
-
-        .. note:: If you have the full path of the reference, then this method would give the same result as
-            agoing with `reference / self`
-        """
-        if reference is None:
-            reference = P.cwd()[-1].string
-        return P.cwd().split(at=reference)[0] / reference / self
+    def abs_from_home(self):
+        return P.home() / self
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index

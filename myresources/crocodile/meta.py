@@ -836,7 +836,7 @@ class Scheduler:
         """
         self.routine = routine  # main routine to be repeated every `wait` time.
         self.occasional = occasional  # routine to be repeated every `other` time.
-        self.exception_handler = exception
+        self.exception_handler = exception if exception is not None else lambda: None
         self.wind_down = wind_down
         # routine to be run_command when an error occurs, e.g. save object.
         self.wait = wait  # wait period between routine cycles.
@@ -903,8 +903,8 @@ class Scheduler:
         """One can implement a handler that raises an error, which terminates the program, or handle
         it in some fashion, in which case the cycles continue."""
         self.record_session_end(reason=ex)
-        if self.exception_handler is not None: self.exception_handler(ex)
-        else: raise ex
+        self.exception_handler(ex)
+        raise ex
         # import signal
         # def keyboard_interrupt_handler(signum, frame):
         #     print(signum, frame)
