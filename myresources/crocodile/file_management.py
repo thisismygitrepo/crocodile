@@ -899,6 +899,17 @@ class Fridge:
         self.save = save
         self.read = read
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if self.path is not None:
+            state["path"] = self.path.rel2home()
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.path is not None:
+            self.path = P.home() / self.path
+
     @property
     def age(self):
         if self.path is None:

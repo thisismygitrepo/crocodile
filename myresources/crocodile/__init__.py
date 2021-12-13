@@ -1,8 +1,8 @@
 
-__version__ = "4.1"
+__version__ = "4.5"
 docs = r"https://crocodile.readthedocs.io/en/latest/"
 git = r"https://github.com/thisismygitrepo/crocodile"
 release_notes = """
 
-Robust pickling mechanism is now supported.
+Added Log and Frdige classes.
 """

@@ -269,7 +269,7 @@ class Base(object):
                 obj = obj.copy()  # do not mess with original __dict__
                 for key, val in obj.items():
                     if Base in val.__class__.__mro__:  # a class instance rather than pure data
-                        val.save()
+                        val.save(itself=itself, include_code=include_code, path=path, r=r)
                         obj[key] = None  # this tough object is finished, the rest should be easy.
                     else:
                         pass  # leave this object as is.
@@ -1042,7 +1042,7 @@ class DisplayData:
         pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
 
     @staticmethod
-    def set_auto_width():
+    def set_pandas_auto_width():
         """For fixed width host windows, this is recommended to avoid chaos due to line-wrapping."""
         pd.options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
 

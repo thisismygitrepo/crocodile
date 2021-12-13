@@ -1,3 +1,4 @@
+
 import logging
 import dill
 import subprocess
@@ -540,8 +541,11 @@ class Terminal:
         header = f"""
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir}')
-"""  # header is necessary so import statements in the script passed are identified relevant to wdir.
+"""  # this header is necessary so import statements in the script passed are identified relevant to wdir.
+
         script = header + script
+        if console in {"wt", "powershell", "pwsh"}:
+            script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
@@ -609,24 +613,22 @@ class Log(object):
     def __getattr__(self, item):  # makes it twice as slower as direct access 300 ns vs 600 ns
         return getattr(self.logger, item)
 
-    def debug(self, msg):
+    def debug(self, msg):  # to speed up the process and avoid falling back to __getattr__
         return self.logger.debug(msg)
+
+    def info(self, msg):
+        return self.logger.info(msg)
 
     def warn(self, msg):
         return self.logger.warn(msg)
 
-    def info(self, msg):
-        return self.logger.info(msg)
+    def error(self, msg):
+        return self.logger.error(msg)
 
     def critical(self, msg):
         return self.logger.critical(msg)
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
-        if self.specs["file"] is True and self.specs["file_path"] is not None:
-            try:
-                P(self.specs["file_path"]).touch()
-            except FileNotFoundError:  # e.g. loading up on a different machine.
-                self.specs["file_path"] = P.tmpfile()
         if self.dialect == "colorlog":
             self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
         elif self.dialect == "logging":
@@ -638,16 +640,24 @@ class Log(object):
 
     def __setstate__(self, state):
         self.__dict__ = state
+        if self.specs["file_path"] is not None:
+            self.specs["file_path"] = P.home() / self.specs["file_path"]
         self._install()
 
     def __getstate__(self):
         # logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy()
+        state["specs"] = state["specs"].copy()
         del state["logger"]
+        if self.specs["file_path"] is not None:
+            state["specs"]["file_path"] = P(self.specs["file_path"]).rel2home()
         return state
 
     def __repr__(self):
-        return fr"{self.logger} with handlers: \n {self.logger.handlers}"
+        tmp = f"{self.logger} with handlers: \n"
+        for h in self.logger.handlers:
+            tmp += repr(h) + "\n"
+        return tmp
 
     @staticmethod
     def get_format(sep):
@@ -672,8 +682,8 @@ class Log(object):
                         'notice': {'color': 'magenta'},
                         'warning': {'color': 'yellow'},
                         'success': {'color': 'green', 'bold': True},
-                        'error': {'color': 'red', "faint": True},
-                        'critical': {'color': 'red', 'bold': True, "inverse": True}}
+                        'error': {'color': 'red', "faint": True, "underline": True},
+                        'critical': {'color': 'red', 'bold': True, "inverse": False}}
         field_styles = {'asctime': {'color': 'green'},
                         'hostname': {'color': 'magenta'},
                         'levelname': {'color': 'black', 'bold': True},
