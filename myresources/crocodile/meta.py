@@ -3,7 +3,7 @@ import logging
 import dill
 import subprocess
 import time
-from crocodile.core import np, os, sys, inspect, importlib, timestamp, randstr, str2timedelta, datetime, pd
+from crocodile.core import np, os, sys, inspect, importlib, timestamp, randstr, str2timedelta, datetime, pd, Save
 from crocodile.file_management import P
 
 
@@ -497,7 +497,10 @@ class Terminal:
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
     def run_command(self, command, console="powershell"):
-        # alternative: res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
+        """Blocking operation.
+        This is short for:
+        res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
+        """
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
         if self.elevated is False or self.is_admin():
@@ -509,6 +512,7 @@ class Terminal:
         return resp
 
     def run_command_async(self, command, console=None):
+        """Opens a new terminal, and let it run asynchronously."""
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
         w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, shell=True)
@@ -533,14 +537,18 @@ class Terminal:
             return os.system(fr'{"start" if new_window else ""} {console} {command} \K')
             # /K remains the window, /C executes and dies (popup)
 
-    def run_script(self, script, wdir=None, interactive=True, shell=True, delete=False, console="", new_window=True):
-        """
+    @staticmethod
+    def run_script(script, wdir=None, interactive=True, shell=True, delete=False, console="", new_window=True):
+        """This method is a wrapper on top of `run_command_async" except that the command passed will launch python
+        console that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
         """
         wdir = wdir or P.cwd()
         header = f"""
+# The following lines of code form a header appended by Terminal.run_script
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir}')
+# End of header, start of script passed:
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
 
         script = header + script
@@ -550,7 +558,7 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        self.open_console(console=console, command=f"ipython {'-i' if interactive else ''} {file}",
+        Terminal.open_console(console=console, command=f"ipython {'-i' if interactive else ''} {file}",
                           shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
@@ -558,22 +566,22 @@ tb.sys.path.insert(0, r'{wdir}')
         # TODO: add return option (asynchronous programming)
         # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
-    def run_function(self, func):
+    @staticmethod
+    def load_object_in_new_session(obj):
         """Python brachnes off to a new window and execute the function passed.
         context can be either a pickled session or the current file __file__"""
         # step 1: pickle the function
         # step 2: create a script that unpickles it.
         # step 3: run the script that runs the function.
         # TODO complete this
-        fname = P.tmpfile()
-        dill.dump(obj=func, file=fname)
+        fname = P.tmpfile(tstamp=False, suffix=".pkl")
+        Save.pickle(obj=obj, path=fname, verbose=False)
         script = f"""
-import crocodile.toolbox as tb
-func = dill.unpickle({fname})
-func()
+fname = tb.P(r'{fname}')
+obj = fname.readit()
+fname.delete(are_you_sure=True, verbose=False)
 """
-        # TODO: make sure that pickling function that serialize to tmp location delete this location afterwards
-        self.run_script(script)
+        Terminal.run_script(script)
 
 
 class Log(object):
@@ -627,6 +635,10 @@ class Log(object):
 
     def critical(self, msg):
         return self.logger.critical(msg)
+
+    @property
+    def file(self):
+        return P(self.specs["file_path"]) if self.specs["file_path"] else None
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
         if self.dialect == "colorlog":
