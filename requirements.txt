@@ -11,18 +11,19 @@ setuptools
 twine
 pytest
 ipython
+fire  # for automatic CLI interface
 
-cycler
-tqdm
-send2trash
+
+tqdm  # for progress bar
+send2trash  # move to recycle bin
 clipboard
+dill  # extends pickle
+cryptography  # for encoding
+requests
+pyyaml
+cycler
 
 scikit-image
-pyyaml
-send2trash
-dill
-cryptography
-requests
 
 # torch
 # tensorflow

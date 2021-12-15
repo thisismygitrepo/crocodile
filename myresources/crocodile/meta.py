@@ -250,7 +250,7 @@ class Experimental:
             _ = self
             func = eval(func, modules)
 
-        from file_management import Struct
+        from crocodile.file_management import Struct
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default)
         ak = ak.update(kwargs)
@@ -259,7 +259,7 @@ class Experimental:
         for key, val in ak.items():
             if key != "args" and key != "kwargs":
                 flag = False
-                if val.default is val.empty:  # not passed argument.
+                if val is inspect._empty:  # not passed argument.
                     if exclude_args: flag = True
                     else:
                         val = None
@@ -496,7 +496,7 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run_command(self, command, console="powershell"):
+    def run_command(self, command, console="powershell", str_op=False):
         """Blocking operation.
         This is short for:
         res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
@@ -509,7 +509,9 @@ class Terminal:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         print(f"Crocodile: meta: Terminal: command execution response: {resp}")
-        return resp
+        if not str_op:
+            return resp
+        else: return resp.stdout.replace("\n", "")
 
     def run_command_async(self, command, console=None):
         """Opens a new terminal, and let it run asynchronously."""

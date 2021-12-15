@@ -867,16 +867,16 @@ class MemoryDB:
         self.max_num = self.min_num * 10
         # self.min_time = "1h"
         # self.max_time = "24h"
-        self.data = List()
+        self.list = List()
 
     def append(self, df):
-        self.data.append(df)
+        self.list.append(df)
         if self.len > self.max_num:
-            self.data = self.data[-self.max_num:]  # take latest frames and drop the older ones.
+            self.list = self.list[-self.max_num:]  # take latest frames and drop the older ones.
 
     @property
     def len(self):
-        return len(self.data)
+        return len(self.list)
 
     def detect_market_correction(self):
         """Market correction is when there is a 10% movement in prices of all tickers."""
