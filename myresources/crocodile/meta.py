@@ -540,7 +540,8 @@ class Terminal:
             # /K remains the window, /C executes and dies (popup)
 
     @staticmethod
-    def run_script(script, wdir=None, interactive=True, shell=True, delete=False, console="", new_window=True):
+    def run_script(script, wdir=None, interactive=True, ipython=True,
+                   shell=True, delete=False, console="", new_window=True):
         """This method is a wrapper on top of `run_command_async" except that the command passed will launch python
         console that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
@@ -560,7 +561,9 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.as_uri())
-        Terminal.open_console(console=console, command=f"ipython {'-i' if interactive else ''} {file}",
+        Terminal.open_console(console=console, command=f"{'ipython' if ipython else 'python'} "
+                                                       f"{'-i' if interactive else ''}"
+                                                       f" {file}",
                           shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)

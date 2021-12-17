@@ -1,4 +1,3 @@
-
 from crocodile.core import Struct, pd, np, os, sys, List, datetime, timestamp, randstr, str2timedelta, Base, Save
 # Typing
 import re
@@ -403,7 +402,8 @@ class P(type(Path()), Path, Base):
             if not self.exists():
                 if verbose: print(f"File {self.as_uri()} does not exist. No deletion performed.")
                 return None  # terminate the function.
-            if self.is_file(): self.unlink()  # missing_ok=True added in 3.8
+            if self.is_file():
+                self.unlink()  # missing_ok=True added in 3.8
             else:
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
@@ -741,35 +741,91 @@ class P(type(Path()), Path, Base):
     def decompress(self):
         pass
 
-    def encrypt(self, path=None, key=None):
-        """Supports either password in the form of a string, or a key in the form of 32 random bytes.
+    def lock(self, password: str = None, op_path=None):
+        print(f"Warning: this method is less secure than `encrypt`. It exposes the plain string passwords to console. "
+              f"Use only for PIN purpose.")
+        if password is None:
+            password = randstr(length=6, punctuation=True)
+
+        import hashlib
+        m = hashlib.sha256()  # converts anything to fixed length 32 bytes
+        m.update(password.encode("utf-8"))
+        q = m.digest()
+        import base64
+        key = base64.urlsafe_b64encode(q)  # make url-safe bytes required by Ferent.
+
+        if op_path is None: op_path = self.append("_locked")
+        key_path, op_path = self.encrypt(key=key, op_path=op_path, verbose=False)
+        key_path.delete(are_you_sure=True, verbose=False)
+        return password, op_path
+
+    def unlock(self, password, op_path=None):
+
+        import hashlib
+        m = hashlib.sha256()
+        m.update(password.encode("utf-8"))
+        q = m.digest()
+        import base64
+        key = base64.urlsafe_b64encode(q)
+
+        if op_path is None: op_path = self.switch("_locked", "")
+        key_path, op_path = self.decrypt(key=key, op_path=op_path, verbose=False)
+        key_path.delete(are_you_sure=True, verbose=False)
+        return password, op_path
+
+    def encrypt(self, key=None, op_path=None, verbose=True):
         """
-        print(f"Encryption Warning: Be careful of key being stored unintendedly in console or terminal history.")
+        see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
+        :param key:
+        :param op_path:
+        :param verbose:
+        :return:
+        """
         from cryptography.fernet import Fernet
-        # import base64
-        # if key is None:
-        #     password = randstr(length=32, punctuation=True)
-        #     key = base64.b64encode(bytes(password, encoding="utf-8"))
         if key is None:
             key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
+            key_path = P.tmp().joinpath("key.bytes")
+            key_path.write_bytes(key)
+            if verbose: print(f"The key generated was saved @ {key_path.as_uri()}")
+        elif type(key) in {str, P, Path}:  # a path
+            key_path = P(key)
+            key = key_path.read_bytes()
+        elif type(key) is bytes:
+            key_path = P.tmp().joinpath("key.bytes")
+            key_path.write_bytes(key)
+            if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
+        else:
+            raise TypeError(f"Key must be either a path, bytes object or None.")
         fernet = Fernet(key)
         data = self.read_bytes()
         encrypted = fernet.encrypt(data)
-        if path is None:
-            path = self.append(name="_encrypted")
-        path.write_bytes(encrypted)
-        return path, key
+        if op_path is None:
+            op_path = self.append(name="_encrypted")
+        op_path.write_bytes(encrypted)
+        if verbose: print(f"Encryption Warning:"
+                          f"* Be careful of key being stored unintendedly in console or terminal history, "
+                          f"e.g. don't use IPython.\n"
+                          f"* It behoves you to try decrypting it to err on the side of safety.\n"
+                          f"* Don't forget to delete OR store key file safely {key_path.as_uri()}")
+        return key_path, op_path
 
-    def decrypt(self, key, path=None):
-        print(f"Decryption Warning: Be wary of key being stored unintendedly in console or terminal history.")
+    def decrypt(self, key, op_path=None, verbose=True):
         from cryptography.fernet import Fernet
-        fernet = Fernet(key)
-        data = self.read_bytes()
-        encrypted = fernet.decrypt(data)
-        if path is None:
-            path = self.append(name="_decrypted")
-        path.write_bytes(encrypted)
-        return path
+        if type(key) is bytes:
+            key_path = P.home().joinpath("key.bytes")
+            key_path.write_bytes(key)
+            if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
+        elif type(key) in {str, P, Path}:
+            key_path = P(key)
+            key = key_path.read_bytes()
+        else:
+            raise TypeError(f"Key must be either str, P, Path or bytes.")
+        op_path = P(op_path) if op_path is not None else self.switch("_encrypted", "")
+        op_path.write_bytes(Fernet(key).decrypt(self.read_bytes()))
+        if verbose: print(f"Decryption Warning:"
+                          f"* Be wary of key being stored unintendedly in console or terminal history.\n"
+                          f"* Don't forget to delete OR safely store the key file {key_path.as_uri()}.")
+        return key_path, op_path
 
 
 class Compression(object):
@@ -889,6 +945,7 @@ class Fridge:
     there will be no problem of API being a bottleneck reducing running time to few seconds
     The class has two flavours, memory-based and disk-based variants.
     """
+
     def __init__(self, refresh, expire="1m", logger=None, path=None, save=Save.pickle, read=Read.read):
         self.cache = None
         self.time = None
