@@ -721,7 +721,7 @@ class P(type(Path()), Path, Base):
                                                   arcname=arcname, fmt='zip', **kwargs)
         return op_path
 
-    def unzip(self, op_path=None, fname=None, **kwargs):
+    def unzip(self, op_path=None, fname=None, verbose=False, **kwargs):
         zipfile = self
 
         if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
@@ -732,8 +732,9 @@ class P(type(Path()), Path, Base):
         if op_path is None:
             op_path = zipfile.parent / zipfile.stem
         else:
-            op_path = P(op_path)
-        return Compression.unzip(zipfile, op_path, fname, **kwargs)
+            op_path = P(op_path) / zipfile.stem
+        result = Compression.unzip(zipfile, op_path, fname, **kwargs)
+        return result
 
     def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):
         formats = ["zip", "tar", "gzip"]
@@ -847,9 +848,9 @@ class P(type(Path()), Path, Base):
 
     def decipher_unzip(self, secret, security=["decrypt", "unlock"][1]):
         tmpdir = self.tmpdir(prefix="zip_and_secure_")
-        moved_self = self.move(tmpdir)
+        moved_self = self.move(tmpdir, verbose=True)
         deciphered = getattr(moved_self, security)(secret, verbose=False)
-        unzipped = deciphered.unzip(tmpdir).search("*")[0]
+        unzipped = deciphered.unzip(op_path=tmpdir).search("*")[0]
         result = unzipped.rename(self.parent / unzipped.name)
         tmpdir.delete(are_you_sure=True)
         return result
