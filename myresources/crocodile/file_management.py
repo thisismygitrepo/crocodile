@@ -1,3 +1,4 @@
+
 from crocodile.core import Struct, pd, np, os, sys, List, datetime, timestamp, randstr, str2timedelta, Base, Save
 # Typing
 import re
@@ -104,6 +105,8 @@ class Read(object):
 class P(type(Path()), Path, Base):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
+    # def __init__(self, *string):
+    #     super(P, self).__init__(Path(*string).expanduser())
 
     def as_url(self):
         string_ = self.as_posix()
@@ -474,11 +477,11 @@ class P(type(Path()), Path, Base):
             print(f"Could not copy this thing: {self.as_uri()}. Not a file nor a folder.")
         return dest / self.name
 
-    def clean(self):
+    def clean(self, trash=True):
         """removes contents on a folder, rather than deleting the folder."""
         contents = self.listdir()
         for content in contents:
-            self.joinpath(content).send2trash()
+            self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(are_you_sure=True)
         return self
 
     def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
@@ -668,8 +671,8 @@ class P(type(Path()), Path, Base):
         return P(tempfile.mktemp())
 
     @staticmethod
-    def tmpdir():
-        return P.tmp(folder=rf"tmpdirs/{randstr()}")
+    def tmpdir(prefix=""):
+        return P.tmp(folder=rf"tmpdirs/{prefix + randstr()}")
 
     @staticmethod
     def temp(*args, **kwargs):
@@ -741,12 +744,11 @@ class P(type(Path()), Path, Base):
     def decompress(self):
         pass
 
-    def lock(self, password: str = None, op_path=None):
-        print(f"Warning: this method is less secure than `encrypt`. It exposes the plain string passwords to console. "
+    def lock(self, password: str = None, op_path=None, verbose=True):
+        if verbose: print(f"Warning: this method is less secure than `encrypt`. It exposes the plain string passwords to console. "
               f"Use only for PIN purpose.")
         if password is None:
             password = randstr(length=6, punctuation=True)
-
         import hashlib
         m = hashlib.sha256()  # converts anything to fixed length 32 bytes
         m.update(password.encode("utf-8"))
@@ -756,22 +758,20 @@ class P(type(Path()), Path, Base):
 
         if op_path is None: op_path = self.append("_locked")
         key_path, op_path = self.encrypt(key=key, op_path=op_path, verbose=False)
-        key_path.delete(are_you_sure=True, verbose=False)
+        if type(key_path) is not bytes:
+            key_path.delete(are_you_sure=True, verbose=False)
+        if verbose: print(f"Locking completed. {self.as_uri()} ==> {op_path.as_uri()}.")
         return password, op_path
 
-    def unlock(self, password, op_path=None):
-
-        import hashlib
+    def unlock(self, password, op_path=None, verbose=True):
+        import hashlib, base64
         m = hashlib.sha256()
         m.update(password.encode("utf-8"))
-        q = m.digest()
-        import base64
-        key = base64.urlsafe_b64encode(q)
-
+        key = base64.urlsafe_b64encode(m.digest())
         if op_path is None: op_path = self.switch("_locked", "")
-        key_path, op_path = self.decrypt(key=key, op_path=op_path, verbose=False)
-        key_path.delete(are_you_sure=True, verbose=False)
-        return password, op_path
+        op_path = self.decrypt(key=key, op_path=op_path, verbose=False)
+        if verbose: print(f"Unlocking completed. {self.as_uri()} ==> {op_path.as_uri()}.")
+        return op_path
 
     def encrypt(self, key=None, op_path=None, verbose=True):
         """
@@ -781,40 +781,39 @@ class P(type(Path()), Path, Base):
         :param verbose:
         :return:
         """
+        op_path = self.append(name="_encrypted") if op_path is None else P(op_path)
         from cryptography.fernet import Fernet
         if key is None:
             key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
-            key_path = P.tmp().joinpath("key.bytes")
+            key_path = op_path.parent.joinpath("key.bytes")
             key_path.write_bytes(key)
             if verbose: print(f"The key generated was saved @ {key_path.as_uri()}")
         elif type(key) in {str, P, Path}:  # a path
             key_path = P(key)
             key = key_path.read_bytes()
         elif type(key) is bytes:
-            key_path = P.tmp().joinpath("key.bytes")
-            key_path.write_bytes(key)
-            if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
+            key_path = key
+            # key_path = P.tmp().joinpath("key.bytes")
+            # key_path.write_bytes(key)
+            # if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
         else:
             raise TypeError(f"Key must be either a path, bytes object or None.")
-        fernet = Fernet(key)
-        data = self.read_bytes()
-        encrypted = fernet.encrypt(data)
-        if op_path is None:
-            op_path = self.append(name="_encrypted")
-        op_path.write_bytes(encrypted)
-        if verbose: print(f"Encryption Warning:"
+        op_path.write_bytes(Fernet(key).encrypt(self.read_bytes()))
+        if verbose: print(f"Encryption Warning:\n"
                           f"* Be careful of key being stored unintendedly in console or terminal history, "
                           f"e.g. don't use IPython.\n"
                           f"* It behoves you to try decrypting it to err on the side of safety.\n"
                           f"* Don't forget to delete OR store key file safely {key_path.as_uri()}")
+        if verbose: print(f"Encryption completed. {self.as_uri()} ==> {op_path.as_uri()}. Key = {key_path.as_uri()}")
         return key_path, op_path
 
     def decrypt(self, key, op_path=None, verbose=True):
         from cryptography.fernet import Fernet
         if type(key) is bytes:
-            key_path = P.home().joinpath("key.bytes")
-            key_path.write_bytes(key)
-            if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
+            key_path = key
+            # key_path = P.home().joinpath("key.bytes")
+            # key_path.write_bytes(key)
+            # if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
         elif type(key) in {str, P, Path}:
             key_path = P(key)
             key = key_path.read_bytes()
@@ -822,10 +821,38 @@ class P(type(Path()), Path, Base):
             raise TypeError(f"Key must be either str, P, Path or bytes.")
         op_path = P(op_path) if op_path is not None else self.switch("_encrypted", "")
         op_path.write_bytes(Fernet(key).decrypt(self.read_bytes()))
-        if verbose: print(f"Decryption Warning:"
+        if verbose: print(f"Decryption Warning:\n"
                           f"* Be wary of key being stored unintendedly in console or terminal history.\n"
                           f"* Don't forget to delete OR safely store the key file {key_path.as_uri()}.")
-        return key_path, op_path
+        if verbose: print(f"Decryption completed. {self.as_uri()} ==> {op_path.as_uri()}. Key = {key_path.as_uri()}")
+        return op_path
+
+    def zip_cipher(self, secret=None, security=["encrypt", "lock"][1]):
+
+        tmpdir = self.tmpdir(prefix="zip_and_secure_")
+        zipped = self.zip(op_path=tmpdir.joinpath(self.name))
+        secret, zipped_secured = getattr(zipped, security)(secret, verbose=False)
+
+        class FileHandler:
+            def __init__(slf):
+                slf.tmpdir = tmpdir
+                slf.secret = secret
+                slf.file = zipped_secured
+
+            def decimate(slf):
+                slf.tmpdir.delete(are_you_sure=True)
+                slf.secret = None
+
+        return FileHandler()
+
+    def decipher_unzip(self, secret, security=["decrypt", "unlock"][1]):
+        tmpdir = self.tmpdir(prefix="zip_and_secure_")
+        moved_self = self.move(tmpdir)
+        deciphered = getattr(moved_self, security)(secret, verbose=False)
+        unzipped = deciphered.unzip(tmpdir).search("*")[0]
+        result = unzipped.rename(self.parent / unzipped.name)
+        tmpdir.delete(are_you_sure=True)
+        return result
 
 
 class Compression(object):
@@ -918,17 +945,22 @@ class Compression(object):
 class MemoryDB:
     """This class holds the historical data. It acts like a database, except that is memory based."""
 
-    def __init__(self, min_num=60, ):
-        self.min_num = min_num
-        self.max_num = self.min_num * 10
+    def __init__(self, size=5, ):
+        self.size = size
         # self.min_time = "1h"
         # self.max_time = "24h"
         self.list = List()
 
-    def append(self, df):
-        self.list.append(df)
-        if self.len > self.max_num:
-            self.list = self.list[-self.max_num:]  # take latest frames and drop the older ones.
+    def __repr__(self):
+        return f"MemoryDB. Size={self.size}. Current length = {self.len}"
+
+    def append(self, item):
+        self.list.append(item)
+        if self.len > self.size:
+            self.list = self.list[-self.size:]  # take latest frames and drop the older ones.
+
+    def __getitem__(self, item):
+        return self.list[item]
 
     @property
     def len(self):
