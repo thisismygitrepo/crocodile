@@ -140,7 +140,7 @@ class P(type(Path()), Path, Base):
                 if item.is_file():
                     total_size += item.stat().st_size
         else:
-            raise FileNotFoundError(self.as_uri())
+            raise FileNotFoundError(self.absolute().as_uri())
         return round(total_size / factor, 1)
 
     def time(self, which="m", **kwargs):
@@ -403,16 +403,16 @@ class P(type(Path()), Path, Base):
     def delete(self, are_you_sure=False, verbose=True):
         if are_you_sure:
             if not self.exists():
-                if verbose: print(f"File {self.as_uri()} does not exist. No deletion performed.")
+                if verbose: print(f"File {self.absolute().as_uri()} does not exist. No deletion performed.")
                 return None  # terminate the function.
             if self.is_file():
                 self.unlink()  # missing_ok=True added in 3.8
             else:
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
-            if verbose: print(f"File {self.as_uri()} deleted.")
+            if verbose: print(f"File {self.absolute().as_uri()} deleted.")
         else:
-            if verbose: print(f"File {self.as_uri()} not deleted because user is not sure.")
+            if verbose: print(f"File {self.absolute().as_uri()} not deleted because user is not sure.")
 
     def send2trash(self):
         # send2trash = Experimental.assert_package_installed("send2trash")
@@ -425,7 +425,7 @@ class P(type(Path()), Path, Base):
         new_path = P(new_path).absolute() / temp.name
         if overwrite: new_path.delete(are_you_sure=True, verbose=False)
         temp.rename(new_path)
-        if verbose: print(f"{self.as_uri()} MOVED TO {new_path.as_uri()}")
+        if verbose: print(f"{self.absolute().as_uri()} MOVED TO {new_path.absolute().as_uri()}")
         return new_path
 
     def renameit(self, new_file_name):
@@ -472,9 +472,9 @@ class P(type(Path()), Path, Base):
                 copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
             if verbose:
                 preface = "Contents of " if contents else ""
-                print(f"{preface} {self.as_uri()} copied successfully to: {dest.as_uri()}")
+                print(f"{preface} {self.absolute().as_uri()} copied successfully to: {dest.absolute().as_uri()}")
         else:
-            print(f"Could not copy this thing: {self.as_uri()}. Not a file nor a folder.")
+            print(f"Could not copy this thing: {self.absolute().as_uri()}. Not a file nor a folder.")
         return dest / self.name
 
     def clean(self, trash=True):
@@ -696,7 +696,7 @@ class P(type(Path()), Path, Base):
             path.mkdir(exist_ok=True, parents=True)
         if file is not None:
             path = path / file
-        if verbose: print(path.as_uri(), "\n", path.parent.as_uri())
+        if verbose: print(path.absolute().as_uri(), "\n", path.parent.absolute().as_uri())
         return path
 
     @staticmethod
@@ -761,7 +761,7 @@ class P(type(Path()), Path, Base):
         key_path, op_path = self.encrypt(key=key, op_path=op_path, verbose=False)
         if type(key_path) is not bytes:
             key_path.delete(are_you_sure=True, verbose=False)
-        if verbose: print(f"Locking completed. {self.as_uri()} ==> {op_path.as_uri()}.")
+        if verbose: print(f"Locking completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}.")
         return password, op_path
 
     def unlock(self, password, op_path=None, verbose=True):
@@ -771,7 +771,7 @@ class P(type(Path()), Path, Base):
         key = base64.urlsafe_b64encode(m.digest())
         if op_path is None: op_path = self.switch("_locked", "")
         op_path = self.decrypt(key=key, op_path=op_path, verbose=False)
-        if verbose: print(f"Unlocking completed. {self.as_uri()} ==> {op_path.as_uri()}.")
+        if verbose: print(f"Unlocking completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}.")
         return op_path
 
     def encrypt(self, key=None, op_path=None, verbose=True):
@@ -788,7 +788,7 @@ class P(type(Path()), Path, Base):
             key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
             key_path = op_path.parent.joinpath("key.bytes")
             key_path.write_bytes(key)
-            if verbose: print(f"The key generated was saved @ {key_path.as_uri()}")
+            if verbose: print(f"The key generated was saved @ {key_path.absolute().as_uri()}")
         elif type(key) in {str, P, Path}:  # a path
             key_path = P(key)
             key = key_path.read_bytes()
@@ -796,7 +796,7 @@ class P(type(Path()), Path, Base):
             key_path = key
             # key_path = P.tmp().joinpath("key.bytes")
             # key_path.write_bytes(key)
-            # if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
+            # if verbose: print(f"The key passed was saved @ {key_path.absolute(.)as_uri()}")
         else:
             raise TypeError(f"Key must be either a path, bytes object or None.")
         op_path.write_bytes(Fernet(key).encrypt(self.read_bytes()))
@@ -804,8 +804,9 @@ class P(type(Path()), Path, Base):
                           f"* Be careful of key being stored unintendedly in console or terminal history, "
                           f"e.g. don't use IPython.\n"
                           f"* It behoves you to try decrypting it to err on the side of safety.\n"
-                          f"* Don't forget to delete OR store key file safely {key_path.as_uri()}")
-        if verbose: print(f"Encryption completed. {self.as_uri()} ==> {op_path.as_uri()}. Key = {key_path.as_uri()}")
+                          f"* Don't forget to delete OR store key file safely {key_path.absolute().as_uri()}")
+        if verbose: print(f"Encryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
+                          f" Key = {key_path.absolute().as_uri()}")
         return key_path, op_path
 
     def decrypt(self, key, op_path=None, verbose=True):
@@ -814,7 +815,7 @@ class P(type(Path()), Path, Base):
             key_path = key
             # key_path = P.home().joinpath("key.bytes")
             # key_path.write_bytes(key)
-            # if verbose: print(f"The key passed was saved @ {key_path.as_uri()}")
+            # if verbose: print(f"The key passed was saved @ {key_path.absolute(.)as_uri()}")
         elif type(key) in {str, P, Path}:
             key_path = P(key)
             key = key_path.read_bytes()
@@ -824,8 +825,9 @@ class P(type(Path()), Path, Base):
         op_path.write_bytes(Fernet(key).decrypt(self.read_bytes()))
         if verbose: print(f"Decryption Warning:\n"
                           f"* Be wary of key being stored unintendedly in console or terminal history.\n"
-                          f"* Don't forget to delete OR safely store the key file {key_path.as_uri()}.")
-        if verbose: print(f"Decryption completed. {self.as_uri()} ==> {op_path.as_uri()}. Key = {key_path.as_uri()}")
+                          f"* Don't forget to delete OR safely store the key file {key_path.absolute().as_uri()}.")
+        if verbose: print(f"Decryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
+                          f" Key = {key_path.absolute().as_uri()}")
         return op_path
 
     def zip_cipher(self, secret=None, security=["encrypt", "lock"][1]):

@@ -134,11 +134,11 @@ class Experimental:
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
 
         readmepath.write_text(text)
-        print(f"Successfully generated README.md file. Checkout:\n", readmepath.as_uri())
+        print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
 
         if save_source_code:
             P(inspect.getmodule(obj).__file__).zip(op_path=readmepath.with_name("source_code.zip"))
-            print("Source code saved @ " + readmepath.with_name("source_code.zip").as_uri())
+            print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
 
     @staticmethod
     def load_from_source_code(directory, obj=None, delete=False):
@@ -482,14 +482,14 @@ class Terminal:
             for key, val in self.output.items():
                 print(key, f"\n{'='*30}\n", val)
 
-    def __init__(self, stdout=None, stderr=None, elevated=False):
+    def __init__(self, stdout=sys.stdout, stderr=sys.stderr, stdin=sys.stdin, elevated=False):
         """
         Console
         Terminal
         Bash
         Shell
         Host
-        * adding console to the begining of the command results in launching a new console that will not
+        * adding `start` to the begining of the command results in launching a new console that will not
         inherent from the console python was launched from (e.g. conda enviroment), unlike when console name is ignored.
 
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
@@ -500,13 +500,14 @@ class Terminal:
         * To launch a new window, either use
         """
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
-        self.stdout = subprocess.DEVNULL if stdout is None else stdout
-        self.stderr = subprocess.DEVNULL if stderr is None else stderr
+        self.stdout = stdout
+        self.stderr = stderr
+        self.stdin = stdin
         self.elevated = elevated
-        # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
 
     @staticmethod
     def is_admin():
+        # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
@@ -518,7 +519,8 @@ class Terminal:
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
         if self.elevated is False or self.is_admin():
-            resp = subprocess.run(my_list, capture_output=True, text=True, shell=True)
+            resp = subprocess.run(my_list, capture_output=True, text=True, shell=True,
+                                  stdin=self.stdin, stdout=self.stdout, stderr=self.stderr)
         else:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
@@ -531,7 +533,7 @@ class Terminal:
         """Opens a new terminal, and let it run asynchronously."""
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
-        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, shell=True)
+        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=True)
         return w
 
     @staticmethod
@@ -574,7 +576,7 @@ tb.sys.path.insert(0, r'{wdir}')
         script = f"""print(r'''{script}''')""" + "\n" + script
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
-        print(f"Script to be executed asyncronously: ", file.as_uri())
+        print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal.open_console(console=console, command=f"{'ipython' if ipython else 'python'} "
                                                        f"{'-i' if interactive else ''}"
                                                        f" {file}",
@@ -619,6 +621,12 @@ class SSH(object):
                          username=username,
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
 
+        self.load_python_cmd = rf""""source ~/miniconda3/bin/activate; """
+        import platform
+        self.source_machine = platform.system()  # Windows, Linux, Darwin
+        self.target_machine = self.ssh.exec_command(self.load_python_cmd +
+                                                    "python -c 'import platform; platform.system()'")
+
     def open_console(self):
         cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
         print(cmd)
@@ -652,7 +660,9 @@ class SSH(object):
             source.delete(are_you_sure=True)
 
         if encrypt:
-            cmd = rf"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
+            cmd = """"""
+            cmd = cmd + self.load_python_cmd
+            cmd = cmd + rf"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
             cmd += fr"""p.expanduser().decipher_unzip(secret='{handler.secret}')" """
             print(f"Executign on remote: {cmd}")
             resp = self.run(cmd)
@@ -863,7 +873,7 @@ class Log(object):
         fhandler.setLevel(level=f_level)
         fhandler.set_name(name)
         logger.addHandler(fhandler)
-        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).as_uri())
+        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).absolute().as_uri())
 
     @staticmethod
     def test_logger(logger):
