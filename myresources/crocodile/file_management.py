@@ -734,6 +734,7 @@ class P(type(Path()), Path, Base):
         else:
             op_path = P(op_path) / zipfile.stem
         result = Compression.unzip(zipfile, op_path, fname, **kwargs)
+        if verbose: print(f"{zipfile} was zipped to  {result}")
         return result
 
     def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):
@@ -746,10 +747,9 @@ class P(type(Path()), Path, Base):
         pass
 
     def lock(self, password: str = None, op_path=None, verbose=True):
-        if verbose: print(f"Warning: this method is less secure than `encrypt`. It exposes the plain string passwords to console. "
-              f"Use only for PIN purpose.")
-        if password is None:
-            password = randstr(length=6, punctuation=True)
+        if verbose: print(f"Warning: this method is less secure than `encrypt`. It exposes the plain string passwords "
+                          f"to console. Use only for PIN purpose.")
+        if password is None: password = randstr(length=6, punctuation=True)
         import hashlib
         m = hashlib.sha256()  # converts anything to fixed length 32 bytes
         m.update(password.encode("utf-8"))
@@ -833,18 +833,7 @@ class P(type(Path()), Path, Base):
         tmpdir = self.tmpdir(prefix="zip_and_secure_")
         zipped = self.zip(op_path=tmpdir.joinpath(self.name))
         secret, zipped_secured = getattr(zipped, security)(secret, verbose=False)
-
-        class FileHandler:
-            def __init__(slf):
-                slf.tmpdir = tmpdir
-                slf.secret = secret
-                slf.file = zipped_secured
-
-            def decimate(slf):
-                slf.tmpdir.delete(are_you_sure=True)
-                slf.secret = None
-
-        return FileHandler()
+        return FileHandler(tmpdir, secret, zipped_secured)
 
     def decipher_unzip(self, secret, security=["decrypt", "unlock"][1]):
         tmpdir = self.tmpdir(prefix="zip_and_secure_")
@@ -854,6 +843,17 @@ class P(type(Path()), Path, Base):
         result = unzipped.rename(self.parent / unzipped.name)
         tmpdir.delete(are_you_sure=True)
         return result
+
+
+class FileHandler:  # will not be exported
+    def __init__(self, tmpdir, secret, zipped_secured):
+        self.tmpdir = tmpdir
+        self.secret = secret
+        self.file = zipped_secured
+
+    def decimate(self):
+        self.tmpdir.delete(are_you_sure=True)
+        self.secret = None
 
 
 class Compression(object):

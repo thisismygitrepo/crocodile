@@ -1,6 +1,6 @@
 
 import logging
-import dill
+# import dill
 import subprocess
 import time
 from crocodile.core import np, os, sys, inspect, importlib, timestamp, randstr, str2timedelta, datetime, pd, Save
@@ -468,6 +468,20 @@ def batcherv2(func_type='function', order=1):
 
 
 class Terminal:
+
+    class Response:
+        def __init__(self, streams, cmd=None):
+            self.streams = dict(stdin=streams[0], stdout=streams[1], stderr=streams[2])
+            self.output = None
+            self.cmd = cmd
+
+        def capture(self):
+            self.output = {key: val.readlines() for key, val in self.streams.items()}
+
+        def print(self):
+            for key, val in self.output.items():
+                print(key, f"\n{'='*30}\n", val)
+
     def __init__(self, stdout=None, stderr=None, elevated=False):
         """
         Console
@@ -496,7 +510,7 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run_command(self, command, console="powershell", str_op=False):
+    def run(self, command, console="powershell", str_op=False):
         """Blocking operation.
         This is short for:
         res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
@@ -513,7 +527,7 @@ class Terminal:
             return resp
         else: return resp.stdout.replace("\n", "")
 
-    def run_command_async(self, command, console=None):
+    def run_async(self, command, console=None):
         """Opens a new terminal, and let it run asynchronously."""
         my_list = [console, "-Command"] if console is not None else []
         my_list.append(command)
@@ -542,7 +556,7 @@ class Terminal:
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
                    shell=True, delete=False, console="", new_window=True):
-        """This method is a wrapper on top of `run_command_async" except that the command passed will launch python
+        """This method is a wrapper on top of `run_async" except that the command passed will launch python
         console that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
         """
@@ -573,7 +587,7 @@ tb.sys.path.insert(0, r'{wdir}')
 
     @staticmethod
     def load_object_in_new_session(obj):
-        """Python brachnes off to a new window and execute the function passed.
+        """Python brachnes off to a new window and run the function passed.
         context can be either a pickled session or the current file __file__"""
         # step 1: pickle the function
         # step 2: create a script that unpickles it.
@@ -591,6 +605,9 @@ fname.delete(are_you_sure=True, verbose=False)
 
 class SSH(object):
     def __init__(self, hostname, username, ssh_key=None):
+        _ = False
+        if _:
+            super().__init__()
         import paramiko
         self.ssh_key = ssh_key
         self.ssh = paramiko.SSHClient()
@@ -602,66 +619,52 @@ class SSH(object):
                          username=username,
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
 
-    def launch_terminal(self):
+    def open_console(self):
         cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
         print(cmd)
         Terminal().open_console(command=cmd)
 
     def copy_from_here(self, source, target=None, compress=False, encrypt=False):
-        source = tb.P(source)
+        source = P(source)
 
         if target is None:
             # target = source  # works if source is relative.
-            target = tb.P(source).parent.string  # works if source is relative.
-        self.execute(f"mkdir -p {target}")
+            target = P(source).parent.string  # works if source is relative.
+        self.run(f"mkdir -p {target}")
 
         if compress:
             source = source.zip()
 
         handler = None
         if encrypt:
-            handler = source.expanduser().zip_cipher(secret=tb.randstr(length=10))
+            secret = randstr(length=10)
+            handler = source.expanduser().zip_cipher(secret=secret)
             source = handler.file
+            print(f"{secret=}")
 
         command = fr"""scp -r -i {self.ssh_key} {str(source.expanduser())} {self.username}@{self.hostname}:{target} """
         print(f"Locally Executing: {command}")
-        tb.os.system(command)
+        os.system(command)
 
         if compress:
-            self.execute(fr"cd {str(target)};sudo apt install unzip; unzip {str(target)}/{source.name}")
-            self.execute(fr"rm {str(target)}/{source.name}")
+            self.run(fr"cd {str(target)};sudo apt install unzip; unzip {str(target)}/{source.name}")
+            self.run(fr"rm {str(target)}/{source.name}")
             source.delete(are_you_sure=True)
 
         if encrypt:
             cmd = rf"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
             cmd += fr"""p.expanduser().decipher_unzip(secret='{handler.secret}')" """
             print(f"Executign on remote: {cmd}")
-            resp = self.execute(cmd)
+            resp = self.run(cmd)
             handler.decimate()
             return resp
 
     def copy_to_here(self, source, target=None):
         pass
 
-    def execute(self, command):
-        res = tb.L(self.ssh.exec_command(command))
-
-        class Response:
-            def __init__(slf, streams, cmd=None):
-                slf.streams = tb.Struct(stdin=streams[0], stdout=streams[1], stderr=streams[2])
-                slf.output = None
-                slf.cmd = cmd
-
-            def capture(slf):
-                output = slf.streams.values().apply(lambda x: x.readlines())
-                slf.output = tb.Struct.from_keys_values(slf.streams.keys(), output)
-
-            def print(slf):
-                for key, val in slf.output:
-                    print(key, f"\n{'='*30}\n", val)
-                return res
-
-        return Response(res)
+    def run(self, command):
+        res = self.ssh.exec_command(command)
+        return Terminal.Response(res)
 
 
 class Log(object):
@@ -932,10 +935,10 @@ class Scheduler:
         self.occasional = occasional  # routine to be repeated every `other` time.
         self.exception_handler = exception if exception is not None else lambda ex: None
         self.wind_down = wind_down
-        # routine to be run_command when an error occurs, e.g. save object.
+        # routine to be run when an error occurs, e.g. save object.
         self.wait = wait  # wait period between routine cycles.
         self.other = other  # number of routine cycles before `occasional` get executed once.
-        self.cycles = runs  # how many times to run_command the routine. defaults to infinite.
+        self.cycles = runs  # how many times to run the routine. defaults to infinite.
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
         self.history = []
         self._start_time = None  # begining of a session (local time)
