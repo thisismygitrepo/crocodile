@@ -31,7 +31,8 @@ VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityVie
 
 Cycle, Experimental, Terminal, Manipulator = meta.Cycle, meta.Experimental, meta.Terminal, meta.Manipulator
 batcher, batcherv2, Log, accelerate, Null = meta.batcher, meta.batcherv2, meta.Log, meta.accelerate, meta.Null
-Scheduler = meta.Scheduler
+Scheduler, SSH = meta.Scheduler, meta.SSH
+
 
 L = List
 tmp = P.tmp

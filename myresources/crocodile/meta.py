@@ -589,6 +589,81 @@ fname.delete(are_you_sure=True, verbose=False)
         Terminal.run_script(script)
 
 
+class SSH(object):
+    def __init__(self, hostname, username, ssh_key=None):
+        import paramiko
+        self.ssh_key = ssh_key
+        self.ssh = paramiko.SSHClient()
+        self.ssh.load_system_host_keys()
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.hostname = hostname
+        self.username = username
+        self.ssh.connect(hostname=hostname,
+                         username=username,
+                         port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
+
+    def launch_terminal(self):
+        cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
+        print(cmd)
+        Terminal().open_console(command=cmd)
+
+    def copy_from_here(self, source, target=None, compress=False, encrypt=False):
+        source = tb.P(source)
+
+        if target is None:
+            # target = source  # works if source is relative.
+            target = tb.P(source).parent.string  # works if source is relative.
+        self.execute(f"mkdir -p {target}")
+
+        if compress:
+            source = source.zip()
+
+        handler = None
+        if encrypt:
+            handler = source.expanduser().zip_cipher(secret=tb.randstr(length=10))
+            source = handler.file
+
+        command = fr"""scp -r -i {self.ssh_key} {str(source.expanduser())} {self.username}@{self.hostname}:{target} """
+        print(f"Locally Executing: {command}")
+        tb.os.system(command)
+
+        if compress:
+            self.execute(fr"cd {str(target)};sudo apt install unzip; unzip {str(target)}/{source.name}")
+            self.execute(fr"rm {str(target)}/{source.name}")
+            source.delete(are_you_sure=True)
+
+        if encrypt:
+            cmd = rf"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
+            cmd += fr"""p.expanduser().decipher_unzip(secret='{handler.secret}')" """
+            print(f"Executign on remote: {cmd}")
+            resp = self.execute(cmd)
+            handler.decimate()
+            return resp
+
+    def copy_to_here(self, source, target=None):
+        pass
+
+    def execute(self, command):
+        res = tb.L(self.ssh.exec_command(command))
+
+        class Response:
+            def __init__(slf, streams, cmd=None):
+                slf.streams = tb.Struct(stdin=streams[0], stdout=streams[1], stderr=streams[2])
+                slf.output = None
+                slf.cmd = cmd
+
+            def capture(slf):
+                output = slf.streams.values().apply(lambda x: x.readlines())
+                slf.output = tb.Struct.from_keys_values(slf.streams.keys(), output)
+
+            def print(slf):
+                for key, val in slf.output:
+                    print(key, f"\n{'='*30}\n", val)
+                return res
+
+        return Response(res)
+
+
 class Log(object):
     """This class is needed once a project grows beyond simple work. Simple print statements from
     dozens of objects will not be useful as the programmer will not easily recognize who
