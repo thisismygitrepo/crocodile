@@ -705,7 +705,7 @@ class P(type(Path()), Path, Base):
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================
-    def zip(self, op_path=None, arcname=None, **kwargs):
+    def zip(self, op_path=None, arcname=None, delete=False, **kwargs):
         """
         """
         op_path = op_path or self
@@ -719,62 +719,82 @@ class P(type(Path()), Path, Base):
         else:
             op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
                                                   arcname=arcname, fmt='zip', **kwargs)
+        if delete: self.delete(are_you_sure=True)
         return op_path
 
-    def unzip(self, op_path=None, fname=None, verbose=False, **kwargs):
+    def unzip(self, op_path=None, fname=None, verbose=False, delete=False, **kwargs):
         zipfile = self
-
         if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
             assert ".zip" in str(self), f"Not a zip archive."
             zipfile, fname = self.split(at=".zip", sep=0)
             zipfile += ".zip"
-
         if op_path is None:
             op_path = zipfile.parent / zipfile.stem
         else:
             op_path = P(op_path) / zipfile.stem
         result = Compression.unzip(zipfile, op_path, fname, **kwargs)
-        if verbose: print(f"{zipfile} was zipped to  {result}")
+        if verbose:
+            msg = f"{zipfile} was zipped to  {result}"
+            if delete: msg += "\nOriginal file deleted."
+            print(msg)
+        if delete: self.delete(are_you_sure=True)
         return result
 
-    def compress(self, op_path=None, base_dir=None, format_="zip", **kwargs):
-        formats = ["zip", "tar", "gzip"]
-        assert format_ in formats, f"Unsupported format {format_}. The supported formats are {formats}"
+    def tar(self, op_path=None):
+        if op_path is None: op_path = self + '.gz'
+        return Compression.untar(self, op_path=op_path)
+
+    def untar(self):
+        pass
+
+    def gz(self):
+        pass
+
+    def ungz(self):
+        pass
+
+    def tar_gz(self):
+        pass
+
+    def untar_ungz(self, op_path=None, delete=True):
+        op_path = op_path or P(self.parent) / P(self.stem)
+        intrem = Compression.ungz(self, op_path=op_path)
+        result = Compression.untar(intrem, op_path=op_path)
+        if delete: intrem.delete(are_you_sure=True)
+        return result
+
+    def compress(self, op_path=None, base_dir=None, fmt="zip", **kwargs):
+        fmts = ["zip", "tar", "gzip"]
+        assert fmt in fmts, f"Unsupported format {fmt}. The supported formats are {fmts}"
         _ = self, op_path, base_dir, kwargs
         pass
 
     def decompress(self):
         pass
 
-    def lock(self, password: str = None, op_path=None, verbose=True):
-        if verbose: print(f"Warning: this method is less secure than `encrypt`. It exposes the plain string passwords "
-                          f"to console. Use only for PIN purpose.")
+    @staticmethod
+    def pwd2key(password=None):
         if password is None: password = randstr(length=6, punctuation=True)
-        import hashlib
+        import hashlib, base64
         m = hashlib.sha256()  # converts anything to fixed length 32 bytes
         m.update(password.encode("utf-8"))
-        q = m.digest()
-        import base64
-        key = base64.urlsafe_b64encode(q)  # make url-safe bytes required by Ferent.
+        return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
 
-        if op_path is None: op_path = self.append("_locked")
-        key_path, op_path = self.encrypt(key=key, op_path=op_path, verbose=False)
-        if type(key_path) is not bytes:
-            key_path.delete(are_you_sure=True, verbose=False)
+    def lock(self, password: str = None, op_path=None, verbose=True):
+        if verbose: print(f"Warning: `lock` method is less secure than `encrypt`. It exposes the plain string passwords"
+                          f" to console. Use only for PIN purpose.")
+        key_path, op_path = self.encrypt(key=self.pwd2key(password), op_path=op_path,
+                                         verbose=False, append="_locked", delete=False)
         if verbose: print(f"Locking completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}.")
         return password, op_path
 
-    def unlock(self, password, op_path=None, verbose=True):
-        import hashlib, base64
-        m = hashlib.sha256()
-        m.update(password.encode("utf-8"))
-        key = base64.urlsafe_b64encode(m.digest())
-        if op_path is None: op_path = self.switch("_locked", "")
-        op_path = self.decrypt(key=key, op_path=op_path, verbose=False)
+    def unlock(self, password, op_path=None, verbose=True, delete=False):
+        op_path = self.decrypt(key=self.pwd2key(password), op_path=op_path,
+                               verbose=False, append="_locked", delete=delete)
         if verbose: print(f"Unlocking completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}.")
         return op_path
 
-    def encrypt(self, key=None, op_path=None, verbose=True):
+    def encrypt(self, key=None, op_path=None, verbose=True, append="_encrypted", delete=False):
         """
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         :param key:
@@ -782,7 +802,7 @@ class P(type(Path()), Path, Base):
         :param verbose:
         :return:
         """
-        op_path = self.append(name="_encrypted") if op_path is None else P(op_path)
+        op_path = self.append(name=append) if op_path is None else P(op_path)
         from cryptography.fernet import Fernet
         if key is None:
             key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
@@ -793,69 +813,60 @@ class P(type(Path()), Path, Base):
             key_path = P(key)
             key = key_path.read_bytes()
         elif type(key) is bytes:
-            key_path = key
-            # key_path = P.tmp().joinpath("key.bytes")
-            # key_path.write_bytes(key)
-            # if verbose: print(f"The key passed was saved @ {key_path.absolute(.)as_uri()}")
+            key_path = None
         else:
             raise TypeError(f"Key must be either a path, bytes object or None.")
         op_path.write_bytes(Fernet(key).encrypt(self.read_bytes()))
-        if verbose: print(f"Encryption Warning:\n"
-                          f"* Be careful of key being stored unintendedly in console or terminal history, "
-                          f"e.g. don't use IPython.\n"
-                          f"* It behoves you to try decrypting it to err on the side of safety.\n"
-                          f"* Don't forget to delete OR store key file safely {key_path.absolute().as_uri()}")
-        if verbose: print(f"Encryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
-                          f" Key = {key_path.absolute().as_uri()}")
+        if verbose:
+            msg = f"Encryption Warning:\n"
+            f"* Be careful of key being stored unintendedly in console or terminal history, "
+            f"e.g. don't use IPython.\n"
+            f"* It behoves you to try decrypting it to err on the side of safety.\n"
+            f"* Don't forget to delete OR store key file safely {key_path.absolute().as_uri()}"
+            print(msg)
+            msg = f"Encryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
+            if delete: msg += "\nOriginal file deleted."
+            if key_path is not None: msg += f" Key = {key_path.absolute().as_uri()}"
+            print(msg)
+        if delete: self.delete(are_you_sure=True)
         return key_path, op_path
 
-    def decrypt(self, key, op_path=None, verbose=True):
+    def decrypt(self, key, op_path=None, verbose=True, append="_encrypted", delete=False):
         from cryptography.fernet import Fernet
         if type(key) is bytes:
-            key_path = key
-            # key_path = P.home().joinpath("key.bytes")
-            # key_path.write_bytes(key)
-            # if verbose: print(f"The key passed was saved @ {key_path.absolute(.)as_uri()}")
+            key_path = None
         elif type(key) in {str, P, Path}:
             key_path = P(key)
             key = key_path.read_bytes()
         else:
             raise TypeError(f"Key must be either str, P, Path or bytes.")
-        op_path = P(op_path) if op_path is not None else self.switch("_encrypted", "")
+        op_path = P(op_path) if op_path is not None else self.switch(append, "")
         op_path.write_bytes(Fernet(key).decrypt(self.read_bytes()))
-        if verbose: print(f"Decryption Warning:\n"
-                          f"* Be wary of key being stored unintendedly in console or terminal history.\n"
-                          f"* Don't forget to delete OR safely store the key file {key_path.absolute().as_uri()}.")
-        if verbose: print(f"Decryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
-                          f" Key = {key_path.absolute().as_uri()}")
+        if verbose:
+            msg = f"Decryption Warning:\n"
+            f"* Be wary of key being stored unintendedly in console or terminal history.\n"
+            f"* Don't forget to delete OR safely store the key file {key_path.absolute().as_uri()}."
+            print(msg)
+            msg = f"Decryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
+            if delete: msg += "\nOriginal file deleted."
+            if key_path is not None:
+                msg += f" Key = {key_path.absolute().as_uri()}"
+            print(msg)
+        if delete: self.delete(are_you_sure=True)
         return op_path
 
-    def zip_cipher(self, secret=None, security=["encrypt", "lock"][1]):
-
-        tmpdir = self.tmpdir(prefix="zip_and_secure_")
-        zipped = self.zip(op_path=tmpdir.joinpath(self.name))
+    def zip_cipher(self, secret=None, security=["encrypt", "lock"][1], delete=False):
+        zipped = self.zip(delete=delete)
         secret, zipped_secured = getattr(zipped, security)(secret, verbose=False)
-        return FileHandler(tmpdir, secret, zipped_secured)
+        if delete: zipped.delete(are_you_sure=True)
+        return secret, zipped_secured
 
     def decipher_unzip(self, secret, security=["decrypt", "unlock"][1]):
-        tmpdir = self.tmpdir(prefix="zip_and_secure_")
-        moved_self = self.move(tmpdir, verbose=True)
-        deciphered = getattr(moved_self, security)(secret, verbose=False)
+        deciphered = getattr(self, security)(secret, verbose=False)
         unzipped = deciphered.unzip(op_path=tmpdir).search("*")[0]
         result = unzipped.rename(self.parent / unzipped.name)
-        tmpdir.delete(are_you_sure=True)
+        unzipped.delete(are_you_sure=True)
         return result
-
-
-class FileHandler:  # will not be exported
-    def __init__(self, tmpdir, secret, zipped_secured):
-        self.tmpdir = tmpdir
-        self.secret = secret
-        self.file = zipped_secured
-
-    def decimate(self):
-        self.tmpdir.delete(are_you_sure=True)
-        self.secret = None
 
 
 class Compression(object):
@@ -908,41 +919,41 @@ class Compression(object):
             if fname is None:  # extract all:
                 zipObj.extractall(op_path, pwd=password, **kwargs)
             else:
-                zipObj.extract(str(fname), str(op_path), pwd=password)
+                zipObj.extract(member=str(fname), path=str(op_path), pwd=password)
                 op_path = P(op_path) / fname
         return P(op_path)
 
     @staticmethod
-    def gz(file):
+    def gz(file, op_file):
         import gzip
         with open(file, 'rb') as f_in:
-            with gzip.open(str(file) + '.gz', 'wb') as f_out:
+            with gzip.open(op_file, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
+        return op_file
 
     @staticmethod
     def ungz(self, op_path=None):
         import gzip
-        fn = str(self)
-        op_path = op_path or self.parent / self.stem
-        with gzip.open(fn, 'r') as f_in, open(op_path, 'wb') as f_out:
+        with gzip.open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
         return P(op_path)
 
     @staticmethod
-    def tar():
-        # import tarfile
-        pass
+    def tar(self, op_path):
+        import tarfile
+        with tarfile.open(op_path, "w:gz") as tar:
+            tar.add(str(self), arcname=os.path.basename(str(self)))
+        return op_path
 
     @staticmethod
-    def untar(self, fname=None, extract_dir='.', mode='r', **kwargs):
+    def untar(self, op_path, fname=None, mode='r', **kwargs):
         import tarfile
-        file = tarfile.open(str(self), mode)
-        if fname is None:  # extract all files in the archive
-            file.extractall(path=extract_dir, **kwargs)
-        else:
-            file.extract(fname, **kwargs)
-        file.close()
-        return fname
+        with tarfile.open(str(self), mode) as file:
+            if fname is None:  # extract all files in the archive
+                file.extractall(path=op_path, **kwargs)
+            else:
+                file.extract(fname, **kwargs)
+        return P(op_path)
 
 
 class MemoryDB:
@@ -981,11 +992,13 @@ class Fridge:
     The class has two flavours, memory-based and disk-based variants.
     """
 
-    def __init__(self, refresh, expire="1m", logger=None, path=None, save=Save.pickle, read=Read.read):
-        self.cache = None
-        self.time = None
-        self.expire = expire
-        self.refresh = refresh
+    def __init__(self, refresh, expire="1m", time=None, logger=None, path=None, save=Save.pickle, read=Read.read):
+        """
+        """
+        self.cache = None  # fridge content
+        self.time = time  or pd.Timestamp.now()  # init time
+        self.expire = expire  # how much time elapsed before
+        self.refresh = refresh  # function which when called returns a fresh object to be frozen.
         self.logger = logger
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.save = save
@@ -1009,7 +1022,11 @@ class Fridge:
         else:
             return pd.Timestamp.now() - self.path.stats().content_mod_time
 
+    def reset(self):
+        self.time = pd.Timestamp.now()
+
     def __call__(self, fresh=False):
+        """"""
         if self.path is None:  # Memory Fridge
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
                 self.cache = self.refresh()

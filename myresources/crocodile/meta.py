@@ -1,4 +1,3 @@
-
 import logging
 # import dill
 import subprocess
@@ -260,7 +259,8 @@ class Experimental:
             if key != "args" and key != "kwargs":
                 flag = False
                 if val is inspect._empty:  # not passed argument.
-                    if exclude_args: flag = True
+                    if exclude_args:
+                        flag = True
                     else:
                         val = None
                         print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
@@ -463,24 +463,33 @@ def batcherv2(func_type='function', order=1):
             def __call__(self, *args, **kwargs):
                 output = [self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
                 return np.array(output)
-
         return Batch
 
 
 class Terminal:
-
     class Response:
-        def __init__(self, streams, cmd=None):
-            self.streams = dict(stdin=streams[0], stdout=streams[1], stderr=streams[2])
-            self.output = None
-            self.cmd = cmd
+        @staticmethod
+        def from_completed_process(cp: subprocess.CompletedProcess):
+            resp = Terminal.Response(cmd=cp.args)
+            resp.output = dict(stdout=cp.stdout, stderr=cp.stderr,
+                               returncode=cp.returncode)
+            return resp
+
+        def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None):
+            self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)
+            self.input = cmd  # input command
+            self.output = None  # streams
+            # self.returncode = None  # only relevant for completed processes.
 
         def capture(self):
-            self.output = {key: val.readlines() for key, val in self.streams.items()}
+            for key, val in self.std.items():
+                self.output[key] = val.readlines()
 
         def print(self):
-            for key, val in self.output.items():
-                print(key, f"\n{'='*30}\n", val)
+            if self.output is None: self.capture()
+            print(f"Terminal Response:\nInput Command: {self.input}")
+            for idx, (key, val) in enumerate(self.output.items()):
+                print(f"{idx} - {key} ", f"{'=' * 30}\n", val)
 
     def __init__(self, stdout=sys.stdout, stderr=sys.stderr, stdin=sys.stdin, elevated=False):
         """
@@ -504,6 +513,8 @@ class Terminal:
         self.stderr = stderr
         self.stdin = stdin
         self.elevated = elevated
+        import platform
+        self.source_machine = platform.system()  # Windows, Linux, Darwin
 
     @staticmethod
     def is_admin():
@@ -511,23 +522,22 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run(self, command, console="powershell", str_op=False):
+    def run(self, command, console=None):
         """Blocking operation.
         This is short for:
         res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
         """
-        my_list = [console, "-Command"] if console is not None else []
+        my_list = []
+        if console is None:  # auto choice:
+            if self.source_machine == "Windows": my_list = [console, "-Command"]
+            else: my_list = []
         my_list.append(command)
         if self.elevated is False or self.is_admin():
-            resp = subprocess.run(my_list, capture_output=True, text=True, shell=True,
-                                  stdin=self.stdin, stdout=self.stdout, stderr=self.stderr)
+            resp = subprocess.run(my_list, capture_output=True, text=True, shell=True)
         else:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        print(f"Crocodile: meta: Terminal: command execution response: {resp}")
-        if not str_op:
-            return resp
-        else: return resp.stdout.replace("\n", "")
+        return self.Response.from_completed_process(resp)
 
     def run_async(self, command, console=None):
         """Opens a new terminal, and let it run asynchronously."""
@@ -580,7 +590,7 @@ tb.sys.path.insert(0, r'{wdir}')
         Terminal.open_console(console=console, command=f"{'ipython' if ipython else 'python'} "
                                                        f"{'-i' if interactive else ''}"
                                                        f" {file}",
-                          shell=shell, new_window=new_window)
+                              shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete
@@ -622,8 +632,6 @@ class SSH(object):
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
 
         self.load_python_cmd = rf""""source ~/miniconda3/bin/activate; """
-        import platform
-        self.source_machine = platform.system()  # Windows, Linux, Darwin
         self.target_machine = self.ssh.exec_command(self.load_python_cmd +
                                                     "python -c 'import platform; platform.system()'")
 
@@ -662,8 +670,8 @@ class SSH(object):
         if encrypt:
             cmd = """"""
             cmd = cmd + self.load_python_cmd
-            cmd = cmd + rf"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
-            cmd += fr"""p.expanduser().decipher_unzip(secret='{handler.secret}')" """
+            cmd = cmd + f"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
+            cmd += f"""p.expanduser().decipher_unzip(secret='{handler.secret}')" """
             print(f"Executign on remote: {cmd}")
             resp = self.run(cmd)
             handler.decimate()
@@ -873,7 +881,8 @@ class Log(object):
         fhandler.setLevel(level=f_level)
         fhandler.set_name(name)
         logger.addHandler(fhandler)
-        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).absolute().as_uri())
+        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(
+            file_path).absolute().as_uri())
 
     @staticmethod
     def test_logger(logger):
