@@ -146,7 +146,7 @@ class P(type(Path()), Path, Base):
     def time(self, which="m", **kwargs):
         """Meaning of ``which values``
             * ``m`` time of modifying file ``content``, i.e. the time it was created.
-            * ``c`` time of changing file status (its inode is changed like permissions, name etc, but not contents)
+            * ``c`` time of changing file status (its inode is changed like permissions, name etc, but not content)
             * ``a`` last time the file was accessed.
 
         :param which: Determines which time to be returned. Three options are availalable:
@@ -192,9 +192,9 @@ class P(type(Path()), Path, Base):
         def inner(apath: P, prefix: str = '', level_=-1):
             nonlocal files, directories
             if not level_: return  # 0, stop iterating
-            contents = apath.search("*", files=not limit_to_directories)
-            pointers = [tee] * (len(contents) - 1) + [last]
-            for pointer, path in zip(pointers, contents):
+            content = apath.search("*", files=not limit_to_directories)
+            pointers = [tee] * (len(content) - 1) + [last]
+            for pointer, path in zip(pointers, content):
                 if path.is_dir():
                     yield prefix + pointer + path.name + get_stats(path)
                     directories += 1
@@ -403,16 +403,16 @@ class P(type(Path()), Path, Base):
     def delete(self, are_you_sure=False, verbose=True):
         if are_you_sure:
             if not self.exists():
-                if verbose: print(f"File {self.absolute().as_uri()} does not exist. No deletion performed.")
+                if verbose: print(f"Could NOT DELETE nonexisting file `{self.absolute().as_uri()}`. ")
                 return None  # terminate the function.
             if self.is_file():
                 self.unlink()  # missing_ok=True added in 3.8
             else:
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
-            if verbose: print(f"File {self.absolute().as_uri()} deleted.")
+            if verbose: print(f"DELETED `{self.absolute().as_uri()}`.")
         else:
-            if verbose: print(f"File {self.absolute().as_uri()} not deleted because user is not sure.")
+            if verbose: print(f"Did NOT DELETE because user is not sure. file: `{self.absolute().as_uri()}`.")
 
     def send2trash(self):
         # send2trash = Experimental.assert_package_installed("send2trash")
@@ -425,7 +425,7 @@ class P(type(Path()), Path, Base):
         new_path = P(new_path).absolute() / temp.name
         if overwrite: new_path.delete(are_you_sure=True, verbose=False)
         temp.rename(new_path)
-        if verbose: print(f"{self.absolute().as_uri()} MOVED TO {new_path.absolute().as_uri()}")
+        if verbose: print(f"MOVED `{self.absolute().as_uri()}` ==> `{new_path.absolute().as_uri()}`")
         return new_path
 
     def renameit(self, new_file_name):
@@ -434,12 +434,12 @@ class P(type(Path()), Path, Base):
         self.rename(new_path)
         return new_path
 
-    def copy(self, target_dir=None, target_name=None, contents=False, verbose=False):
+    def copy(self, target_dir=None, target_name=None, content=False, verbose=True):
         """
 
         :param target_dir: copy the file to this directory (filename remains the same).
         :param target_name: full path of destination (including -potentially different-  file name).
-        :param contents: copy the parent directory or its contents (relevant only if copying a directory)
+        :param content: copy the parent directory or its content (relevant only if copying a directory)
         :param verbose:
         :return: path to copied file or directory.
 
@@ -463,24 +463,24 @@ class P(type(Path()), Path, Base):
 
         if self.is_file():
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
-            if verbose: print(f"File {self} copied successfully to: {dest}")
+            if verbose: print(f"COPIED {self} ==> `{dest}`")
         elif self.is_dir():
             from distutils.dir_util import copy_tree
-            if contents:
+            if content:
                 copy_tree(str(self), str(dest))
             else:
                 copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
             if verbose:
-                preface = "Contents of " if contents else ""
-                print(f"{preface} {self.absolute().as_uri()} copied successfully to: {dest.absolute().as_uri()}")
+                preface = "Content of " if content else ""
+                print(f"COPIED {preface} `{self.absolute().as_uri()}` ==> `{dest.absolute().as_uri()}`")
         else:
-            print(f"Could not copy this thing: {self.absolute().as_uri()}. Not a file nor a folder.")
+            print(f"Could NOT COPY. Not a file nor a folder: `{self.absolute().as_uri()}`.")
         return dest / self.name
 
     def clean(self, trash=True):
-        """removes contents on a folder, rather than deleting the folder."""
-        contents = self.listdir()
-        for content in contents:
+        """removes content on a folder, rather than deleting the folder."""
+        content = self.listdir()
+        for content in content:
             self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(are_you_sure=True)
         return self
 
@@ -496,9 +496,7 @@ class P(type(Path()), Path, Base):
         """
         filename = self
         if '.zip' in str(self):
-            filename = self.unzip(op_path=self.tmp(folder="unzipped"))
-            if verbose: print(f"File {self} was uncompressed to {filename}")
-
+            filename = self.unzip(op_path=self.tmp(folder="unzipped"), verbose=verbose)
         try:
             if reader is None:  # infer the reader
                 return Read.read(filename, **kwargs)
@@ -510,6 +508,9 @@ class P(type(Path()), Path, Base):
             else:
                 return notfound
         # for other errors, we do not know how to handle them, thus, they will be raised automatically.
+
+    def __call__(self, *args, **kwargs):
+        return self.start()
 
     def start(self):  # explore folders.
         if str(self).startswith("http") or str(self).startswith("www"):
@@ -579,9 +580,9 @@ class P(type(Path()), Path, Base):
         if self.suffix == ".zip":
             import zipfile
             with zipfile.ZipFile(str(self)) as z:
-                contents = List(z.namelist())
+                content = List(z.namelist())
             from fnmatch import fnmatch
-            raw = contents.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: self / x)
+            raw = content.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: self / x)
 
         elif dotfiles:
             raw = self.glob(pattern) if not r else self.rglob(pattern)
@@ -696,7 +697,7 @@ class P(type(Path()), Path, Base):
             path.mkdir(exist_ok=True, parents=True)
         if file is not None:
             path = path / file
-        if verbose: print(path.absolute().as_uri(), "\n", path.parent.absolute().as_uri())
+        if verbose: print(f"TMPDIR `{path.absolute().as_uri()}`. Parent: `{path.parent.absolute().as_uri()}`")
         return path
 
     @staticmethod
@@ -705,7 +706,7 @@ class P(type(Path()), Path, Base):
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================
-    def zip(self, op_path=None, arcname=None, delete=False, **kwargs):
+    def zip(self, op_path=None, arcname=None, delete=False, verbose=True, **kwargs):
         """
         """
         op_path = op_path or self
@@ -719,25 +720,24 @@ class P(type(Path()), Path, Base):
         else:
             op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
                                                   arcname=arcname, fmt='zip', **kwargs)
-        if delete: self.delete(are_you_sure=True)
+        if verbose: print(f"ZIPPED `{self.absolute().as_uri()}` ==>  `{op_path.absolute().as_uri()}`")
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
-    def unzip(self, op_path=None, fname=None, verbose=False, delete=False, **kwargs):
+    def unzip(self, op_path=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
         zipfile = self
         if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
             assert ".zip" in str(self), f"Not a zip archive."
             zipfile, fname = self.split(at=".zip", sep=0)
             zipfile += ".zip"
-        if op_path is None:
-            op_path = zipfile.parent / zipfile.stem
-        else:
-            op_path = P(op_path) / zipfile.stem
+        if op_path is None: op_path = zipfile.parent / zipfile.stem
+        else:  op_path = P(op_path)
+        if content: op_path = op_path.parent
         result = Compression.unzip(zipfile, op_path, fname, **kwargs)
         if verbose:
-            msg = f"{zipfile} was zipped to  {result}"
-            if delete: msg += "\nOriginal file deleted."
+            msg = f"UNZIPPED `{zipfile.absolute().as_uri()}` ==> `{result.absolute().as_uri()}`"
             print(msg)
-        if delete: self.delete(are_you_sure=True)
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return result
 
     def tar(self, op_path=None):
@@ -756,17 +756,18 @@ class P(type(Path()), Path, Base):
     def tar_gz(self):
         pass
 
-    def untar_ungz(self, op_path=None, delete=True):
+    def untar_ungz(self, op_path=None, delete=False, verbose=True):
         op_path = op_path or P(self.parent) / P(self.stem)
-        intrem = Compression.ungz(self, op_path=op_path)
-        result = Compression.untar(intrem, op_path=op_path)
-        if delete: intrem.delete(are_you_sure=True)
+        intrem = Compression.ungz(self, op_path=op_path, verbose=verbose)
+        result = Compression.untar(intrem, op_path=op_path, verbose=verbose)
+        intrem.delete(are_you_sure=True, verbose=verbose)
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return result
 
-    def compress(self, op_path=None, base_dir=None, fmt="zip", **kwargs):
+    def compress(self, op_path=None, base_dir=None, fmt="zip", delete=False, **kwargs):
         fmts = ["zip", "tar", "gzip"]
         assert fmt in fmts, f"Unsupported format {fmt}. The supported formats are {fmts}"
-        _ = self, op_path, base_dir, kwargs
+        _ = self, op_path, base_dir, kwargs, delete
         pass
 
     def decompress(self):
@@ -780,18 +781,20 @@ class P(type(Path()), Path, Base):
         m.update(password.encode("utf-8"))
         return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
 
-    def lock(self, password: str = None, op_path=None, verbose=True):
+    def lock(self, password: str = None, op_path=None, delete=False, verbose=True):
         if verbose: print(f"Warning: `lock` method is less secure than `encrypt`. It exposes the plain string passwords"
                           f" to console. Use only for PIN purpose.")
         key_path, op_path = self.encrypt(key=self.pwd2key(password), op_path=op_path,
                                          verbose=False, append="_locked", delete=False)
-        if verbose: print(f"Locking completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}.")
+        if verbose: print(f"LOCKED `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return password, op_path
 
     def unlock(self, password, op_path=None, verbose=True, delete=False):
         op_path = self.decrypt(key=self.pwd2key(password), op_path=op_path,
-                               verbose=False, append="_locked", delete=delete)
-        if verbose: print(f"Unlocking completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}.")
+                               verbose=False, append="_locked", delete=False)
+        if verbose: print(f"UNLOCKED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
     def encrypt(self, key=None, op_path=None, verbose=True, append="_encrypted", delete=False):
@@ -808,7 +811,7 @@ class P(type(Path()), Path, Base):
             key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
             key_path = op_path.parent.joinpath("key.bytes")
             key_path.write_bytes(key)
-            if verbose: print(f"The key generated was saved @ {key_path.absolute().as_uri()}")
+            if verbose: print(f"KEY SAVED @ `{key_path.absolute().as_uri()}`")
         elif type(key) in {str, P, Path}:  # a path
             key_path = P(key)
             key = key_path.read_bytes()
@@ -818,17 +821,16 @@ class P(type(Path()), Path, Base):
             raise TypeError(f"Key must be either a path, bytes object or None.")
         op_path.write_bytes(Fernet(key).encrypt(self.read_bytes()))
         if verbose:
-            msg = f"Encryption Warning:\n"
-            f"* Be careful of key being stored unintendedly in console or terminal history, "
-            f"e.g. don't use IPython.\n"
-            f"* It behoves you to try decrypting it to err on the side of safety.\n"
-            f"* Don't forget to delete OR store key file safely {key_path.absolute().as_uri()}"
+            msg = f"Encryption Warning:\n" \
+                  f"* Be careful of key being stored unintendedly in console or terminal history, " \
+                  f"e.g. don't use IPython.\n" \
+                  f"* It behoves you to try decrypting it to err on the side of safety.\n" \
+                  f"* Don't forget to delete OR store key file safely."
             print(msg)
-            msg = f"Encryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
-            if delete: msg += "\nOriginal file deleted."
+            msg = f"ENCRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`."
             if key_path is not None: msg += f" Key = {key_path.absolute().as_uri()}"
             print(msg)
-        if delete: self.delete(are_you_sure=True)
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return key_path, op_path
 
     def decrypt(self, key, op_path=None, verbose=True, append="_encrypted", delete=False):
@@ -843,30 +845,26 @@ class P(type(Path()), Path, Base):
         op_path = P(op_path) if op_path is not None else self.switch(append, "")
         op_path.write_bytes(Fernet(key).decrypt(self.read_bytes()))
         if verbose:
-            msg = f"Decryption Warning:\n"
-            f"* Be wary of key being stored unintendedly in console or terminal history.\n"
-            f"* Don't forget to delete OR safely store the key file {key_path.absolute().as_uri()}."
+            msg = f"Decryption Warning:\n" \
+                  f"* Be wary of key being stored unintendedly in console or terminal history.\n" \
+                  f"* Don't forget to delete OR safely store the key file."
             print(msg)
-            msg = f"Decryption completed. {self.absolute().as_uri()} ==> {op_path.absolute().as_uri()}."
-            if delete: msg += "\nOriginal file deleted."
-            if key_path is not None:
-                msg += f" Key = {key_path.absolute().as_uri()}"
+            msg = f"DECRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`."
+            if key_path is not None: msg += f" Key = {key_path.absolute().as_uri()}"
             print(msg)
-        if delete: self.delete(are_you_sure=True)
+        if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
-    def zip_cipher(self, secret=None, security=["encrypt", "lock"][1], delete=False):
-        zipped = self.zip(delete=delete)
-        secret, zipped_secured = getattr(zipped, security)(secret, verbose=False)
-        if delete: zipped.delete(are_you_sure=True)
+    def zip_and_cipher(self, secret=None, security=["encrypt", "lock"][1], delete=False, verbose=True):
+        zipped = self.zip(delete=delete, verbose=verbose)
+        secret, zipped_secured = getattr(zipped, security)(secret, verbose=verbose, delete=True)
         return secret, zipped_secured
 
-    def decipher_unzip(self, secret, security=["decrypt", "unlock"][1]):
-        deciphered = getattr(self, security)(secret, verbose=False)
-        unzipped = deciphered.unzip(op_path=tmpdir).search("*")[0]
-        result = unzipped.rename(self.parent / unzipped.name)
-        unzipped.delete(are_you_sure=True)
-        return result
+    def decipher_and_unzip(self, secret, security=["decrypt", "unlock"][1], delete=False, verbose=True):
+        deciphered = getattr(self, security)(secret, verbose=verbose, delete=delete)
+        unzipped = deciphered.unzip(op_path=None, delete=True, content=True)
+        # result = unzipped.rename(self.parent / unzipped.name)
+        return unzipped.joinpath(deciphered.stem)
 
 
 class Compression(object):

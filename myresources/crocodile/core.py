@@ -124,8 +124,7 @@ def save_decorator(ext=""):
             if verbose:
                 rep = repr(obj)
                 rep = rep if len(rep) < 50 else rep[:10] + "... "
-                print(f"Object {rep} saved @ ", path.absolute().as_uri(),
-                      " |  Directory: ", path.parent.absolute().as_uri())
+                print(f"SAVED {rep}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`")
             return path
 
         return wrapper
