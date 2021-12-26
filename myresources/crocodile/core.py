@@ -730,6 +730,9 @@ class List(list, Base):
             if sep:
                 print(sep * 100)
 
+    def to_series(self):
+        return pd.Series(self.list)
+
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         """
 
@@ -859,7 +862,7 @@ class Struct(Base):  # inheriting from dict gives `get` method.
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=None, yaml=False, typeinfo=True, logger=False):
+    def print(self, sep=None, yaml=False, typeinfo=True, logger=False, limit=50):
         if bool(self) is False:
             print(f"Empty Struct.")
             return None  # break out of the function.
@@ -878,7 +881,7 @@ class Struct(Base):  # inheriting from dict gives `get` method.
         for key in self.keys().list:
             key_str = str(key)
             type_str = str(type(self[key])).split("'")[1]
-            val_str = DisplayData.get_repr(self[key]).replace("\n", " ")
+            val_str = DisplayData.get_repr(self[key], limit=limit).replace("\n", " ")
             repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
             if typeinfo:
                 repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")

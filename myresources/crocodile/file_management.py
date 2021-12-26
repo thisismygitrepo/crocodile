@@ -113,15 +113,20 @@ class P(type(Path()), Path, Base):
         string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
         return string_
 
-    def download(self, directory=None):
+    def download(self, directory=None, memory=False, allow_redirects=True):
+        """Assuming URL points to anything but html page."""
         import requests
-        if directory is None:
-            directory = P.home().joinpath("Downloads")
-        obj = requests.get(self.as_url())
-        directory = directory.joinpath(self.name)
-        P(directory).write_bytes(obj.content)
-        # try: urllib.urlopen(url).read()
-        return directory
+        response = requests.get(self.as_url(), allow_redirects=allow_redirects)
+
+        if memory is False:
+            directory = P.home().joinpath("Downloads") if directory is None else P(directory)
+            directory = directory.joinpath(self.name)
+            directory.write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
+            # try: urllib.urlopen(url).read()
+            return directory
+        else:
+            return response.content
+        # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8')
 
     def read_refresh(self, refresh, expire="1w", save=Save.pickle, read=Read.read):
         return Fridge(refresh=refresh, path=self, expire=expire, save=save, read=read)
@@ -414,11 +419,12 @@ class P(type(Path()), Path, Base):
         else:
             if verbose: print(f"Did NOT DELETE because user is not sure. file: `{self.absolute().as_uri()}`.")
 
-    def send2trash(self):
+    def send2trash(self, verbose=True):
         # send2trash = Experimental.assert_package_installed("send2trash")
         # removed for disentanglement
         import send2trash
         send2trash.send2trash(self.string)
+        if verbose: print(f"TRASHED `{self.absolute().as_uri()}`")
 
     def move(self, new_path, overwrite=False, verbose=True):
         temp = self.absolute()
@@ -577,7 +583,7 @@ class P(type(Path()), Path, Base):
 
         # ============================ get generator of search results ========================================
 
-        if self.suffix == ".zip":
+        if compressed and self.suffix == ".zip":
             import zipfile
             with zipfile.ZipFile(str(self)) as z:
                 content = List(z.namelist())
@@ -659,13 +665,17 @@ class P(type(Path()), Path, Base):
     def listdir(self):
         return List(os.listdir(self)).apply(P)
 
-    def find(self, *args, r=True, **kwargs):
+    def find(self, *args, r=True, compressed=True, **kwargs):
         """short for the method ``search`` then pick first item from results.
 
         .. note:: it is delibrately made to return None in case and object is not found.
         """
-        results = self.search(*args, r=r, **kwargs)
-        return results[0] if len(results) > 0 else None
+        if compressed is False and self.is_file(): return self
+        results = self.search(*args, r=r, compressed=compressed, **kwargs)
+        if len(results) > 0:
+            result = results[0]
+            return result.unzip()
+        else: return None
 
     @staticmethod
     def tempdir():
@@ -727,9 +737,8 @@ class P(type(Path()), Path, Base):
     def unzip(self, op_path=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
         zipfile = self
         if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
-            assert ".zip" in str(self), f"Not a zip archive."
-            zipfile, fname = self.split(at=".zip", sep=0)
-            zipfile += ".zip"
+            if ".zip" not in str(self): return self
+            zipfile, fname = self.split(at=List(self.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
         if op_path is None: op_path = zipfile.parent / zipfile.stem
         else:  op_path = P(op_path)
         if content: op_path = op_path.parent
