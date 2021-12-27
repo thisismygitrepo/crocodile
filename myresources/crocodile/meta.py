@@ -498,13 +498,16 @@ class Terminal:
         def capture(self):
             for key, val in self.std.items():
                 if val.readable():
-                    self.output[key] = val.read().decode()
+                    string = val.read().decode()
+                    self.output[key] = string.rstrip()  # move ending spaces and new lines.
 
         def print(self):
             self.capture()
             print(f"Terminal Response:\nInput Command: {self.input}")
             for idx, (key, val) in enumerate(self.output.items()):
                 print(f"{idx} - {key} {'=' * 30}\n{val}")
+            print("-" * 50, "\n\n")
+            return self
 
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
@@ -668,7 +671,7 @@ class SSH(object):
         self.ssh.connect(hostname=hostname,
                          username=username,
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
-
+        self.sftp = self.ssh.open_sftp()
         self.load_python_cmd = rf"""source ~/miniconda3/bin/activate"""  # possible activate an env
         import platform
         self.platform = platform
@@ -676,58 +679,61 @@ class SSH(object):
                                                     "python -c 'import platform; platform.system()'")
 
     def get_key(self):
+        """In SSH commands you need this:
+        scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
+        """
         if self.ssh_key is not None:
             return f"""-i "{str(P(self.ssh_key.expanduser()))}" """
         else:
             return ""
 
     def __repr__(self):
-        return f"{self.platform.node()} SSH connection to {self.username}@{self.hostname}"
+        return f"{self.local()} SSH connection to {self.remote()}"
+
+    def remote(self):
+        return f"{self.username}@{self.hostname}"
+
+    def local(self):
+        return f"{os.getlogin()}@{self.platform.node()}"
 
     def open_console(self, new_window=True):
         cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
         Terminal().run_async(cmd, new_window=new_window)
 
     def copy_from_here(self, source, target=None, zip_and_cipher=True):
-        source = P(source)
-        if target is None:
-            try:
-                source = source.collapseuser()
-            except ValueError:
-                raise ValueError(f"Automatic determination of target doesn't work if source file path is not "
-                                 f"made relative. Currently recieved {source}")
-            target = P(source).parent.as_posix()  # works if source is relative.
-            print(f"Target directory not passed, assuming it is: {target}")
-        self.run(f"""{self.load_python_cmd}; python -m crocodile.run --here --cmd "tb.P(r'{target}').expanduser().create()" """)
         pwd = None
         if zip_and_cipher:
             pwd = randstr(length=10, safe=True)
-            source = source.expanduser().zip_and_cipher(pwd=pwd)
+            source = P(source).expanduser().zip_and_cipher(pwd=pwd)
 
-        command = fr"""scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
-        """
-        print(f"Executing Locally @ {self.platform.node()}:\n{command}")
-        os.system(command)
-
+        print(f"Step 1: Creating Target directory {target} @ remote machine.")
+        if target is None: target = P(source).collapseuser().as_posix()  # works if source is relative.
+        resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
+        remotepath = P(resp.op or "").joinpath(P(target).name)
+        # return remotepath
+        print(f"Send `{source}` ==> `{remotepath}` ")
+        self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix())
         if zip_and_cipher:
-            py_command = f"""
-import crocodile.toolbox as tb
-p = tb.P(r"{str(target)}/{source.name}")
-p.expanduser().decipher_unzip(pwd='{pwd}', delete=True)
-"""
-            cmd = self.load_python_cmd + "; python -c '" + py_command + "'"
-            print(f"Executing on remote {self.username}@{self.hostname}:\n{cmd}")
-            resp = self.run(cmd, printit=True)
+            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decipher_and_unzip(pwd="{pwd}", delete=False)""")
             return resp
 
     def copy_to_here(self, source, target=None):
         pass
 
     def run(self, command, printit=True):
+        print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{command}")
         res = self.ssh.exec_command(command)
         res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2])
         if printit: res.print()
         return res
+
+    def runpy(self, cmd):
+        cmd = f"""{self.load_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """
+        return self.run(cmd)
+
+    def run_locally(self, command):
+        print(f"Executing Locally @ {self.platform.node()}:\n{command}")
+        return Terminal.Response(os.system(command))
 
 
 class Log(object):

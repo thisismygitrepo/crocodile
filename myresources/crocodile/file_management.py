@@ -1,6 +1,6 @@
 
 from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, str2timedelta,\
-    Base, Save, Path, assert_package_installed, dill
+    Save, Path, assert_package_installed, dill
 
 
 # =============================== Security ================================================
@@ -198,16 +198,11 @@ class Read(object):
         return dill.loads(bytes_obj)
 
 
-class P(type(Path()), Path, Base):
+class P(type(Path()), Path):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
     """
     # def __init__(self, *string):
     #     super(P, self).__init__(Path(*string).expanduser())
-
-    def as_url(self):
-        string_ = self.as_posix()
-        string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
-        return string_
 
     def download(self, directory=None, memory=False, allow_redirects=True):
         """Assuming URL points to anything but html page."""
@@ -493,6 +488,14 @@ class P(type(Path()), Path, Base):
     # ================================ String Nature management ====================================
     def __repr__(self):  # this is useful only for the console
         return "P: " + self.__str__()
+
+    def clickable(self):
+        return self.expanduser().absolute().resolve().as_uri()
+
+    def as_url(self):
+        string_ = self.as_posix()
+        string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
+        return string_
 
     def __getstate__(self):
         return str(self)
@@ -839,10 +842,10 @@ class P(type(Path()), Path, Base):
     def zip(self, op_path=None, arcname=None, delete=False, verbose=True, **kwargs):
         """
         """
-        op_path = op_path or self
-        arcname = arcname or self.name
-        arcname = P(self.evalstr(arcname, expected="self"))
-        op_path = P(self.evalstr(op_path, expected="self"))
+        op_path = P(op_path or self)
+        arcname = P(arcname or self.name)
+        # arcname = P(self.evalstr(arcname, expected="self"))
+        # op_path = P(self.evalstr(op_path, expected="self"))
         if arcname.name != self.name:
             arcname /= self.name  # arcname has to start from somewhere and end with filename
         if self.is_file():

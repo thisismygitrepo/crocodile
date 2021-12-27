@@ -34,7 +34,7 @@ def build_parser():
     parser.add_argument("--here", "-H",
                         help="Flag for running in this window.", action="store_true")  # default is False
     parser.add_argument("-s", "--solitary",
-                        help="Flag to specify a non-interactive session.", action="store_false")  # default is True
+                        help="Flag to specify a non-interactive session.", action="store_true")  # default is False
     parser.add_argument("-p", "--python",
                         help="Flag to use python over IPython.", action="store_true")  # default is False
     parser.add_argument("-e", help="Flag to explore the file (what are its contents).",
