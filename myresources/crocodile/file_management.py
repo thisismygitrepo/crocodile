@@ -325,13 +325,19 @@ class P(type(Path()), Path, Base):
         """Behaves like `.parts` but returns a List."""
         return List(self.parts)
 
-    def __add__(self, name):
+    def __add__(self, other):  # called when P + other
         """Behaves like adding strings"""
-        return self.parent.joinpath(self.stem + name)
+        return self.parent.joinpath(self.stem + str(other))
+
+    def __radd__(self, other):  # called when other + P and `other` doesn't know how to make this addition.
+        return self.parent.joinpath(str(other) + self.stem)
 
     def __sub__(self, other):
         """removes all similar characters from the string form of the path"""
-        return P(str(self).replace(str(other), ""))
+        res = P(str(self).replace(str(other), ""))
+        if str(res[0]) in {"\\", "/"}:
+            res = res[1:]  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
+        return res
 
     # def __rtruediv__(self, other):
     #     tmp = str(self)
@@ -363,11 +369,19 @@ class P(type(Path()), Path, Base):
     def rel2home(self):
         return P(self.relative_to(Path.home()))
 
+    def collapseuser(self):
+        """same as rel2home except that it adds the tilde `~` to indicated home at the beginning.
+         Thus, it is a self-contained absolute path, bar a `expanduser` method."""
+        if "~" in self: return self
+        assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}"
+                                                      f" OR one path is relative and the other is absolute.")
+        return "~" / (self - P.home())
+
     def rel2cwd(self):
         return P(self.relative_to(Path.cwd()))
 
-    def abs_from_home(self):
-        return P.home() / self
+    # def abs_from_home(self):
+    #     return P.home() / self
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -504,8 +518,8 @@ class P(type(Path()), Path, Base):
         import re
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
-    def as_unix(self):
-        return P(str(self).replace('\\', '/').replace('//', '/'))
+    # def as_unix(self):  # use as_posix()
+    #     return P(str(self).replace('\\', '/').replace('//', '/'))
 
     # ==================================== File management =========================================
     def delete(self, are_you_sure=False, verbose=True):
@@ -911,16 +925,15 @@ class P(type(Path()), Path, Base):
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
-    def zip_and_cipher(self, secret=None, security=["encrypt", "lock"][1], delete=False, verbose=True):
+    def zip_and_cipher(self, key=None, pwd=None, delete=False, verbose=True):
         zipped = self.zip(delete=delete, verbose=verbose)
-        secret, zipped_secured = getattr(zipped, security)(secret, verbose=verbose, delete=True)
-        return secret, zipped_secured
+        zipped_secured = zipped.encrypt(key=key, pwd=pwd, verbose=verbose, delete=True)
+        return zipped_secured
 
-    def decipher_and_unzip(self, secret, security=["decrypt", "unlock"][1], delete=False, verbose=True):
-        deciphered = getattr(self, security)(secret, verbose=verbose, delete=delete)
+    def decipher_and_unzip(self, key=None, pwd=None, delete=False, verbose=True):
+        deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
         unzipped = deciphered.unzip(op_path=None, delete=True, content=True)
-        # result = unzipped.rename(self.parent / unzipped.name)
-        return unzipped.joinpath(deciphered.stem)
+        return unzipped.find()
 
 
 class Compression(object):

@@ -1,4 +1,3 @@
-
 import logging
 import subprocess
 import time
@@ -83,7 +82,7 @@ class Experimental:
 
     @staticmethod
     def profile_memory(command):
-        import psutil
+        psutil = assert_package_installed("psutil")
         before = psutil.virtual_memory()
         exec(command)
         after = psutil.virtual_memory()
@@ -463,6 +462,7 @@ def batcherv2(func_type='function', order=1):
             def __call__(self, *args, **kwargs):
                 output = [self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
                 return np.array(output)
+
         return Batch
 
 
@@ -471,27 +471,42 @@ class Terminal:
         @staticmethod
         def from_completed_process(cp: subprocess.CompletedProcess):
             resp = Terminal.Response(cmd=cp.args)
-            resp.output = dict(stdout=cp.stdout, stderr=cp.stderr,
-                               returncode=cp.returncode)
+            resp.output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode))
             return resp
 
         def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None):
-            self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)
+            self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)  # streams go here.
+            self.output = dict(stdin=None, stdout=None, stderr=None, returncode=None)
             self.input = cmd  # input command
-            self.output = None  # streams
-            # self.returncode = None  # only relevant for completed processes.
+
+        @property
+        def op(self):
+            return self.output["stdout"]
+
+        @property
+        def ip(self):
+            return self.output["stdin"]
+
+        @property
+        def err(self):
+            return self.output["stderr"]
+
+        @property
+        def returncode(self):
+            return self.output["returncode"]
 
         def capture(self):
             for key, val in self.std.items():
-                self.output[key] = val.readlines()
+                if val.readable():
+                    self.output[key] = val.read().decode()
 
         def print(self):
-            if self.output is None: self.capture()
+            self.capture()
             print(f"Terminal Response:\nInput Command: {self.input}")
             for idx, (key, val) in enumerate(self.output.items()):
-                print(f"{idx} - {key} ", f"{'=' * 30}\n", val)
+                print(f"{idx} - {key} {'=' * 30}\n{val}")
 
-    def __init__(self, stdout=sys.stdout, stderr=sys.stderr, stdin=sys.stdin, elevated=False):
+    def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
         Console
         Terminal
@@ -509,12 +524,28 @@ class Terminal:
         * To launch a new window, either use
         """
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
+        self.elevated = elevated
         self.stdout = stdout
         self.stderr = stderr
         self.stdin = stdin
-        self.elevated = elevated
         import platform
-        self.source_machine = platform.system()  # Windows, Linux, Darwin
+        self.machine = platform.system()  # Windows, Linux, Darwin
+
+    def set_std_system(self):
+        self.stdout = sys.stdout
+        self.stderr = sys.stderr
+        self.stdin = sys.stdin
+
+    def set_std_pipe(self):
+        self.stdout = subprocess.PIPE
+        self.stderr = subprocess.PIPE
+        self.stdin = subprocess.PIPE
+
+    def set_std_null(self):
+        """Equivalent to `echo 'foo' &> /dev/null`"""
+        self.stdout = subprocess.DEVNULL
+        self.stderr = subprocess.DEVNULL
+        self.stdin = subprocess.DEVNULL
 
     @staticmethod
     def is_admin():
@@ -522,28 +553,55 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run(self, command, console=None):
-        """Blocking operation.
-        This is short for:
-        res = subprocess.run("powershell -ls; dir", capture_output=True, shell=True, text=True)
+    def run(self, *cmds, powershell=True, check=False, ip=None):
+        """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
+        won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
+        Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
+
+        * This method is short for:
+        res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
+        * Unlike `os.system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
+        * `shell=True` loads up the profile of the shell called so more specific commands can be run.
+            Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
+        * `text=True` converts the bytes objects returned in stdout to text by default.
+
+        :param ip:
+        :param powershell:
+        :param check: throw an exception is the execution of the external command failed (non zero returncode)
         """
         my_list = []
-        if console is None:  # auto choice:
-            if self.source_machine == "Windows": my_list = [console, "-Command"]
-            else: my_list = []
-        my_list.append(command)
+        if self.machine == "Windows" and powershell is True:
+            my_list = ["powershell", "-Command"]  # alternatively, one can run "cmd"
+            """The advantage of addig `powershell -Command` is to give access to wider range of options.
+            Other wise, command prompt shell doesn't recognize commands like `ls`."""
+        my_list += list(cmds)
         if self.elevated is False or self.is_admin():
-            resp = subprocess.run(my_list, capture_output=True, text=True, shell=True)
+            resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout,
+                                  text=True, shell=True, check=check, input=ip)
+            """
+            `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will
+        be stored in the Response object returned.
+            # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`
+            """
         else:
             import ctypes
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return self.Response.from_completed_process(resp)
 
-    def run_async(self, command, console=None):
-        """Opens a new terminal, and let it run asynchronously."""
-        my_list = [console, "-Command"] if console is not None else []
-        my_list.append(command)
+    def run_async(self, *cmds):
+        """Opens a new terminal, and let it run asynchronously.
+        Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
+        commands in one go without interaction with an ongoing channel. Use this only for the purpose of
+        producing a different window and humanly interact with it.
+        https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
+        https://www.youtube.com/watch?v=IynV6Y80vws
+        """
+        my_list = []
+        if self.machine == "Windows":
+            my_list += ["start", "powershell", "-Command"]
+        my_list += cmds
         w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=True)
+        # returns Popen object, not so useful for communcation with an opened terminal
         return w
 
     @staticmethod
@@ -594,7 +652,6 @@ tb.sys.path.insert(0, r'{wdir}')
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete
-        # TODO: add return option (asynchronous programming)
         # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
     @staticmethod
@@ -631,58 +688,66 @@ class SSH(object):
                          username=username,
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
 
-        self.load_python_cmd = rf""""source ~/miniconda3/bin/activate; """
+        self.load_python_cmd = rf"""source ~/miniconda3/bin/activate"""  # possible activate an env
+        import platform
+        self.platform = platform
         self.target_machine = self.ssh.exec_command(self.load_python_cmd +
                                                     "python -c 'import platform; platform.system()'")
+
+    def get_key(self):
+        if self.ssh_key is not None:
+            return f"""-i "{str(P(self.ssh_key.expanduser()))}" """
+        else:
+            return ""
+
+    def __repr__(self):
+        return f"{self.platform.node()} SSH connection to {self.username}@{self.hostname}"
 
     def open_console(self):
         cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
         print(cmd)
         Terminal().open_console(command=cmd)
 
-    def copy_from_here(self, source, target=None, compress=False, encrypt=False):
+    def copy_from_here(self, source, target=None, zip_and_cipher=True):
         source = P(source)
-
         if target is None:
-            # target = source  # works if source is relative.
-            target = P(source).parent.string  # works if source is relative.
-        self.run(f"mkdir -p {target}")
+            try:
+                source = source.collapseuser()
+            except ValueError:
+                raise ValueError(f"Automatic determination of target doesn't work if source file path is not "
+                                 f"made relative. Currently recieved {source}")
+            target = P(source).parent.as_posix()  # works if source is relative.
+            print(f"Target directory not passed, assuming it is: {target}")
+        self.run(f"""{self.load_python_cmd}; python -m crocodile.run --here --cmd "tb.P(r'{target}').create()" """)
+        pwd = None
+        if zip_and_cipher:
+            pwd = randstr(length=10, safe=True)
+            source = source.expanduser().zip_and_cipher(pwd=pwd)
 
-        if compress:
-            source = source.zip()
-
-        handler = None
-        if encrypt:
-            secret = randstr(length=10)
-            handler = source.expanduser().zip_cipher(secret=secret)
-            source = handler.file
-            print(f"{secret=}")
-
-        command = fr"""scp -r -i {self.ssh_key} {str(source.expanduser())} {self.username}@{self.hostname}:{target} """
-        print(f"Locally Executing: {command}")
+        command = fr"""scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
+        """
+        print(f"Executing Locally @ {self.platform.node()}:\n{command}")
         os.system(command)
 
-        if compress:
-            self.run(fr"cd {str(target)};sudo apt install unzip; unzip {str(target)}/{source.name}")
-            self.run(fr"rm {str(target)}/{source.name}")
-            source.delete(are_you_sure=True)
-
-        if encrypt:
-            cmd = """"""
-            cmd = cmd + self.load_python_cmd
-            cmd = cmd + f"""python -c "import crocodile.toolbox as tb; p = tb.P('{str(target)}/{source.name}'); """
-            cmd += f"""p.expanduser().decipher_unzip(secret='{handler.secret}')" """
-            print(f"Executign on remote: {cmd}")
-            resp = self.run(cmd)
-            handler.decimate()
+        if zip_and_cipher:
+            py_command = f"""
+import crocodile.toolbox as tb
+p = tb.P(r"{str(target)}/{source.name}")
+p.expanduser().decipher_unzip(pwd='{pwd}', delete=True)
+"""
+            cmd = self.load_python_cmd + "; python -c '" + py_command + "'"
+            print(f"Executing on remote {self.username}@{self.hostname}:\n{cmd}")
+            resp = self.run(cmd, printit=True)
             return resp
 
     def copy_to_here(self, source, target=None):
         pass
 
-    def run(self, command):
+    def run(self, command, printit=True):
         res = self.ssh.exec_command(command)
-        return Terminal.Response(res)
+        res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2])
+        if printit: res.print()
+        return res
 
 
 class Log(object):

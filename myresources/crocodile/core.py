@@ -447,7 +447,7 @@ class Base(object):
             return string_
 
     def print(self, typeinfo=False):
-        Struct(self.__dict__).print(typeinfo=typeinfo)
+        Struct(self.__dict__).print(dtype=typeinfo)
 
     def viz_heirarchy(self, depth=3, obj=None, filt=None):
         import objgraph
@@ -884,7 +884,7 @@ class Struct(Base):  # inheriting from dict gives `get` method.
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=None, yaml=False, typeinfo=True, logger=False, limit=50):
+    def print(self, sep=None, yaml=False, dtype=True, logger=False, limit=50):
         if bool(self) is False:
             print(f"Empty Struct.")
             return None  # break out of the function.
@@ -898,14 +898,14 @@ class Struct(Base):  # inheriting from dict gives `get` method.
             sep = 5 + max(self.keys().apply(str).apply(len).list)
         repr_string = ""
         repr_string += "Structure, with following entries:\n"
-        repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if typeinfo else "") + "Item Details\n"
-        repr_string += "---" + " " * sep + (("---------" + " " * sep) if typeinfo else "") + "------------\n"
+        repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if dtype else "") + "Item Details\n"
+        repr_string += "---" + " " * sep + (("---------" + " " * sep) if dtype else "") + "------------\n"
         for key in self.keys().list:
             key_str = str(key)
             type_str = str(type(self[key])).split("'")[1]
             val_str = DisplayData.get_repr(self[key], limit=limit).replace("\n", " ")
             repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
-            if typeinfo:
+            if dtype:
                 repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
         if logger:

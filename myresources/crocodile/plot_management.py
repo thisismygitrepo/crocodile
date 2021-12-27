@@ -5,7 +5,7 @@ from crocodile.core import np, List, timestamp, os, Save
 from crocodile.file_management import P
 import typing
 import pandas as pd
-from crocodile.meta import Cycle, Experimental
+from crocodile.meta import Cycle
 
 
 class FigurePolicy(enum.Enum):
@@ -13,18 +13,6 @@ class FigurePolicy(enum.Enum):
     add_new = 'Create a new figure with same name but with added suffix'
     same = 'Grab the figure of the same name'
 
-
-# def timestamp(ft=None, name=None):
-#     if ft is None:  # this is better than putting the default non-None value above.
-#         ft = '%Y-%m-%d-%I-%M-%S-%p-%f'  # if another function using this internally and wants to expise those kwarg
-#         # then it has to worry about not sending None which will overwrite this defualt value.
-#     _ = datetime.now().strftime(ft)
-#     if name:
-#         name = name + '_' + _
-#     else:
-#         name = _
-#     return name
-#
 
 class FigureManager:
     """
@@ -704,7 +692,6 @@ class SaveType:
             self.data_gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs)
             plt.pause(0.5)  # give time for figures to show up before updating them
-            Experimental.assert_package_installed("tqdm")
             from tqdm import tqdm
             for idx, datum in tqdm(enumerate(self.data_gen())):
                 self.plotter.animate(datum)
@@ -783,7 +770,7 @@ class SaveType:
             self.data = gen_function
             self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
             plt.pause(0.5)  # give time for figures to show up before updating them
-            Experimental.assert_package_installed("tqdm")
+
             from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
                 for datum in tqdm(self.data()):
