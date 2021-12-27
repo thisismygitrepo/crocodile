@@ -7,16 +7,13 @@ email programmer@usa.com
 # Path
 import os
 import sys
-import importlib
-import inspect
-import tempfile
 from pathlib import Path
 import string
 import random
 
 # Numerical
 import numpy as np
-import pandas as pd
+# import pandas as pd  # heavy weight, avoid unless necessary.
 # Meta
 import dill
 import copy
@@ -24,6 +21,9 @@ from datetime import datetime
 import datetime as dt  # useful for deltatime and timezones.
 
 _ = dt
+
+
+# ============================== Accessories ============================================
 
 
 def timestamp(fmt=None, name=None):
@@ -54,13 +54,31 @@ def str2timedelta(past):
     return dt.timedelta(**{key: val})
 
 
-def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False):
+def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False):
+    if safe:
+        import secrets  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
+        return secrets.token_urlsafe(length)
     pool = "" + (string.ascii_lowercase if lower else "")
     pool = pool + (string.ascii_uppercase if upper else "")
     pool = pool + (string.digits if digits else "")
     pool = pool + (string.punctuation if punctuation else "")
     result_str = ''.join(random.choice(pool) for _ in range(length))
     return result_str
+
+
+def assert_package_installed(package):
+    """imports a package and installs it if not."""
+    try:
+        pkg = __import__(package)
+        return pkg
+    except ImportError:
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+    pkg = __import__(package)
+    return pkg
+
+
+# ====================================== Classes ====================================
 
 
 class SaveDecorator(object):
@@ -85,6 +103,7 @@ class SaveDecorator(object):
     def __call__(self, path=None, obj=None, **kwargs):
         # Called when calling the decorated function (instance of this called).
         if path is None:
+            import tempfile
             path = Path(tempfile.mkdtemp() + "-" + timestamp() + self.ext)
             # raise ValueError
         else:
@@ -226,6 +245,7 @@ class Base(object):
     def save_code(self, path):
         """a usecase for including code in the save is when the source code is continously
          changing and still you want to reload an old version."""
+        import inspect
         module = inspect.getmodule(self)
         if hasattr(module, "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! "
@@ -339,6 +359,7 @@ class Base(object):
         """
         code_path = Path(code_path)
         sys.path.insert(0, str(code_path.parent))
+        import importlib
         sourcefile = importlib.import_module(code_path.stem)
         return getattr(sourcefile, class_name).from_state(data_path, *args, r=r, **kwargs)
 
@@ -381,6 +402,7 @@ class Base(object):
             [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
         # if exclude is not None:
         #     [attrs.remove(x) for x in exlcude]
+        import inspect
         if not fields:  # logic (questionable): anything that is not a method is a field
             attrs = list(filter(lambda x: inspect.ismethod(getattr(self, x)), attrs))
         
@@ -672,9 +694,7 @@ class List(list, Base):
             self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
-        # tqdm = 0
-        # Experimental.assert_package_installed("tqdm")  # removed for disentanglement
-        from tqdm import tqdm
+        tqdm = assert_package_installed("tqdm")
         if other is None:
             iterator = self.list if not verbose else tqdm(self.list, desc=desc)
             if jobs:
@@ -731,6 +751,7 @@ class List(list, Base):
                 print(sep * 100)
 
     def to_series(self):
+        import pandas as pd
         return pd.Series(self.list)
 
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
@@ -745,6 +766,7 @@ class List(list, Base):
         columns = list(self.list[0].__dict__.keys())
         if obj_included or names:
             columns = ['object'] + columns
+        import pandas as pd
         df = pd.DataFrame(columns=columns)
         if minimal:
             return df
@@ -1005,6 +1027,7 @@ class Struct(Base):  # inheriting from dict gives `get` method.
 
     def to_dataframe(self, *args, **kwargs):
         # return self.values().to_dataframe(names=self.keys())
+        import pandas as pd
         return pd.DataFrame(self.__dict__, *args, **kwargs)
 
     def spawn_from_values(self, values):
@@ -1033,11 +1056,9 @@ class Struct(Base):  # inheriting from dict gives `get` method.
 
 
 class DisplayData:
-    def __init__(self, x):
-        self.x = pd.DataFrame(x)
-
     @staticmethod
     def set_pandas_display(rows=1000, columns=1000, width=1000, colwidth=40):
+        import pandas as pd
         pd.set_option('display.max_colwidth', colwidth)
         pd.set_option('display.max_columns', columns)  # to avoid replacing them with ...
         pd.set_option('display.width', width)  # to avoid wrapping the table.
@@ -1046,10 +1067,12 @@ class DisplayData:
     @staticmethod
     def set_pandas_auto_width():
         """For fixed width host windows, this is recommended to avoid chaos due to line-wrapping."""
+        import pandas as pd
         pd.options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
 
     @staticmethod
     def eng():
+        import pandas as pd
         pd.set_eng_float_format(accuracy=3, use_eng_prefix=True)
         pd.options.display.float_format = '{:, .5f}'.format
         pd.set_option('precision', 7)

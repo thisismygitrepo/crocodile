@@ -8,10 +8,9 @@ This is `export file` while one can dictate what will be exposed with toolbox
 """
 
 from crocodile import core
-from crocodile.core import datetime, dt, os, sys, string, random, np, pd, copy, dill, inspect, importlib
+from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
 
 from crocodile import file_management as _fm
-from crocodile.file_management import re, typing, shutil, glob, tempfile  # Path
 
 from crocodile import meta
 from crocodile.meta import logging, subprocess, time
@@ -19,6 +18,8 @@ from crocodile.meta import logging, subprocess, time
 from crocodile import plot_management as _pm
 from crocodile.plot_management import plt, enum, FigureManager
 
+import pandas as pd
+_ = pd
 
 Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
 Struct, DisplayData, str2timedelta, Save, List = core.Struct, core.DisplayData, core.str2timedelta, core.Save, core.List
@@ -39,15 +40,17 @@ tmp = P.tmp
 E = Experimental
 
 _ = Base, timestamp, Save, Terminal, List, Struct, DisplayData
-_ = datetime, dt, os, sys, np, pd, copy, random, dill, importlib, inspect
+_ = datetime, dt, os, sys, np, copy, random, dill
 
-_ = P, Read, Compression, re, typing, string, sys, shutil, glob, tempfile  # , Path
+_ = P, Read, Compression, string, sys  # , Path
 _ = Experimental, Cycle, batcher, batcherv2, accelerate
 _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
 _ = logging, subprocess, time
 
 
 def reload(verbose=True):
+    import inspect
+    import importlib
     tb = sys.modules["crocodile.toolbox"]
     for val in tb.__dict__.values():
         if inspect.ismodule(val):

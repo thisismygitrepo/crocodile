@@ -1,9 +1,10 @@
 
 import enum
 import matplotlib.pyplot as plt
-
-from crocodile.core import np, List, pd, timestamp, os, Save
-from crocodile.file_management import P, typing
+from crocodile.core import np, List, timestamp, os, Save
+from crocodile.file_management import P
+import typing
+import pandas as pd
 from crocodile.meta import Cycle, Experimental
 
 

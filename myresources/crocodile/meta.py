@@ -1,8 +1,8 @@
+
 import logging
-# import dill
 import subprocess
 import time
-from crocodile.core import np, os, sys, inspect, importlib, timestamp, randstr, str2timedelta, datetime, pd, Save
+from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, assert_package_installed
 from crocodile.file_management import P
 
 
@@ -82,6 +82,14 @@ class Experimental:
     """Debugging and Meta programming tools"""
 
     @staticmethod
+    def profile_memory(command):
+        import psutil
+        before = psutil.virtual_memory()
+        exec(command)
+        after = psutil.virtual_memory()
+        print(f"Memory used = {(after.used - before.used) / 1e6}")
+
+    @staticmethod
     def try_this(func, otherwise=None):
         try:
             return func()
@@ -98,17 +106,6 @@ class Experimental:
         res.print(**kwargs)
 
     @staticmethod
-    def assert_package_installed(package):
-        """imports a package and installs it if not."""
-        try:
-            pkg = __import__(package)
-            return pkg
-        except ImportError:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-        pkg = __import__(package)
-        return pkg
-
-    @staticmethod
     def generate_readme(path, obj=None, meta=None, save_source_code=True):
         """Generates a readme file to contextualize any binary files.
 
@@ -118,6 +115,7 @@ class Experimental:
         :param meta:
         :param save_source_code:
         """
+        import inspect
         path = P(path)
         readmepath = path / f"README.md" if path.is_dir() else path
 
@@ -234,7 +232,7 @@ class Experimental:
             code_string = args_kwargs + code_string
 
         if copy2clipboard:
-            clipboard = Experimental.assert_package_installed("clipboard")
+            clipboard = assert_package_installed("clipboard")
             clipboard.copy(code_string)
         if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
         return code_string  # ready to be run with exec()
@@ -250,6 +248,7 @@ class Experimental:
             func = eval(func, modules)
 
         from crocodile.file_management import Struct
+        import inspect
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default)
         ak = ak.update(kwargs)
@@ -274,7 +273,7 @@ class Experimental:
             res += f"{ak.varkw} = " + "{}\n"
 
         if copy2clipboard:
-            clipboard = Experimental.assert_package_installed("clipboard")
+            clipboard = assert_package_installed("clipboard")
             clipboard.copy(res)
         if verbose: print("Finished. Paste code now.")
         return res
@@ -296,6 +295,7 @@ class Experimental:
                 raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
         newsource = "\n".join(sourcelines)
         P(module.__file__).write_text(newsource)
+        import importlib
         importlib.reload(module)
         return module
 
@@ -321,7 +321,7 @@ class Experimental:
         else:
             raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
         print(cell)
-        clipboard = Experimental.assert_package_installed("clipboard")
+        clipboard = assert_package_installed("clipboard")
         clipboard.copy(cell)
         return cell
 
@@ -803,9 +803,9 @@ class Log(object):
                         'name': {'color': 'blue'},
                         'programname': {'color': 'cyan'},
                         'username': {'color': 'yellow'}}
-        coloredlogs = Experimental.assert_package_installed("coloredlogs")
+        coloredlogs = assert_package_installed("coloredlogs")
         if verbose:
-            verboselogs = Experimental.assert_package_installed("verboselogs")
+            verboselogs = assert_package_installed("verboselogs")
             # https://github.com/xolox/python-verboselogs
             # verboselogs.install()  # hooks into logging module.
             logger = verboselogs.VerboseLogger(name=name)
@@ -832,7 +832,7 @@ class Log(object):
                           'ERROR': 'thin_red',
                           'CRITICAL': 'fg_bold_red,bg_white',
                           }  # see here for format: https://pypi.org/project/colorlog/
-        colorlog = Experimental.assert_package_installed("colorlog")
+        colorlog = assert_package_installed("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
         fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
@@ -969,6 +969,7 @@ class Scheduler:
         self.count = 0
         self._start_time = datetime.now()
         wait_time = str2timedelta(self.wait).total_seconds()
+        import pandas as pd
         until = pd.to_datetime(until)  # (local time)
 
         while datetime.now() < until and self.count < self.cycles:

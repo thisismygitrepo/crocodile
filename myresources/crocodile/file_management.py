@@ -1,15 +1,114 @@
 
-from crocodile.core import Struct, pd, np, os, sys, List, datetime, timestamp, randstr, str2timedelta, Base, Save
-# Typing
-import re
-import typing
-# Path
-import shutil
-import tempfile
-from glob import glob
-from pathlib import Path
+from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, str2timedelta,\
+    Base, Save, Path, assert_package_installed, dill
 
 
+# =============================== Security ================================================
+
+def obscure(data: bytes) -> bytes:
+    import zlib
+    from base64 import urlsafe_b64encode as b64e
+    return b64e(zlib.compress(data, 9))
+
+
+def unobscure(obscured: bytes) -> bytes:
+    import zlib
+    from base64 import urlsafe_b64decode as b64d
+    return zlib.decompress(b64d(obscured))
+
+
+def pwd2key(password: str, salt=None, iterations=None) -> bytes:
+    """Derive a secret key from a given password and salt"""
+    import base64
+    if salt is None:
+        import hashlib
+        m = hashlib.sha256()  # converts anything to fixed length 32 bytes
+        m.update(password.encode("utf-8"))
+        return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
+
+    """Adding salt and iterations to the password. The salt and iteration numbers will be stored explicitly
+    with the final encrypted message, i.e. known publicly. The benefit is that they makes trying very hard.
+    The machinery below that produces the final key is very expensive (as large as iteration)"""
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None)
+    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
+
+
+def encrypt(message: bytes, key=None, pwd: str = None, salted=True, iterations: int = None) -> bytes:
+    """
+        Encryption Tips:
+        * Be careful of key being stored unintendedly in console or terminal history,
+        e.g. don't use IPython.
+        * It behoves you to try decrypting it to err on the side of safety.
+        * Don't forget to delete OR store key file safely.
+    """
+    from cryptography.fernet import Fernet
+    salt = None  # silence the linter.
+
+    # step 1: get the key:
+    if pwd is not None:  # generate it from password
+        assert key is None, f"You can either pass key or pwd, or none of them, but not both."
+        assert type(pwd) is str
+        if salted:
+            import secrets
+            if iterations is None: iterations = secrets.randbelow(1_000_000)
+            salt = secrets.token_bytes(16)
+        else:
+            salt = iterations = None
+        key = pwd2key(pwd, salt, iterations)
+    elif key is None:  # generate a new key: discouraged, always make your keys/pwd before invoking the func.
+        key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
+        key_path = P.tmpdir().joinpath("key.bytes")
+        key_path.write_bytes(key)
+        # without verbosity check:
+        print(f"KEY SAVED @ `{key_path.absolute().as_uri()}`")
+        global __keypath__
+        __keypath__ = key_path
+        print(f"KEY PATH REFERENCED IN GLOBAL SCOPE AS `__keypath__`")
+    elif type(key) in {str, P, Path}:  # a path to a key file was passed, read it:
+        key_path = P(key)
+        key = key_path.read_bytes()
+    elif type(key) is bytes:  # key passed explicitly
+        pass  # key_path = None
+    else:
+        raise TypeError(f"Key must be either a path, bytes object or None.")
+
+    code = Fernet(key).encrypt(message)
+
+    if pwd is not None and salted is True:
+        from base64 import urlsafe_b64encode as b64e
+        from base64 import urlsafe_b64decode as b64d
+        return b64e(b'%b%b%b' % (salt, iterations.to_bytes(4, 'big'), b64d(code)))
+    else:
+        return code
+
+
+def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
+    from base64 import urlsafe_b64encode as b64e
+    from base64 import urlsafe_b64decode as b64d
+    from cryptography.fernet import Fernet
+
+    if pwd is not None:
+        assert key is None, f"You can either pass key or pwd, or none of them, but not both."
+        assert type(pwd) is str
+        if salted:
+            decoded = b64d(token)
+            salt, iterations, token = decoded[:16], decoded[16:20], b64e(decoded[20:])
+            key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
+        else:
+            key = pwd2key(pwd)
+    if type(key) is bytes:  # passsed explicitly
+        pass
+    elif type(key) in {str, P, Path}:  # passed a path to a file containing kwy
+        key_path = P(key)
+        key = key_path.read_bytes()
+    else:
+        raise TypeError(f"Key must be either str, P, Path or bytes.")
+    return Fernet(key).decrypt(token)
+
+
+# =================================== File ============================================
 class Read(object):
     @staticmethod
     def read(path, **kwargs):
@@ -78,14 +177,11 @@ class Read(object):
     def csv(path, **kwargs):
         # w = P(path).append(".dtypes").readit(reader=pd.read_csv, notexist=None)
         # w = dict(zip(w['index'], w['dtypes'])) if w else w
+        import pandas as pd
         return pd.read_csv(path, **kwargs)
 
     @staticmethod
     def pickle(path, **kwargs):
-        # import pickle
-        # dill = Experimental.assert_package_installed("dill")
-        # removed for disentanglement
-        import dill
         with open(path, 'rb') as file:
             obj = dill.load(file, **kwargs)
         if type(obj) is dict:
@@ -328,7 +424,13 @@ class P(type(Path()), Path, Base):
         else:
             return P(self.parts[slici])
 
-    def __setitem__(self, key: typing.Union[str, int, slice], value: typing.Union[str, Path]):
+    def __setitem__(self, key, value):
+        """
+
+        :param key: typing.Union[str, int, slice]
+        :param value: typing.Union[str, Path]
+        :return:
+        """
         fullparts = list(self.parts)
         new = list(P(value).parts)
         if type(key) is str:
@@ -399,6 +501,7 @@ class P(type(Path()), Path, Base):
 
     @staticmethod
     def make_valid_filename_(astring, replace='_'):
+        import re
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
     def as_unix(self):
@@ -413,6 +516,7 @@ class P(type(Path()), Path, Base):
             if self.is_file():
                 self.unlink()  # missing_ok=True added in 3.8
             else:
+                import shutil
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
             if verbose: print(f"DELETED `{self.absolute().as_uri()}`.")
@@ -420,9 +524,7 @@ class P(type(Path()), Path, Base):
             if verbose: print(f"Did NOT DELETE because user is not sure. file: `{self.absolute().as_uri()}`.")
 
     def send2trash(self, verbose=True):
-        # send2trash = Experimental.assert_package_installed("send2trash")
-        # removed for disentanglement
-        import send2trash
+        send2trash = assert_package_installed("send2tresh")
         send2trash.send2trash(self.string)
         if verbose: print(f"TRASHED `{self.absolute().as_uri()}`")
 
@@ -468,6 +570,7 @@ class P(type(Path()), Path, Base):
             dest = self.append(f"_copy__{timestamp()}")
 
         if self.is_file():
+            import shutil
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
             if verbose: print(f"COPIED {self} ==> `{dest}`")
         elif self.is_dir():
@@ -592,7 +695,8 @@ class P(type(Path()), Path, Base):
 
         elif dotfiles:
             raw = self.glob(pattern) if not r else self.rglob(pattern)
-        else:
+        else:  # glob ignroes dot and hidden files
+            from glob import glob
             if r:
                 path = self / "**" / pattern
                 raw = glob(str(path), recursive=r)
@@ -659,6 +763,7 @@ class P(type(Path()), Path, Base):
             if not processed:  # if empty, don't proceeed
                 return List(processed)
             if win_order:  # this option only supported in non-generator mode.
+                import re
                 processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
             return List(processed)
 
@@ -679,6 +784,7 @@ class P(type(Path()), Path, Base):
 
     @staticmethod
     def tempdir():
+        import tempfile
         return P(tempfile.mktemp())
 
     @staticmethod
@@ -751,24 +857,28 @@ class P(type(Path()), Path, Base):
 
     def tar(self, op_path=None):
         if op_path is None: op_path = self + '.gz'
-        return Compression.untar(self, op_path=op_path)
+        result = Compression.untar(self, op_path=op_path)
+        return result
 
-    def untar(self):
-        pass
+    def untar(self, op_path, verbose=True):
+        _ = self, op_path, verbose
+        return P()
 
-    def gz(self):
-        pass
+    def gz(self, op_path, verbose=True):
+        _ = self, op_path, verbose
+        return P()
 
-    def ungz(self):
-        pass
+    def ungz(self, op_path, verbose=True):
+        _ = self, op_path, verbose
+        return P()
 
     def tar_gz(self):
         pass
 
     def untar_ungz(self, op_path=None, delete=False, verbose=True):
         op_path = op_path or P(self.parent) / P(self.stem)
-        intrem = Compression.ungz(self, op_path=op_path, verbose=verbose)
-        result = Compression.untar(intrem, op_path=op_path, verbose=verbose)
+        intrem = self.ungz(op_path=op_path, verbose=verbose)
+        result = intrem.untar(op_path=op_path, verbose=verbose)
         intrem.delete(are_you_sure=True, verbose=verbose)
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return result
@@ -782,85 +892,22 @@ class P(type(Path()), Path, Base):
     def decompress(self):
         pass
 
-    @staticmethod
-    def pwd2key(password=None):
-        if password is None: password = randstr(length=6, punctuation=True)
-        import hashlib, base64
-        m = hashlib.sha256()  # converts anything to fixed length 32 bytes
-        m.update(password.encode("utf-8"))
-        return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
-
-    def lock(self, password: str = None, op_path=None, delete=False, verbose=True):
-        if verbose: print(f"Warning: `lock` method is less secure than `encrypt`. It exposes the plain string passwords"
-                          f" to console. Use only for PIN purpose.")
-        key_path, op_path = self.encrypt(key=self.pwd2key(password), op_path=op_path,
-                                         verbose=False, append="_locked", delete=False)
-        if verbose: print(f"LOCKED `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
-        return password, op_path
-
-    def unlock(self, password, op_path=None, verbose=True, delete=False):
-        op_path = self.decrypt(key=self.pwd2key(password), op_path=op_path,
-                               verbose=False, append="_locked", delete=False)
-        if verbose: print(f"UNLOCKED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
+    def encrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
+        """
+        see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
+        https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
+        """
+        code = encrypt(message=self.read_bytes(), key=key, pwd=pwd)
+        op_path = self.append(name=append) if op_path is None else P(op_path)
+        op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
+        if verbose: print(f"ENCRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
-    def encrypt(self, key=None, op_path=None, verbose=True, append="_encrypted", delete=False):
-        """
-        see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
-        :param key:
-        :param op_path:
-        :param verbose:
-        :return:
-        """
-        op_path = self.append(name=append) if op_path is None else P(op_path)
-        from cryptography.fernet import Fernet
-        if key is None:
-            key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
-            key_path = op_path.parent.joinpath("key.bytes")
-            key_path.write_bytes(key)
-            if verbose: print(f"KEY SAVED @ `{key_path.absolute().as_uri()}`")
-        elif type(key) in {str, P, Path}:  # a path
-            key_path = P(key)
-            key = key_path.read_bytes()
-        elif type(key) is bytes:
-            key_path = None
-        else:
-            raise TypeError(f"Key must be either a path, bytes object or None.")
-        op_path.write_bytes(Fernet(key).encrypt(self.read_bytes()))
-        if verbose:
-            msg = f"Encryption Warning:\n" \
-                  f"* Be careful of key being stored unintendedly in console or terminal history, " \
-                  f"e.g. don't use IPython.\n" \
-                  f"* It behoves you to try decrypting it to err on the side of safety.\n" \
-                  f"* Don't forget to delete OR store key file safely."
-            print(msg)
-            msg = f"ENCRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`."
-            if key_path is not None: msg += f" Key = {key_path.absolute().as_uri()}"
-            print(msg)
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
-        return key_path, op_path
-
-    def decrypt(self, key, op_path=None, verbose=True, append="_encrypted", delete=False):
-        from cryptography.fernet import Fernet
-        if type(key) is bytes:
-            key_path = None
-        elif type(key) in {str, P, Path}:
-            key_path = P(key)
-            key = key_path.read_bytes()
-        else:
-            raise TypeError(f"Key must be either str, P, Path or bytes.")
+    def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
         op_path = P(op_path) if op_path is not None else self.switch(append, "")
-        op_path.write_bytes(Fernet(key).decrypt(self.read_bytes()))
-        if verbose:
-            msg = f"Decryption Warning:\n" \
-                  f"* Be wary of key being stored unintendedly in console or terminal history.\n" \
-                  f"* Don't forget to delete OR safely store the key file."
-            print(msg)
-            msg = f"DECRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`."
-            if key_path is not None: msg += f" Key = {key_path.absolute().as_uri()}"
-            print(msg)
+        op_path.write_bytes(decrypt(self.read_bytes(), key, pwd))  # Fernet(key).decrypt(self.read_bytes()))
+        if verbose: print(f"DECRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
@@ -898,6 +945,7 @@ class Compression(object):
         .. note:: ``fmt`` can only be one of ``zip, tar, gztar, bztar, xztar``.
         """
         root_dir = ip_path.split(at=arcname[0])[0]  # shutil works with folders nicely (recursion is done interally)
+        import shutil
         result_path = shutil.make_archive(base_name=op_path, format=fmt,
                                           root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
         return P(result_path)  # same as op_path but (possibly) with format extension
@@ -933,6 +981,7 @@ class Compression(object):
     @staticmethod
     def gz(file, op_file):
         import gzip
+        import shutil
         with open(file, 'rb') as f_in:
             with gzip.open(op_file, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
@@ -941,6 +990,7 @@ class Compression(object):
     @staticmethod
     def ungz(self, op_path=None):
         import gzip
+        import shutil
         with gzip.open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
         return P(op_path)
@@ -1003,7 +1053,7 @@ class Fridge:
         """
         """
         self.cache = None  # fridge content
-        self.time = time  or pd.Timestamp.now()  # init time
+        self.time = time or datetime.now()  # init time
         self.expire = expire  # how much time elapsed before
         self.refresh = refresh  # function which when called returns a fresh object to be frozen.
         self.logger = logger
@@ -1025,19 +1075,19 @@ class Fridge:
     @property
     def age(self):
         if self.path is None:
-            return pd.Timestamp.now() - self.time
+            return datetime.now() - self.time
         else:
-            return pd.Timestamp.now() - self.path.stats().content_mod_time
+            return datetime.now() - self.path.stats().content_mod_time
 
     def reset(self):
-        self.time = pd.Timestamp.now()
+        self.time = datetime.now()
 
     def __call__(self, fresh=False):
         """"""
         if self.path is None:  # Memory Fridge
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
                 self.cache = self.refresh()
-                self.time = pd.Timestamp.now()
+                self.time = datetime.now()
                 if self.logger: self.logger.debug(f"Updating / Saving data from {self.refresh}")
             else:
                 if self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
@@ -1045,7 +1095,7 @@ class Fridge:
         else:  # disk fridge
             if fresh or not self.path.exists() or self.age > str2timedelta(self.expire):
                 if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
-                # print(pd.Timestamp.now() - self.path.stats().content_mod_time, str2timedelta(self.expire))
+                # print(datetime.now() - self.path.stats().content_mod_time, str2timedelta(self.expire))
                 self.cache = self.refresh()  # fresh order, never existed or exists but expired.
                 self.save(obj=self.cache, path=self.path)
             elif self.age < str2timedelta(self.expire):
