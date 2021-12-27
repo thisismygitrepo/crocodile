@@ -33,8 +33,8 @@ def build_parser():
     # default is running as module, unless indicated by --main flag, which runs the script as main
     parser.add_argument("--here", "-H",
                         help="Flag for running in this window.", action="store_true")  # default is False
-    parser.add_argument("-i", "--interactive",
-                        help="Flag to specify an interactive session.", action="store_false")  # default is True
+    parser.add_argument("-s", "--solitary",
+                        help="Flag to specify a non-interactive session.", action="store_false")  # default is True
     parser.add_argument("-p", "--python",
                         help="Flag to use python over IPython.", action="store_true")  # default is False
     parser.add_argument("-e", help="Flag to explore the file (what are its contents).",
@@ -80,7 +80,7 @@ from {path} import *\\
         if args.func != "":
             script += f"tb.E.run_globally({args.func}, globals())"
         tb.Terminal().run_script(script=script, console=args.console, new_window=not args.here,
-                                 interactive=args.interactive, ipython=not args.python)
+                                 interactive=not args.solitary, ipython=not args.python)
 
 
 # tips: to launch python in the same terminal, simply don't use crocodile.run

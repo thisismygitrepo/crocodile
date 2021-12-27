@@ -588,7 +588,7 @@ class Terminal:
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return self.Response.from_completed_process(resp)
 
-    def run_async(self, *cmds):
+    def run_async(self, *cmds, new_window=True, console="powershell", shell=True):
         """Opens a new terminal, and let it run asynchronously.
         Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of
@@ -598,30 +598,11 @@ class Terminal:
         """
         my_list = []
         if self.machine == "Windows":
-            my_list += ["start", "powershell", "-Command"]
+            my_list += (["start"] if new_window else []) + [console, "-Command"]
         my_list += cmds
-        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=True)
+        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=shell)
         # returns Popen object, not so useful for communcation with an opened terminal
         return w
-
-    @staticmethod
-    def open_console(console="", command="", shell=True, new_window=True, new_context=True):
-        """
-        :param console: default is same as the launching console. `cmd` doesn't recieve command, spoiler: not easy.
-         `powershell` doesn't inherit venv. `wt` and `` works.
-        :param command:
-        :param shell:
-        :param new_window:
-        :param new_context:
-        :return:
-        """
-        # This does not inherit from the from the shell launched python.
-        if new_context:
-            return subprocess.Popen(f'{"start" if new_window else ""} {console} {command}', shell=shell,
-                                    creationflags=subprocess.CREATE_NEW_CONSOLE)
-        else:  # this way, the new console inherits from its current context.
-            return os.system(fr'{"start" if new_window else ""} {console} {command} \K')
-            # /K remains the window, /C executes and dies (popup)
 
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
@@ -645,10 +626,10 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
-        Terminal.open_console(console=console, command=f"{'ipython' if ipython else 'python'} "
-                                                       f"{'-i' if interactive else ''}"
-                                                       f" {file}",
-                              shell=shell, new_window=new_window)
+        Terminal().run_async(f"{'ipython' if ipython else 'python'} "
+                             f"{'-i' if interactive else ''}"
+                             f" {file}",
+                             console=console, shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete
@@ -703,10 +684,9 @@ class SSH(object):
     def __repr__(self):
         return f"{self.platform.node()} SSH connection to {self.username}@{self.hostname}"
 
-    def open_console(self):
+    def open_console(self, new_window=True):
         cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
-        print(cmd)
-        Terminal().open_console(command=cmd)
+        Terminal().run_async(cmd, new_window=new_window)
 
     def copy_from_here(self, source, target=None, zip_and_cipher=True):
         source = P(source)
@@ -718,7 +698,7 @@ class SSH(object):
                                  f"made relative. Currently recieved {source}")
             target = P(source).parent.as_posix()  # works if source is relative.
             print(f"Target directory not passed, assuming it is: {target}")
-        self.run(f"""{self.load_python_cmd}; python -m crocodile.run --here --cmd "tb.P(r'{target}').create()" """)
+        self.run(f"""{self.load_python_cmd}; python -m crocodile.run --here --cmd "tb.P(r'{target}').expanduser().create()" """)
         pwd = None
         if zip_and_cipher:
             pwd = randstr(length=10, safe=True)
