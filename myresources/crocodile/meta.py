@@ -1,3 +1,4 @@
+
 import logging
 import subprocess
 import time
@@ -1084,6 +1085,15 @@ class Scheduler:
         #     print(signum, frame)
         #     raise KeyboardInterrupt
         # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+
+
+def qr(txt):
+    qrcode = assert_package_installed("qrcode")
+    img = qrcode.make(txt)
+    file = P.tmpfile(suffix=".png")
+    img.save(file.__str__())
+    file()
+    return file
 
 
 if __name__ == '__main__':

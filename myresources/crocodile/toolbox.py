@@ -26,6 +26,7 @@ Struct, DisplayData, str2timedelta, Save, List = core.Struct, core.DisplayData, 
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
 Fridge, MemoryDB = _fm.Fridge, _fm.MemoryDB
+encrypt, decrypt = _fm.encrypt, _fm.decrypt
 
 Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImShow, _pm.SaveType
 VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto

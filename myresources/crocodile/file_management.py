@@ -35,7 +35,7 @@ def pwd2key(password: str, salt=None, iterations=None) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 
-def encrypt(message: bytes, key=None, pwd: str = None, salted=True, iterations: int = None) -> bytes:
+def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iterations: int = None) -> bytes:
     """
         Encryption Tips:
         * Be careful of key being stored unintendedly in console or terminal history,
@@ -74,7 +74,8 @@ def encrypt(message: bytes, key=None, pwd: str = None, salted=True, iterations: 
     else:
         raise TypeError(f"Key must be either a path, bytes object or None.")
 
-    code = Fernet(key).encrypt(message)
+    # if type(msg) is str: msg = msg.encode("utf-8")
+    code = Fernet(key).encrypt(msg)
 
     if pwd is not None and salted is True:
         from base64 import urlsafe_b64encode as b64e
@@ -495,6 +496,8 @@ class P(type(Path()), Path):
                 rep += " | " + self.time(which="c").isoformat()[:-7].replace("T", "  ")
                 if self.is_file():
                     rep += f" | {self.size()} Mb"
+        elif "http" in str(self):
+            rep += " URL " + self.as_url()
         else:  # not much can be said about this path.
             rep += " Relative " + "'" + str(self) + "'"
         return rep
@@ -517,6 +520,10 @@ class P(type(Path()), Path):
         string_ = self.as_posix()
         string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
         return string_
+
+    def to_url(self):
+        import urllib3
+        return urllib3.connection_from_url(self)
 
     def __getstate__(self):
         return str(self)
@@ -971,7 +978,7 @@ class P(type(Path()), Path):
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
         """
-        code = encrypt(message=self.read_bytes(), key=key, pwd=pwd)
+        code = encrypt(msg=self.read_bytes(), key=key, pwd=pwd)
         op_path = self.append(name=append) if op_path is None else P(op_path)
         op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
         if verbose: print(f"ENCRYPTED: {repr(self)} ==> {repr(op_path)}.")
