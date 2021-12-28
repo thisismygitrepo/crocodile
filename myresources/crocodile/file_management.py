@@ -541,8 +541,8 @@ class P(type(Path()), Path):
         import re
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
-    # def as_unix(self):  # use as_posix()
-    #     return P(str(self).replace('\\', '/').replace('//', '/'))
+    def as_unix(self):  # use as_posix()
+        return P(str(self).replace('\\', '/').replace('//', '/'))
 
     # ==================================== File management =========================================
     def delete(self, are_you_sure=False, verbose=True):
@@ -566,10 +566,19 @@ class P(type(Path()), Path):
         if verbose: print(f"TRASHED {repr(self)}")
 
     def move(self, new_path, overwrite=False, verbose=True):
-        temp = self.absolute()
-        new_path = P(new_path).absolute() / temp.name
-        if overwrite: new_path.delete(are_you_sure=True, verbose=False)
-        temp.rename(new_path)
+        slf = self.absolute()
+
+        if overwrite:
+            str_ = randstr()
+            new_path = P(new_path).absolute() / str_  # no conflict with existing files/dirs of same `self.name`
+            slf.rename(new_path)  # no error are likely to occur as the random name won't cause conflict.
+            # now we can delete any potential conflict before eventually taking its name
+            (new_path.parent / slf.name).delete(are_you_sure=True, verbose=False)  # It is important to delete after moving
+            # because `self` could be within the file you want to delete.
+            new_path.rename(new_path.parent / slf.name)
+        else:
+            new_path = P(new_path).absolute() / slf.name
+            slf.rename(new_path)
         if verbose: print(f"MOVED {repr(self)} ==> {repr(new_path)}`")
         return new_path
 
@@ -579,7 +588,8 @@ class P(type(Path()), Path):
             result = self.parent.parent
         else:
             result = self.move(self.parent.parent, overwrite=overwrite)
-        self.parent.delete(are_you_sure=delete)
+        if result != self:
+            self.parent.delete(are_you_sure=delete)
         return result
 
     def renameit(self, new_file_name, verbose=True):
@@ -817,7 +827,7 @@ class P(type(Path()), Path):
     def listdir(self):
         return List(os.listdir(self)).apply(P)
 
-    def find(self, *args, r=True, compressed=True, **kwargs):
+    def find(self, *args, r=True, compressed=False, **kwargs):
         """short for the method ``search`` then pick first item from results.
 
         .. note:: it is delibrately made to return None in case and object is not found.
@@ -826,7 +836,7 @@ class P(type(Path()), Path):
         results = self.search(*args, r=r, compressed=compressed, **kwargs)
         if len(results) > 0:
             result = results[0]
-            return result.unzip()
+            return result
         else: return None
 
     @staticmethod
@@ -978,7 +988,8 @@ class P(type(Path()), Path):
     def decipher_and_unzip(self, key=None, pwd=None, delete=False, verbose=True):
         deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
         unzipped = deciphered.unzip(op_path=None, delete=True, content=False)
-        return unzipped.find().move_up()
+        # return unzipped
+        return unzipped.find().move_up(overwrite=False)
 
 
 class Compression(object):
@@ -1004,6 +1015,7 @@ class Compression(object):
         """
         root_dir = ip_path.split(at=arcname[0])[0]  # shutil works with folders nicely (recursion is done interally)
         import shutil
+        print(op_path, root_dir, arcname)
         result_path = shutil.make_archive(base_name=op_path, format=fmt,
                                           root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
         return P(result_path)  # same as op_path but (possibly) with format extension

@@ -705,16 +705,14 @@ class SSH(object):
         if zip_and_cipher:
             pwd = randstr(length=10, safe=True)
             source = P(source).expanduser().zip_and_cipher(pwd=pwd)
-
         print(f"Step 1: Creating Target directory {target} @ remote machine.")
         if target is None: target = P(source).collapseuser().as_posix()  # works if source is relative.
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
-        remotepath = P(resp.op or "").joinpath(P(target).name)
-        # return remotepath
+        remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
         print(f"Send `{source}` ==> `{remotepath}` ")
-        self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix())
+        self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_and_cipher:
-            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decipher_and_unzip(pwd="{pwd}", delete=False)""")
+            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decipher_and_unzip(pwd="{pwd}", delete=True)""")
             return resp
 
     def copy_to_here(self, source, target=None):
