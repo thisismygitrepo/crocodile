@@ -964,7 +964,8 @@ class P(type(Path()), Path):
 
     def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
         op_path = P(op_path) if op_path is not None else self.switch(append, "")
-        op_path.write_bytes(decrypt(self.read_bytes(), key, pwd))  # Fernet(key).decrypt(self.read_bytes()))
+        print(self, str(self), repr(self))
+        op_path.write_bytes(decrypt(self.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
         if verbose: print(f"DECRYPTED: {repr(self)} ==> {repr(op_path)}.")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
