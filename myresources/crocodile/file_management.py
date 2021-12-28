@@ -62,7 +62,7 @@ def encrypt(message: bytes, key=None, pwd: str = None, salted=True, iterations: 
         key_path = P.tmpdir().joinpath("key.bytes")
         key_path.write_bytes(key)
         # without verbosity check:
-        print(f"KEY SAVED @ `{key_path.absolute().as_uri()}`")
+        print(f"KEY SAVED @ {repr(key_path)}")
         global __keypath__
         __keypath__ = key_path
         print(f"KEY PATH REFERENCED IN GLOBAL SCOPE AS `__keypath__`")
@@ -487,10 +487,30 @@ class P(type(Path()), Path):
 
     # ================================ String Nature management ====================================
     def __repr__(self):  # this is useful only for the console
-        return "P: " + self.__str__()
+        rep = "P:"
+        if self.is_absolute():
+            rep += " " + self._spec() + " '" + self.clickable() + "'"
+            if self.exists():
+                rep += " | " + self.time(which="c").isoformat()[:-7].replace("T", "  ")
+                if self.is_file():
+                    rep += f" | {self.size()} Mb"
+        else:  # not much can be said about this path.
+            rep += " Relative " + "'" + str(self) + "'"
+        return rep
 
     def clickable(self):
         return self.expanduser().absolute().resolve().as_uri()
+
+    def _spec(self):
+        if self.absolute():
+            if self.is_file():
+                return "File"
+            elif self.is_dir():
+                return "Dir"
+            else:  # there is no tell if it is a file or directory.
+                return "NotExist"
+        else:  # there is no tell whether it is a file or directory.
+            return "Relative"
 
     def as_url(self):
         string_ = self.as_posix()
@@ -528,7 +548,7 @@ class P(type(Path()), Path):
     def delete(self, are_you_sure=False, verbose=True):
         if are_you_sure:
             if not self.exists():
-                if verbose: print(f"Could NOT DELETE nonexisting file `{self.absolute().as_uri()}`. ")
+                if verbose: print(f"Could NOT DELETE nonexisting file {repr(self)}. ")
                 return None  # terminate the function.
             if self.is_file():
                 self.unlink()  # missing_ok=True added in 3.8
@@ -536,27 +556,37 @@ class P(type(Path()), Path):
                 import shutil
                 shutil.rmtree(self, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
-            if verbose: print(f"DELETED `{self.absolute().as_uri()}`.")
+            if verbose: print(f"DELETED {repr(self)}.")
         else:
-            if verbose: print(f"Did NOT DELETE because user is not sure. file: `{self.absolute().as_uri()}`.")
+            if verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.")
 
     def send2trash(self, verbose=True):
-        send2trash = assert_package_installed("send2tresh")
+        send2trash = assert_package_installed("send2trash")
         send2trash.send2trash(self.string)
-        if verbose: print(f"TRASHED `{self.absolute().as_uri()}`")
+        if verbose: print(f"TRASHED {repr(self)}")
 
     def move(self, new_path, overwrite=False, verbose=True):
         temp = self.absolute()
         new_path = P(new_path).absolute() / temp.name
         if overwrite: new_path.delete(are_you_sure=True, verbose=False)
         temp.rename(new_path)
-        if verbose: print(f"MOVED `{self.absolute().as_uri()}` ==> `{new_path.absolute().as_uri()}`")
+        if verbose: print(f"MOVED {repr(self)} ==> {repr(new_path)}`")
         return new_path
 
-    def renameit(self, new_file_name):
+    def move_up(self, delete=True, content=False, overwrite=False):
+        if content:
+            self.search("*").apply(lambda x: x.move_up(delete=delete, content=False))
+            result = self.parent.parent
+        else:
+            result = self.move(self.parent.parent, overwrite=overwrite)
+        self.parent.delete(are_you_sure=delete)
+        return result
+
+    def renameit(self, new_file_name, verbose=True):
         assert type(new_file_name) is str, "New new should be a string representing file name alone."
         new_path = self.parent / new_file_name
         self.rename(new_path)
+        if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
         return new_path
 
     def copy(self, target_dir=None, target_name=None, content=False, verbose=True):
@@ -589,7 +619,7 @@ class P(type(Path()), Path):
         if self.is_file():
             import shutil
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
-            if verbose: print(f"COPIED {self} ==> `{dest}`")
+            if verbose: print(f"COPIED {repr(self)} ==> {repr(dest)}")
         elif self.is_dir():
             from distutils.dir_util import copy_tree
             if content:
@@ -598,9 +628,9 @@ class P(type(Path()), Path):
                 copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
             if verbose:
                 preface = "Content of " if content else ""
-                print(f"COPIED {preface} `{self.absolute().as_uri()}` ==> `{dest.absolute().as_uri()}`")
+                print(f"COPIED {preface} {repr(self)} ==> {repr(dest)}")
         else:
-            print(f"Could NOT COPY. Not a file nor a folder: `{self.absolute().as_uri()}`.")
+            print(f"Could NOT COPY. Not a file nor a folder: {repr(self)}.")
         return dest / self.name
 
     def clean(self, trash=True):
@@ -830,7 +860,7 @@ class P(type(Path()), Path):
             path.mkdir(exist_ok=True, parents=True)
         if file is not None:
             path = path / file
-        if verbose: print(f"TMPDIR `{path.absolute().as_uri()}`. Parent: `{path.parent.absolute().as_uri()}`")
+        if verbose: print(f"TMPDIR {repr(path)}. Parent: {repr(path.parent)}")
         return path
 
     @staticmethod
@@ -853,11 +883,22 @@ class P(type(Path()), Path):
         else:
             op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
                                                   arcname=arcname, fmt='zip', **kwargs)
-        if verbose: print(f"ZIPPED `{self.absolute().as_uri()}` ==>  `{op_path.absolute().as_uri()}`")
+        if verbose: print(f"ZIPPED {repr(self)} ==>  {repr(op_path)}")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
     def unzip(self, op_path=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
+        """
+
+        :param op_path: directory where extracted files will live.
+        :param fname: a specific file name to be extracted from the archive.
+        :param verbose:
+        :param content: if set to True, all contents of the zip archive will be scattered in op_path dir.
+        If set to False, a directory with same name as the zip file will be created and will contain the results.
+        :param delete: delete the original zip file after successful extraction.
+        :param kwargs:
+        :return: op_path if content=False, else, op_path.parent. Default op_path = self.parent / self.stem
+        """
         zipfile = self
         if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(self): return self
@@ -867,7 +908,7 @@ class P(type(Path()), Path):
         if content: op_path = op_path.parent
         result = Compression.unzip(zipfile, op_path, fname, **kwargs)
         if verbose:
-            msg = f"UNZIPPED `{zipfile.absolute().as_uri()}` ==> `{result.absolute().as_uri()}`"
+            msg = f"UNZIPPED {repr(zipfile)} ==> {repr(result)}"
             print(msg)
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return result
@@ -917,14 +958,14 @@ class P(type(Path()), Path):
         code = encrypt(message=self.read_bytes(), key=key, pwd=pwd)
         op_path = self.append(name=append) if op_path is None else P(op_path)
         op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
-        if verbose: print(f"ENCRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
+        if verbose: print(f"ENCRYPTED: {repr(self)} ==> {repr(op_path)}.")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
     def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
         op_path = P(op_path) if op_path is not None else self.switch(append, "")
         op_path.write_bytes(decrypt(self.read_bytes(), key, pwd))  # Fernet(key).decrypt(self.read_bytes()))
-        if verbose: print(f"DECRYPTED: `{self.absolute().as_uri()}` ==> `{op_path.absolute().as_uri()}`.")
+        if verbose: print(f"DECRYPTED: {repr(self)} ==> {repr(op_path)}.")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
@@ -935,8 +976,8 @@ class P(type(Path()), Path):
 
     def decipher_and_unzip(self, key=None, pwd=None, delete=False, verbose=True):
         deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
-        unzipped = deciphered.unzip(op_path=None, delete=True, content=True)
-        return unzipped.find()
+        unzipped = deciphered.unzip(op_path=None, delete=True, content=False)
+        return unzipped.find().move_up()
 
 
 class Compression(object):
