@@ -718,10 +718,10 @@ class SSH(object):
     def copy_to_here(self, source, target=None):
         pass
 
-    def run(self, command, printit=True):
-        print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{command}")
-        res = self.ssh.exec_command(command)
-        res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2])
+    def run(self, cmd, printit=True):
+        print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{cmd}")
+        res = self.ssh.exec_command(cmd)
+        res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
         if printit: res.print()
         return res
 

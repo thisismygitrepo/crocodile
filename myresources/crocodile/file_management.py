@@ -390,6 +390,7 @@ class P(type(Path()), Path):
              at exact match.
         :return: two paths
         """
+
         # ====================================   Splitting
         if index is None and (at is not None):  # at is provided
 
@@ -430,7 +431,7 @@ class P(type(Path()), Path):
             return P(*self.parts[slici])
         elif type(slici) is list or type(slici) is np.ndarray:
             return P(*[self[item] for item in slici])
-        else:
+        else:  # it is an integer
             return P(self.parts[slici])
 
     def __setitem__(self, key, value):
@@ -879,20 +880,25 @@ class P(type(Path()), Path):
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================
-    def zip(self, op_path=None, arcname=None, delete=False, verbose=True, **kwargs):
+    def zip(self, op_path=None, arcname=None, delete=False, verbose=True, content=True, **kwargs):
         """
         """
         op_path = P(op_path or self)
         arcname = P(arcname or self.name)
-        # arcname = P(self.evalstr(arcname, expected="self"))
-        # op_path = P(self.evalstr(op_path, expected="self"))
         if arcname.name != self.name:
             arcname /= self.name  # arcname has to start from somewhere and end with filename
         if self.is_file():
+            if op_path.suffix != ".zip": op_path = op_path + f".zip"
             op_path = Compression.zip_file(ip_path=self, op_path=op_path, arcname=arcname, **kwargs)
         else:
-            op_path = Compression.compress_folder(ip_path=self, op_path=op_path,
-                                                  arcname=arcname, fmt='zip', **kwargs)
+            if content:
+                root_dir = self
+                base_dir = "."
+            else:
+                root_dir = self.split(at=str(arcname[0]))[0]
+                base_dir = arcname
+            op_path = Compression.compress_folder(root_dir=root_dir, op_path=op_path,
+                                                  base_dir=base_dir, fmt='zip', **kwargs)
         if verbose: print(f"ZIPPED {repr(self)} ==>  {repr(op_path)}")
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
@@ -988,8 +994,7 @@ class P(type(Path()), Path):
     def decipher_and_unzip(self, key=None, pwd=None, delete=False, verbose=True):
         deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
         unzipped = deciphered.unzip(op_path=None, delete=True, content=False)
-        # return unzipped
-        return unzipped.find().move_up(overwrite=False)
+        return unzipped
 
 
 class Compression(object):
@@ -1000,40 +1005,32 @@ class Compression(object):
         pass
 
     @staticmethod
-    def compress_folder(ip_path, op_path, arcname, fmt='zip', **kwargs):
-        """Explanation of Shutil parameters:
-
-        * ``base_dir`` (here referred to as ``ip_path``) is what is going to be acturally archived.
-            When provided, it **has to** be relevant to ``root_dir`` (here referred to as ``arcname``).
-        * ``root_dir`` is where the archive is going to start from. It will create all the necessary subfolder till
-            it reaches the ``base_dir`` where archiving actually starts.
-        * Example: If you want to compress a folder in ``Downloads/myfolder/compress_this``
-            Then, say that your rootdir is where you want the archive structure to include,
-            then mention the folder you want to actually archive relatively to that root.
-
-        .. note:: ``fmt`` can only be one of ``zip, tar, gztar, bztar, xztar``.
+    def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):
         """
-        root_dir = ip_path.split(at=arcname[0])[0]  # shutil works with folders nicely (recursion is done interally)
+        shutil works with folders nicely (recursion is done interally)
+        # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path.
+        # when archive opened; base_dir will be found.
+        """
+        assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}
+        assert P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
         import shutil
-        print(op_path, root_dir, arcname)
         result_path = shutil.make_archive(base_name=op_path, format=fmt,
-                                          root_dir=str(root_dir), base_dir=str(arcname), **kwargs)
+                                          root_dir=str(root_dir), base_dir=str(base_dir), **kwargs)
         return P(result_path)  # same as op_path but (possibly) with format extension
 
     @staticmethod
-    def zip_file(ip_path, op_path, arcname, password=None, **kwargs):
+    def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
         """
         arcname determines the directory of the file being archived inside the archive. Defaults to same
         as original directory except for drive. When changed, it should still include the file name in its end.
         If arcname = filename without any path, then, it will be in the root of the archive.
         """
         import zipfile
-        if op_path.suffix != ".zip":
-            op_path = op_path + f".zip"
         jungle_zip = zipfile.ZipFile(str(op_path), 'w')
         if password is not None:
             jungle_zip.setpassword(pwd=password)
-        jungle_zip.write(filename=str(ip_path), arcname=str(arcname), compress_type=zipfile.ZIP_DEFLATED, **kwargs)
+        jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None,
+                         compress_type=zipfile.ZIP_DEFLATED, **kwargs)
         jungle_zip.close()
         return op_path
 
