@@ -66,7 +66,7 @@ def commit_all_repos():
 
     def commit_all(repos=None):
         if repos is None: repos = tb.P.home().joinpath("code")
-        return repos.search("*").apply(lambda x: commit_one(x))
+        return repos.search("*").apply(lambda x: commit_one(x), verbose=True)
 
     def commit_one(path, mess="auto_commit_" + tb.randstr()):
         return tm.run(f'cd {path}; git add .; git commit -am "{mess}"; git push origin')

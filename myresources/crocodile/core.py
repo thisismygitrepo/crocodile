@@ -694,7 +694,7 @@ class List(list, Base):
             self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
-        tqdm = assert_package_installed("tqdm")
+        tqdm = assert_package_installed("tqdm").tqdm
         if other is None:
             iterator = self.list if not verbose else tqdm(self.list, desc=desc)
             if jobs:
@@ -791,10 +791,18 @@ class List(list, Base):
         return np.array(self.list)
 
 
-class Struct(Base):  # inheriting from dict gives `get` method.
+class Struct(dict):  # inheriting from dict gives `get` method.
     """Use this class to keep bits and sundry items.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     """
+
+    def save_json(self, path=None):
+        path = Save.json(obj=self.__dict__, path=path)
+        return path
+
+    def save_yaml(self, path=None):
+        return Save.yaml(obj=self.__dict__, path=path)
+
     def __len__(self):
         return len(self.keys())
 

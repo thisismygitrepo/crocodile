@@ -157,8 +157,13 @@ class Read(object):
     def json(path, r=False, **kwargs):
         """Returns a Structure"""
         import json
-        with open(str(path), "r") as file:
-            mydict = json.load(file, **kwargs)
+        try:
+            with open(str(path), "r") as file:
+                mydict = json.load(file, **kwargs)
+        except Exception:  # file has C-style comments.
+            with open(str(path), "r") as file:
+                lib = assert_package_installed("pyjson5")
+                mydict = lib.load(file, **kwargs)
         if r:
             return Struct.recursive_struct(mydict)
         else:
@@ -208,7 +213,7 @@ class P(type(Path()), Path):
     def download(self, directory=None, memory=False, allow_redirects=True):
         """Assuming URL points to anything but html page."""
         import requests
-        response = requests.get(self.as_url(), allow_redirects=allow_redirects)
+        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects)
 
         if memory is False:
             directory = P.home().joinpath("Downloads") if directory is None else P(directory)
@@ -316,6 +321,25 @@ class P(type(Path()), Path):
         """
         return self.name.split('.')[0]
 
+    def prepend(self, prefix, suffix=None):
+        """Add extra text before file name
+        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
+        notice that `__add__` method removes the extension, while this one preserves it.
+        """
+        if suffix is None: suffix = ''.join(self.suffixes)
+        return self.parent.joinpath(prefix + self.trunk + suffix)
+
+    def append(self, name='', suffix=None):
+        """Add extra text after file name, and optionally add extra suffix.
+        e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension
+        """
+        if suffix is None: suffix = ''.join(self.suffixes)
+        return self.parent.joinpath(self.trunk + name + suffix)
+
+    def with_trunk(self, name):
+        """Complementary to `with_stem` and `with_suffic`"""
+        return self.parent.joinpath(name + "".join(self.suffixes))
+
     @property
     def items(self):
         """Behaves like `.parts` but returns a List."""
@@ -340,24 +364,6 @@ class P(type(Path()), Path):
     #     if tmp[0] == "/":  # if dir starts with this, all Path methods fail.
     #         tmp = tmp[1:]
     #     return P(other) / tmp
-
-    def prepend(self, prefix, stem=False):
-        """Add extra text before file name
-        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
-        notice that `__add__` method removes the extension, while this one preserves it.
-        """
-        if stem:
-            return self.parent.joinpath(prefix + self.stem)
-        else:
-            return self.parent.joinpath(prefix + self.name)
-
-    def append(self, name='', suffix=None):
-        """Add extra text after file name, and optionally add extra suffix.
-        e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension
-        """
-        if suffix is None:
-            suffix = ''.join(self.suffixes)
-        return self.parent.joinpath(self.stem + name + suffix)
 
     def append_time_stamp(self, fmt=None):
         return self.append(name="-" + timestamp(fmt=fmt))
@@ -490,20 +496,22 @@ class P(type(Path()), Path):
     # ================================ String Nature management ====================================
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
-        if self.is_absolute():
+        if self.is_symlink():
+            rep += " Symlink '" + self.clickable() + "' ==> " + self.resolve().__repr__()
+        elif self.is_absolute():
             rep += " " + self._spec() + " '" + self.clickable() + "'"
             if self.exists():
                 rep += " | " + self.time(which="c").isoformat()[:-7].replace("T", "  ")
                 if self.is_file():
                     rep += f" | {self.size()} Mb"
         elif "http" in str(self):
-            rep += " URL " + self.as_url()
-        else:  # not much can be said about this path.
+            rep += " URL " + self.as_url_str()
+        else:  # not much can be said about a relative path.
             rep += " Relative " + "'" + str(self) + "'"
         return rep
 
     def clickable(self):
-        return self.expanduser().absolute().resolve().as_uri()
+        return self.expanduser().absolute().as_uri()  # .resolve()
 
     def _spec(self):
         if self.absolute():
@@ -516,12 +524,12 @@ class P(type(Path()), Path):
         else:  # there is no tell whether it is a file or directory.
             return "Relative"
 
-    def as_url(self):
+    def to_url_str(self):
         string_ = self.as_posix()
         string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
         return string_
 
-    def to_url(self):
+    def to_url_obj(self):
         import urllib3
         return urllib3.connection_from_url(self)
 
@@ -532,8 +540,8 @@ class P(type(Path()), Path):
         self._str = str(state)
 
     @property
-    def string(self):  # this method is used by other functions to get string representation of path
-        return str(self)
+    def str(self):  # this method is used by other functions to get string representation of path
+        return str(self)  # or self._str
 
     def get_num(self, astring=None):
         if astring is None:
@@ -549,8 +557,50 @@ class P(type(Path()), Path):
         import re
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
-    def as_unix(self):  # use as_posix()
+    # =========================== OVERTIDE ===============================================
+    def as_unix(self):
+        """Similar to `as_posix()` but returns P object"""
         return P(str(self).replace('\\', '/').replace('//', '/'))
+
+    def symlink_to(self, target, target_is_directory: bool = ..., verbose=True):
+        super(P, self).symlink_to(target, target_is_directory)
+        print(f"LINKED {repr(self)}")
+
+    @staticmethod
+    def pwd():
+        return P.cwd()
+
+    def append_text(self, txt):
+        text = self.read_text()
+        text += txt
+        self.write_text(text)
+        return self
+
+    def modify_text(self, txt, alt, newline=True):
+        """
+        :param txt: text to be searched for in the file. The line in which it is found will be up for change.
+        :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
+        :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
+        :return:
+
+        Works seamlessly for config files that has one-liners in it, which is invariably the case.
+        File is created if it doesn't exist.
+        Text is simply appended if not found in the text file.
+        """
+        self.parent.create()
+        if not self.exists(): self.write_text(txt)
+        lines = self.read_text().split("\n")
+        bingo = False
+        for idx, line in enumerate(lines):
+            if txt in line:
+                bingo = True
+                if newline is True:
+                    lines[idx] = alt if type(alt) is str else alt(line)
+                else:
+                    lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
+        if bingo is False:  lines.append(txt)  # txt not found, add it anyway.
+        self.write_text("\n".join(lines))
+        return self
 
     # ==================================== File management =========================================
     def delete(self, are_you_sure=False, verbose=True):
@@ -607,9 +657,8 @@ class P(type(Path()), Path):
         if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
         return new_path
 
-    def copy(self, target_dir=None, target_name=None, content=False, verbose=True):
+    def copy(self, target_dir=None, target_name=None, content=False, verbose=True, append=(f"_copy_{randstr()}")):
         """
-
         :param target_dir: copy the file to this directory (filename remains the same).
         :param target_name: full path of destination (including -potentially different-  file name).
         :param content: copy the parent directory or its content (relevant only if copying a directory)
@@ -632,12 +681,13 @@ class P(type(Path()), Path):
             dest = target_name
 
         if dest is None:
-            dest = self.append(f"_copy__{timestamp()}")
+            dest = self.append(append)
 
         if self.is_file():
             import shutil
             shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
             if verbose: print(f"COPIED {repr(self)} ==> {repr(dest)}")
+
         elif self.is_dir():
             from distutils.dir_util import copy_tree
             if content:
@@ -882,7 +932,7 @@ class P(type(Path()), Path):
         return path
 
     @staticmethod
-    def tmpfile(name=None, suffix="", folder=None, tstamp=True):
+    def tmpfile(name=None, suffix="", folder=None, tstamp=False):
         return P.tmp(file=(name or randstr()) + "-" + (timestamp() if tstamp else "") + suffix,
                      folder="tmpfiles" if folder is None else folder)
 

@@ -42,8 +42,8 @@ def build_parser():
 
     # OPTIONAL KEYWORD
     parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
-    parser.add_argument("--console", "-C", dest="console",
-                        help=f"Flag to specify which consol to be used. Default CMD.", default="")  # can choose `wt`
+    parser.add_argument("--terminal", "-C", dest="terminal",
+                        help=f"Flag to specify which terminal to be used. Default CMD.", default="")  # can choose `wt`
 
     args = parser.parse_args()
     print(f"Args of the firing command: \n", tb.Struct(args.__dict__).print(dtype=False))
@@ -52,7 +52,7 @@ def build_parser():
     # ==================================================================================
 
     if args.main is True and args.fname != "":  # run the file itself, don't import it.
-        tb.Terminal().open_console(command=f"ipython -i {args.fname}", console=args.console)
+        tb.Terminal().run_async(f"ipython -i {args.fname}", terminal=args.terminal)
     else:  # run as a module (i.e. import it)
 
         if args.fname != "":  # non empty file name:
@@ -69,8 +69,7 @@ def build_parser():
                 # """
 
             script = fr"""
-from {path} import *\\
-
+from {path} import *
 """
             script += args.cmd
             script += "\n"
@@ -79,7 +78,7 @@ from {path} import *\\
 
         if args.func != "":
             script += f"tb.E.run_globally({args.func}, globals())"
-        tb.Terminal().run_script(script=script, console=args.console, new_window=not args.here,
+        tb.Terminal().run_script(script=script, terminal=args.terminal, new_window=not args.here,
                                  interactive=not args.solitary, ipython=not args.python)
 
 

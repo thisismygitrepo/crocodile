@@ -471,14 +471,21 @@ class Terminal:
     class Response:
         @staticmethod
         def from_completed_process(cp: subprocess.CompletedProcess):
+            tmp = dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)
+            # for key, val in tmp:
+            #     if val is str:
+            #         tmp[key] = val.rstrip()
             resp = Terminal.Response(cmd=cp.args)
-            resp.output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode))
+            resp.output.update(tmp)
             return resp
 
         def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None):
             self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)  # streams go here.
             self.output = dict(stdin=None, stdout=None, stderr=None, returncode=None)
             self.input = cmd  # input command
+
+        def __call__(self, *args, **kwargs):
+            return self.op.rstrip() if type(self.op) is str else None
 
         @property
         def op(self):
@@ -498,7 +505,7 @@ class Terminal:
 
         def capture(self):
             for key, val in self.std.items():
-                if val.readable():
+                if val is not None and val.readable():
                     string = val.read().decode()
                     self.output[key] = string.rstrip()  # move ending spaces and new lines.
 
@@ -557,7 +564,7 @@ class Terminal:
         import ctypes
         return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
 
-    def run(self, *cmds, powershell=True, check=False, ip=None):
+    def run(self, *cmds, shell=None, check=False, ip=None):
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
         won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
         Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
@@ -569,15 +576,18 @@ class Terminal:
             Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
         * `text=True` converts the bytes objects returned in stdout to text by default.
 
+        :param shell:
         :param ip:
-        :param powershell:
         :param check: throw an exception is the execution of the external command failed (non zero returncode)
         """
         my_list = []
-        if self.machine == "Windows" and powershell is True:
-            my_list = ["powershell", "-Command"]  # alternatively, one can run "cmd"
-            """The advantage of addig `powershell -Command` is to give access to wider range of options.
+        if self.machine == "Windows":
+            if shell in {"powershell", "pwsh"}:
+                my_list = [shell, "-Command"]  # alternatively, one can run "cmd"
+                """ The advantage of addig `powershell -Command` is to give access to wider range of options.
             Other wise, command prompt shell doesn't recognize commands like `ls`."""
+            else:
+                pass  # that is, use command prompt as a shell, which is the default.
         my_list += list(cmds)
         if self.elevated is False or self.is_admin():
             resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout,
@@ -592,7 +602,7 @@ class Terminal:
             resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return self.Response.from_completed_process(resp)
 
-    def run_async(self, *cmds, new_window=True, console="powershell", shell=True):
+    def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
         """Opens a new terminal, and let it run asynchronously.
         Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of
@@ -600,19 +610,35 @@ class Terminal:
         https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
         https://www.youtube.com/watch?v=IynV6Y80vws
         """
+        if terminal is None:
+            terminal = ""  # this means that cmd is the default console. alternative is "wt"
+        if shell is None:
+            if self.machine == "Windows":
+                shell = "powershell"  # other options are "powershell" and "cmd"
+                # if terminal is wt, then it will pick powershell by default anyway.
+            else:
+                shell = ""
+        if new_window is True:  # start is alias for Start-Process which launches a new window.
+            new_window = "start"
+        else:
+            new_window = ""
+        if shell in {"powershell", "pwsh"}:
+            extra = "-Command"
+        else:
+            extra = ""
         my_list = []
         if self.machine == "Windows":
-            my_list += (["start"] if new_window else []) + [console, "-Command"]
+            my_list += [new_window, terminal, shell, extra]
         my_list += cmds
-        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=shell)
+        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=True)
         # returns Popen object, not so useful for communcation with an opened terminal
         return w
 
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
-                   shell=True, delete=False, console="", new_window=True):
+                   shell=True, delete=False, terminal="", new_window=True):
         """This method is a wrapper on top of `run_async" except that the command passed will launch python
-        console that will run script passed by user.
+        terminal that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
         """
         wdir = wdir or P.cwd()
@@ -624,7 +650,7 @@ tb.sys.path.insert(0, r'{wdir}')
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
 
         script = header + script
-        if console in {"wt", "powershell", "pwsh"}:
+        if terminal in {"wt", "powershell", "pwsh"}:
             script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
@@ -633,7 +659,7 @@ tb.sys.path.insert(0, r'{wdir}')
         Terminal().run_async(f"{'ipython' if ipython else 'python'} "
                              f"{'-i' if interactive else ''}"
                              f" {file}",
-                             console=console, shell=shell, new_window=new_window)
+                             terminal=terminal, shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
         _ = delete
@@ -700,6 +726,10 @@ class SSH(object):
     def open_console(self, new_window=True):
         cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
         Terminal().run_async(cmd, new_window=new_window)
+
+    def copy_env_var(self, name):
+        assert self.target_machine == "Linux"
+        self.run(f"{name} = {os.environ[name]}; export {name}")
 
     def copy_from_here(self, source, target=None, zip_and_cipher=True):
         pwd = None
@@ -1098,4 +1128,4 @@ def qr(txt):
 
 if __name__ == '__main__':
     # Log.get_colorlog()
-    pass
+    Terminal().run("$profile", shell="pwsh").print()
