@@ -22,10 +22,10 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")
 
     # POSITIONAL ARGUMENT (UNNAMED)
-    # parser.add_argument(dest="fname", help="Python file name.", default="this")
+    parser.add_argument(dest="file", help="Python file name.", default="this")
     # if dest is not specified, then, it has same name as keyword, e.g. "--dest"
 
-    parser.add_argument("--file", "-f", dest="fname", help="Python file name.", default="")
+    # parser.add_argument("--file", "-f", dest="file", help="Python file name.", default="")
     parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
 
     # A FLAG:
@@ -34,30 +34,33 @@ def build_parser():
     parser.add_argument("--here", "-H",
                         help="Flag for running in this window.", action="store_true")  # default is False
     parser.add_argument("-s", "--solitary",
-                        help="Flag to specify a non-interactive session.", action="store_true")  # default is False
+                        help="Specify a non-interactive session.", action="store_true")  # default is False
     parser.add_argument("-p", "--python",
-                        help="Flag to use python over IPython.", action="store_true")  # default is False
-    parser.add_argument("-e", help="Flag to explore the file (what are its contents).",
+                        help="Use python over IPython.", action="store_true")  # default is False
+    parser.add_argument("-e", help="Explore the file (what are its contents).",
                         action="store_true")  # default is False
 
     # OPTIONAL KEYWORD
     parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
-    parser.add_argument("--terminal", "-C", dest="terminal",
+    parser.add_argument("--terminal", "-t", dest="terminal",
                         help=f"Flag to specify which terminal to be used. Default CMD.", default="")  # can choose `wt`
+    parser.add_argument("--shell", "-S", dest="shell",
+                        help=f"Flag to specify which terminal to be used. Default CMD.", default="")
 
     args = parser.parse_args()
-    print(f"Args of the firing command: \n", tb.Struct(args.__dict__).print(dtype=False))
+    print(f"Crocodile.run: args of the firing command: ")
+    tb.Struct(args.__dict__).print(dtype=False)
 
-    if args.cmd == "" and args.fname == "": raise ValueError(f"Pass either a command (using -c) or .py file name (-f)")
+    # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file name (-f)")
     # ==================================================================================
 
-    if args.main is True and args.fname != "":  # run the file itself, don't import it.
-        tb.Terminal().run_async(f"ipython -i {args.fname}", terminal=args.terminal)
+    if args.main is True and args.file != "":  # run the file itself, don't import it.
+        tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal)
     else:  # run as a module (i.e. import it)
 
-        if args.fname != "":  # non empty file name:
+        if args.file != "":  # non empty file name:
 
-            path = tb.P(args.fname)
+            path = tb.P(args.file)
             if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.
                 path = str((path - path.suffix)).replace(tb.os.sep, ".")
             else:  # It must be that user passed a.b format
@@ -70,6 +73,7 @@ def build_parser():
 
             script = fr"""
 from {path} import *
+
 """
             script += args.cmd
             script += "\n"

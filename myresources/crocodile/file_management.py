@@ -150,7 +150,7 @@ class Read(object):
         from scipy.io import loadmat
         res = Struct(loadmat(path, **kwargs))
         if remove_meta:
-            res.keys().filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
+            List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
         return res
 
     @staticmethod
@@ -524,13 +524,13 @@ class P(type(Path()), Path):
         else:  # there is no tell whether it is a file or directory.
             return "Relative"
 
-    def to_url_str(self):
+    def as_url_str(self):
         string_ = self.as_posix()
         string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
         return string_
 
-    def to_url_obj(self):
-        import urllib3
+    def as_url_obj(self):
+        urllib3 = assert_package_installed("urllib3")
         return urllib3.connection_from_url(self)
 
     def __getstate__(self):
@@ -620,7 +620,7 @@ class P(type(Path()), Path):
 
     def send2trash(self, verbose=True):
         send2trash = assert_package_installed("send2trash")
-        send2trash.send2trash(self.string)
+        send2trash.send2trash(self.str)
         if verbose: print(f"TRASHED {repr(self)}")
 
     def move(self, new_path, overwrite=False, verbose=True):
@@ -657,8 +657,9 @@ class P(type(Path()), Path):
         if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
         return new_path
 
-    def copy(self, target_dir=None, target_name=None, content=False, verbose=True, append=(f"_copy_{randstr()}")):
+    def copy(self, target_dir=None, target_name=None, content=False, verbose=True, append=f"_copy_{randstr()}"):
         """
+        :param append:
         :param target_dir: copy the file to this directory (filename remains the same).
         :param target_name: full path of destination (including -potentially different-  file name).
         :param content: copy the parent directory or its content (relevant only if copying a directory)
@@ -743,7 +744,7 @@ class P(type(Path()), Path):
             return self
 
         # os.startfile(os.path.realpath(self))
-        filename = self.absolute().string
+        filename = self.absolute().str
         if sys.platform == "win32":
             os.startfile(filename)  # works for files and folders alike
         elif sys.platform == 'linux':
@@ -933,7 +934,7 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmpfile(name=None, suffix="", folder=None, tstamp=False):
-        return P.tmp(file=(name or randstr()) + "-" + (timestamp() if tstamp else "") + suffix,
+        return P.tmp(file=(name or randstr()) + "-" + randstr() + "-" + (timestamp() if tstamp else "") + suffix,
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================

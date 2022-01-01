@@ -525,7 +525,7 @@ class Terminal:
         Shell
         Host
         * adding `start` to the begining of the command results in launching a new console that will not
-        inherent from the console python was launched from (e.g. conda enviroment), unlike when console name is ignored.
+        inherit from the console python was launched from (e.g. conda enviroment), unlike when console name is ignored.
 
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
         * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
@@ -609,12 +609,14 @@ class Terminal:
         producing a different window and humanly interact with it.
         https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
         https://www.youtube.com/watch?v=IynV6Y80vws
+
+        https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html
         """
         if terminal is None:
             terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None:
             if self.machine == "Windows":
-                shell = "powershell"  # other options are "powershell" and "cmd"
+                shell = ""  # other options are "powershell" and "cmd"
                 # if terminal is wt, then it will pick powershell by default anyway.
             else:
                 shell = ""
@@ -630,13 +632,15 @@ class Terminal:
         if self.machine == "Windows":
             my_list += [new_window, terminal, shell, extra]
         my_list += cmds
-        w = subprocess.Popen(my_list, stdout=self.stdout, stderr=self.stderr, stdin=self.stdin, shell=True)
+        print("Meta.Terminal.run_async: Subprocess command: ", my_list)
+        my_list = [item for item in my_list if item is not ""]
+        w = subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
         # returns Popen object, not so useful for communcation with an opened terminal
         return w
 
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
-                   shell=True, delete=False, terminal="", new_window=True):
+                   shell=None, delete=False, terminal="", new_window=True):
         """This method is a wrapper on top of `run_async" except that the command passed will launch python
         terminal that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
@@ -656,9 +660,9 @@ tb.sys.path.insert(0, r'{wdir}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
-        Terminal().run_async(f"{'ipython' if ipython else 'python'} "
-                             f"{'-i' if interactive else ''}"
-                             f" {file}",
+        Terminal().run_async(f"{'ipython' if ipython else 'python'}",
+                             f"{'-i' if interactive else ''}",
+                             f"{file}",
                              terminal=terminal, shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(are_you_sure=delete, verbose=False)
