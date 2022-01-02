@@ -633,7 +633,7 @@ class Terminal:
             my_list += [new_window, terminal, shell, extra]
         my_list += cmds
         print("Meta.Terminal.run_async: Subprocess command: ", my_list)
-        my_list = [item for item in my_list if item is not ""]
+        my_list = [item for item in my_list if item != ""]
         w = subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
         # returns Popen object, not so useful for communcation with an opened terminal
         return w
