@@ -10,6 +10,7 @@ matplotlib
 joblib  # multitasking
 pip
 setuptools  # for packaging
+wheel
 twine  # for pushing package to pypi.org
 pytest  # popular alternative to builtint unittest
 ipython  # interactive python
