@@ -998,7 +998,7 @@ class P(type(Path()), Path):
             if ".zip" not in str(self): return self
             zipfile, fname = self.split(at=List(self.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
         if op_path is None: op_path = zipfile.parent / zipfile.stem
-        else:  op_path = P(op_path)
+        else:  op_path = P(op_path).joinpath(zipfile.stem)
         if content: op_path = op_path.parent
         result = Compression.unzip(zipfile, op_path, fname, **kwargs)
         if verbose:
