@@ -38,7 +38,8 @@ setup(
         # h5py
         "joblib",  # multitasking
         "pip",
-        "setuptools",  # for packaging
+        "setuptools",  # for packaging  # correct place is in .toml
+        "wheel",
         "twine",  # for pushing package to pypi.org
         "pytest",  # popular alternative to builtint unittest
         "ipython",  # interactive python

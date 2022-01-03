@@ -735,19 +735,19 @@ class SSH(object):
         assert self.target_machine == "Linux"
         self.run(f"{name} = {os.environ[name]}; export {name}")
 
-    def copy_from_here(self, source, target=None, zip_and_cipher=True):
+    def copy_from_here(self, source, target=None, zip_n_encrypt=True):
         pwd = None
-        if zip_and_cipher:
+        if zip_n_encrypt:
             pwd = randstr(length=10, safe=True)
-            source = P(source).expanduser().zip_and_cipher(pwd=pwd)
+            source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
         print(f"Step 1: Creating Target directory {target} @ remote machine.")
         if target is None: target = P(source).collapseuser().as_posix()  # works if source is relative.
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
         remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
         print(f"Send `{source}` ==> `{remotepath}` ")
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
-        if zip_and_cipher:
-            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decipher_and_unzip(pwd="{pwd}", delete=True)""")
+        if zip_n_encrypt:
+            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", delete=True)""")
             return resp
 
     def copy_to_here(self, source, target=None):

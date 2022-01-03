@@ -35,7 +35,7 @@ def pwd2key(password: str, salt=None, iterations=None) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 
-def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iterations: int = None) -> bytes:
+def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int = None) -> bytes:
     """
         Encryption Tips:
         * Be careful of key being stored unintendedly in console or terminal history,
@@ -50,13 +50,15 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iterations: int 
     if pwd is not None:  # generate it from password
         assert key is None, f"You can either pass key or pwd, or none of them, but not both."
         assert type(pwd) is str
-        if salted:
+        if salted:   # strengthen the password by adding random characters to it. The characters will be
+            # explicitly mentioned in final encryption and used at decryption. They help to make problem more expensive
+            # to brute force, hence reducing hances of finding a password even though it has few characters.
             import secrets
-            if iterations is None: iterations = secrets.randbelow(1_000_000)
+            if iteration is None: iteration = secrets.randbelow(1_000_000)
             salt = secrets.token_bytes(16)
         else:
-            salt = iterations = None
-        key = pwd2key(pwd, salt, iterations)
+            salt = iteration = None
+        key = pwd2key(pwd, salt, iteration)
     elif key is None:  # generate a new key: discouraged, always make your keys/pwd before invoking the func.
         key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
         key_path = P.tmpdir().joinpath("key.bytes")
@@ -562,9 +564,12 @@ class P(type(Path()), Path):
         """Similar to `as_posix()` but returns P object"""
         return P(str(self).replace('\\', '/').replace('//', '/'))
 
-    def symlink_to(self, target, target_is_directory: bool = ..., verbose=True):
-        super(P, self).symlink_to(target, target_is_directory)
-        print(f"LINKED {repr(self)}")
+    def symlink_to(self, target, verbose=True, delete=False):
+        self.parent.create()
+        if self.exists() and delete: self.send2trash(verbose=verbose)
+        super(P, self).symlink_to(str(target))
+        if verbose: print(f"LINKED {repr(self)}")
+        return P(target)
 
     @staticmethod
     def pwd():
@@ -886,15 +891,21 @@ class P(type(Path()), Path):
     def listdir(self):
         return List(os.listdir(self)).apply(P)
 
-    def find(self, *args, r=True, compressed=False, **kwargs):
+    def find(self, *args, r=True, compressed=True, **kwargs):
         """short for the method ``search`` then pick first item from results.
+        useful for superflous directories or zip archives containing a single file.
 
-        .. note:: it is delibrately made to return None in case and object is not found.
+        Behaviour:
+        * if path (self) is a file, it returns itself.
+        * unless this path is an archive file, in which case it is parsed as a directory.
+        * Return None in case the directory is empty.
         """
         if compressed is False and self.is_file(): return self
         results = self.search(*args, r=r, compressed=compressed, **kwargs)
         if len(results) > 0:
             result = results[0]
+            if ".zip" in str(result):
+                return result.unzip()
             return result
         else: return None
 
@@ -963,7 +974,6 @@ class P(type(Path()), Path):
 
     def unzip(self, op_path=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
         """
-
         :param op_path: directory where extracted files will live.
         :param fname: a specific file name to be extracted from the archive.
         :param verbose:
@@ -1029,6 +1039,7 @@ class P(type(Path()), Path):
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
         """
+        assert self.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         code = encrypt(msg=self.read_bytes(), key=key, pwd=pwd)
         op_path = self.append(name=append) if op_path is None else P(op_path)
         op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
@@ -1044,12 +1055,12 @@ class P(type(Path()), Path):
         if delete: self.delete(are_you_sure=True, verbose=verbose)
         return op_path
 
-    def zip_and_cipher(self, key=None, pwd=None, delete=False, verbose=True):
+    def zip_n_encrypt(self, key=None, pwd=None, delete=False, verbose=True):
         zipped = self.zip(delete=delete, verbose=verbose)
         zipped_secured = zipped.encrypt(key=key, pwd=pwd, verbose=verbose, delete=True)
         return zipped_secured
 
-    def decipher_and_unzip(self, key=None, pwd=None, delete=False, verbose=True):
+    def decrypt_n_unzip(self, key=None, pwd=None, delete=False, verbose=True):
         deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
         unzipped = deciphered.unzip(op_path=None, delete=True, content=False)
         return unzipped
