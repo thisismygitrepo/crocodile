@@ -149,7 +149,7 @@ class Experimental:
         P(directory).find("source_code*", r=True).unzip(tmpdir)
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
-        tmpdir.delete(are_you_sure=delete, verbose=False)
+        tmpdir.delete(sure=delete, verbose=False)
         if obj is not None:
             loaded = getattr(sourcefile, obj)
             return loaded
@@ -665,7 +665,7 @@ tb.sys.path.insert(0, r'{wdir}')
                              f"{file}",
                              terminal=terminal, shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
-        # file.delete(are_you_sure=delete, verbose=False)
+        # file.delete(sure=delete, verbose=False)
         _ = delete
         # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
@@ -682,7 +682,7 @@ tb.sys.path.insert(0, r'{wdir}')
         script = f"""
 fname = tb.P(r'{fname}')
 obj = fname.readit()
-fname.delete(are_you_sure=True, verbose=False)
+fname.delete(sure=True, verbose=False)
 """
         Terminal.run_script(script)
 

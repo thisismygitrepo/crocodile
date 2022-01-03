@@ -499,7 +499,11 @@ class P(type(Path()), Path):
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
         if self.is_symlink():
-            rep += " Symlink '" + self.clickable() + "' ==> " + self.resolve().__repr__()
+            if self == self.resolve():  # a bad self-referential object.
+                target = str(self.resolve())
+            else:
+                target = self.resolve()
+            rep += " Symlink '" + self.clickable() + "' ==> " + repr(target)
         elif self.is_absolute():
             rep += " " + self._spec() + " '" + self.clickable() + "'"
             if self.exists():
@@ -566,7 +570,10 @@ class P(type(Path()), Path):
 
     def symlink_to(self, target, verbose=True, delete=False):
         self.parent.create()
-        if self.exists() and delete: self.send2trash(verbose=verbose)
+        if delete:
+            if self.is_symlink() or self.exists():
+            # self.exist() is False for broken links even though they exist
+                self.delete(sure=True, verbose=verbose)
         super(P, self).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target)
@@ -608,13 +615,13 @@ class P(type(Path()), Path):
         return self
 
     # ==================================== File management =========================================
-    def delete(self, are_you_sure=False, verbose=True):
-        if are_you_sure:
+    def delete(self, sure=False, verbose=True):
+        if sure:
             if not self.exists():
                 if verbose: print(f"Could NOT DELETE nonexisting file {repr(self)}. ")
                 return None  # terminate the function.
             if self.is_file():
-                self.unlink()  # missing_ok=True added in 3.8
+                self.unlink(missing_ok=True)
             else:
                 import shutil
                 shutil.rmtree(self, ignore_errors=True)
@@ -625,8 +632,11 @@ class P(type(Path()), Path):
 
     def send2trash(self, verbose=True):
         send2trash = assert_package_installed("send2trash")
-        send2trash.send2trash(self.str)
-        if verbose: print(f"TRASHED {repr(self)}")
+        if self.exists():
+            send2trash.send2trash(self.str)
+            if verbose: print(f"TRASHED {repr(self)}")
+        else:
+            if verbose: print(f"Could NOT trash {self}")
 
     def move(self, new_path, overwrite=False, verbose=True):
         slf = self.absolute()
@@ -636,7 +646,7 @@ class P(type(Path()), Path):
             new_path = P(new_path).absolute() / str_  # no conflict with existing files/dirs of same `self.name`
             slf.rename(new_path)  # no error are likely to occur as the random name won't cause conflict.
             # now we can delete any potential conflict before eventually taking its name
-            (new_path.parent / slf.name).delete(are_you_sure=True, verbose=False)  # It is important to delete after moving
+            (new_path.parent / slf.name).delete(sure=True, verbose=False)  # It is important to delete after moving
             # because `self` could be within the file you want to delete.
             new_path.rename(new_path.parent / slf.name)
         else:
@@ -652,7 +662,7 @@ class P(type(Path()), Path):
         else:
             result = self.move(self.parent.parent, overwrite=overwrite)
         if result != self:
-            self.parent.delete(are_you_sure=delete)
+            self.parent.delete(sure=delete)
         return result
 
     def renameit(self, new_file_name, verbose=True):
@@ -711,7 +721,7 @@ class P(type(Path()), Path):
         """removes content on a folder, rather than deleting the folder."""
         content = self.listdir()
         for content in content:
-            self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(are_you_sure=True)
+            self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(sure=True)
         return self
 
     def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
@@ -969,7 +979,7 @@ class P(type(Path()), Path):
             op_path = Compression.compress_folder(root_dir=root_dir, op_path=op_path,
                                                   base_dir=base_dir, fmt='zip', **kwargs)
         if verbose: print(f"ZIPPED {repr(self)} ==>  {repr(op_path)}")
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
+        if delete: self.delete(sure=True, verbose=verbose)
         return op_path
 
     def unzip(self, op_path=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
@@ -994,7 +1004,7 @@ class P(type(Path()), Path):
         if verbose:
             msg = f"UNZIPPED {repr(zipfile)} ==> {repr(result)}"
             print(msg)
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
+        if delete: self.delete(sure=True, verbose=verbose)
         return result
 
     def tar(self, op_path=None):
@@ -1021,8 +1031,8 @@ class P(type(Path()), Path):
         op_path = op_path or P(self.parent) / P(self.stem)
         intrem = self.ungz(op_path=op_path, verbose=verbose)
         result = intrem.untar(op_path=op_path, verbose=verbose)
-        intrem.delete(are_you_sure=True, verbose=verbose)
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
+        intrem.delete(sure=True, verbose=verbose)
+        if delete: self.delete(sure=True, verbose=verbose)
         return result
 
     def compress(self, op_path=None, base_dir=None, fmt="zip", delete=False, **kwargs):
@@ -1044,7 +1054,7 @@ class P(type(Path()), Path):
         op_path = self.append(name=append) if op_path is None else P(op_path)
         op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
         if verbose: print(f"ENCRYPTED: {repr(self)} ==> {repr(op_path)}.")
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
+        if delete: self.delete(sure=True, verbose=verbose)
         return op_path
 
     def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
@@ -1052,7 +1062,7 @@ class P(type(Path()), Path):
         print(self, str(self), repr(self))
         op_path.write_bytes(decrypt(self.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
         if verbose: print(f"DECRYPTED: {repr(self)} ==> {repr(op_path)}.")
-        if delete: self.delete(are_you_sure=True, verbose=verbose)
+        if delete: self.delete(sure=True, verbose=verbose)
         return op_path
 
     def zip_n_encrypt(self, key=None, pwd=None, delete=False, verbose=True):
