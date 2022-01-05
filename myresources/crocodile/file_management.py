@@ -621,25 +621,26 @@ class P(type(Path()), Path):
 
     # ==================================== File management =========================================
     def delete(self, sure=False, verbose=True):
+        slf = self.expanduser()
         if sure:
-            if not self.exists():
-                self.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
-                if verbose: print(f"Could NOT DELETE nonexisting file {repr(self)}. ")
+            if not slf.exists():
+                slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
+                if verbose: print(f"Could NOT DELETE nonexisting file {repr(slf)}. ")
                 return None  # terminate the function.
-            if self.is_file():
-                self.unlink(missing_ok=True)
+            if slf.is_file():
+                slf.unlink(missing_ok=True)
             else:
                 import shutil
-                shutil.rmtree(self, ignore_errors=True)
+                shutil.rmtree(slf, ignore_errors=True)
                 # self.rmdir()  # dir must be empty
-            if verbose: print(f"DELETED {repr(self)}.")
+            if verbose: print(f"DELETED {repr(slf)}.")
         else:
-            if verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.")
+            if verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
 
     def send2trash(self, verbose=True):
         send2trash = assert_package_installed("send2trash")
         if self.exists():
-            send2trash.send2trash(self.str)
+            send2trash.send2trash(self.expanduser().absolute().str)
             if verbose: print(f"TRASHED {repr(self)}")
         else:
             if verbose: print(f"Could NOT trash {self}")
@@ -686,7 +687,7 @@ class P(type(Path()), Path):
             return self
 
         # os.startfile(os.path.realpath(self))
-        filename = self.absolute().str
+        filename = self.expanduser().absolute().str
         if sys.platform == "win32":
             os.startfile(filename)  # works for files and folders alike
         elif sys.platform == 'linux':
@@ -708,7 +709,7 @@ class P(type(Path()), Path):
         :return:
         """
         if path is not None:
-            path = P(path)
+            path = P(path).absolute().expanduser()
             assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
             folder = path.parent
             name = path.name
@@ -717,9 +718,9 @@ class P(type(Path()), Path):
             assert folder is not None, "`path` or `path` must be passed."
             if name is None: name = self.absolute().name
             else: name = str(name)  # good for edge cases of path with single part.
-            path = P(folder).absolute() / name
+            path = P(folder).absolute().expanduser() / name
 
-        slf = self.absolute()
+        slf = self.absolute().expanduser()
 
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
             path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
@@ -780,6 +781,9 @@ class P(type(Path()), Path):
             dest = self.append(append)
         else: raise NotImplementedError
 
+        dest = dest.expanduser().absolute().resolve()
+        slf = self.expanduser().absolute().resolve()
+
         dest.parent.create()
         if overwrite:
             if dest.exists(): dest.delete(sure=True)
@@ -787,23 +791,23 @@ class P(type(Path()), Path):
         # else:
         #     assert not dest.exists()
 
-        if self.is_file():
+        if slf.is_file():
             import shutil
-            shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
-            if verbose: print(f"COPIED {repr(self)} ==> {repr(dest)}")
+            shutil.copy(str(slf), str(dest))  # str() only there for Python < (3.6)
+            if verbose: print(f"COPIED {repr(slf)} ==> {repr(dest)}")
 
-        elif self.is_dir():
+        elif slf.is_dir():
             from distutils.dir_util import copy_tree
             if content:
-                copy_tree(str(self), str(dest))
+                copy_tree(str(slf), str(dest))
             else:
-                copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
+                copy_tree(str(slf), str(P(dest).joinpath(slf.name).create()))
             if verbose:
                 preface = "Content of " if content else ""
-                print(f"COPIED {preface} {repr(self)} ==> {repr(dest)}")
+                print(f"COPIED {preface} {repr(slf)} ==> {repr(dest)}")
         else:
-            print(f"Could NOT COPY. Not a file nor a path: {repr(self)}.")
-        return dest / self.name
+            print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
+        return dest / slf.name
 
     # ======================================== Folder management =======================================
     def create(self, parents=True, exist_ok=True, parent_only=False):
@@ -849,22 +853,23 @@ class P(type(Path()), Path):
 
         # ============================ get generator of search results ========================================
 
-        if compressed and self.suffix == ".zip":
+        slf = self.expanduser().absolute()
+        if compressed and slf.suffix == ".zip":
             import zipfile
-            with zipfile.ZipFile(str(self)) as z:
+            with zipfile.ZipFile(str(slf)) as z:
                 content = List(z.namelist())
             from fnmatch import fnmatch
-            raw = content.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: self / x)
+            raw = content.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: slf / x)
 
         elif dotfiles:
-            raw = self.glob(pattern) if not r else self.rglob(pattern)
+            raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else:  # glob ignroes dot and hidden files
             from glob import glob
             if r:
-                path = self / "**" / pattern
+                path = slf / "**" / pattern
                 raw = glob(str(path), recursive=r)
             else:
-                path = self.joinpath(pattern)
+                path = slf.joinpath(pattern)
                 raw = glob(str(path))
 
         if compressed:
@@ -931,7 +936,7 @@ class P(type(Path()), Path):
             return List(processed)
 
     def listdir(self):
-        return List(os.listdir(self)).apply(P)
+        return List(os.listdir(self.absolute().expanduser())).apply(P)
 
     def find(self, *args, r=True, compressed=True, **kwargs):
         """short for the method ``search`` then pick first item from results.
@@ -1002,23 +1007,26 @@ class P(type(Path()), Path):
             path = self
         else: raise NotImplementedError("`path` and `folder` are passed. Only one is allowed.")
 
-        arcname = P(arcname or self.name)
-        if arcname.name != self.name:
-            arcname /= self.name  # arcname has to start from somewhere and end with filename
-        if self.is_file():
+        path = path.expanduser().absolute()
+        slf = self.expanduser().absolute()
+
+        arcname = P(arcname or slf.name)
+        if arcname.name != slf.name:
+            arcname /= slf.name  # arcname has to start from somewhere and end with filename
+        if slf.is_file():
             if path.suffix != ".zip": path = path + f".zip"
-            path = Compression.zip_file(ip_path=self, op_path=path, arcname=arcname, **kwargs)
+            path = Compression.zip_file(ip_path=slf, op_path=path, arcname=arcname, **kwargs)
         else:
             if content:
-                root_dir = self
+                root_dir = slf
                 base_dir = "."
             else:
-                root_dir = self.split(at=str(arcname[0]))[0]
+                root_dir = slf.split(at=str(arcname[0]))[0]
                 base_dir = arcname
             path = Compression.compress_folder(root_dir=root_dir, op_path=path,
                                                base_dir=base_dir, fmt='zip', **kwargs)
-        if verbose: print(f"ZIPPED {repr(self)} ==>  {repr(path)}")
-        if delete: self.delete(sure=True, verbose=verbose)
+        if verbose: print(f"ZIPPED {repr(slf)} ==>  {repr(path)}")
+        if delete: slf.delete(sure=True, verbose=verbose)
         return path
 
     def unzip(self, folder=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
@@ -1032,18 +1040,19 @@ class P(type(Path()), Path):
         :param kwargs:
         :return: path if content=False, else, path.parent. Default path = self.parent / self.stem
         """
-        zipfile = self
-        if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
-            if ".zip" not in str(self): return self
-            zipfile, fname = self.split(at=List(self.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
-        if folder is None: folder = zipfile.parent / zipfile.stem
-        else:  folder = P(folder).joinpath(zipfile.stem)
+        slf = self.expanduser().absolute()
+        zipfile = slf
+        if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
+            if ".zip" not in str(slf): return slf
+            zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
+        if folder is None: folder = (zipfile.parent / zipfile.stem)
+        else:  folder = P(folder).joinpath(zipfile.stem).absolute().expanduser()
         if content: folder = folder.parent
         result = Compression.unzip(zipfile, folder, fname, **kwargs)
         if verbose:
             msg = f"UNZIPPED {repr(zipfile)} ==> {repr(result)}"
             print(msg)
-        if delete: self.delete(sure=True, verbose=verbose)
+        if delete: slf.delete(sure=True, verbose=verbose)
         return result
 
     def tar(self, path=None):
@@ -1088,20 +1097,21 @@ class P(type(Path()), Path):
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
         """
-        assert self.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
-        code = encrypt(msg=self.read_bytes(), key=key, pwd=pwd)
-        op_path = self.append(name=append) if op_path is None else P(op_path)
+        slf = self.expanduser().absolute()
+        assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
+        code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)
+        op_path = slf.append(name=append) if op_path is None else P(op_path)
         op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
-        if verbose: print(f"ENCRYPTED: {repr(self)} ==> {repr(op_path)}.")
-        if delete: self.delete(sure=True, verbose=verbose)
+        if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(op_path)}.")
+        if delete: slf.delete(sure=True, verbose=verbose)
         return op_path
 
     def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
-        op_path = P(op_path) if op_path is not None else self.switch(append, "")
-        print(self, str(self), repr(self))
-        op_path.write_bytes(decrypt(self.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
-        if verbose: print(f"DECRYPTED: {repr(self)} ==> {repr(op_path)}.")
-        if delete: self.delete(sure=True, verbose=verbose)
+        slf = self.absolute().expanduser()
+        op_path = P(op_path) if op_path is not None else slf.switch(append, "")
+        op_path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
+        if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(op_path)}.")
+        if delete: slf.delete(sure=True, verbose=verbose)
         return op_path
 
     def zip_n_encrypt(self, key=None, pwd=None, delete=False, verbose=True):
