@@ -77,5 +77,5 @@ setup(
 # python setup.py sdist bdist_wheel
 # twine upload dist/*
 # Locally: (only once)
-# pip install -e .
+# pip install -e . # add --user if there is .toml file
 # The files backed up here OneDrive/AppData/home/.pypirc saves the credentials needed by Twine to uploade to pypi

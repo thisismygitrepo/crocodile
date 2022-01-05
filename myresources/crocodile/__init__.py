@@ -1,5 +1,5 @@
 
-__version__ = "5.4"
+__version__ = "5.41"
 docs = r"https://crocodile.readthedocs.io/en/latest/"
 git = r"https://github.com/thisismygitrepo/crocodile"
 release_notes = """
