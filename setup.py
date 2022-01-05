@@ -5,11 +5,6 @@ with open("README.md", "r") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
 
-with open("./myresources/crocodile/art/happy_croco", "r") as file:
-    croco = file.read()  # search ascii art or characters art.
-print(croco)
-
-
 setup(
     name='crocodile',
     version=__version__,
@@ -68,6 +63,12 @@ setup(
 
 )
 
+
+with open("./myresources/crocodile/art/happy_croco", "r") as file:
+    croco = file.read()  # search ascii art or characters art.
+print(croco)
+
+
 # useful webiste: gitignore.io
 # choosealicense.com
 
@@ -79,3 +80,5 @@ setup(
 # Locally: (only once)
 # pip install -e . # add --user if there is .toml file
 # The files backed up here OneDrive/AppData/home/.pypirc saves the credentials needed by Twine to uploade to pypi
+# Note: the tag v.54 or whatever convention is followed must be consistent as pypi decides on which version is the latest
+# based on that. E.g. if the version was named 5.6 as opposed tp v5.6 then 5.6 will appear as old release.

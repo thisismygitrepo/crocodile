@@ -10,8 +10,8 @@ from crocodile.meta import Cycle
 
 class FigurePolicy(enum.Enum):
     close_create_new = 'Close the previous figure that has the same figname and create a new fresh one'
-    add_new = 'Create a new figure with same name but with added suffix'
-    same = 'Grab the figure of the same name'
+    add_new = 'Create a new figure with same path but with added suffix'
+    same = 'Grab the figure of the same path'
 
 
 class FigureManager:
@@ -331,7 +331,7 @@ class FigureManager:
 
     @staticmethod
     def update(figname, obj_name, data=None):
-        """Fastest update ever. But, you need access to label name.
+        """Fastest update ever. But, you need access to label path.
         Using this function external to the plotter. But inside the plotter you need to define labels to objects
         The other alternative is to do the update inside the plotter, but it will become very verbose.
 
@@ -497,7 +497,7 @@ class SaveType:
                 print('Turning off IO')
                 plt.ioff()
 
-            if fignames:  # name sent explicitly
+            if fignames:  # path sent explicitly
                 self.watch_figs = [plt.figure(figname) for figname in fignames]
             else:  # tow choices:
                 if self.watch_figs is None:  # None exist ==> add all
@@ -506,7 +506,7 @@ class SaveType:
                 else:  # they exist already.
                     pass
 
-            if names is None:  # individual save name, useful for PNG.
+            if names is None:  # individual save path, useful for PNG.
                 names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
 
             for afig, aname in zip(self.watch_figs, names):
@@ -549,7 +549,7 @@ class SaveType:
                 import webbrowser as wb
                 # chrome_path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe".replace('\\', '/')
                 # wb.register('chrome', None, wb.BackgroundBrowser(chrome_path))
-                # wb.get('chrome').open(self.fname)
+                # wb.get('chrome').open(self.path)
                 wb.open(self.fname)
             return self
 

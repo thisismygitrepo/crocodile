@@ -711,7 +711,7 @@ class List(list, Base):
                 return List([func(x, y) for x, y in iterator])
 
     def modify(self, func, lest=None):
-        """Modifies objects rather than returning new list of objects, hence the name of the method.
+        """Modifies objects rather than returning new list of objects, hence the path of the method.
         :param func: a string that will be executed, assuming idx, x and y are given.
         :param lest:
         :return:
@@ -757,7 +757,7 @@ class List(list, Base):
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         """
 
-        :param names: name of each object.
+        :param names: path of each object.
         :param minimal: Return Dataframe structure without contents.
         :param obj_included: Include a colum for objects themselves.
         :return:

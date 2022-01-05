@@ -426,7 +426,7 @@ class BaseModel(ABC):
         results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test,
                             names=names_test, loss_df=loss_dict, )
         if viz:
-            loss_name = results.loss_df.columns.to_list()[0]  # first loss name
+            loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
             names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
             self.viz(pred, gt, names=names, **kwargs)
@@ -439,17 +439,17 @@ class BaseModel(ABC):
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
         loss_dict = dict()
         for a_metric in metrics:
-            if hasattr(a_metric, "name"):
+            if hasattr(a_metric, "path"):
                 name = a_metric.name
             elif hasattr(a_metric, "__name__"):
                 name = a_metric.__name__
             else:
                 name = "unknown"
             # try:  # EAFP principle.
-            #     name = a_metric.name  # works for subclasses Metrics
+            #     path = a_metric.path  # works for subclasses Metrics
             # except AttributeError:
             #
-            #     name = a_metric.__name__  # works for functions.
+            #     path = a_metric.__name__  # works for functions.
             loss_dict[name] = []
 
             for a_prediction, a_y_test in zip(prediction, groun_truth):
@@ -460,19 +460,19 @@ class BaseModel(ABC):
         return tb.pd.DataFrame(loss_dict)
 
     def save_model(self, directory):
-        self.model.save(directory)  # In TF: send only folder name. Save name is saved_model.pb
+        self.model.save(directory)  # In TF: send only path path. Save path is saved_model.pb
 
     def save_weights(self, directory):
-        self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file name.
+        self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
 
     @staticmethod
     def load_model(directory):
         import tensorflow as tf
-        return tf.keras.models.load_model(directory)  # path to folder. file saved_model.pb is read auto.
+        return tf.keras.models.load_model(directory)  # path to path. file saved_model.pb is read auto.
 
     def load_weights(self, directory):
         name = directory.glob('*.data*').__next__().__str__().split('.data')[0]
-        self.model.load_weights(name)  # requires path to file name.
+        self.model.load_weights(name)  # requires path to file path.
 
     def save_class(self, weights_only=True, version='0', **kwargs):
         """Simply saves everything:
@@ -486,14 +486,14 @@ class BaseModel(ABC):
         :return:
 
         """
-        self.hp.save()  # goes into the meta folder.
-        self.data.save()  # goes into the meta folder.
-        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl')  # goes into the meta folder.
-        # model save goes into data folder.
+        self.hp.save()  # goes into the meta path.
+        self.data.save()  # goes into the meta path.
+        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl')  # goes into the meta path.
+        # model save goes into data path.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
-        # Saving wrapper_class and model architecture in the main folder:
+        # Saving wrapper_class and model architecture in the main path:
         tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         print(f'Model class saved successfully!, check out: {self.hp.save_dir.as_uri()}')
 

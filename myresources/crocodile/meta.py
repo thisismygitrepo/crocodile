@@ -134,7 +134,7 @@ class Experimental:
         print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
 
         if save_source_code:
-            P(inspect.getmodule(obj).__file__).zip(op_path=readmepath.with_name("source_code.zip"))
+            P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
             print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
 
     @staticmethod
@@ -162,7 +162,7 @@ class Experimental:
         :param func:
         :param scope: `globals()` executed in the main scope. This provides the function with scope defined in main.
         :param args: dict of what you would like to pass to the function as arguments.
-        :param self: relevant only if the function is a method of a class. self refers to the name of the instance
+        :param self: relevant only if the function is a method of a class. self refers to the path of the instance
         :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
         code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False,
                                          )
@@ -180,7 +180,7 @@ class Experimental:
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None,
                      verbose=True, copy2clipboard=False, **kwargs):
-        """Takes in a function name, reads it source code and returns a new version of it that can be run in the main.
+        """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
         TODO: how to handle decorated functions.
@@ -525,7 +525,7 @@ class Terminal:
         Shell
         Host
         * adding `start` to the begining of the command results in launching a new console that will not
-        inherit from the console python was launched from (e.g. conda enviroment), unlike when console name is ignored.
+        inherit from the console python was launched from (e.g. conda enviroment), unlike when console path is ignored.
 
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
         * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
@@ -680,9 +680,9 @@ tb.sys.path.insert(0, r'{wdir}')
         fname = P.tmpfile(tstamp=False, suffix=".pkl")
         Save.pickle(obj=obj, path=fname, verbose=False)
         script = f"""
-fname = tb.P(r'{fname}')
-obj = fname.readit()
-fname.delete(sure=True, verbose=False)
+path = tb.P(r'{fname}')
+obj = path.readit()
+path.delete(sure=True, verbose=False)
 """
         Terminal.run_script(script)
 
@@ -799,7 +799,7 @@ class Log(object):
             self.logger = Null()  # to be populated by `_install`
             self._install()
             # update specs after intallation.
-            self.specs["name"] = self.logger.name
+            self.specs["path"] = self.logger.name
             if file:  # first handler is a file handler
                 self.specs["file_path"] = self.logger.handlers[0].baseFilename
 
@@ -858,7 +858,7 @@ class Log(object):
 
     @staticmethod
     def get_format(sep):
-        fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+        fmt = f"%(asctime)s{sep}%(path)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
               f"{sep}%(message)s{sep}"
         # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
         return fmt
@@ -884,7 +884,7 @@ class Log(object):
         field_styles = {'asctime': {'color': 'green'},
                         'hostname': {'color': 'magenta'},
                         'levelname': {'color': 'black', 'bold': True},
-                        'name': {'color': 'blue'},
+                        'path': {'color': 'blue'},
                         'programname': {'color': 'cyan'},
                         'username': {'color': 'yellow'}}
         coloredlogs = assert_package_installed("coloredlogs")
@@ -934,7 +934,7 @@ class Log(object):
     @staticmethod
     def get_base_logger(module, name, l_level):
         if name is None:
-            print(f"Logger name not passed. It is preferable to pass a name indicates the owner.")
+            print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
         else:
             print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
         logger = module.getLogger(name=name or randstr())

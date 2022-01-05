@@ -22,10 +22,10 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")
 
     # POSITIONAL ARGUMENT (UNNAMED)
-    parser.add_argument(dest="file", help="Python file name.", default="this")
-    # if dest is not specified, then, it has same name as keyword, e.g. "--dest"
+    parser.add_argument(dest="file", help="Python file path.", default="this")
+    # if dest is not specified, then, it has same path as keyword, e.g. "--dest"
 
-    # parser.add_argument("--file", "-f", dest="file", help="Python file name.", default="")
+    # parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
     parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
 
     # A FLAG:
@@ -51,14 +51,14 @@ def build_parser():
     print(f"Crocodile.run: args of the firing command: ")
     tb.Struct(args.__dict__).print(dtype=False)
 
-    # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file name (-f)")
+    # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file path (-f)")
     # ==================================================================================
 
     if args.main is True and args.file != "":  # run the file itself, don't import it.
         tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal)
     else:  # run as a module (i.e. import it)
 
-        if args.file != "":  # non empty file name:
+        if args.file != "":  # non empty file path:
 
             path = tb.P(args.file)
             if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.

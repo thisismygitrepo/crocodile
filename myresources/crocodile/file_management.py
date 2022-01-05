@@ -82,7 +82,7 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
     if pwd is not None and salted is True:
         from base64 import urlsafe_b64encode as b64e
         from base64 import urlsafe_b64decode as b64d
-        return b64e(b'%b%b%b' % (salt, iterations.to_bytes(4, 'big'), b64d(code)))
+        return b64e(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), b64d(code)))
     else:
         return code
 
@@ -250,7 +250,7 @@ class P(type(Path()), Path):
     def time(self, which="m", **kwargs):
         """Meaning of ``which values``
             * ``m`` time of modifying file ``content``, i.e. the time it was created.
-            * ``c`` time of changing file status (its inode is changed like permissions, name etc, but not content)
+            * ``c`` time of changing file status (its inode is changed like permissions, path etc, but not content)
             * ``a`` last time the file was accessed.
 
         :param which: Determines which time to be returned. Three options are availalable:
@@ -319,12 +319,12 @@ class P(type(Path()), Path):
     # ================================ Path Object management ===========================================
     @property
     def trunk(self):
-        """ useful if you have multiple dots in file name where .stem fails.
+        """ useful if you have multiple dots in file path where .stem fails.
         """
         return self.name.split('.')[0]
 
     def prepend(self, prefix, suffix=None):
-        """Add extra text before file name
+        """Add extra text before file path
         e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
         notice that `__add__` method removes the extension, while this one preserves it.
         """
@@ -332,7 +332,7 @@ class P(type(Path()), Path):
         return self.parent.joinpath(prefix + self.trunk + suffix)
 
     def append(self, name='', suffix=None):
-        """Add extra text after file name, and optionally add extra suffix.
+        """Add extra text after file path, and optionally add extra suffix.
         e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension
         """
         if suffix is None: suffix = ''.join(self.suffixes)
@@ -560,7 +560,7 @@ class P(type(Path()), Path):
         return int("".join(filter(str.isdigit, str(astring))))
 
     def make_valid_filename(self, replace='_'):
-        """Converts arbitrary filename into proper variable name as per Python."""
+        """Converts arbitrary filename into proper variable path as per Python."""
         return self.make_valid_filename_(self.trunk, replace=replace)
 
     @staticmethod
@@ -577,7 +577,7 @@ class P(type(Path()), Path):
         self.parent.create()
         if delete:
             if self.is_symlink() or self.exists():
-            # self.exist() is False for broken links even though they exist
+                # self.exist() is False for broken links even though they exist
                 self.delete(sure=True, verbose=verbose)
         super(P, self).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
@@ -644,87 +644,8 @@ class P(type(Path()), Path):
         else:
             if verbose: print(f"Could NOT trash {self}")
 
-    def move(self, new_path, overwrite=False, verbose=True):
-        slf = self.absolute()
-
-        if overwrite:
-            str_ = randstr()
-            new_path = P(new_path).absolute() / str_  # no conflict with existing files/dirs of same `self.name`
-            slf.rename(new_path)  # no error are likely to occur as the random name won't cause conflict.
-            # now we can delete any potential conflict before eventually taking its name
-            (new_path.parent / slf.name).delete(sure=True, verbose=False)  # It is important to delete after moving
-            # because `self` could be within the file you want to delete.
-            new_path.rename(new_path.parent / slf.name)
-        else:
-            new_path = P(new_path).absolute() / slf.name
-            slf.rename(new_path)
-        if verbose: print(f"MOVED {repr(self)} ==> {repr(new_path)}`")
-        return new_path
-
-    def move_up(self, delete=True, content=False, overwrite=False):
-        if content:
-            self.search("*").apply(lambda x: x.move_up(delete=delete, content=False))
-            result = self.parent.parent
-        else:
-            result = self.move(self.parent.parent, overwrite=overwrite)
-        if result != self:
-            self.parent.delete(sure=delete)
-        return result
-
-    def renameit(self, new_file_name, verbose=True):
-        assert type(new_file_name) is str, "New new should be a string representing file name alone."
-        new_path = self.parent / new_file_name
-        self.rename(new_path)
-        if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
-        return new_path
-
-    def copy(self, target_dir=None, target_name=None, content=False, verbose=True, append=f"_copy_{randstr()}"):
-        """
-        :param append:
-        :param target_dir: copy the file to this directory (filename remains the same).
-        :param target_name: full path of destination (including -potentially different-  file name).
-        :param content: copy the parent directory or its content (relevant only if copying a directory)
-        :param verbose:
-        :return: path to copied file or directory.
-
-        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
-
-        """
-        dest = None  # destination.
-
-        if target_dir is not None:
-            assert target_name is None, f"You can either pass target_dir or target_name but not both"
-            dest = P(target_dir).create()  # / self.name
-
-        if target_name is not None:
-            assert target_dir is None, f"You can either pass target_dir or target_name but not both"
-            target_name = P(target_name)
-            target_name.parent.create()
-            dest = target_name
-
-        if dest is None:
-            dest = self.append(append)
-
-        if self.is_file():
-            import shutil
-            shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
-            if verbose: print(f"COPIED {repr(self)} ==> {repr(dest)}")
-
-        elif self.is_dir():
-            from distutils.dir_util import copy_tree
-            if content:
-                copy_tree(str(self), str(dest))
-            else:
-                copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
-            if verbose:
-                preface = "Content of " if content else ""
-                print(f"COPIED {preface} {repr(self)} ==> {repr(dest)}")
-        else:
-            print(f"Could NOT COPY. Not a file nor a folder: {repr(self)}.")
-        return dest / self.name
-
     def clean(self, trash=True):
-        """removes content on a folder, rather than deleting the folder."""
+        """removes content on a path, rather than deleting the path."""
         content = self.listdir()
         for content in content:
             self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(sure=True)
@@ -742,7 +663,7 @@ class P(type(Path()), Path):
         """
         filename = self
         if '.zip' in str(self):
-            filename = self.unzip(op_path=self.tmp(folder="unzipped"), verbose=verbose)
+            filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose)
         try:
             if reader is None:  # infer the reader
                 return Read.read(filename, **kwargs)
@@ -777,14 +698,119 @@ class P(type(Path()), Path):
             import subprocess
             subprocess.call(["open", filename])  # works for files and folders alike
 
+    def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True):
+        """
+        :param folder: directory
+        :param name: fname of the file
+        :param path: full path, that includes directory and file fname.
+        :param overwrite:
+        :param verbose:
+        :return:
+        """
+        if path is not None:
+            path = P(path)
+            assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
+            folder = path.parent
+            name = path.name
+            _ = name
+        else:
+            assert folder is not None, "`path` or `path` must be passed."
+            if name is None: name = self.absolute().name
+            else: name = str(name)  # good for edge cases of path with single part.
+            path = P(folder).absolute() / name
+
+        slf = self.absolute()
+
+        if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
+            path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
+            slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict.
+            # now we can delete any potential conflict before eventually taking its path
+            path.delete(sure=True, verbose=False)  # It is important to delete after moving
+            # because `self` could be within the file you want to delete.
+            path_.rename(path)
+        else:
+            slf.rename(path)
+        if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
+        return path
+
+    def move_up(self, delete=True, content=False, overwrite=False):
+        if content:
+            self.search("*").apply(lambda x: x.move_up(delete=delete, content=False))
+            result = self.parent.parent
+        else:
+            result = self.move(self.parent.parent, overwrite=overwrite)
+        if result != self:
+            self.parent.delete(sure=delete)
+        return result
+
+    def renameit(self, name, verbose=True):
+        """Unlike the builtin `rename`, this doesn't require or change full path, only file path."""
+        assert type(name) is str, "New new should be a string representing file path alone."
+        new_path = self.parent / name
+        self.rename(new_path)
+        if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
+        return new_path
+
+    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}",
+             overwrite=False):
+        """
+        :param overwrite:
+        :param name:
+        :param append:
+        :param folder: copy the file to this directory (filename remains the same).
+        :param path: full path of destination (including -potentially different-  file name).
+        :param content: copy the parent directory or its content (relevant only if copying a directory)
+        :param verbose:
+        :return: path to copied file or directory.
+
+        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
+
+        """
+        # tested %100
+        if folder is not None and path is None:
+            if name is None:
+                dest = P(folder).create()
+            else:
+                dest = P(folder) / name
+                content = True
+        elif path is not None and folder is None:
+            dest = P(path)
+            content = True  # this way, the destination will be filled with contents of `self`
+        elif path is None and folder is None:
+            dest = self.append(append)
+        else: raise NotImplementedError
+
+        dest.parent.create()
+        if overwrite:
+            if dest.exists(): dest.delete(sure=True)
+        # TODO: shutil and copy_tree exhisbit different behaviour towards overwriting. make this method consistent.
+        # else:
+        #     assert not dest.exists()
+
+        if self.is_file():
+            import shutil
+            shutil.copy(str(self), str(dest))  # str() only there for Python < (3.6)
+            if verbose: print(f"COPIED {repr(self)} ==> {repr(dest)}")
+
+        elif self.is_dir():
+            from distutils.dir_util import copy_tree
+            if content:
+                copy_tree(str(self), str(dest))
+            else:
+                copy_tree(str(self), str(P(dest).joinpath(self.name).create()))
+            if verbose:
+                preface = "Content of " if content else ""
+                print(f"COPIED {preface} {repr(self)} ==> {repr(dest)}")
+        else:
+            print(f"Could NOT COPY. Not a file nor a path: {repr(self)}.")
+        return dest / self.name
+
     # ======================================== Folder management =======================================
     def create(self, parents=True, exist_ok=True, parent_only=False):
         """Creates directory while returning the same object
         """
-        if parent_only:
-            self.parent.mkdir(parents=parents, exist_ok=exist_ok)
-        else:
-            self.mkdir(parents=parents, exist_ok=exist_ok)
+        if parent_only: self.parent.mkdir(parents=parents, exist_ok=exist_ok)
+        else: self.mkdir(parents=parents, exist_ok=exist_ok)
         return self
 
     @property
@@ -849,12 +875,12 @@ class P(type(Path()), Path):
                                            dotfiles=dotfiles,
                                            absolute=absolute, filters=filters, not_in=not_in, win_order=win_order)
 
-            # if os.name == 'nt':
+            # if os.path == 'nt':
 
         #     import win32api, win32con
 
         # def folder_is_hidden(p):
-        #     if os.name == 'nt':
+        #     if os.path == 'nt':
         #         attribute = win32api.GetFileAttributes(p)
         #         return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
 
@@ -961,20 +987,27 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmpfile(name=None, suffix="", folder=None, tstamp=False):
-        return P.tmp(file=(name or randstr()) + "_" + randstr()  + (("_" + timestamp()) if tstamp else "") + suffix,
+        return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix,
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================
-    def zip(self, op_path=None, arcname=None, delete=False, verbose=True, content=True, **kwargs):
+    def zip(self, path=None, folder=None, name=None, arcname=None, delete=False, verbose=True, content=True, **kwargs):
         """
         """
-        op_path = P(op_path or self)
+        if folder is not None and path is None:
+            path = P(folder) / (name or self.name)
+        elif folder is None and path is not None:
+            path = P(path)
+        elif folder is None and path is None:
+            path = self
+        else: raise NotImplementedError("`path` and `folder` are passed. Only one is allowed.")
+
         arcname = P(arcname or self.name)
         if arcname.name != self.name:
             arcname /= self.name  # arcname has to start from somewhere and end with filename
         if self.is_file():
-            if op_path.suffix != ".zip": op_path = op_path + f".zip"
-            op_path = Compression.zip_file(ip_path=self, op_path=op_path, arcname=arcname, **kwargs)
+            if path.suffix != ".zip": path = path + f".zip"
+            path = Compression.zip_file(ip_path=self, op_path=path, arcname=arcname, **kwargs)
         else:
             if content:
                 root_dir = self
@@ -982,40 +1015,40 @@ class P(type(Path()), Path):
             else:
                 root_dir = self.split(at=str(arcname[0]))[0]
                 base_dir = arcname
-            op_path = Compression.compress_folder(root_dir=root_dir, op_path=op_path,
-                                                  base_dir=base_dir, fmt='zip', **kwargs)
-        if verbose: print(f"ZIPPED {repr(self)} ==>  {repr(op_path)}")
+            path = Compression.compress_folder(root_dir=root_dir, op_path=path,
+                                               base_dir=base_dir, fmt='zip', **kwargs)
+        if verbose: print(f"ZIPPED {repr(self)} ==>  {repr(path)}")
         if delete: self.delete(sure=True, verbose=verbose)
-        return op_path
+        return path
 
-    def unzip(self, op_path=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
         """
-        :param op_path: directory where extracted files will live.
-        :param fname: a specific file name to be extracted from the archive.
+        :param folder: directory where extracted files will live.
+        :param fname: a specific file path to be extracted from the archive.
         :param verbose:
-        :param content: if set to True, all contents of the zip archive will be scattered in op_path dir.
-        If set to False, a directory with same name as the zip file will be created and will contain the results.
+        :param content: if set to True, all contents of the zip archive will be scattered in path dir.
+        If set to False, a directory with same path as the zip file will be created and will contain the results.
         :param delete: delete the original zip file after successful extraction.
         :param kwargs:
-        :return: op_path if content=False, else, op_path.parent. Default op_path = self.parent / self.stem
+        :return: path if content=False, else, path.parent. Default path = self.parent / self.stem
         """
         zipfile = self
         if self.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(self): return self
             zipfile, fname = self.split(at=List(self.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
-        if op_path is None: op_path = zipfile.parent / zipfile.stem
-        else:  op_path = P(op_path).joinpath(zipfile.stem)
-        if content: op_path = op_path.parent
-        result = Compression.unzip(zipfile, op_path, fname, **kwargs)
+        if folder is None: folder = zipfile.parent / zipfile.stem
+        else:  folder = P(folder).joinpath(zipfile.stem)
+        if content: folder = folder.parent
+        result = Compression.unzip(zipfile, folder, fname, **kwargs)
         if verbose:
             msg = f"UNZIPPED {repr(zipfile)} ==> {repr(result)}"
             print(msg)
         if delete: self.delete(sure=True, verbose=verbose)
         return result
 
-    def tar(self, op_path=None):
-        if op_path is None: op_path = self + '.gz'
-        result = Compression.untar(self, op_path=op_path)
+    def tar(self, path=None):
+        if path is None: path = self + '.gz'
+        result = Compression.untar(self, op_path=path)
         return result
 
     def untar(self, op_path, verbose=True):
@@ -1033,10 +1066,10 @@ class P(type(Path()), Path):
     def tar_gz(self):
         pass
 
-    def untar_ungz(self, op_path=None, delete=False, verbose=True):
-        op_path = op_path or P(self.parent) / P(self.stem)
-        intrem = self.ungz(op_path=op_path, verbose=verbose)
-        result = intrem.untar(op_path=op_path, verbose=verbose)
+    def untar_ungz(self, folder=None, delete=False, verbose=True):
+        folder = folder or P(self.parent) / P(self.stem)
+        intrem = self.ungz(op_path=folder, verbose=verbose)
+        result = intrem.untar(op_path=folder, verbose=verbose)
         intrem.delete(sure=True, verbose=verbose)
         if delete: self.delete(sure=True, verbose=verbose)
         return result
@@ -1078,7 +1111,7 @@ class P(type(Path()), Path):
 
     def decrypt_n_unzip(self, key=None, pwd=None, delete=False, verbose=True):
         deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
-        unzipped = deciphered.unzip(op_path=None, delete=True, content=False)
+        unzipped = deciphered.unzip(folder=None, delete=True, content=False)
         return unzipped
 
 
@@ -1101,13 +1134,13 @@ class Compression(object):
         import shutil
         result_path = shutil.make_archive(base_name=op_path, format=fmt,
                                           root_dir=str(root_dir), base_dir=str(base_dir), **kwargs)
-        return P(result_path)  # same as op_path but (possibly) with format extension
+        return P(result_path)  # same as path but (possibly) with format extension
 
     @staticmethod
     def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
         """
         arcname determines the directory of the file being archived inside the archive. Defaults to same
-        as original directory except for drive. When changed, it should still include the file name in its end.
+        as original directory except for drive. When changed, it should still include the file path in its end.
         If arcname = filename without any path, then, it will be in the root of the archive.
         """
         import zipfile

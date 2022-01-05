@@ -53,7 +53,7 @@ def browse(path, depth=2, width=20):
             #     akey = '_' + akey
             for i in string.punctuation.replace('_', ' '):  # disallow punctuation and space except for _
                 akey = akey.replace(i, '_')
-            key_contents.append(akey)  # now we have valid attribute name
+            key_contents.append(akey)  # now we have valid attribute path
         for i, (akey, avalue) in enumerate(zip(key_contents, val_paths)):
             if i < width:
                 if os.path.isfile(avalue):
