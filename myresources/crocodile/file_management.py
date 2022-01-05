@@ -368,7 +368,7 @@ class P(type(Path()), Path):
     #     return P(other) / tmp
 
     def append_time_stamp(self, fmt=None):
-        return self.append(name="-" + timestamp(fmt=fmt))
+        return self.append(name="_" + timestamp(fmt=fmt))
 
     def rel2home(self):
         return P(self.relative_to(Path.home()))
@@ -499,10 +499,8 @@ class P(type(Path()), Path):
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
         if self.is_symlink():
-            if self == self.resolve():  # a bad self-referential object.
-                target = str(self.resolve())
-            else:
-                target = self.resolve()
+            try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
+            except: target = "BROKEN LINK " + str(self)
             rep += " Symlink '" + self.clickable() + "' ==> " + repr(target)
         elif self.is_absolute():
             rep += " " + self._spec() + " '" + self.clickable() + "'"
@@ -517,6 +515,13 @@ class P(type(Path()), Path):
         return rep
 
     def clickable(self):
+        """
+        Design point:
+        `absolute` converts relative to absolute paths.
+        `resolve` solves symlinkes AND convert relatives to absolutes.
+        `expanduser` handles the ~ in path.
+        :return:
+        """
         return self.expanduser().absolute().as_uri()  # .resolve()
 
     def _spec(self):
@@ -618,6 +623,7 @@ class P(type(Path()), Path):
     def delete(self, sure=False, verbose=True):
         if sure:
             if not self.exists():
+                self.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
                 if verbose: print(f"Could NOT DELETE nonexisting file {repr(self)}. ")
                 return None  # terminate the function.
             if self.is_file():
@@ -955,7 +961,7 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmpfile(name=None, suffix="", folder=None, tstamp=False):
-        return P.tmp(file=(name or randstr()) + "-" + randstr() + "-" + (timestamp() if tstamp else "") + suffix,
+        return P.tmp(file=(name or randstr()) + "_" + randstr()  + (("_" + timestamp()) if tstamp else "") + suffix,
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================

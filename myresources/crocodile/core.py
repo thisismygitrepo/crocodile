@@ -892,7 +892,9 @@ class Struct(dict):  # inheriting from dict gives `get` method.
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=None, yaml=False, dtype=True, logger=False, limit=50):
+    def print(self, sep=None, yaml=False, dtype=True, logger=False, limit=50, config=False, newline=True):
+        if config:
+            return print(DisplayData.config(self.__dict__, newline=newline))
         if bool(self) is False:
             print(f"Empty Struct.")
             return None  # break out of the function.
@@ -1064,6 +1066,8 @@ class Struct(dict):  # inheriting from dict gives `get` method.
 
 
 class DisplayData:
+    # primitive = {list, dict, tuple}
+
     @staticmethod
     def set_pandas_display(rows=1000, columns=1000, width=1000, colwidth=40):
         import pandas as pd
@@ -1102,11 +1106,18 @@ class DisplayData:
         return string_
 
     @staticmethod
-    def outline(array, name="Array", imprint=True):
+    def outline(array, name="Array", printit=True):
         str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"
-        if imprint:
-            print(str_)
+        if printit: print(str_)
         return str_
+
+    @staticmethod
+    def config(mydict, newline=True):
+        rep = ""  # returns json repr
+        for key, val in mydict.items():
+            rep += f"{key}={val}"
+            rep += "\n" if newline else ", "
+        return rep
 
     @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):

@@ -4,6 +4,12 @@ from myresources.crocodile import __version__
 with open("README.md", "r") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
+
+with open("./myresources/crocodile/art/happy_croco", "r") as file:
+    croco = file.read()  # search ascii art or characters art.
+print(croco)
+
+
 setup(
     name='crocodile',
     version=__version__,
