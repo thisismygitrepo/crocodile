@@ -463,7 +463,6 @@ def batcherv2(func_type='function', order=1):
             def __call__(self, *args, **kwargs):
                 output = [self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
                 return np.array(output)
-
         return Batch
 
 
@@ -481,7 +480,7 @@ class Terminal:
 
         def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None):
             self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)  # streams go here.
-            self.output = dict(stdin=None, stdout=None, stderr=None, returncode=None)
+            self.output = dict(stdin="", stdout="", stderr="", returncode=None)
             self.input = cmd  # input command
 
         def __call__(self, *args, **kwargs):
@@ -858,7 +857,7 @@ class Log(object):
 
     @staticmethod
     def get_format(sep):
-        fmt = f"%(asctime)s{sep}%(path)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
+        fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
               f"{sep}%(message)s{sep}"
         # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
         return fmt
@@ -965,8 +964,7 @@ class Log(object):
         fhandler.setLevel(level=f_level)
         fhandler.set_name(name)
         logger.addHandler(fhandler)
-        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(
-            file_path).absolute().as_uri())
+        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
 
     @staticmethod
     def test_logger(logger):
@@ -1131,5 +1129,5 @@ def qr(txt):
 
 
 if __name__ == '__main__':
-    # Log.get_colorlog()
-    Terminal().run("$profile", shell="pwsh").print()
+    # Terminal().run("$profile", shell="pwsh").print()
+    pass

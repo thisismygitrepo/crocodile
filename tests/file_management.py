@@ -17,6 +17,9 @@ class Test_P:
         folder.copy(path=dest / "folder_copy_path_passed")
         folder.copy(folder=dest / "folder_copy_folder_passed")
         folder.copy(folder=dest / "folder_copy_folder_passed_2", name="name_passed_after_folder")
+        assert (dest / "folder_copy_path_passed").is_dir()
+        assert (dest / "folder_copy_folder_passed").is_dir()
+        assert (dest / "folder_copy_folder_passed_2/name_passed_after_folder").is_dir()
 
         file.copy(path=dest / "file_copy_path_passed")
         file.copy(folder=dest / "file_copy_folder_passed")

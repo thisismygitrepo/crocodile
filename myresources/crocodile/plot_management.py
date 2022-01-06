@@ -128,7 +128,7 @@ class FigureManager:
     def save(self, event):
         _ = event
         # noinspection PyTypeChecker
-        Save.pickle('.', obj=self)
+        Save.pickle(P.tmpfile(name="figure_manager"), obj=self)
 
     def replay(self, event):
         _ = event
@@ -482,7 +482,7 @@ class SaveType:
                 if type(watch_figs[0]) is str:
                     self.watch_figs = [plt.figure(num=afig) for afig in watch_figs]
 
-            save_dir = save_dir or P.tmp().string
+            save_dir = save_dir or P.tmpdir(prefix="save_")
             self.save_name = timestamp(name=save_name)
             self.save_dir = save_dir
             self.kwargs = kwargs
@@ -1265,3 +1265,7 @@ class Artist(FigureManager):
                 plt.title(astyle)
                 plt.pause(1)
                 plt.cla()
+
+
+if __name__ == '__main__':
+    pass

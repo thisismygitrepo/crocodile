@@ -18,13 +18,12 @@ class Device(enum.Enum):
 
 
 class HyperParam(tb.Struct):
-    """
-    Benefits of this way of organizing the hyperparameters:
+    """Use this class to organize model hyperparameters:
     * one place to control everything: a control panel.
     * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
     * Ease of saving settings of experiments! and also replicating it later.
     """
-    subpath = tb.P('metadata/hyper_params')
+    subpath = tb.P('metadata/hyper_params')  # location within model directory where this will be saved.
 
     def __init__(self, *args, **kwargs):
         super().__init__(
@@ -39,7 +38,7 @@ class HyperParam(tb.Struct):
             precision='float32',
             # ===================== Model =============================
             # ===================== Training ==========================
-            split=0.2,
+            split=0.2,  # test split
             lr=0.0005,
             batch_size=32,
             epochs=30,
@@ -52,18 +51,18 @@ class HyperParam(tb.Struct):
 
     @property
     def save_dir(self):
-        return (self.root / self.exp_name).create()
+        return self.root / self.exp_name
 
-    def save(self, **kwargs):
+    def save(self):
         self.save_dir.joinpath(self.subpath / '.txt').write_text(data=str(self))
-        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath))
+        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / ".pkl"))
 
     @classmethod
-    def from_saved(cls, path, **kwargs):
+    def from_saved(cls, path):
         return (tb.P(path) / HyperParam.subpath / ".pkl").readit()
 
     def __repr__(self):
-        self.print()
+        self.print(config=True)
 
     @property
     def pkg(self):
@@ -180,8 +179,8 @@ class DataReader(object):
         self.split = split
         self.plotter = None
 
-    def __str__(self):
-        return f"DataReader Object with these keys: \n{self.__dict__.keys()}"
+    def __repr__(self):
+        return f"DataReader Object with these keys: \n" + self.specs.keys().__str__()
 
     def data_split(self, *args, strings=None, **kwargs):
         """
@@ -728,7 +727,7 @@ class KerasOptimizer:
         pass
 
     def tune(self):
-        kt = tb.E.assert_package_installed("kerastuner")
+        kt = tb.core.assert_package_installed("kerastuner")
         self.tuner = kt.Hyperband(self,
                                   objective='loss',
                                   max_epochs=10,

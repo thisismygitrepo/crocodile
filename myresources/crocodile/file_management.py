@@ -709,7 +709,7 @@ class P(type(Path()), Path):
         :return:
         """
         if path is not None:
-            path = P(path).absolute().expanduser()
+            path = P(path).expanduser().absolute()
             assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
             folder = path.parent
             name = path.name
@@ -718,9 +718,9 @@ class P(type(Path()), Path):
             assert folder is not None, "`path` or `path` must be passed."
             if name is None: name = self.absolute().name
             else: name = str(name)  # good for edge cases of path with single part.
-            path = P(folder).absolute().expanduser() / name
+            path = P(folder).expanduser().absolute() / name
 
-        slf = self.absolute().expanduser()
+        slf = self.expanduser().absolute()
 
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
             path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
@@ -936,7 +936,7 @@ class P(type(Path()), Path):
             return List(processed)
 
     def listdir(self):
-        return List(os.listdir(self.absolute().expanduser())).apply(P)
+        return List(os.listdir(self.expanduser().absolute())).apply(P)
 
     def find(self, *args, r=True, compressed=True, **kwargs):
         """short for the method ``search`` then pick first item from results.
@@ -1046,7 +1046,9 @@ class P(type(Path()), Path):
             if ".zip" not in str(slf): return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
         if folder is None: folder = (zipfile.parent / zipfile.stem)
-        else:  folder = P(folder).joinpath(zipfile.stem).absolute().expanduser()
+        else:
+            folder = P(folder).joinpath(zipfile.stem).expanduser().absolute()
+            print(folder)
         if content: folder = folder.parent
         result = Compression.unzip(zipfile, folder, fname, **kwargs)
         if verbose:
@@ -1107,7 +1109,7 @@ class P(type(Path()), Path):
         return op_path
 
     def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
-        slf = self.absolute().expanduser()
+        slf = self.expanduser().absolute()
         op_path = P(op_path) if op_path is not None else slf.switch(append, "")
         op_path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
         if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(op_path)}.")
