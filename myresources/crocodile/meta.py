@@ -746,7 +746,7 @@ class SSH(object):
         print(f"Send `{source}` ==> `{remotepath}` ")
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt:
-            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", delete=True)""")
+            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
             return resp
 
     def copy_to_here(self, source, target=None):
@@ -792,6 +792,7 @@ class Log(object):
         self.dialect = dialect  # specific to this class
         self.verbose = verbose  # specific to coloredlogs dialect
         self.log_colors = log_colors  # specific kwarg to colorlog dialect
+        self.owners = []  # list of objects using this object to log. It won't be pickled anyway, no circularity prob
         if file is False and stream is False:
             self.logger = Null()
         else:
@@ -820,6 +821,27 @@ class Log(object):
     def critical(self, msg):
         return self.logger.critical(msg)
 
+    def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
+        if which in {"logger", "all"}: self.logger.setLevel(level)
+        if which in {"stream", "all"}: self.get_shandler().setLevel(level)
+        if which in {"file", "all"}: self.get_fhandler().setLevel(level)
+
+    def get_shandler(self, first=True):
+        shandlers = []
+        for handler in self.logger.handlers:
+            if "StreamHandler" in str(handler):
+                if first: return handler
+                else: shandlers.append(handler)
+        return shandlers
+
+    def get_fhandler(self, first=True):
+        fhandlers = []
+        for handler in self.logger.handlers:
+            if "FileHandler" in str(handler):
+                if first: return handler
+                else: fhandlers.append(handler)
+        return fhandlers
+
     @property
     def file(self):
         return P(self.specs["file_path"]) if self.specs["file_path"] else None
@@ -841,7 +863,8 @@ class Log(object):
         self._install()
 
     def __getstate__(self):
-        # logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
+        # logger can be pickled without this method,
+        # but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy()
         state["specs"] = state["specs"].copy()
         del state["logger"]
@@ -948,15 +971,16 @@ class Log(object):
             Log.add_streamhandler(logger, s_level, fmt, module=module)
 
     @staticmethod
-    def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging):
+    def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
         shandler = module.StreamHandler()
         shandler.setLevel(level=s_level)
         shandler.setFormatter(fmt=fmt)
+        shandler.set_name(name)
         logger.addHandler(shandler)
         print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
 
     @staticmethod
-    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="fileHandler"):
+    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
         if file_path is None:
             file_path = P.tmpfile(name="logger", suffix=".log", folder="loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)

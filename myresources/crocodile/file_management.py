@@ -319,28 +319,28 @@ class P(type(Path()), Path):
     # ================================ Path Object management ===========================================
     @property
     def trunk(self):
-        """ useful if you have multiple dots in file path where .stem fails.
+        """ useful if you have multiple dots in file path where `.stem` fails.
         """
         return self.name.split('.')[0]
 
-    def prepend(self, prefix, suffix=None):
+    def prepend(self, prefix, suffix=None, inplace=False):
         """Add extra text before file path
         e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
         notice that `__add__` method removes the extension, while this one preserves it.
         """
         if suffix is None: suffix = ''.join(self.suffixes)
-        return self.parent.joinpath(prefix + self.trunk + suffix)
+        return self._return(self.parent.joinpath(prefix + self.trunk + suffix), inplace)
 
-    def append(self, name='', suffix=None):
+    def append(self, name='', suffix=None, inplace=False):
         """Add extra text after file path, and optionally add extra suffix.
         e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension
         """
         if suffix is None: suffix = ''.join(self.suffixes)
-        return self.parent.joinpath(self.trunk + name + suffix)
+        return self._return(self.parent.joinpath(self.trunk + name + suffix), inplace)
 
-    def with_trunk(self, name):
+    def with_trunk(self, name, inplace=False):
         """Complementary to `with_stem` and `with_suffic`"""
-        return self.parent.joinpath(name + "".join(self.suffixes))
+        return self._return(self.parent.joinpath(name + "".join(self.suffixes)), inplace)
 
     @property
     def items(self):
@@ -367,25 +367,23 @@ class P(type(Path()), Path):
     #         tmp = tmp[1:]
     #     return P(other) / tmp
 
-    def append_time_stamp(self, fmt=None):
-        return self.append(name="_" + timestamp(fmt=fmt))
+    def append_time_stamp(self, fmt=None, inplace=False):
+        return self._return(self.append(name="_" + timestamp(fmt=fmt)), inplace)
 
-    def rel2home(self):
-        return P(self.relative_to(Path.home()))
+    def rel2home(self, inplace=False):
+        return self._return(P(self.relative_to(Path.home())), inplace)
 
-    def collapseuser(self):
+    def collapseuser(self, strict=True, inplace=False):
         """same as rel2home except that it adds the tilde `~` to indicated home at the beginning.
          Thus, it is a self-contained absolute path, bar a `expanduser` method."""
         if "~" in self: return self
-        assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}"
-                                                      f" OR one path is relative and the other is absolute.")
-        return "~" / (self - P.home())
+        if strict:
+            assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}"
+                                                          f" OR one path is relative and the other is absolute.")
+        return self._return("~" / (self - P.home()), inplace)
 
-    def rel2cwd(self):
-        return P(self.relative_to(Path.cwd()))
-
-    # def abs_from_home(self):
-    #     return P.home() / self
+    def rel2cwd(self, inplace=False):
+        return self._return(P(self.relative_to(Path.cwd())), inplace)
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -480,15 +478,22 @@ class P(type(Path()), Path):
     def len(self):
         return self.__len__()
 
-    def switch(self, key: str, val: str):
-        """Changes a given part of the path to another given one. `replace` is an already defined method."""
-        return P(str(self).replace(key, val))
+    def _return(self, res, inplace: bool):
+        if not inplace:
+            return res
+        else:
+            self._str = str(res)
+            return self
 
-    def switch_by_index(self, key: int, val: str):
+    def switch(self, key: str, val: str, inplace=False):
+        """Changes a given part of the path to another given one. `replace` is an already defined method."""
+        return self._return(str(self).replace(key, val), inplace)
+
+    def switch_by_index(self, key: int, val: str, inplace=False):
         """Changes a given index of the path to another given one"""
         fullparts = list(self.parts)
         fullparts[key] = val
-        return P(*fullparts)
+        return self._return(P(*fullparts), inplace)
 
     def __deepcopy__(self, memodict=None):
         if memodict is None:
@@ -514,7 +519,7 @@ class P(type(Path()), Path):
             rep += " Relative " + "'" + str(self) + "'"
         return rep
 
-    def clickable(self):
+    def clickable(self, inplace=False):
         """
         Design point:
         `absolute` converts relative to absolute paths.
@@ -522,7 +527,7 @@ class P(type(Path()), Path):
         `expanduser` handles the ~ in path.
         :return:
         """
-        return self.expanduser().absolute().as_uri()  # .resolve()
+        return self._return(self.expanduser().absolute().as_uri(), inplace)  # .resolve()
 
     def _spec(self):
         if self.absolute():
@@ -535,14 +540,14 @@ class P(type(Path()), Path):
         else:  # there is no tell whether it is a file or directory.
             return "Relative"
 
-    def as_url_str(self):
+    def as_url_str(self, inplace=False):
         string_ = self.as_posix()
         string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
-        return string_
+        return self._return(string_, inplace)
 
-    def as_url_obj(self):
+    def as_url_obj(self, inplace=False):
         urllib3 = assert_package_installed("urllib3")
-        return urllib3.connection_from_url(self)
+        return self._return(urllib3.connection_from_url(self), inplace)
 
     def __getstate__(self):
         return str(self)
@@ -569,19 +574,19 @@ class P(type(Path()), Path):
         return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
     # =========================== OVERTIDE ===============================================
-    def as_unix(self):
+    def as_unix(self, inplace=False):
         """Similar to `as_posix()` but returns P object"""
-        return P(str(self).replace('\\', '/').replace('//', '/'))
+        return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inplace)
 
-    def symlink_to(self, target, verbose=True, delete=False):
+    def symlink_to(self, target, verbose=True, inplace=False, orig=False):
         self.parent.create()
-        if delete:
+        if inplace:
             if self.is_symlink() or self.exists():
                 # self.exist() is False for broken links even though they exist
                 self.delete(sure=True, verbose=verbose)
         super(P, self).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
-        return P(target)
+        return P(target) if not orig else self
 
     @staticmethod
     def pwd():
@@ -600,9 +605,9 @@ class P(type(Path()), Path):
         :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
         :return:
 
-        Works seamlessly for config files that has one-liners in it, which is invariably the case.
-        File is created if it doesn't exist.
-        Text is simply appended if not found in the text file.
+        * This method is suitable for config files and simple scripts that has one-liners in it,
+        * File is created if it doesn't exist.
+        * Text is simply appended if not found in the text file.
         """
         self.parent.create()
         if not self.exists(): self.write_text(txt)
@@ -636,6 +641,7 @@ class P(type(Path()), Path):
             if verbose: print(f"DELETED {repr(slf)}.")
         else:
             if verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
+        return self
 
     def send2trash(self, verbose=True):
         send2trash = assert_package_installed("send2trash")
@@ -644,6 +650,7 @@ class P(type(Path()), Path):
             if verbose: print(f"TRASHED {repr(self)}")
         else:
             if verbose: print(f"Could NOT trash {self}")
+        return self
 
     def clean(self, trash=True):
         """removes content on a path, rather than deleting the path."""
@@ -698,6 +705,7 @@ class P(type(Path()), Path):
             # os.system(f"open {filename}")
             import subprocess
             subprocess.call(["open", filename])  # works for files and folders alike
+        return self
 
     def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True):
         """
@@ -734,27 +742,28 @@ class P(type(Path()), Path):
         if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
         return path
 
-    def move_up(self, delete=True, content=False, overwrite=False):
+    def move_up(self, inplace=True, content=False, overwrite=False):
         if content:
-            self.search("*").apply(lambda x: x.move_up(delete=delete, content=False))
+            self.search("*").apply(lambda x: x.move_up(inplace=inplace, content=False))
             result = self.parent.parent
         else:
             result = self.move(self.parent.parent, overwrite=overwrite)
         if result != self:
-            self.parent.delete(sure=delete)
+            self.parent.delete(sure=inplace)
         return result
 
-    def renameit(self, name, verbose=True):
+    def renameit(self, name, verbose=True, orig=False):
         """Unlike the builtin `rename`, this doesn't require or change full path, only file path."""
         assert type(name) is str, "New new should be a string representing file path alone."
         new_path = self.parent / name
         self.rename(new_path)
         if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
-        return new_path
+        return new_path if not orig else self
 
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}",
-             overwrite=False):
+             overwrite=False, orig=False):
         """
+        :param orig:
         :param overwrite:
         :param name:
         :param append:
@@ -807,7 +816,7 @@ class P(type(Path()), Path):
                 print(f"COPIED {preface} {repr(slf)} ==> {repr(dest)}")
         else:
             print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
-        return dest / slf.name
+        return dest / slf.name if not orig else self
 
     # ======================================== Folder management =======================================
     def create(self, parents=True, exist_ok=True, parent_only=False):
@@ -996,7 +1005,8 @@ class P(type(Path()), Path):
                      folder="tmpfiles" if folder is None else folder)
 
     # ====================================== Compression ===========================================
-    def zip(self, path=None, folder=None, name=None, arcname=None, delete=False, verbose=True, content=True, **kwargs):
+    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
+            orig=False, **kwargs):
         """
         """
         if folder is not None and path is None:
@@ -1026,11 +1036,12 @@ class P(type(Path()), Path):
             path = Compression.compress_folder(root_dir=root_dir, op_path=path,
                                                base_dir=base_dir, fmt='zip', **kwargs)
         if verbose: print(f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-        if delete: slf.delete(sure=True, verbose=verbose)
-        return path
+        if inplace: slf.delete(sure=True, verbose=verbose)
+        return path if not orig else self
 
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, delete=False, **kwargs):
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, **kwargs):
         """
+        :param orig:
         :param folder: directory where extracted files will live.
         :param fname: a specific file path to be extracted from the archive.
         :param verbose:
@@ -1054,8 +1065,8 @@ class P(type(Path()), Path):
         if verbose:
             msg = f"UNZIPPED {repr(zipfile)} ==> {repr(result)}"
             print(msg)
-        if delete: slf.delete(sure=True, verbose=verbose)
-        return result
+        if inplace: slf.delete(sure=True, verbose=verbose)
+        return result if not orig else self
 
     def tar(self, path=None):
         if path is None: path = self + '.gz'
@@ -1077,24 +1088,24 @@ class P(type(Path()), Path):
     def tar_gz(self):
         pass
 
-    def untar_ungz(self, folder=None, delete=False, verbose=True):
+    def untar_ungz(self, folder=None, inplace=False, verbose=True):
         folder = folder or P(self.parent) / P(self.stem)
         intrem = self.ungz(op_path=folder, verbose=verbose)
         result = intrem.untar(op_path=folder, verbose=verbose)
         intrem.delete(sure=True, verbose=verbose)
-        if delete: self.delete(sure=True, verbose=verbose)
+        if inplace: self.delete(sure=True, verbose=verbose)
         return result
 
-    def compress(self, op_path=None, base_dir=None, fmt="zip", delete=False, **kwargs):
+    def compress(self, op_path=None, base_dir=None, fmt="zip", inplace=False, **kwargs):
         fmts = ["zip", "tar", "gzip"]
         assert fmt in fmts, f"Unsupported format {fmt}. The supported formats are {fmts}"
-        _ = self, op_path, base_dir, kwargs, delete
+        _ = self, op_path, base_dir, kwargs, inplace
         pass
 
     def decompress(self):
         pass
 
-    def encrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
+    def encrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", inplace=False, orig=False):
         """
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
@@ -1105,26 +1116,26 @@ class P(type(Path()), Path):
         op_path = slf.append(name=append) if op_path is None else P(op_path)
         op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
         if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(op_path)}.")
-        if delete: slf.delete(sure=True, verbose=verbose)
-        return op_path
+        if inplace: slf.delete(sure=True, verbose=verbose)
+        return op_path if not orig else self
 
-    def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", delete=False):
+    def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", inplace=False, orig=False):
         slf = self.expanduser().absolute()
         op_path = P(op_path) if op_path is not None else slf.switch(append, "")
         op_path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
         if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(op_path)}.")
-        if delete: slf.delete(sure=True, verbose=verbose)
-        return op_path
+        if inplace: slf.delete(sure=True, verbose=verbose)
+        return op_path if not orig else self
 
-    def zip_n_encrypt(self, key=None, pwd=None, delete=False, verbose=True):
-        zipped = self.zip(delete=delete, verbose=verbose)
-        zipped_secured = zipped.encrypt(key=key, pwd=pwd, verbose=verbose, delete=True)
-        return zipped_secured
+    def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False):
+        zipped = self.zip(inplace=inplace, verbose=verbose)
+        zipped_secured = zipped.encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True)
+        return zipped_secured if not orig else self
 
-    def decrypt_n_unzip(self, key=None, pwd=None, delete=False, verbose=True):
-        deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, delete=delete)
-        unzipped = deciphered.unzip(folder=None, delete=True, content=False)
-        return unzipped
+    def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False):
+        deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace)
+        unzipped = deciphered.unzip(folder=None, inplace=True, content=False)
+        return unzipped if not orig else self
 
 
 class Compression(object):
