@@ -5,10 +5,11 @@ from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, rands
 
 # =============================== Security ================================================
 
-def obscure(data: bytes) -> bytes:
+def obscure(msg: bytes) -> bytes:
+    # if type(msg) is str: msg = msg.encode()
     import zlib
     from base64 import urlsafe_b64encode as b64e
-    return b64e(zlib.compress(data, 9))
+    return b64e(zlib.compress(msg, 9))
 
 
 def unobscure(obscured: bytes) -> bytes:
@@ -43,6 +44,7 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         * It behoves you to try decrypting it to err on the side of safety.
         * Don't forget to delete OR store key file safely.
     """
+    # if type(msg) is str: msg = msg.encode()
     from cryptography.fernet import Fernet
     salt = None  # silence the linter.
 
@@ -201,8 +203,7 @@ class Read(object):
         return Read.pickle(*args, **kwargs)
 
     @staticmethod
-    def pickle_s(bytes_obj):
-        import dill
+    def pickles(bytes_obj):
         return dill.loads(bytes_obj)
 
 
@@ -787,7 +788,7 @@ class P(type(Path()), Path):
             dest = P(path)
             content = True  # this way, the destination will be filled with contents of `self`
         elif path is None and folder is None:
-            dest = self.append(append)
+            dest = self.append(name or append)
         else: raise NotImplementedError
 
         dest = dest.expanduser().absolute().resolve()
@@ -1009,17 +1010,8 @@ class P(type(Path()), Path):
             orig=False, **kwargs):
         """
         """
-        if folder is not None and path is None:
-            path = P(folder) / (name or self.name)
-        elif folder is None and path is not None:
-            path = P(path)
-        elif folder is None and path is None:
-            path = self
-        else: raise NotImplementedError("`path` and `folder` are passed. Only one is allowed.")
-
-        path = path.expanduser().absolute()
+        path = self._resolve_path(folder, name, path, self.name).expanduser().absolute()
         slf = self.expanduser().absolute()
-
         arcname = P(arcname or slf.name)
         if arcname.name != slf.name:
             arcname /= slf.name  # arcname has to start from somewhere and end with filename
@@ -1047,7 +1039,7 @@ class P(type(Path()), Path):
         :param verbose:
         :param content: if set to True, all contents of the zip archive will be scattered in path dir.
         If set to False, a directory with same path as the zip file will be created and will contain the results.
-        :param delete: delete the original zip file after successful extraction.
+        :param inplace: delete the original zip file after successful extraction.
         :param kwargs:
         :return: path if content=False, else, path.parent. Default path = self.parent / self.stem
         """
@@ -1073,16 +1065,16 @@ class P(type(Path()), Path):
         result = Compression.untar(self, op_path=path)
         return result
 
-    def untar(self, op_path, verbose=True):
-        _ = self, op_path, verbose
+    def untar(self, path, verbose=True):
+        _ = self, path, verbose
         return P()
 
-    def gz(self, op_path, verbose=True):
-        _ = self, op_path, verbose
+    def gz(self, path, verbose=True):
+        _ = self, path, verbose
         return P()
 
-    def ungz(self, op_path, verbose=True):
-        _ = self, op_path, verbose
+    def ungz(self, path, verbose=True):
+        _ = self, path, verbose
         return P()
 
     def tar_gz(self):
@@ -1090,22 +1082,23 @@ class P(type(Path()), Path):
 
     def untar_ungz(self, folder=None, inplace=False, verbose=True):
         folder = folder or P(self.parent) / P(self.stem)
-        intrem = self.ungz(op_path=folder, verbose=verbose)
-        result = intrem.untar(op_path=folder, verbose=verbose)
+        intrem = self.ungz(path=folder, verbose=verbose)
+        result = intrem.untar(path=folder, verbose=verbose)
         intrem.delete(sure=True, verbose=verbose)
         if inplace: self.delete(sure=True, verbose=verbose)
         return result
 
-    def compress(self, op_path=None, base_dir=None, fmt="zip", inplace=False, **kwargs):
+    def compress(self, path=None, base_dir=None, fmt="zip", inplace=False, **kwargs):
         fmts = ["zip", "tar", "gzip"]
         assert fmt in fmts, f"Unsupported format {fmt}. The supported formats are {fmts}"
-        _ = self, op_path, base_dir, kwargs, inplace
+        _ = self, path, base_dir, kwargs, inplace
         pass
 
     def decompress(self):
         pass
 
-    def encrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", inplace=False, orig=False):
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True,
+                append="_encrypted", inplace=False, orig=False):
         """
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
@@ -1113,19 +1106,19 @@ class P(type(Path()), Path):
         slf = self.expanduser().absolute()
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)
-        op_path = slf.append(name=append) if op_path is None else P(op_path)
-        op_path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
-        if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(op_path)}.")
+        path = self._resolve_path(folder, name, path, slf.append(name=append).name)
+        path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
+        if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
         if inplace: slf.delete(sure=True, verbose=verbose)
-        return op_path if not orig else self
+        return path if not orig else self
 
-    def decrypt(self, key=None, pwd=None, op_path=None, verbose=True, append="_encrypted", inplace=False, orig=False):
+    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", inplace=False, orig=False):
         slf = self.expanduser().absolute()
-        op_path = P(op_path) if op_path is not None else slf.switch(append, "")
-        op_path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
-        if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(op_path)}.")
+        path = self._resolve_path(folder, name, path, slf.switch(append, "").name)
+        path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
+        if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(path)}.")
         if inplace: slf.delete(sure=True, verbose=verbose)
-        return op_path if not orig else self
+        return path if not orig else self
 
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False):
         zipped = self.zip(inplace=inplace, verbose=verbose)
@@ -1136,6 +1129,17 @@ class P(type(Path()), Path):
         deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace)
         unzipped = deciphered.unzip(folder=None, inplace=True, content=False)
         return unzipped if not orig else self
+
+    def _resolve_path(self, folder, name, path, default_name):
+        if path is None:
+            if folder is not None:
+                path = P(folder).joinpath(name or default_name)
+            else:
+                path = self.parent.joinpath(name or default_name)
+        else:
+            assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."
+            path = P(path)
+        return path
 
 
 class Compression(object):

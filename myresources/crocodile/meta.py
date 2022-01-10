@@ -2,7 +2,8 @@
 import logging
 import subprocess
 import time
-from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, assert_package_installed
+from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save,\
+    dill, assert_package_installed
 from crocodile.file_management import P
 
 
@@ -631,8 +632,8 @@ class Terminal:
         if self.machine == "Windows":
             my_list += [new_window, terminal, shell, extra]
         my_list += cmds
-        print("Meta.Terminal.run_async: Subprocess command: ", my_list)
         my_list = [item for item in my_list if item != ""]
+        print("Meta.Terminal.run_async: Subprocess command: ", my_list)
         w = subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
         # returns Popen object, not so useful for communcation with an opened terminal
         return w
@@ -669,21 +670,33 @@ tb.sys.path.insert(0, r'{wdir}')
         # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
     @staticmethod
-    def load_object_in_new_session(obj):
+    def replicate_in_new_session(obj, execute=False):
         """Python brachnes off to a new window and run the function passed.
         context can be either a pickled session or the current file __file__"""
         # step 1: pickle the function
         # step 2: create a script that unpickles it.
         # step 3: run the script that runs the function.
-        # TODO complete this
-        fname = P.tmpfile(tstamp=False, suffix=".pkl")
-        Save.pickle(obj=obj, path=fname, verbose=False)
+        file = P.tmpfile(tstamp=False, suffix=".pkl")
+        Save.pickle(obj=obj, path=file, verbose=False)
         script = f"""
-path = tb.P(r'{fname}')
+path = tb.P(r'{file}')
 obj = path.readit()
 path.delete(sure=True, verbose=False)
+obj{'()' if execute else ''}
 """
         Terminal.run_script(script)
+
+    @staticmethod
+    def replicate_session(cmd=""):
+        file = P.tmpfile(suffix=".pkl")
+        dill.dump_session(file, main=sys.modules[__name__])
+        script = f"""
+path = tb.P(r'{file}')
+tb.dill.load_session(str(path)); 
+path.delete(sure=True, verbose=False)
+{cmd}
+"""
+        Terminal().run_script(script=script)
 
 
 class SSH(object):

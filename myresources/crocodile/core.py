@@ -220,7 +220,7 @@ class Save:
             dill.dump(obj, file, recurse=r, **kwargs)
 
     @staticmethod
-    def pickle_s(obj):
+    def pickles(obj):
         binary = dill.dumps(obj)
         return binary
 
