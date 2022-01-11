@@ -213,14 +213,14 @@ class P(type(Path()), Path):
     # def __init__(self, *string):
     #     super(P, self).__init__(Path(*string).expanduser())
 
-    def download(self, directory=None, memory=False, allow_redirects=True):
+    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         """Assuming URL points to anything but html page."""
         import requests
-        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects)
+        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, params=params)
 
         if memory is False:
             directory = P.home().joinpath("Downloads") if directory is None else P(directory)
-            directory = directory.joinpath(self.name)
+            directory = directory.joinpath(name or self.make_valid_filename_(self.name))
             directory.write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
             # try: urllib.urlopen(url).read()
             return directory

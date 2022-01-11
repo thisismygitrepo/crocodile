@@ -1115,7 +1115,7 @@ class DisplayData:
     def config(mydict, newline=True):
         rep = ""  # returns json repr
         for key, val in mydict.items():
-            rep += f"{key}={val}"
+            rep += f"{key} = {val}"
             rep += "\n" if newline else ", "
         return rep
 
