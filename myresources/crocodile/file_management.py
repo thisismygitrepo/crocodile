@@ -488,7 +488,7 @@ class P(type(Path()), Path):
 
     def switch(self, key: str, val: str, inplace=False):
         """Changes a given part of the path to another given one. `replace` is an already defined method."""
-        return self._return(str(self).replace(key, val), inplace)
+        return self._return(P(str(self).replace(key, val)), inplace)
 
     def switch_by_index(self, key: int, val: str, inplace=False):
         """Changes a given index of the path to another given one"""
