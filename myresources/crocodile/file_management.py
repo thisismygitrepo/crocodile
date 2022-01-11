@@ -780,9 +780,9 @@ class P(type(Path()), Path):
         # tested %100
         if folder is not None and path is None:
             if name is None:
-                dest = P(folder).create()
+                dest = P(folder).expanduser().absolute().create()
             else:
-                dest = P(folder) / name
+                dest = P(folder).expanduser().absolute() / name
                 content = True
         elif path is not None and folder is None:
             dest = P(path)
