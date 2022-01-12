@@ -372,6 +372,7 @@ class P(type(Path()), Path):
         return self._return(self.append(name="_" + timestamp(fmt=fmt)), inplace)
 
     def rel2home(self, inplace=False):
+        """Exact opposite of `expanduser`"""
         return self._return(P(self.relative_to(Path.home())), inplace)
 
     def collapseuser(self, strict=True, inplace=False):
@@ -1112,7 +1113,8 @@ class P(type(Path()), Path):
         if inplace: slf.delete(sure=True, verbose=verbose)
         return path if not orig else self
 
-    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", inplace=False, orig=False):
+    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted",
+                inplace=False, orig=False):
         slf = self.expanduser().absolute()
         path = self._resolve_path(folder, name, path, slf.switch(append, "").name)
         path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))

@@ -806,15 +806,11 @@ class Log(object):
         self.verbose = verbose  # specific to coloredlogs dialect
         self.log_colors = log_colors  # specific kwarg to colorlog dialect
         self.owners = []  # list of objects using this object to log. It won't be pickled anyway, no circularity prob
-        if file is False and stream is False:
-            self.logger = Null()
-        else:
-            self.logger = Null()  # to be populated by `_install`
-            self._install()
-            # update specs after intallation.
-            self.specs["path"] = self.logger.name
-            if file:  # first handler is a file handler
-                self.specs["file_path"] = self.logger.handlers[0].baseFilename
+        self._install()
+        # update specs after intallation.
+        self.specs["path"] = self.logger.name
+        if file:  # first handler is a file handler
+            self.specs["file_path"] = self.logger.handlers[0].baseFilename
 
     def __getattr__(self, item):  # makes it twice as slower as direct access 300 ns vs 600 ns
         return getattr(self.logger, item)
@@ -860,7 +856,9 @@ class Log(object):
         return P(self.specs["file_path"]) if self.specs["file_path"] else None
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
-        if self.dialect == "colorlog":
+        if self.specs["file"] is False and self.specs["stream"] is False:
+            self.logger = Null()
+        elif self.dialect == "colorlog":
             self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
         elif self.dialect == "logging":
             self.logger = Log.get_logger(**self.specs)
@@ -871,8 +869,9 @@ class Log(object):
 
     def __setstate__(self, state):
         self.__dict__ = state
-        if self.specs["file_path"] is not None:
-            self.specs["file_path"] = P.home() / self.specs["file_path"]
+        if self.specs["file_path"] is not None:  # this way of creating relative path makes transferrable
+            # across machines.
+            self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
         self._install()
 
     def __getstate__(self):
@@ -882,8 +881,11 @@ class Log(object):
         state["specs"] = state["specs"].copy()
         del state["logger"]
         if self.specs["file_path"] is not None:
-            state["specs"]["file_path"] = P(self.specs["file_path"]).rel2home()
+            state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
+
+    def close(self):  # close file.
+        raise NotImplementedError
 
     def __repr__(self):
         tmp = f"{self.logger} with handlers: \n"
