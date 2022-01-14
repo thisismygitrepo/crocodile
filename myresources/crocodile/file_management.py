@@ -481,6 +481,8 @@ class P(type(Path()), Path):
         return self.__len__()
 
     def _return(self, res, inplace: bool):
+        """decides on whether the current object is mutated to be the result `res`
+        or the result is returned as a separate object."""
         if not inplace:
             return res
         else:
@@ -508,6 +510,7 @@ class P(type(Path()), Path):
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
             except: target = "BROKEN LINK " + str(self)
+            if target == self: target = str(target)  # avoid infinite recursions for broken links.
             rep += " Symlink '" + self.clickable() + "' ==> " + repr(target)
         elif self.is_absolute():
             rep += " " + self._spec() + " '" + self.clickable() + "'"
@@ -580,9 +583,11 @@ class P(type(Path()), Path):
         """Similar to `as_posix()` but returns P object"""
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inplace)
 
-    def symlink_to(self, target, verbose=True, inplace=False, orig=False):
+    def symlink_to(self, target, verbose=True, overwrite=False, orig=False):
+        target = P(target).expanduser().absolute()
+        assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
-        if inplace:
+        if overwrite:
             if self.is_symlink() or self.exists():
                 # self.exist() is False for broken links even though they exist
                 self.delete(sure=True, verbose=verbose)
@@ -628,13 +633,13 @@ class P(type(Path()), Path):
 
     # ==================================== File management =========================================
     def delete(self, sure=False, verbose=True):
-        slf = self.expanduser()
+        slf = self.expanduser().absolute()
         if sure:
             if not slf.exists():
                 slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
                 if verbose: print(f"Could NOT DELETE nonexisting file {repr(slf)}. ")
-                return None  # terminate the function.
-            if slf.is_file():
+                return slf  # terminate the function.
+            if slf.is_file() or slf.is_symlink():
                 slf.unlink(missing_ok=True)
             else:
                 import shutil
@@ -974,7 +979,7 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmpdir(prefix=""):
-        return P.tmp(folder=rf"tmpdirs/{prefix + randstr()}")
+        return P.tmp(folder=rf"tmpdirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
 
     @staticmethod
     def temp(*args, **kwargs):
