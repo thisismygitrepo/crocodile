@@ -630,7 +630,8 @@ class Terminal:
             extra = ""
         my_list = []
         if self.machine == "Windows":
-            my_list += [new_window, terminal, shell, extra]
+            my_list += [new_window, terminal, shell, extra]  # by having a list,
+            # it is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         my_list += cmds
         my_list = [item for item in my_list if item != ""]
         print("Meta.Terminal.run_async: Subprocess command: ", my_list)
