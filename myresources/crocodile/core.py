@@ -475,6 +475,9 @@ class List(list, Base):
 
     def __bool__(self):
         return bool(self.list)
+    
+    def __contains__(self, key):
+        return key in self.list
 
     @classmethod
     def from_copies(cls, obj, count):
@@ -836,6 +839,9 @@ class Struct(dict):  # inheriting from dict gives `get` method.
 
     def __bool__(self):
         return bool(self.__dict__)
+    
+    def __contains__(self, key):
+        return key in self.__dict__
 
     @staticmethod
     def recursive_struct(mydict):
@@ -1136,4 +1142,5 @@ class DisplayData:
 
 
 if __name__ == '__main__':
+    # a = 2
     pass
