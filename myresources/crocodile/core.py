@@ -462,6 +462,7 @@ class Base(object):
 
 class List(list, Base):
     """Use this class to keep items of the same type.
+    # Inheriting from Base gives save method.
     """
 
     # =============================== Constructor Methods ====================
@@ -676,6 +677,10 @@ class List(list, Base):
     def len(self):
         return self.list.__len__()
 
+    def to_list(self):
+        """Matches `to_list` from Pandas Series."""
+        return self.list
+
     def __iter__(self):
         return iter(self.list)
 
@@ -794,9 +799,11 @@ class List(list, Base):
         return np.array(self.list)
 
 
-class Struct(dict):  # inheriting from dict gives `get` method.
+class Struct(dict, Base):  
     """Use this class to keep bits and sundry items.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
+    # inheriting from dict gives `get` method, should give `__contains__` but not working.
+    # Inheriting from Base gives `save` method.
     """
 
     def save_json(self, path=None):
