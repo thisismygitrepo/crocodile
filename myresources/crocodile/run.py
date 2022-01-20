@@ -62,6 +62,8 @@ def build_parser():
 
             path = tb.P(args.file)
             if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.
+                if path.absolute():
+                    path = path.rel2cwd()
                 path = str((path - path.suffix)).replace(tb.os.sep, ".")
             else:  # It must be that user passed a.b format
                 assert path.exists() is False, f"I could not determine whether this is a.b or a/b format."
