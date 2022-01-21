@@ -646,6 +646,7 @@ class Terminal:
         terminal that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
         """
+        # TODO: add option whether to add prepend to the script or not.
         wdir = wdir or P.cwd()
         header = f"""
 # The following lines of code form a header appended by Terminal.run_script
