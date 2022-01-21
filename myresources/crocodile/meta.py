@@ -641,21 +641,21 @@ class Terminal:
 
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
-                   shell=None, delete=False, terminal="", new_window=True):
+                   shell=None, delete=False, terminal="", new_window=True, header=True):
         """This method is a wrapper on top of `run_async" except that the command passed will launch python
         terminal that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
         """
         # TODO: add option whether to add prepend to the script or not.
         wdir = wdir or P.cwd()
-        header = f"""
+        header_script = f"""
 # The following lines of code form a header appended by Terminal.run_script
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir}')
 # End of header, start of script passed:
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
 
-        script = header + script
+        script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}:
             script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
