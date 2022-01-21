@@ -1082,7 +1082,7 @@ class DisplayData:
     # primitive = {list, dict, tuple}
 
     @staticmethod
-    def set_pandas_display(rows=1000, columns=1000, width=1000, colwidth=40):
+    def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40):
         import pandas as pd
         pd.set_option('display.max_colwidth', colwidth)
         pd.set_option('display.max_columns', columns)  # to avoid replacing them with ...

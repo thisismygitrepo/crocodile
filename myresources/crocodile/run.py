@@ -55,13 +55,16 @@ def build_parser():
     # ==================================================================================
 
     if args.main is True and args.file != "":  # run the file itself, don't import it.
-        tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal)
+        tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal, new_window=not args.here,
+                                 interactive=not args.solitary, ipython=not args.python)
     else:  # run as a module (i.e. import it)
 
         if args.file != "":  # non empty file path:
 
             path = tb.P(args.file)
             if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.
+                if path.absolute():
+                    path = path.rel2cwd()
                 path = str((path - path.suffix)).replace(tb.os.sep, ".")
             else:  # It must be that user passed a.b format
                 assert path.exists() is False, f"I could not determine whether this is a.b or a/b format."
