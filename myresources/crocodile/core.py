@@ -460,7 +460,7 @@ class Base(object):
         return filename
 
 
-class List(list, Base):
+class List(Base, list):
     """Use this class to keep items of the same type.
     # Inheriting from Base gives save method.
     """
@@ -799,7 +799,7 @@ class List(list, Base):
         return np.array(self.list)
 
 
-class Struct(dict, Base):  
+class Struct(Base, dict):
     """Use this class to keep bits and sundry items.
     Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
     # inheriting from dict gives `get` method, should give `__contains__` but not working.
@@ -1038,11 +1038,11 @@ class Struct(dict, Base):
 
     def keys(self):
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
-        return List(self.dict.keys())
+        return List(list(self.dict.keys()))
 
     def values(self):
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
-        return List(self.dict.values())
+        return List(list(self.dict.values()))
 
     def items(self):
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""

@@ -701,7 +701,7 @@ path.delete(sure=True, verbose=False)
 
 
 class SSH(object):
-    def __init__(self, hostname, username, ssh_key=None):
+    def __init__(self, username, hostname, ssh_key=None):
         _ = False
         if _:
             super().__init__()
@@ -716,7 +716,7 @@ class SSH(object):
                          username=username,
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
         self.sftp = self.ssh.open_sftp()
-        self.load_python_cmd = rf"""source ~/miniconda3/bin/activate"""  # possible activate an env
+        self.load_python_cmd = rf"""source ~/venvs/ve/bin/activate"""  # possible activate an env
         import platform
         self.platform = platform
         self.target_machine = self.ssh.exec_command(self.load_python_cmd +
@@ -761,6 +761,7 @@ class SSH(object):
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt:
             resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
+            source.delete(sure=True)
             return resp
 
     def copy_to_here(self, source, target=None):
