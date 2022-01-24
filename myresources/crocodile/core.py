@@ -1078,7 +1078,7 @@ class Struct(Base, dict):
         return artist
 
 
-class DisplayData:
+class Display:
     # primitive = {list, dict, tuple}
 
     @staticmethod

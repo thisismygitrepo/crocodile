@@ -22,7 +22,7 @@ import pandas as pd
 _ = pd
 
 Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
-Struct, DisplayData, str2timedelta, Save, List = core.Struct, core.DisplayData, core.str2timedelta, core.Save, core.List
+Struct, Display, str2timedelta, Save, List = core.Struct, core.Display, core.str2timedelta, core.Save, core.List
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
 Fridge, MemoryDB = _fm.Fridge, _fm.MemoryDB

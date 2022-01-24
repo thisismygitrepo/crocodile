@@ -649,10 +649,10 @@ class Terminal:
         # TODO: add option whether to add prepend to the script or not.
         wdir = wdir or P.cwd()
         header_script = f"""
-# The following lines of code form a header appended by Terminal.run_script
+# ======================== Code prepended by Terminal.run_script =========================
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir}')
-# End of header, start of script passed:
+# ======================== End of header, start of script passed: ========================
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
 
         script = header_script + script if header else script
