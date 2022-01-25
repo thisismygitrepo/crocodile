@@ -343,7 +343,7 @@ class P(type(Path()), Path):
         """Complementary to `with_stem` and `with_suffic`"""
         res = self.parent.joinpath(name + "".join(self.suffixes))
         if self.exists() and inplace:
-            res = self.renameit(name=name + "".join(self.suffixes))
+            res = self.retitle(name=name + "".join(self.suffixes))
         return self._return(res, inplace)
 
     @property
@@ -762,10 +762,11 @@ class P(type(Path()), Path):
             self.parent.delete(sure=inplace)
         return result
 
-    def renameit(self, name, verbose=True, orig=False):
+    def retitle(self, name, overwrite=False, verbose=True, orig=False):
         """Unlike the builtin `rename`, this doesn't require or change full path, only file name."""
         assert type(name) is str, "New new should be a string representing file name alone."
         new_path = self.parent / name
+        if overwrite and new_path.exists(): new_path.delete(sure=True)
         self.rename(new_path)
         if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
         return new_path if not orig else self
