@@ -770,7 +770,7 @@ class List(Base, list):
         :param obj_included: Include a colum for objects themselves.
         :return:
         """
-        # DisplayData.set_pandas_display()  # removed for disentanglement
+        # Display.set_pandas_display()  # removed for disentanglement
         columns = list(self.list[0].__dict__.keys())
         if obj_included or names:
             columns = ['object'] + columns
@@ -907,7 +907,7 @@ class Struct(Base, dict):
 
     def print(self, sep=None, yaml=False, dtype=True, logger=False, limit=50, config=False, newline=True):
         if config:
-            return print(DisplayData.config(self.__dict__, newline=newline))
+            return print(Display.config(self.__dict__, newline=newline))
         if bool(self) is False:
             print(f"Empty Struct.")
             return None  # break out of the function.
@@ -926,7 +926,7 @@ class Struct(Base, dict):
         for key in self.keys().list:
             key_str = str(key)
             type_str = str(type(self[key])).split("'")[1]
-            val_str = DisplayData.get_repr(self[key], limit=limit).replace("\n", " ")
+            val_str = Display.get_repr(self[key], limit=limit).replace("\n", " ")
             repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
             if dtype:
                 repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
