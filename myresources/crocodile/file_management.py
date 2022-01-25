@@ -342,8 +342,6 @@ class P(type(Path()), Path):
     def with_trunk(self, name, inplace=False):
         """Complementary to `with_stem` and `with_suffic`"""
         res = self.parent.joinpath(name + "".join(self.suffixes))
-        if self.exists() and inplace:
-            res = self.retitle(name=name + "".join(self.suffixes))
         return self._return(res, inplace)
 
     @property
@@ -489,6 +487,7 @@ class P(type(Path()), Path):
         if not inplace:
             return res
         else:
+            if self.exists(): self.rename(str(res))
             self._str = str(res)
             return self
 
@@ -807,7 +806,7 @@ class P(type(Path()), Path):
         dest.parent.create()
         if overwrite:
             if dest.exists(): dest.delete(sure=True)
-        # TODO: shutil and copy_tree exhisbit different behaviour towards overwriting. make this method consistent.
+        # TODO: shutil and copy_tree exhibits different behaviour towards overwriting. make this method consistent.
         # else:
         #     assert not dest.exists()
 
