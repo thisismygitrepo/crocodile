@@ -341,7 +341,10 @@ class P(type(Path()), Path):
 
     def with_trunk(self, name, inplace=False):
         """Complementary to `with_stem` and `with_suffic`"""
-        return self._return(self.parent.joinpath(name + "".join(self.suffixes)), inplace)
+        res = self.parent.joinpath(name + "".join(self.suffixes))
+        if self.exists() and inplace:
+            res = self.renameit(name=name + "".join(self.suffixes))
+        return self._return(res, inplace)
 
     @property
     def items(self):
@@ -760,8 +763,8 @@ class P(type(Path()), Path):
         return result
 
     def renameit(self, name, verbose=True, orig=False):
-        """Unlike the builtin `rename`, this doesn't require or change full path, only file path."""
-        assert type(name) is str, "New new should be a string representing file path alone."
+        """Unlike the builtin `rename`, this doesn't require or change full path, only file name."""
+        assert type(name) is str, "New new should be a string representing file name alone."
         new_path = self.parent / name
         self.rename(new_path)
         if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")

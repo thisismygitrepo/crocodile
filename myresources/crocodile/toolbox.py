@@ -40,7 +40,7 @@ L = List
 tmp = P.tmp
 E = Experimental
 
-_ = Base, timestamp, Save, Terminal, List, Struct, DisplayData
+_ = Base, timestamp, Save, Terminal, List, Struct, Display
 _ = datetime, dt, os, sys, np, copy, random, dill
 
 _ = P, Read, Compression, string, sys  # , Path
