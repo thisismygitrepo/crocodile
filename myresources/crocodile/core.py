@@ -66,8 +66,8 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
     return result_str
 
 
-def assert_package_installed(package):
-    """imports a package and installs it if not."""
+def install_n_import(package):
+    """imports a package and installs it first if not."""
     try:
         pkg = __import__(package)
         return pkg
@@ -450,7 +450,7 @@ class Base(object):
         Struct(self.__dict__).print(dtype=typeinfo)
 
     def viz_heirarchy(self, depth=3, obj=None, filt=None):
-        import objgraph
+        objgraph = install_n_import("objgraph")
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
@@ -702,7 +702,7 @@ class List(Base, list):
             self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
 
         func = self.evalstr(func, expected='func')
-        tqdm = assert_package_installed("tqdm").tqdm
+        tqdm = install_n_import("tqdm").tqdm
         if other is None:
             iterator = self.list if not verbose else tqdm(self.list, desc=desc)
             if jobs:
@@ -901,13 +901,18 @@ class Struct(Base, dict):
 
     def __repr__(self):
         repr_string = ""
-        for key in self.keys().list:
+        for key in self.keys().to_list():
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
     def print(self, sep=None, yaml=False, dtype=True, logger=False, limit=50, config=False, newline=True):
         if config:
-            return print(Display.config(self.__dict__, newline=newline))
+            repr_str = Display.config(self.__dict__, newline=newline)
+            if logger: return repr_str
+            else:
+                print(repr_str)
+                return self
+
         if bool(self) is False:
             print(f"Empty Struct.")
             return None  # break out of the function.

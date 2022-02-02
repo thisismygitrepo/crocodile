@@ -28,7 +28,7 @@ class HyperParam(tb.Struct):
     def __init__(self, *args, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
-            exp_name='default',
+            exp_name='default_model_experiment',
             root=tb.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=Device.gpu0,
@@ -38,8 +38,8 @@ class HyperParam(tb.Struct):
             precision='float32',
             # ===================== Model =============================
             # ===================== Training ==========================
-            split=0.2,  # test split
-            lr=0.0005,
+            test_split=0.2,  # test split
+            learning_rate=0.0005,
             batch_size=32,
             epochs=30,
         )
@@ -53,16 +53,18 @@ class HyperParam(tb.Struct):
     def save_dir(self):
         return self.root / self.exp_name
 
-    def save(self):
-        self.save_dir.joinpath(self.subpath / '.txt').write_text(data=str(self))
-        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / ".pkl"))
+    def save(self, path=None, itself=True, r=False, include_code=False):
+        self.save_dir.joinpath(self.subpath + '.txt').create(parent_only=True).write_text(data=str(self))
+        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=True)
+        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=False)
 
     @classmethod
-    def from_saved(cls, path):
-        return (tb.P(path) / HyperParam.subpath / ".pkl").readit()
+    def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
+        save_dir = tb.P(path)
+        return (save_dir / HyperParam.subpath + ".HyperParam.dat.pkl").readit()
 
     def __repr__(self):
-        self.print(config=True)
+        return self.print(config=True, logger=True)
 
     @property
     def pkg(self):
@@ -176,6 +178,7 @@ class DataReader(object):
         super().__init__(*args, **kwargs)
         self.hp = hp
         self.specs = specs if specs else tb.Struct()  # Summary of data to be memorized by model
+        self.scaler = None
         self.split = split
         self.plotter = None
 
@@ -191,7 +194,7 @@ class DataReader(object):
         """
         # import sklearn.preprocessing as preprocessing
         from sklearn.model_selection import train_test_split
-        result = train_test_split(*args, test_size=self.hp.split, shuffle=self.hp.shuffle,
+        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle,
                                   random_state=self.hp.seed, **kwargs)
         self.split = tb.Struct(train_loader=None, test_loader=None)
         if strings is None:
@@ -239,6 +242,13 @@ class DataReader(object):
     def postprocess(self, *args, **kwargs):
         _ = args, kwargs, self
         return args[0]  # acts like identity
+
+    def standardize(self):
+        assert self.split is not None, "Load up the data first."
+        from sklearn.preprocessing import StandardScaler
+        self.scaler = StandardScaler()
+        self.split.x_train = self.scaler.fit_transform(self.split.x_train)
+        self.split.x_test = self.scaler.transform(self.split.x_test)
 
     def image_viz(self, pred, gt=None, names=None, **kwargs):
         """
@@ -299,14 +309,14 @@ class BaseModel(ABC):
             if loss is None:
                 loss = pkg.keras.losses.MeanSquaredError()
             if optimizer is None:
-                optimizer = pkg.keras.optimizers.Adam(self.hp.lr)
+                optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
             if metrics is None:
                 metrics = tb.List()  # [pkg.keras.metrics.MeanSquaredError()]
         elif self.hp.pkg_name == 'torch':
             if loss is None:
                 loss = pkg.nn.MSELoss()
             if optimizer is None:
-                optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.lr)
+                optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
             if metrics is None:
                 metrics = tb.List()  # [tmp.MeanSquareError()]
         # Create a new compiler object
@@ -338,9 +348,9 @@ class BaseModel(ABC):
         #     self.model.reset_metrics()
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         if self.hp.pkg.__name__ == 'tensorflow':
-            new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.lr * 0.5)
+            new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
         else:
-            new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.lr * 0.5)
+            new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
@@ -727,7 +737,7 @@ class KerasOptimizer:
         pass
 
     def tune(self):
-        kt = tb.core.assert_package_installed("kerastuner")
+        kt = tb.core.install_n_import("kerastuner")
         self.tuner = kt.Hyperband(self,
                                   objective='loss',
                                   max_epochs=10,

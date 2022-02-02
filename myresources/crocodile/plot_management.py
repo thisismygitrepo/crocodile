@@ -1183,7 +1183,7 @@ class ImShow(FigureManager):
 
     @staticmethod
     def resize(path, m, n):
-        # Experimental.assert_package_installed("skimage")
+        # Experimental.install_n_import("skimage")
         from skimage.transform import resize
         image = plt.imread(path)
         image_resized = resize(image, (m, n), anti_aliasing=True)

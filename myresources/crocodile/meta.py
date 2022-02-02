@@ -3,7 +3,7 @@ import logging
 import subprocess
 import time
 from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save,\
-    dill, assert_package_installed
+    dill, install_n_import
 from crocodile.file_management import P
 
 
@@ -84,7 +84,7 @@ class Experimental:
 
     @staticmethod
     def profile_memory(command):
-        psutil = assert_package_installed("psutil")
+        psutil = install_n_import("psutil")
         before = psutil.virtual_memory()
         exec(command)
         after = psutil.virtual_memory()
@@ -233,7 +233,7 @@ class Experimental:
             code_string = args_kwargs + code_string
 
         if copy2clipboard:
-            clipboard = assert_package_installed("clipboard")
+            clipboard = install_n_import("clipboard")
             clipboard.copy(code_string)
         if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
         return code_string  # ready to be run with exec()
@@ -274,7 +274,7 @@ class Experimental:
             res += f"{ak.varkw} = " + "{}\n"
 
         if copy2clipboard:
-            clipboard = assert_package_installed("clipboard")
+            clipboard = install_n_import("clipboard")
             clipboard.copy(res)
         if verbose: print("Finished. Paste code now.")
         return res
@@ -322,7 +322,7 @@ class Experimental:
         else:
             raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
         print(cell)
-        clipboard = assert_package_installed("clipboard")
+        clipboard = install_n_import("clipboard")
         clipboard.copy(cell)
         return cell
 
@@ -659,7 +659,7 @@ tb.sys.path.insert(0, r'{wdir}')
         if terminal in {"wt", "powershell", "pwsh"}:
             script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
-        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmpscripts")
+        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts")
         file.write_text(script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}",
@@ -927,9 +927,9 @@ class Log(object):
                         'path': {'color': 'blue'},
                         'programname': {'color': 'cyan'},
                         'username': {'color': 'yellow'}}
-        coloredlogs = assert_package_installed("coloredlogs")
+        coloredlogs = install_n_import("coloredlogs")
         if verbose:
-            verboselogs = assert_package_installed("verboselogs")
+            verboselogs = install_n_import("verboselogs")
             # https://github.com/xolox/python-verboselogs
             # verboselogs.install()  # hooks into logging module.
             logger = verboselogs.VerboseLogger(name=name)
@@ -956,7 +956,7 @@ class Log(object):
                           'ERROR': 'thin_red',
                           'CRITICAL': 'fg_bold_red,bg_white',
                           }  # see here for format: https://pypi.org/project/colorlog/
-        colorlog = assert_package_installed("colorlog")
+        colorlog = install_n_import("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
         fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
@@ -1162,7 +1162,7 @@ class Scheduler:
 
 
 def qr(txt):
-    qrcode = assert_package_installed("qrcode")
+    qrcode = install_n_import("qrcode")
     img = qrcode.make(txt)
     file = P.tmpfile(suffix=".png")
     img.save(file.__str__())

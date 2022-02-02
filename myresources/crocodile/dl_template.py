@@ -20,11 +20,10 @@ class HParams(dl.HyperParam):
             # ===================== Model =============================
             # ===================== Training ==========================
             split=0.2,
-            lr=0.0005,
+            learning_rate=0.0005,
             batch_size=32,
             epochs=30,
         )
-        self.save_code()
 
 
 class DataReader(dl.DataReader):

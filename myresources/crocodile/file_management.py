@@ -1,6 +1,6 @@
 
 from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, str2timedelta,\
-    Save, Path, assert_package_installed, dill
+    Save, Path, install_n_import, dill
 
 
 # =============================== Security ================================================
@@ -166,7 +166,7 @@ class Read(object):
                 mydict = json.load(file, **kwargs)
         except Exception:  # file has C-style comments.
             with open(str(path), "r") as file:
-                lib = assert_package_installed("pyjson5")
+                lib = install_n_import("pyjson5")
                 mydict = lib.load(file, **kwargs)
         if r:
             return Struct.recursive_struct(mydict)
@@ -553,7 +553,7 @@ class P(type(Path()), Path):
         return self._return(string_, inplace)
 
     def as_url_obj(self, inplace=False):
-        urllib3 = assert_package_installed("urllib3")
+        urllib3 = install_n_import("urllib3")
         return self._return(urllib3.connection_from_url(self), inplace)
 
     def __getstate__(self):
@@ -653,7 +653,7 @@ class P(type(Path()), Path):
         return self
 
     def send2trash(self, verbose=True):
-        send2trash = assert_package_installed("send2trash")
+        send2trash = install_n_import("send2trash")
         if self.exists():
             send2trash.send2trash(self.expanduser().absolute().str)
             if verbose: print(f"TRASHED {repr(self)}")
