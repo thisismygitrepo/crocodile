@@ -67,8 +67,8 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         key_path.write_bytes(key)
         # without verbosity check:
         print(f"KEY SAVED @ {repr(key_path)}")
-        global __keypath__
-        __keypath__ = key_path
+        # global __keypath__
+        # __keypath__ = key_path
         print(f"KEY PATH REFERENCED IN GLOBAL SCOPE AS `__keypath__`")
     elif type(key) in {str, P, Path}:  # a path to a key file was passed, read it:
         key_path = P(key)
@@ -209,26 +209,250 @@ class Read(object):
 
 class P(type(Path()), Path):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
-    Convention behind methods:
-    * methods either act on the path itself, or on the underlying disk object.
-    * move, copy, zip and delete act on the underlying disk object.
-    * switch, prepend, append, stem, parent act on the path object itself.
-    * the default behaviour of methods acting on underlying disk object is to perform the action
-    and return a new path referring to the mutated object in disk. However, there is a flag `orig` that makes
-    the function return orignal path object `self` as opposed to the new one pointing to new object.
-    Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace`
-    which in essence, deletes the original underlying object. This can be seen in `zip` and `encrypt`
-    but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
-    Furthermore, those methods are accompanied with print statement explaining what happened to the object.
-    * the default behaviour of methods that mutate the path object:
-    Those methods do not perform an action on objects in disk. Instead, only manipulate strings in memory.
-    The new object returned by these methods can be a new one (Default) or mutation of `self`, which is
-    achieved by using `inliue` flag. A different name for this flag is chosen to distinguish it from `inpalce`
-    used by the aforementioned category of methods. Furthermore, this gives extra controllability for user
-    to dictate the exact behaviour wanted.
-    `Inplace` flag might still be offered in some of those methods and is relevant only if path exists
-    The default for this flag is False in those methods.
+    It offers:
+    * methods act on the underlying object in the disk drive: move, move_up, copy, encrypt, zip and delete.
+    * methods act on the path object: parent, joinpath, switch, prepend, append
+    * attributes of path: stem, trunk, size, date etc.
     """
+
+    # ==================================== File management =========================================
+    """ The default behaviour of methods acting on underlying disk object is to perform the action
+        and return a new path referring to the mutated object in disk drive. However, there is a flag `orig` that makes
+        the function return orignal path object `self` as opposed to the new one pointing to new object.
+        Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace`
+        it defaults to False and in essence, it deletes the original underlying object. This can be seen in `zip` and `encrypt`
+        but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
+        Furthermore, those methods are accompanied with print statement explaining what happened to the object.
+    """
+    def delete(self, sure=False, verbose=True):
+        slf = self.expanduser().absolute()
+        if sure:
+            if not slf.exists():
+                slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
+                if verbose: print(f"Could NOT DELETE nonexisting file {repr(slf)}. ")
+                return slf  # terminate the function.
+            if slf.is_file() or slf.is_symlink():
+                slf.unlink(missing_ok=True)
+            else:
+                import shutil
+                shutil.rmtree(slf, ignore_errors=True)
+                # self.rmdir()  # dir must be empty
+            if verbose: print(f"DELETED {repr(slf)}.")
+        else:
+            if verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
+        return self
+
+    def send2trash(self, verbose=True):
+        send2trash = install_n_import("send2trash")
+        if self.exists():
+            send2trash.send2trash(self.expanduser().absolute().str)
+            if verbose: print(f"TRASHED {repr(self)}")
+        else:
+            if verbose: print(f"Could NOT trash {self}")
+        return self
+
+    def clean(self, trash=True):
+        """removes content on a path, rather than deleting the path."""
+        content = self.listdir()
+        for content in content:
+            self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(sure=True)
+        return self
+
+    def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True, parents=True):
+        """
+        :param folder: directory
+        :param name: fname of the file
+        :param path: full path, that includes directory and file fname.
+        :param overwrite:
+        :param parents:
+        :param verbose:
+        :return:
+        """
+        if path is not None:
+            path = P(path).expanduser().absolute()
+            assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
+            folder = path.parent
+            name = path.name
+            _ = name
+        else:
+            assert folder is not None, "`path` or `path` must be passed."
+            if name is None: name = self.absolute().name
+            else: name = str(name)  # good for edge cases of path with single part.
+            path = P(folder).expanduser().absolute() / name
+
+        if parents: folder.create(parents=True, exist_ok=True)
+        slf = self.expanduser().absolute()
+
+        if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
+            path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
+            slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict.
+            # now we can delete any potential conflict before eventually taking its path
+            path.delete(sure=True, verbose=False)  # It is important to delete after moving
+            # because `self` could be within the file you want to delete.
+            path_.rename(path)
+        else:
+            slf.rename(path)
+        if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
+        return path
+
+    def move_up(self, inplace=True, content=False, overwrite=False):
+        if content:
+            assert self.is_dir(), f"When `content` flag is set to True, path must be a directory. It is not: `{self}`"
+            self.search("*").apply(lambda x: x.move_up(inplace=inplace, content=False))
+            result = self.parent.parent
+        else:
+            result = self.move(self.parent.parent, overwrite=overwrite)  # current directory = self.parent  (no fname)
+        if result != self:
+            self.parent.delete(sure=inplace)
+        return result
+
+    def retitle(self, name, overwrite=False, verbose=True, orig=False):
+        """Unlike the builtin `rename`, this doesn't require or change full path, only file name."""
+        assert type(name) is str, "New new should be a string representing file name alone."
+        new_path = self.parent / name
+        if overwrite and new_path.exists(): new_path.delete(sure=True)
+        self.rename(new_path)
+        if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
+        return new_path if not orig else self
+
+    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}",
+             overwrite=False, orig=False):
+        """
+        :param orig:
+        :param overwrite:
+        :param name:
+        :param append:
+        :param folder: copy the file to this directory (filename remains the same).
+        :param path: full path of destination (including -potentially different-  file name).
+        :param content: copy the parent directory or its content (relevant only if copying a directory)
+        :param verbose:
+        :return: path to copied file or directory.
+
+        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
+
+        """
+        # tested %100
+        if folder is not None and path is None:
+            if name is None:
+                dest = P(folder).expanduser().absolute().create()
+            else:
+                dest = P(folder).expanduser().absolute() / name
+                content = True
+        elif path is not None and folder is None:
+            dest = P(path)
+            content = True  # this way, the destination will be filled with contents of `self`
+        elif path is None and folder is None:
+            dest = self.append(name or append)
+        else: raise NotImplementedError
+
+        dest = dest.expanduser().absolute().resolve()
+        slf = self.expanduser().absolute().resolve()
+
+        dest.parent.create()
+        if overwrite:
+            if dest.exists(): dest.delete(sure=True)
+        # TODO: shutil and copy_tree exhibits different behaviour towards overwriting. make this method consistent.
+        # else:
+        #     assert not dest.exists()
+
+        if slf.is_file():
+            import shutil
+            shutil.copy(str(slf), str(dest))  # str() only there for Python < (3.6)
+            if verbose: print(f"COPIED {repr(slf)} ==> {repr(dest)}")
+
+        elif slf.is_dir():
+            from distutils.dir_util import copy_tree
+            if content:
+                copy_tree(str(slf), str(dest))
+            else:
+                copy_tree(str(slf), str(P(dest).joinpath(slf.name).create()))
+            if verbose:
+                preface = "Content of " if content else ""
+                print(f"COPIED {preface} {repr(slf)} ==> {repr(dest)}")
+        else:
+            print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
+        return dest / slf.name if not orig else self
+
+    # ======================================= File Editing / Reading ===================================
+    def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
+        """
+
+        :param reader: function that reads this file format, if not passed it will be inferred from extension.
+        :param notfound: behaviour when file ``self`` to be read doesn't actually exist. Default: throw an error.
+                can be set to return `False` or any other value that will be returned if file not found.
+        :param verbose:
+        :param kwargs:
+        :return:
+        """
+        filename = self
+        if '.zip' in str(self):
+            filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose)
+        try:
+            if reader is None:  # infer the reader
+                return Read.read(filename, **kwargs)
+            else:
+                return reader(str(filename), **kwargs)
+        except FileNotFoundError:
+            if notfound is FileNotFoundError:
+                raise notfound
+            else:
+                return notfound
+        # for other errors, we do not know how to handle them, thus, they will be raised automatically.
+
+    def __call__(self, *args, **kwargs):
+        return self.start()
+
+    def start(self):  # explore folders.
+        if str(self).startswith("http") or str(self).startswith("www"):
+            import webbrowser
+            webbrowser.open(str(self))
+            return self
+
+        # os.startfile(os.path.realpath(self))
+        filename = self.expanduser().absolute().str
+        if sys.platform == "win32":
+            os.startfile(filename)  # works for files and folders alike
+        elif sys.platform == 'linux':
+            import subprocess
+            opener = "xdg-open"
+            subprocess.call([opener, filename])  # works for files and folders alike
+        else:  # mac
+            # os.system(f"open {filename}")
+            import subprocess
+            subprocess.call(["open", filename])  # works for files and folders alike
+        return self
+
+    def append_text(self, txt):
+        text = self.read_text()
+        text += txt
+        self.write_text(text)
+        return self
+
+    def modify_text(self, txt, alt, newline=True):
+        """
+        :param txt: text to be searched for in the file. The line in which it is found will be up for change.
+        :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
+        :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
+        :return:
+
+        * This method is suitable for config files and simple scripts that has one-liners in it,
+        * File is created if it doesn't exist.
+        * Text is simply appended if not found in the text file.
+        """
+        self.parent.create()
+        if not self.exists(): self.write_text(txt)
+        lines = self.read_text().split("\n")
+        bingo = False
+        for idx, line in enumerate(lines):
+            if txt in line:
+                bingo = True
+                if newline is True:
+                    lines[idx] = alt if type(alt) is str else alt(line)
+                else:
+                    lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
+        if bingo is False:  lines.append(txt)  # txt not found, add it anyway.
+        self.write_text("\n".join(lines))
+        return self
 
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         """Assuming URL points to anything but html page."""
@@ -248,109 +472,16 @@ class P(type(Path()), Path):
     def read_refresh(self, refresh, expire="1w", save=Save.pickle, read=Read.read):
         return Fridge(refresh=refresh, path=self, expire=expire, save=save, read=read)
 
-    # %% ===================================== File Specs =============================================================
-    def size(self, units='mb'):
-        sizes = List(['b', 'kb', 'mb', 'gb'])
-        factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
-                          np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
-        if self.is_file():
-            total_size = self.stat().st_size
-        elif self.is_dir():
-            results = self.rglob("*")
-            total_size = 0
-            for item in results:
-                if item.is_file():
-                    total_size += item.stat().st_size
-        else:
-            raise FileNotFoundError(self.absolute().as_uri())
-        return round(total_size / factor, 1)
-
-    def time(self, which="m", **kwargs):
-        """Meaning of ``which values``
-            * ``m`` time of modifying file ``content``, i.e. the time it was created.
-            * ``c`` time of changing file status (its inode is changed like permissions, path etc, but not content)
-            * ``a`` last time the file was accessed.
-
-        :param which: Determines which time to be returned. Three options are availalable:
-        :param kwargs:
-        :return:
-        """
-        time = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
-        return datetime.fromtimestamp(time, **kwargs)
-
-    def stats(self):
-        """A variant of `stat` method that returns a structure with human-readable values."""
-        res = Struct(size=self.size(),
-                     content_mod_time=self.time(which="m"),
-                     attr_mod_time=self.time(which="c"),
-                     last_access_time=self.time(which="a"),
-                     group_id_owner=self.stat().st_gid,
-                     user_id_owner=self.stat().st_uid)
-        return res
-
-    def tree(self, level: int = -1, limit_to_directories: bool = False,
-             length_limit: int = 1000, stats=False, desc=None):
-        """Given a directory Path object print a visual tree structure
-        Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
-        from itertools import islice
-        space = '    '
-        branch = '│   '
-        tee = '├── '
-        last = '└── '
-        dir_path = self
-        files = 0
-        directories = 0
-
-        def get_stats(apath):
-            if stats or desc:
-                sts = apath.stats(printit=False)
-                result = f" {sts.size} MB. {sts.content_mod_time}. "
-                if desc is not None:
-                    result += desc(apath)
-                return result
-            else:
-                return ""
-
-        def inner(apath: P, prefix: str = '', level_=-1):
-            nonlocal files, directories
-            if not level_: return  # 0, stop iterating
-            content = apath.search("*", files=not limit_to_directories)
-            pointers = [tee] * (len(content) - 1) + [last]
-            for pointer, path in zip(pointers, content):
-                if path.is_dir():
-                    yield prefix + pointer + path.name + get_stats(path)
-                    directories += 1
-                    extension = branch if pointer == tee else space
-                    yield from inner(path, prefix=prefix + extension, level_=level_ - 1)
-                elif not limit_to_directories:
-                    yield prefix + pointer + path.name + get_stats(path)
-                    files += 1
-
-        print(dir_path.name)
-        iterator = inner(dir_path, level_=level)
-        for line in islice(iterator, length_limit):
-            print(line)
-        if next(iterator, None):
-            print(f'... length_limit, {length_limit}, reached, counted:')
-        print(f'\n{directories} directories' + (f', {files} files' if files else ''))
-
     # ================================ Path Object management ===========================================
-    def _return(self, res, inlieu: bool):
-        """
-        :param res: result path, could exists or not.
-        :params inlieu: decides on whether the current object `self` is mutated to be the result `res`
-        or the result is returned as a separate object.
-
-        :param inplace: decides whether the file/folder `self` was referring to will be replaced by `res`.
-        Both `res` and `self` must exist. `self` will be deleted.
-        """
-        if not inlieu:
-            return res
-        else:
-            if self.exists(): self.rename(str(res))
-            self._str = str(res)
-            return self
-
+    """ The default behaviour of methods that mutate the path object:
+        Those methods do not perform an action on objects in disk. Instead, only manipulate strings in memory.
+        The new object returned by these methods can be a new one (Default) or mutation of `self`, which is
+        achieved by using `inliue` flag. A different name for this flag is chosen to distinguish it from `inpalce`
+        used by the aforementioned category of methods. Furthermore, this gives extra controllability for user
+        to dictate the exact behaviour wanted.
+        `Inplace` flag might still be offered in some of those methods and is relevant only if path exists
+        The default for this flag is False in those methods.
+    """
     def prepend(self, prefix, suffix=None, inlieu=False, inplace=False):
         """Add extra text before file path
         e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
@@ -358,7 +489,9 @@ class P(type(Path()), Path):
         """
         if suffix is None: suffix = ''.join(self.suffixes)
         result = self._return(self.parent.joinpath(prefix + self.trunk + suffix), inlieu)
-        if inplace and self.exists(): self.retitle(result.name)
+        if inplace:
+            assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
+            self.retitle(result.name)
         return result
 
     def append(self, name='', suffix=None, inplace=False, inlieu=False):
@@ -373,7 +506,8 @@ class P(type(Path()), Path):
     def with_trunk(self, name, inlieu=False, inplace=False):
         """Complementary to `with_stem` and `with_suffic`"""
         res = self.parent.joinpath(name + "".join(self.suffixes))
-        if inplace and self.exists(): self.retitle(name=res.name)
+        if inplace and self.exists():
+            self.retitle(name=res.name)
         return self._return(res, inlieu)
 
     def append_time_stamp(self, fmt=None, inlieu=False, inplace=False):
@@ -394,6 +528,19 @@ class P(type(Path()), Path):
         result = self._return(P(*fullparts), inlieu)
         if inplace and self.exists(): self.retitle(result)
         return result
+
+    def _return(self, res, inlieu: bool):
+        """
+        :param res: result path, could exists or not.
+        :params inlieu: decides on whether the current object `self` is mutated to be the result `res`
+        or the result is returned as a separate object.
+        """
+        if not inlieu:
+            return res
+        else:
+            if self.exists(): self.rename(str(res))
+            self._str = str(res)
+            return self
 
     # ============================= attributes of object ======================================
     @property
@@ -551,7 +698,6 @@ class P(type(Path()), Path):
     def __setstate__(self, state):
         self._str = str(state)
 
-    # ================================ String Nature management ====================================
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
         if self.is_symlink():
@@ -560,7 +706,7 @@ class P(type(Path()), Path):
             if target == self: target = str(target)  # avoid infinite recursions for broken links.
             rep += " Symlink '" + self.clickable() + "' ==> " + repr(target)
         elif self.is_absolute():
-            rep += " " + self._spec() + " '" + self.clickable() + "'"
+            rep += " " + self._type() + " '" + self.clickable() + "'"
             if self.exists():
                 rep += " | " + self.time(which="c").isoformat()[:-7].replace("T", "  ")
                 if self.is_file():
@@ -571,7 +717,50 @@ class P(type(Path()), Path):
             rep += " Relative " + "'" + str(self) + "'"
         return rep
 
-    def clickable(self, inplace=False):
+    # %% ===================================== File Specs =============================================================
+
+    def size(self, units='mb'):
+        sizes = List(['b', 'kb', 'mb', 'gb'])
+        factor = dict(zip(sizes + sizes.apply("x.swapcase()"),
+                          np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
+        if self.is_file():
+            total_size = self.stat().st_size
+        elif self.is_dir():
+            results = self.rglob("*")
+            total_size = 0
+            for item in results:
+                if item.is_file():
+                    total_size += item.stat().st_size
+        else:
+            raise FileNotFoundError(self.absolute().as_uri())
+        return round(total_size / factor, 1)
+
+    def time(self, which="m", **kwargs):
+        """Meaning of ``which values``
+            * ``m`` time of modifying file ``content``, i.e. the time it was created.
+            * ``c`` time of changing file status (its inode is changed like permissions, path etc, but not content)
+            * ``a`` last time the file was accessed.
+
+        :param which: Determines which time to be returned. Three options are availalable:
+        :param kwargs:
+        :return:
+        """
+        time = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
+        return datetime.fromtimestamp(time, **kwargs)
+
+    def stats(self):
+        """A variant of `stat` method that returns a structure with human-readable values."""
+        res = Struct(size=self.size(),
+                     content_mod_time=self.time(which="m"),
+                     attr_mod_time=self.time(which="c"),
+                     last_access_time=self.time(which="a"),
+                     group_id_owner=self.stat().st_gid,
+                     user_id_owner=self.stat().st_uid)
+        return res
+
+    # ================================ String Nature management ====================================
+
+    def clickable(self, inlieu=False):
         """
         Design point:
         `absolute` converts relative to absolute paths.
@@ -579,9 +768,9 @@ class P(type(Path()), Path):
         `expanduser` handles the ~ in path.
         :return:
         """
-        return self._return(self.expanduser().absolute().as_uri(), inplace)  # .resolve()
+        return self._return(self.expanduser().absolute().as_uri(), inlieu)  # .resolve()
 
-    def _spec(self):
+    def _type(self):
         if self.absolute():
             if self.is_file():
                 return "File"
@@ -610,11 +799,11 @@ class P(type(Path()), Path):
         """Converts arbitrary filename into proper variable path as per Python."""
         return validate_name(self.trunk, replace=replace)
 
-    # =========================== OVERTIDE ===============================================
     def as_unix(self, inlieu=False):
         """Similar to `as_posix()` but returns P object"""
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
+    # ======================================== Folder management =======================================
     def symlink_to(self, target, verbose=True, overwrite=False, orig=False):
         target = P(target).expanduser().absolute()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
@@ -627,241 +816,6 @@ class P(type(Path()), Path):
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
 
-    @staticmethod
-    def pwd():
-        return P.cwd()
-
-    def append_text(self, txt):
-        text = self.read_text()
-        text += txt
-        self.write_text(text)
-        return self
-
-    def modify_text(self, txt, alt, newline=True):
-        """
-        :param txt: text to be searched for in the file. The line in which it is found will be up for change.
-        :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
-        :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
-        :return:
-
-        * This method is suitable for config files and simple scripts that has one-liners in it,
-        * File is created if it doesn't exist.
-        * Text is simply appended if not found in the text file.
-        """
-        self.parent.create()
-        if not self.exists(): self.write_text(txt)
-        lines = self.read_text().split("\n")
-        bingo = False
-        for idx, line in enumerate(lines):
-            if txt in line:
-                bingo = True
-                if newline is True:
-                    lines[idx] = alt if type(alt) is str else alt(line)
-                else:
-                    lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
-        if bingo is False:  lines.append(txt)  # txt not found, add it anyway.
-        self.write_text("\n".join(lines))
-        return self
-
-    # ==================================== File management =========================================
-    def delete(self, sure=False, verbose=True):
-        slf = self.expanduser().absolute()
-        if sure:
-            if not slf.exists():
-                slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
-                if verbose: print(f"Could NOT DELETE nonexisting file {repr(slf)}. ")
-                return slf  # terminate the function.
-            if slf.is_file() or slf.is_symlink():
-                slf.unlink(missing_ok=True)
-            else:
-                import shutil
-                shutil.rmtree(slf, ignore_errors=True)
-                # self.rmdir()  # dir must be empty
-            if verbose: print(f"DELETED {repr(slf)}.")
-        else:
-            if verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
-        return self
-
-    def send2trash(self, verbose=True):
-        send2trash = install_n_import("send2trash")
-        if self.exists():
-            send2trash.send2trash(self.expanduser().absolute().str)
-            if verbose: print(f"TRASHED {repr(self)}")
-        else:
-            if verbose: print(f"Could NOT trash {self}")
-        return self
-
-    def clean(self, trash=True):
-        """removes content on a path, rather than deleting the path."""
-        content = self.listdir()
-        for content in content:
-            self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(sure=True)
-        return self
-
-    def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
-        """
-
-        :param reader: function that reads this file format, if not passed it will be inferred from extension.
-        :param notfound: behaviour when file ``self`` to be read doesn't actually exist. Default: throw an error.
-                can be set to return `False` or any other value that will be returned if file not found.
-        :param verbose:
-        :param kwargs:
-        :return:
-        """
-        filename = self
-        if '.zip' in str(self):
-            filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose)
-        try:
-            if reader is None:  # infer the reader
-                return Read.read(filename, **kwargs)
-            else:
-                return reader(str(filename), **kwargs)
-        except FileNotFoundError:
-            if notfound is FileNotFoundError:
-                raise notfound
-            else:
-                return notfound
-        # for other errors, we do not know how to handle them, thus, they will be raised automatically.
-
-    def __call__(self, *args, **kwargs):
-        return self.start()
-
-    def start(self):  # explore folders.
-        if str(self).startswith("http") or str(self).startswith("www"):
-            import webbrowser
-            webbrowser.open(str(self))
-            return self
-
-        # os.startfile(os.path.realpath(self))
-        filename = self.expanduser().absolute().str
-        if sys.platform == "win32":
-            os.startfile(filename)  # works for files and folders alike
-        elif sys.platform == 'linux':
-            import subprocess
-            opener = "xdg-open"
-            subprocess.call([opener, filename])  # works for files and folders alike
-        else:  # mac
-            # os.system(f"open {filename}")
-            import subprocess
-            subprocess.call(["open", filename])  # works for files and folders alike
-        return self
-
-    def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True, parents=True):
-        """
-        :param folder: directory
-        :param name: fname of the file
-        :param path: full path, that includes directory and file fname.
-        :param overwrite:
-        :param parents:
-        :param verbose:
-        :return:
-        """
-        if path is not None:
-            path = P(path).expanduser().absolute()
-            assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
-            folder = path.parent
-            name = path.name
-            _ = name
-        else:
-            assert folder is not None, "`path` or `path` must be passed."
-            if name is None: name = self.absolute().name
-            else: name = str(name)  # good for edge cases of path with single part.
-            path = P(folder).expanduser().absolute() / name
-
-        if parents: folder.create(parents=True, exist_ok=True)
-        slf = self.expanduser().absolute()
-
-        if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
-            path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
-            slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict.
-            # now we can delete any potential conflict before eventually taking its path
-            path.delete(sure=True, verbose=False)  # It is important to delete after moving
-            # because `self` could be within the file you want to delete.
-            path_.rename(path)
-        else:
-            slf.rename(path)
-        if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
-        return path
-
-    def move_up(self, inplace=True, content=False, overwrite=False):
-        if content:
-            assert self.is_dir(), f"When `content` flag is set to True, path must be a directory. It is not: `{self}`"
-            self.search("*").apply(lambda x: x.move_up(inplace=inplace, content=False))
-            result = self.parent.parent
-        else:
-            result = self.move(self.parent.parent, overwrite=overwrite)  # current directory = self.parent  (no fname)
-        if result != self:
-            self.parent.delete(sure=inplace)
-        return result
-
-    def retitle(self, name, overwrite=False, verbose=True, orig=False):
-        """Unlike the builtin `rename`, this doesn't require or change full path, only file name."""
-        assert type(name) is str, "New new should be a string representing file name alone."
-        new_path = self.parent / name
-        if overwrite and new_path.exists(): new_path.delete(sure=True)
-        self.rename(new_path)
-        if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
-        return new_path if not orig else self
-
-    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}",
-             overwrite=False, orig=False):
-        """
-        :param orig:
-        :param overwrite:
-        :param name:
-        :param append:
-        :param folder: copy the file to this directory (filename remains the same).
-        :param path: full path of destination (including -potentially different-  file name).
-        :param content: copy the parent directory or its content (relevant only if copying a directory)
-        :param verbose:
-        :return: path to copied file or directory.
-
-        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
-
-        """
-        # tested %100
-        if folder is not None and path is None:
-            if name is None:
-                dest = P(folder).expanduser().absolute().create()
-            else:
-                dest = P(folder).expanduser().absolute() / name
-                content = True
-        elif path is not None and folder is None:
-            dest = P(path)
-            content = True  # this way, the destination will be filled with contents of `self`
-        elif path is None and folder is None:
-            dest = self.append(name or append)
-        else: raise NotImplementedError
-
-        dest = dest.expanduser().absolute().resolve()
-        slf = self.expanduser().absolute().resolve()
-
-        dest.parent.create()
-        if overwrite:
-            if dest.exists(): dest.delete(sure=True)
-        # TODO: shutil and copy_tree exhibits different behaviour towards overwriting. make this method consistent.
-        # else:
-        #     assert not dest.exists()
-
-        if slf.is_file():
-            import shutil
-            shutil.copy(str(slf), str(dest))  # str() only there for Python < (3.6)
-            if verbose: print(f"COPIED {repr(slf)} ==> {repr(dest)}")
-
-        elif slf.is_dir():
-            from distutils.dir_util import copy_tree
-            if content:
-                copy_tree(str(slf), str(dest))
-            else:
-                copy_tree(str(slf), str(P(dest).joinpath(slf.name).create()))
-            if verbose:
-                preface = "Content of " if content else ""
-                print(f"COPIED {preface} {repr(slf)} ==> {repr(dest)}")
-        else:
-            print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
-        return dest / slf.name if not orig else self
-
-    # ======================================== Folder management =======================================
     def create(self, parents=True, exist_ok=True, parent_only=False):
         """Creates directory while returning the same object
         """
@@ -990,6 +944,52 @@ class P(type(Path()), Path):
     def listdir(self):
         return List(os.listdir(self.expanduser().absolute())).apply(P)
 
+    def tree(self, level: int = -1, limit_to_directories: bool = False,
+             length_limit: int = 1000, stats=False, desc=None):
+        """Given a directory Path object print a visual tree structure
+        Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
+        from itertools import islice
+        space = '    '
+        branch = '│   '
+        tee = '├── '
+        last = '└── '
+        dir_path = self
+        files = 0
+        directories = 0
+
+        def get_stats(apath):
+            if stats or desc:
+                sts = apath.stats(printit=False)
+                result = f" {sts.size} MB. {sts.content_mod_time}. "
+                if desc is not None:
+                    result += desc(apath)
+                return result
+            else:
+                return ""
+
+        def inner(apath: P, prefix: str = '', level_=-1):
+            nonlocal files, directories
+            if not level_: return  # 0, stop iterating
+            content = apath.search("*", files=not limit_to_directories)
+            pointers = [tee] * (len(content) - 1) + [last]
+            for pointer, path in zip(pointers, content):
+                if path.is_dir():
+                    yield prefix + pointer + path.name + get_stats(path)
+                    directories += 1
+                    extension = branch if pointer == tee else space
+                    yield from inner(path, prefix=prefix + extension, level_=level_ - 1)
+                elif not limit_to_directories:
+                    yield prefix + pointer + path.name + get_stats(path)
+                    files += 1
+
+        print(dir_path.name)
+        iterator = inner(dir_path, level_=level)
+        for line in islice(iterator, length_limit):
+            print(line)
+        if next(iterator, None):
+            print(f'... length_limit, {length_limit}, reached, counted:')
+        print(f'\n{directories} directories' + (f', {files} files' if files else ''))
+
     def find(self, *args, r=True, compressed=True, **kwargs):
         """short for the method ``search`` then pick first item from results.
         useful for superflous directories or zip archives containing a single file.
@@ -1046,6 +1046,10 @@ class P(type(Path()), Path):
     def tmpfile(name=None, suffix="", folder=None, tstamp=False):
         return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix,
                      folder="tmp_files" if folder is None else folder)
+
+    @staticmethod
+    def pwd():
+        return P.cwd()
 
     # ====================================== Compression ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
