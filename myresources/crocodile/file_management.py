@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, str2timedelta,\
+from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, validate_name, str2timedelta,\
     Save, Path, install_n_import, dill
 
 
@@ -571,14 +571,9 @@ class P(type(Path()), Path):
             astring = self.stem
         return int("".join(filter(str.isdigit, str(astring))))
 
-    def make_valid_filename(self, replace='_'):
+    def validate_name(self, replace='_'):
         """Converts arbitrary filename into proper variable path as per Python."""
-        return self.make_valid_filename_(self.trunk, replace=replace)
-
-    @staticmethod
-    def make_valid_filename_(astring, replace='_'):
-        import re
-        return re.sub(r'^(?=\d)|\W', replace, str(astring))
+        return validate_name(self.trunk, replace=replace)
 
     # =========================== OVERTIDE ===============================================
     def as_unix(self, inplace=False):

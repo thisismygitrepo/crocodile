@@ -1,6 +1,15 @@
 """
 A collection of classes extending the functionality of Python's builtins.
 email programmer@usa.com
+
+Crocodile Philosophy:
+Make Python even friendlier, by making available the common functionality for everyday use. Specifically,
+path management, file management, and other common tasks.
+A the risk of vandalizing the concept, to make Python more MATLAB-like, in that more libraries are loaded up at
+start time than basic arithmetic, but just enought to make it more useful for everyday errands.
+Thus, the terseness of Crocodile makes Python REPL a proper shell
+
+The focus is on ease of use, not efficiency.
 """
 
 # Typing
@@ -64,6 +73,11 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
     pool = pool + (string.punctuation if punctuation else "")
     result_str = ''.join(random.choice(pool) for _ in range(length))
     return result_str
+
+
+def validate_name(astring, replace='_'):
+    import re
+    return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
 
 def install_n_import(package):

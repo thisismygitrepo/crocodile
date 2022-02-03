@@ -12,7 +12,7 @@ https://docs.sqlalchemy.org/en/14/tutorial/index.html#a-note-on-the-future
 
 """
 
-tb.DisplayData.set_pandas_display()
+tb.Display.set_pandas_display()
 
 
 class DBMS:
@@ -37,6 +37,11 @@ class DBMS:
         self.sch_tab = None
         self.sch_vws = None
         self.refresh()
+
+    def close(self):
+        self.eng
+        self.con.close()
+        self.ses.close()
 
     def refresh(self, sch=None):
         # fails if multiple schemas are there and None is specified
@@ -106,10 +111,10 @@ class DBMS:
         res = self.con.execute(text(f"""SELECT * FROM '{self._get_table_identifier(table, sch)}'"""))
         return res.fetchmany(size)
 
-    def read_table_as_df(self, name, schema=None):
+    def make_df(self, table_name, records=None, schema=None):
         self.meta.reflect(bind=self.eng, schema=schema or self.sch)
-        table = self.meta.tables[name]
-        res = pd.DataFrame(self.ses.query(table).all(), columns=table.exported_columns.keys())
+        table = self.meta.tables[table_name]
+        res = pd.DataFrame(records or self.ses.query(table).all(), columns=table.exported_columns.keys())
         # the following spits an error if sqlalchemy is 2.0
         # df = pd.read_sql_table(table, con=self.eng, schema=schema or self.sch)
         return res

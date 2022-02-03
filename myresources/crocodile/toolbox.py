@@ -21,7 +21,7 @@ from crocodile.plot_management import plt, enum, FigureManager
 import pandas as pd
 _ = pd
 
-Base, timestamp, randstr = core.Base, core.timestamp, core.randstr
+Base, timestamp, randstr, validate_name = core.Base, core.timestamp, core.randstr, core.validate_name
 Struct, Display, str2timedelta, Save, List = core.Struct, core.Display, core.str2timedelta, core.Save, core.List
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
