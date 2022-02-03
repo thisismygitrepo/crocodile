@@ -209,9 +209,26 @@ class Read(object):
 
 class P(type(Path()), Path):
     """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
+    Convention behind methods:
+    * methods either act on the path itself, or on the underlying disk object.
+    * move, copy, zip and delete act on the underlying disk object.
+    * switch, prepend, append, stem, parent act on the path object itself.
+    * the default behaviour of methods acting on underlying disk object is to perform the action
+    and return a new path referring to the mutated object in disk. However, there is a flag `orig` that makes
+    the function return orignal path object `self` as opposed to the new one pointing to new object.
+    Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace`
+    which in essence, deletes the original underlying object. This can be seen in `zip` and `encrypt`
+    but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
+    Furthermore, those methods are accompanied with print statement explaining what happened to the object.
+    * the default behaviour of methods that mutate the path object:
+    Those methods do not perform an action on objects in disk. Instead, only manipulate strings in memory.
+    The new object returned by these methods can be a new one (Default) or mutation of `self`, which is
+    achieved by using `inliue` flag. A different name for this flag is chosen to distinguish it from `inpalce`
+    used by the aforementioned category of methods. Furthermore, this gives extra controllability for user
+    to dictate the exact behaviour wanted.
+    `Inplace` flag might still be offered in some of those methods and is relevant only if path exists
+    The default for this flag is False in those methods.
     """
-    # def __init__(self, *string):
-    #     super(P, self).__init__(Path(*string).expanduser())
 
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         """Assuming URL points to anything but html page."""
@@ -220,7 +237,7 @@ class P(type(Path()), Path):
 
         if memory is False:
             directory = P.home().joinpath("Downloads") if directory is None else P(directory)
-            directory = directory.joinpath(name or self.make_valid_filename_(self.name))
+            directory = directory.joinpath(name or validate_name(self.name))
             directory.write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
             # try: urllib.urlopen(url).read()
             return directory
@@ -318,36 +335,88 @@ class P(type(Path()), Path):
         print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
     # ================================ Path Object management ===========================================
+    def _return(self, res, inlieu: bool):
+        """
+        :param res: result path, could exists or not.
+        :params inlieu: decides on whether the current object `self` is mutated to be the result `res`
+        or the result is returned as a separate object.
+
+        :param inplace: decides whether the file/folder `self` was referring to will be replaced by `res`.
+        Both `res` and `self` must exist. `self` will be deleted.
+        """
+        if not inlieu:
+            return res
+        else:
+            if self.exists(): self.rename(str(res))
+            self._str = str(res)
+            return self
+
+    def prepend(self, prefix, suffix=None, inlieu=False, inplace=False):
+        """Add extra text before file path
+        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
+        notice that `__add__` method removes the extension, while this one preserves it.
+        """
+        if suffix is None: suffix = ''.join(self.suffixes)
+        result = self._return(self.parent.joinpath(prefix + self.trunk + suffix), inlieu)
+        if inplace and self.exists(): self.retitle(result.name)
+        return result
+
+    def append(self, name='', suffix=None, inplace=False, inlieu=False):
+        """Add extra text after file path, and optionally add extra suffix.
+        e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension
+        """
+        if suffix is None: suffix = ''.join(self.suffixes)
+        result = self._return(self.parent.joinpath(self.trunk + name + suffix), inlieu)
+        if inplace and self.exists(): self.retitle(result.name)
+        return result
+
+    def with_trunk(self, name, inlieu=False, inplace=False):
+        """Complementary to `with_stem` and `with_suffic`"""
+        res = self.parent.joinpath(name + "".join(self.suffixes))
+        if inplace and self.exists(): self.retitle(name=res.name)
+        return self._return(res, inlieu)
+
+    def append_time_stamp(self, fmt=None, inlieu=False, inplace=False):
+        result = self._return(self.append(name="_" + timestamp(fmt=fmt)), inlieu)
+        if inplace and self.exists(): self.retitle(result.name)
+        return result
+
+    def switch(self, key: str, val: str, inlieu=False, inplace=False):
+        """Changes a given part of the path to another given one. `replace` is an already defined method."""
+        result = self._return(P(str(self).replace(key, val)), inlieu)
+        if inplace and self.exists(): self.retitle(result)
+        return result
+
+    def switch_by_index(self, key: int, val: str, inplace=False, inlieu=False):
+        """Changes a given index of the path to another given one"""
+        fullparts = list(self.parts)
+        fullparts[key] = val
+        result = self._return(P(*fullparts), inlieu)
+        if inplace and self.exists(): self.retitle(result)
+        return result
+
+    # ============================= attributes of object ======================================
     @property
     def trunk(self):
         """ useful if you have multiple dots in file path where `.stem` fails.
         """
         return self.name.split('.')[0]
 
-    def prepend(self, prefix, suffix=None, inplace=False):
-        """Add extra text before file path
-        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
-        notice that `__add__` method removes the extension, while this one preserves it.
-        """
-        if suffix is None: suffix = ''.join(self.suffixes)
-        return self._return(self.parent.joinpath(prefix + self.trunk + suffix), inplace)
+    def __len__(self):
+        return len(self.parts)
 
-    def append(self, name='', suffix=None, inplace=False):
-        """Add extra text after file path, and optionally add extra suffix.
-        e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension
-        """
-        if suffix is None: suffix = ''.join(self.suffixes)
-        return self._return(self.parent.joinpath(self.trunk + name + suffix), inplace)
-
-    def with_trunk(self, name, inplace=False):
-        """Complementary to `with_stem` and `with_suffic`"""
-        res = self.parent.joinpath(name + "".join(self.suffixes))
-        return self._return(res, inplace)
+    @property
+    def len(self):
+        return self.__len__()
 
     @property
     def items(self):
         """Behaves like `.parts` but returns a List."""
         return List(self.parts)
+
+    @property
+    def str(self):  # this method is used by other functions to get string representation of path
+        return str(self)  # or self._str
 
     def __add__(self, other):  # called when P + other
         """Behaves like adding strings"""
@@ -369,24 +438,21 @@ class P(type(Path()), Path):
     #         tmp = tmp[1:]
     #     return P(other) / tmp
 
-    def append_time_stamp(self, fmt=None, inplace=False):
-        return self._return(self.append(name="_" + timestamp(fmt=fmt)), inplace)
-
-    def rel2home(self, inplace=False):
+    def rel2home(self, inlieu=False):
         """Exact opposite of `expanduser`"""
-        return self._return(P(self.relative_to(Path.home())), inplace)
+        return self._return(P(self.relative_to(Path.home())), inlieu)
 
-    def collapseuser(self, strict=True, inplace=False):
+    def collapseuser(self, strict=True, inlieu=False):
         """same as rel2home except that it adds the tilde `~` to indicated home at the beginning.
          Thus, it is a self-contained absolute path, bar a `expanduser` method."""
         if "~" in self: return self
         if strict:
             assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}"
                                                           f" OR one path is relative and the other is absolute.")
-        return self._return("~" / (self - P.home()), inplace)
+        return self._return("~" / (self - P.home()), inlieu)
 
-    def rel2cwd(self, inplace=False):
-        return self._return(P(self.relative_to(Path.cwd())), inplace)
+    def rel2cwd(self, inlieu=False):
+        return self._return(P(self.relative_to(Path.cwd())), inlieu)
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -474,37 +540,16 @@ class P(type(Path()), Path):
         # self._cparts
         # self._cached_cparts
 
-    def __len__(self):
-        return len(self.parts)
-
-    @property
-    def len(self):
-        return self.__len__()
-
-    def _return(self, res, inplace: bool):
-        """decides on whether the current object is mutated to be the result `res`
-        or the result is returned as a separate object."""
-        if not inplace:
-            return res
-        else:
-            if self.exists(): self.rename(str(res))
-            self._str = str(res)
-            return self
-
-    def switch(self, key: str, val: str, inplace=False):
-        """Changes a given part of the path to another given one. `replace` is an already defined method."""
-        return self._return(P(str(self).replace(key, val)), inplace)
-
-    def switch_by_index(self, key: int, val: str, inplace=False):
-        """Changes a given index of the path to another given one"""
-        fullparts = list(self.parts)
-        fullparts[key] = val
-        return self._return(P(*fullparts), inplace)
-
     def __deepcopy__(self, memodict=None):
         if memodict is None:
             _ = {}
         return P(str(self))
+
+    def __getstate__(self):
+        return str(self)
+
+    def __setstate__(self, state):
+        self._str = str(state)
 
     # ================================ String Nature management ====================================
     def __repr__(self):  # this is useful only for the console
@@ -547,24 +592,14 @@ class P(type(Path()), Path):
         else:  # there is no tell whether it is a file or directory.
             return "Relative"
 
-    def as_url_str(self, inplace=False):
+    def as_url_str(self, inlieu=False):
         string_ = self.as_posix()
         string_ = string_.replace("https:/", "https://").replace("http:/", "http://")
-        return self._return(string_, inplace)
+        return self._return(string_, inlieu)
 
-    def as_url_obj(self, inplace=False):
+    def as_url_obj(self, inlieu=False):
         urllib3 = install_n_import("urllib3")
-        return self._return(urllib3.connection_from_url(self), inplace)
-
-    def __getstate__(self):
-        return str(self)
-
-    def __setstate__(self, state):
-        self._str = str(state)
-
-    @property
-    def str(self):  # this method is used by other functions to get string representation of path
-        return str(self)  # or self._str
+        return self._return(urllib3.connection_from_url(self), inlieu)
 
     def get_num(self, astring=None):
         if astring is None:
@@ -576,9 +611,9 @@ class P(type(Path()), Path):
         return validate_name(self.trunk, replace=replace)
 
     # =========================== OVERTIDE ===============================================
-    def as_unix(self, inplace=False):
+    def as_unix(self, inlieu=False):
         """Similar to `as_posix()` but returns P object"""
-        return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inplace)
+        return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
     def symlink_to(self, target, verbose=True, overwrite=False, orig=False):
         target = P(target).expanduser().absolute()
@@ -711,12 +746,13 @@ class P(type(Path()), Path):
             subprocess.call(["open", filename])  # works for files and folders alike
         return self
 
-    def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True):
+    def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True, parents=True):
         """
         :param folder: directory
         :param name: fname of the file
         :param path: full path, that includes directory and file fname.
         :param overwrite:
+        :param parents:
         :param verbose:
         :return:
         """
@@ -732,6 +768,7 @@ class P(type(Path()), Path):
             else: name = str(name)  # good for edge cases of path with single part.
             path = P(folder).expanduser().absolute() / name
 
+        if parents: folder.create(parents=True, exist_ok=True)
         slf = self.expanduser().absolute()
 
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
@@ -748,10 +785,11 @@ class P(type(Path()), Path):
 
     def move_up(self, inplace=True, content=False, overwrite=False):
         if content:
+            assert self.is_dir(), f"When `content` flag is set to True, path must be a directory. It is not: `{self}`"
             self.search("*").apply(lambda x: x.move_up(inplace=inplace, content=False))
             result = self.parent.parent
         else:
-            result = self.move(self.parent.parent, overwrite=overwrite)
+            result = self.move(self.parent.parent, overwrite=overwrite)  # current directory = self.parent  (no fname)
         if result != self:
             self.parent.delete(sure=inplace)
         return result
@@ -833,7 +871,7 @@ class P(type(Path()), Path):
 
     @property
     def browse(self):
-        return self.search("*").to_struct(key_val=lambda x: ("qq_" + x.make_valid_filename(), x)).clean_view
+        return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
 
     def search(self, pattern='*', r=False, generator=False, files=True, folders=True, compressed=False,
                dotfiles=False,
@@ -977,7 +1015,7 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmpdir(prefix=""):
-        return P.tmp(folder=rf"tmpdirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
+        return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
 
     @staticmethod
     def temp(*args, **kwargs):
@@ -1007,7 +1045,7 @@ class P(type(Path()), Path):
     @staticmethod
     def tmpfile(name=None, suffix="", folder=None, tstamp=False):
         return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix,
-                     folder="tmpfiles" if folder is None else folder)
+                     folder="tmp_files" if folder is None else folder)
 
     # ====================================== Compression ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
@@ -1126,6 +1164,8 @@ class P(type(Path()), Path):
         return path if not orig else self
 
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False):
+        """
+        """
         zipped = self.zip(inplace=inplace, verbose=verbose)
         zipped_secured = zipped.encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True)
         return zipped_secured if not orig else self
