@@ -23,6 +23,7 @@ _ = pd
 
 Base, timestamp, randstr, validate_name = core.Base, core.timestamp, core.randstr, core.validate_name
 Struct, Display, str2timedelta, Save, List = core.Struct, core.Display, core.str2timedelta, core.Save, core.List
+install_n_import = core.install_n_import
 
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
 Fridge, MemoryDB = _fm.Fridge, _fm.MemoryDB
