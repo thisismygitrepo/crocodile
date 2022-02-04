@@ -225,7 +225,7 @@ class P(type(Path()), Path):
         Furthermore, those methods are accompanied with print statement explaining what happened to the object.
     """
     def delete(self, sure=False, verbose=True):
-        slf = self.expanduser().absolute()
+        slf = self.expanduser().resolve()
         if sure:
             if not slf.exists():
                 slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
@@ -245,7 +245,7 @@ class P(type(Path()), Path):
     def send2trash(self, verbose=True):
         send2trash = install_n_import("send2trash")
         if self.exists():
-            send2trash.send2trash(self.expanduser().absolute().str)
+            send2trash.send2trash(self.expanduser().resolve().str)
             if verbose: print(f"TRASHED {repr(self)}")
         else:
             if verbose: print(f"Could NOT trash {self}")
@@ -258,30 +258,30 @@ class P(type(Path()), Path):
             self.joinpath(content).send2trash() if trash else self.joinpath(content).delete(sure=True)
         return self
 
-    def move(self, folder=None, name=None, path=None, overwrite=False, verbose=True, parents=True):
+    def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True,
+             content=False):
         """
         :param folder: directory
         :param name: fname of the file
         :param path: full path, that includes directory and file fname.
+        :param rel2it:
         :param overwrite:
         :param parents:
+        :param content:
         :param verbose:
         :return:
         """
-        if path is not None:
-            path = P(path).expanduser().absolute()
-            assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
-            folder = path.parent
-            name = path.name
-            _ = name
-        else:
-            assert folder is not None, "`path` or `path` must be passed."
-            if name is None: name = self.absolute().name
-            else: name = str(name)  # good for edge cases of path with single part.
-            path = P(folder).expanduser().absolute() / name
+        path = self._resolve_path(folder=folder, name=name, path=path,
+                                  default_name=self.absolute().name, rel2it=rel2it)
+        name, folder = self.name, self.parent
 
         if parents: folder.create(parents=True, exist_ok=True)
-        slf = self.expanduser().absolute()
+        slf = self.expanduser().resolve()
+
+        if content:
+            assert self.is_dir(), f"When `content` flag is set to True, path must be a directory. It is not: `{self}`"
+            self.search("*").apply(lambda x: x.move(path=path, content=False))
+            return path  # contents live within this directory.
 
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
             path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
@@ -294,17 +294,6 @@ class P(type(Path()), Path):
             slf.rename(path)
         if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
         return path
-
-    def move_up(self, inplace=True, content=False, overwrite=False):
-        if content:
-            assert self.is_dir(), f"When `content` flag is set to True, path must be a directory. It is not: `{self}`"
-            self.search("*").apply(lambda x: x.move_up(inplace=inplace, content=False))
-            result = self.parent.parent
-        else:
-            result = self.move(self.parent.parent, overwrite=overwrite)  # current directory = self.parent  (no fname)
-        if result != self:
-            self.parent.delete(sure=inplace)
-        return result
 
     def retitle(self, name, overwrite=False, verbose=True, orig=False):
         """Unlike the builtin `rename`, this doesn't require or change full path, only file name."""
@@ -334,19 +323,19 @@ class P(type(Path()), Path):
         # tested %100
         if folder is not None and path is None:
             if name is None:
-                dest = P(folder).expanduser().absolute().create()
+                dest = P(folder).expanduser().resolve().create()
             else:
-                dest = P(folder).expanduser().absolute() / name
+                dest = P(folder).expanduser().resolve() / name
                 content = True
         elif path is not None and folder is None:
             dest = P(path)
             content = True  # this way, the destination will be filled with contents of `self`
         elif path is None and folder is None:
-            dest = self.append(name or append)
+            dest = self.with_name(str(name)) if name is not None else self.append(append)
         else: raise NotImplementedError
 
-        dest = dest.expanduser().absolute().resolve()
-        slf = self.expanduser().absolute().resolve()
+        dest = dest.expanduser().resolve()
+        slf = self.expanduser().resolve()
 
         dest.parent.create()
         if overwrite:
@@ -409,7 +398,7 @@ class P(type(Path()), Path):
             return self
 
         # os.startfile(os.path.realpath(self))
-        filename = self.expanduser().absolute().str
+        filename = self.expanduser().resolve().str
         if sys.platform == "win32":
             os.startfile(filename)  # works for files and folders alike
         elif sys.platform == 'linux':
@@ -768,18 +757,7 @@ class P(type(Path()), Path):
         `expanduser` handles the ~ in path.
         :return:
         """
-        return self._return(self.expanduser().absolute().as_uri(), inlieu)  # .resolve()
-
-    def _type(self):
-        if self.absolute():
-            if self.is_file():
-                return "File"
-            elif self.is_dir():
-                return "Dir"
-            else:  # there is no tell if it is a file or directory.
-                return "NotExist"
-        else:  # there is no tell whether it is a file or directory.
-            return "Relative"
+        return self._return(self.expanduser().resolve().as_uri(), inlieu)  # .resolve()
 
     def as_url_str(self, inlieu=False):
         string_ = self.as_posix()
@@ -805,7 +783,7 @@ class P(type(Path()), Path):
 
     # ======================================== Folder management =======================================
     def symlink_to(self, target, verbose=True, overwrite=False, orig=False):
-        target = P(target).expanduser().absolute()
+        target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
         if overwrite:
@@ -859,7 +837,7 @@ class P(type(Path()), Path):
 
         # ============================ get generator of search results ========================================
 
-        slf = self.expanduser().absolute()
+        slf = self.expanduser().resolve()
         if compressed and slf.suffix == ".zip":
             import zipfile
             with zipfile.ZipFile(str(slf)) as z:
@@ -942,7 +920,7 @@ class P(type(Path()), Path):
             return List(processed)
 
     def listdir(self):
-        return List(os.listdir(self.expanduser().absolute())).apply(P)
+        return List(os.listdir(self.expanduser().resolve())).apply(P)
 
     def tree(self, level: int = -1, limit_to_directories: bool = False,
              length_limit: int = 1000, stats=False, desc=None):
@@ -1056,8 +1034,8 @@ class P(type(Path()), Path):
             orig=False, **kwargs):
         """
         """
-        path = self._resolve_path(folder, name, path, self.name).expanduser().absolute()
-        slf = self.expanduser().absolute()
+        path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
+        slf = self.expanduser().resolve()
         arcname = P(arcname or slf.name)
         if arcname.name != slf.name:
             arcname /= slf.name  # arcname has to start from somewhere and end with filename
@@ -1089,14 +1067,14 @@ class P(type(Path()), Path):
         :param kwargs:
         :return: path if content=False, else, path.parent. Default path = self.parent / self.stem
         """
-        slf = self.expanduser().absolute()
+        slf = self.expanduser().resolve()
         zipfile = slf
         if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(slf): return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
         if folder is None: folder = (zipfile.parent / zipfile.stem)
         else:
-            folder = P(folder).joinpath(zipfile.stem).expanduser().absolute()
+            folder = P(folder).joinpath(zipfile.stem).expanduser().resolve()
             print(folder)
         if content: folder = folder.parent
         result = Compression.unzip(zipfile, folder, fname, **kwargs)
@@ -1149,7 +1127,7 @@ class P(type(Path()), Path):
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
         """
-        slf = self.expanduser().absolute()
+        slf = self.expanduser().resolve()
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)
         path = self._resolve_path(folder, name, path, slf.append(name=append).name)
@@ -1160,7 +1138,7 @@ class P(type(Path()), Path):
 
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted",
                 inplace=False, orig=False):
-        slf = self.expanduser().absolute()
+        slf = self.expanduser().resolve()
         path = self._resolve_path(folder, name, path, slf.switch(append, "").name)
         path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
         if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(path)}.")
@@ -1179,16 +1157,39 @@ class P(type(Path()), Path):
         unzipped = deciphered.unzip(folder=None, inplace=True, content=False)
         return unzipped if not orig else self
 
-    def _resolve_path(self, folder, name, path, default_name):
-        if path is None:
-            if folder is not None:
-                path = P(folder).joinpath(name or default_name)
-            else:
-                path = self.parent.joinpath(name or default_name)
-        else:
+    # ========================== Helpers =========================================
+    def _resolve_path(self, folder, name, path, default_name, rel2it=False):
+        """From all arguments, figure out what is the final path.
+        :param rel2it: `folder` or `path` are relative to `self` as opposed to cwd.
+        """
+        if path is not None:
             assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."
-            path = P(path)
+            if rel2it: path = self.joinpath(path).resolve()
+            path = P(path).expanduser().resolve()
+            assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
+            folder = path.parent
+            name = path.name
+            _ = name, folder
+        else:
+            if name is None: name = default_name
+            else: name = str(name)  # good for edge cases of path with single part.
+            if folder is None:  # means same directory, just different name
+                folder = self.parent
+            if rel2it: folder = self.joinpath(folder).resolve()
+            folder = P(folder)
+            path = folder.expanduser().resolve() / name
         return path
+
+    def _type(self):
+        if self.absolute():
+            if self.is_file():
+                return "File"
+            elif self.is_dir():
+                return "Dir"
+            else:  # there is no tell if it is a file or directory.
+                return "NotExist"
+        else:  # there is no tell whether it is a file or directory.
+            return "Relative"
 
 
 class Compression(object):
