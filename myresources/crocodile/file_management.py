@@ -339,11 +339,7 @@ class P(type(Path()), Path):
         slf = self.expanduser().resolve()
 
         dest.parent.create()
-        if overwrite:
-            if dest.exists(): dest.delete(sure=True)
-        # TODO: shutil and copy_tree exhibits different behaviour towards overwriting. make this method consistent.
-        # else:
-        #     assert not dest.exists()
+        if overwrite and dest.exists(): dest.delete(sure=True)
 
         if slf.is_file():
             import shutil
@@ -671,7 +667,7 @@ class P(type(Path()), Path):
                 fullparts = fullparts[:key.start] + new + fullparts[key.stop:]
         obj = P(*fullparts)
         self._str = str(obj)
-        # TODO: Do we need to update those as well?
+        # similar attributes:
         # self._parts
         # self._pparts
         # self._cparts

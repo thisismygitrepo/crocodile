@@ -8,6 +8,7 @@ __pycache__/
 *$py.class
 .idea/
 .vscode
+.ve
 
 # C extensions
 *.so

@@ -484,10 +484,6 @@ class List(Base, list):
         super().__init__()
         self.list = list(obj_list) if obj_list is not None else []
 
-    def insert(self, __index: int, __object):
-        self.list.insert(__index, __object)
-        return self
-
     def __bool__(self):
         return bool(self.list)
     
@@ -598,20 +594,6 @@ class List(Base, list):
         """Select at random"""
         return self[np.random.choice(len(self), size, replace=replace, p=p)]
 
-    def to_struct(self, key_val=None):
-        """
-        :param key_val: function that returns (key, value) pair.
-        :return:
-        """
-        if key_val is None:
-            def key_val(x):
-                return str(x), x
-        else:
-            key_val = self.evalstr(key_val)
-        # return Struct.from_keys_values_pairs(self.apply(key_val))
-        # removed for disentanglement
-        return dict(self.apply(key_val))
-
     # def find(self, patt, match="fnmatch"):
     #     """Looks up the string representation of all items in the list and finds the one that partially matches
     #     the argument passed. This method is a short for ``self.filter(lambda x: string_ in str(x))`` If you need more
@@ -691,10 +673,6 @@ class List(Base, list):
     def len(self):
         return self.list.__len__()
 
-    def to_list(self):
-        """Matches `to_list` from Pandas Series."""
-        return self.list
-
     def __iter__(self):
         return iter(self.list)
 
@@ -764,6 +742,10 @@ class List(Base, list):
                 result.append(item)
         return result
 
+    def insert(self, __index: int, __object):
+        self.list.insert(__index, __object)
+        return self
+
     def print(self, nl=1, sep=False, style=repr):
         for idx, item in enumerate(self.list):
             print(f"{idx:2}- {style(item)}", end=' ')
@@ -805,12 +787,30 @@ class List(Base, list):
                 df.loc[i] = list(self.list[i].__dict__.values())
         return df
 
+    def to_list(self):
+        """Matches `to_list` from Pandas Series."""
+        return self.list
+
     def to_numpy(self):
         return self.np
 
     @property
     def np(self):
         return np.array(self.list)
+
+    def to_struct(self, key_val=None):
+        """
+        :param key_val: function that returns (key, value) pair.
+        :return:
+        """
+        if key_val is None:
+            def key_val(x):
+                return str(x), x
+        else:
+            key_val = self.evalstr(key_val)
+        # return Struct.from_keys_values_pairs(self.apply(key_val))
+        # removed for disentanglement
+        return dict(self.apply(key_val))
 
 
 class Struct(Base, dict):
@@ -819,16 +819,6 @@ class Struct(Base, dict):
     # inheriting from dict gives `get` method, should give `__contains__` but not working.
     # Inheriting from Base gives `save` method.
     """
-
-    def save_json(self, path=None):
-        path = Save.json(obj=self.__dict__, path=path)
-        return path
-
-    def save_yaml(self, path=None):
-        return Save.yaml(obj=self.__dict__, path=path)
-
-    def __len__(self):
-        return len(self.keys())
 
     def __init__(self, dictionary=None, **kwargs):
         """
@@ -851,18 +841,12 @@ class Struct(Base, dict):
             final_dict.update(kwargs)
         self.__dict__ = final_dict
 
-    def to_default(self, default=lambda: None) -> List:
-        from collections import defaultdict
-        tmp2 = defaultdict(default)
-        tmp2.update(self.__dict__)
-        self.__dict__ = tmp2
-        return self
+    def save_json(self, path=None):
+        path = Save.json(obj=self.__dict__, path=path)
+        return path
 
-    def __bool__(self):
-        return bool(self.__dict__)
-    
-    def __contains__(self, key):
-        return key in self.__dict__
+    def save_yaml(self, path=None):
+        return Save.yaml(obj=self.__dict__, path=path)
 
     @staticmethod
     def recursive_struct(mydict):
@@ -900,6 +884,32 @@ class Struct(Base, dict):
             default_ = [None] * len(names)
         return cls.from_keys_values(names, values=default_)
 
+    def spawn_from_values(self, values):
+        """From the same keys, generate a new Struct with different values passed."""
+        return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
+
+    def spawn_from_keys(self, keys):
+        """From the same values, generate a new Struct with different keys passed."""
+        return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
+
+    def to_default(self, default=lambda: None) -> List:
+        from collections import defaultdict
+        tmp2 = defaultdict(default)
+        tmp2.update(self.__dict__)
+        self.__dict__ = tmp2
+        return self
+
+    # ================ magic ==========================
+    def __bool__(self):
+        return bool(self.__dict__)
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+    def __len__(self):
+        return len(self.keys())
+
+    # =========================== print ===========================
     @property
     def clean_view(self):
 
@@ -992,14 +1002,6 @@ class Struct(Base, dict):
     def save_yaml(path):
         Save.yaml(path)
 
-    @property
-    def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
-        return self.__dict__
-
-    @dict.setter
-    def dict(self, adict):
-        self.__dict__ = adict
-
     def update(self, *args, **kwargs) -> List:
         """Accepts dicts and keyworded args
         """
@@ -1072,13 +1074,13 @@ class Struct(Base, dict):
         import pandas as pd
         return pd.DataFrame(self.__dict__, *args, **kwargs)
 
-    def spawn_from_values(self, values):
-        """From the same keys, generate a new Struct with different values passed."""
-        return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
+    @property
+    def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
+        return self.__dict__
 
-    def spawn_from_keys(self, keys):
-        """From the same values, generate a new Struct with different keys passed."""
-        return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
+    @dict.setter
+    def dict(self, adict):
+        self.__dict__ = adict
 
     def plot(self, artist=None):
         if artist is None:
