@@ -279,7 +279,8 @@ class P(type(Path()), Path):
         slf = self.expanduser().resolve()
 
         if content:
-            assert self.is_dir(), f"When `content` flag is set to True, path must be a directory. It is not: `{self}`"
+            assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. "
+                                                     f"It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False))
             return path  # contents live within this directory.
 
@@ -363,7 +364,7 @@ class P(type(Path()), Path):
         return dest / slf.name if not orig else self
 
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
+    def readit(self, reader=None, notfound=FileNotFoundError, readerror=IOError, verbose=False, **kwargs):
         """
 
         :param reader: function that reads this file format, if not passed it will be inferred from extension.
@@ -373,6 +374,10 @@ class P(type(Path()), Path):
         :param kwargs:
         :return:
         """
+        if not self.exists():
+            if notfound is FileNotFoundError: raise notfound
+            else: return notfound
+
         filename = self
         if '.zip' in str(self):
             filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose)
@@ -381,12 +386,8 @@ class P(type(Path()), Path):
                 return Read.read(filename, **kwargs)
             else:
                 return reader(str(filename), **kwargs)
-        except FileNotFoundError:
-            if notfound is FileNotFoundError:
-                raise notfound
-            else:
-                return notfound
-        # for other errors, we do not know how to handle them, thus, they will be raised automatically.
+        except IOError:
+            raise IOError
 
     def __call__(self, *args, **kwargs):
         return self.start()

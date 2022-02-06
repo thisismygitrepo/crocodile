@@ -851,7 +851,7 @@ class Struct(Base, dict):
             final_dict.update(kwargs)
         self.__dict__ = final_dict
 
-    def to_default(self, default=lambda: None):
+    def to_default(self, default=lambda: None) -> List:
         from collections import defaultdict
         tmp2 = defaultdict(default)
         tmp2.update(self.__dict__)
@@ -881,27 +881,24 @@ class Struct(Base, dict):
         return mydict
 
     @classmethod
-    def from_keys_values(cls, keys, values):
+    def from_keys_values(cls, keys, values) -> List:
         """
         :rtype: Struct
         """
         return cls(dict(zip(keys, values)))
 
     @classmethod
-    def from_keys_values_pairs(cls, my_list):
+    def from_keys_values_pairs(cls, my_list) -> List:
         res = dict()
         for k, v in my_list:
             res[k] = v
         return cls(res)
 
     @classmethod
-    def from_names(cls, names, default_=None):  # Mimick NamedTuple and defaultdict
+    def from_names(cls, names, default_=None) -> List:  # Mimick NamedTuple and defaultdict
         if default_ is None:
             default_ = [None] * len(names)
         return cls.from_keys_values(names, values=default_)
-
-    def get_values(self, keys):
-        return List([self[key] for key in keys])
 
     @property
     def clean_view(self):
@@ -1003,14 +1000,14 @@ class Struct(Base, dict):
     def dict(self, adict):
         self.__dict__ = adict
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> List:
         """Accepts dicts and keyworded args
         """
         new_struct = Struct(*args, **kwargs)
         self.__dict__.update(new_struct.__dict__)
         return self
 
-    def apply(self, func):
+    def apply(self, func) -> List:
         func = self.evalstr(func)
         for key, val in self.items():
             self[key] = func(val)
@@ -1055,17 +1052,20 @@ class Struct(Base, dict):
                             total_dict[key] = adict[key]
         return Struct(total_dict)
 
-    def keys(self):
+    def keys(self) -> List:
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(list(self.dict.keys()))
 
-    def values(self):
+    def values(self) -> List:
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(list(self.dict.values()))
 
-    def items(self):
+    def items(self) -> List:
         """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
         return List(self.dict.items())
+
+    def get_values(self, keys) -> List:
+        return List([self[key] for key in keys])
 
     def to_dataframe(self, *args, **kwargs):
         # return self.values().to_dataframe(names=self.keys())
