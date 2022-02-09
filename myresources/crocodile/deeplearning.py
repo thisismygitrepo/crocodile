@@ -28,7 +28,7 @@ class HyperParam(tb.Struct):
     def __init__(self, *args, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
-            exp_name='default_model_experiment',
+            name='default_model_experiment',
             root=tb.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=Device.gpu0,
@@ -51,7 +51,7 @@ class HyperParam(tb.Struct):
 
     @property
     def save_dir(self):
-        return self.root / self.exp_name
+        return self.root / self.name
 
     def save(self, path=None, itself=True, r=False, include_code=False):
         self.save_dir.joinpath(self.subpath + '.txt').create(parent_only=True).write_text(data=str(self))
@@ -185,7 +185,7 @@ class DataReader(object):
     def __repr__(self):
         return f"DataReader Object with these keys: \n" + self.specs.keys().__str__()
 
-    def data_split(self, *args, strings=None, **kwargs):
+    def split_the_data(self, *args, strings=None, **kwargs):
         """
         :param args: whatever to be sent to train_test_split
         :param kwargs: whatever to be sent to train_test_split
@@ -595,7 +595,7 @@ class Ensemble(tb.Base):
             print("Creating Models".center(100, "="))
             for i in tqdm(range(size)):
                 hp = self.hp_class()
-                hp.exp_name = str(hp.exp_name) + f'__model__{i}'
+                hp.name = str(hp.name) + f'__model__{i}'
                 datacopy = tb.copy.copy(self.data)  # shallow copy
                 datacopy.hp = hp
                 self.models.append(model_class(hp, datacopy))

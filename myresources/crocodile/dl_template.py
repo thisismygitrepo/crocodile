@@ -31,7 +31,7 @@ class DataReader(dl.DataReader):
         super().__init__(*args, **kwargs)
         self.dataset = tb.Struct(x=np.random.normal(1000, 10),
                                  y=np.random.normal(1000, 1))
-        self.data_split(self.dataset.x, self.dataset.y)
+        self.split_the_data(self.dataset.x, self.dataset.y)
 
 
 class Model(dl.BaseModel):
