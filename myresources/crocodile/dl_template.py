@@ -9,7 +9,7 @@ class HParams(dl.HyperParam):
     def __init__(self):
         super().__init__(
             # ==================== Enviroment =========================
-            exp_name='default',
+            name='default',
             root='tmp',
             pkg_name='tensorflow',
             device_name=dl.Device.cpu,
@@ -19,7 +19,7 @@ class HParams(dl.HyperParam):
             precision='float32',
             # ===================== Model =============================
             # ===================== Training ==========================
-            split=0.2,
+            test_split=0.2,
             learning_rate=0.0005,
             batch_size=32,
             epochs=30,

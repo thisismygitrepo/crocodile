@@ -108,7 +108,7 @@ class DBMS:
 
     # ========================== TABLES =====================================
     def read_table(self, table, sch=None, size=100):
-        res = self.con.execute(text(f"""SELECT * FROM '{self._get_table_identifier(table, sch)}'"""))
+        res = self.con.execute(text(f"""SELECT * FROM {self._get_table_identifier(table, sch)}"""))
         return res.fetchmany(size)
 
     def make_df(self, table_name, records=None, schema=None):

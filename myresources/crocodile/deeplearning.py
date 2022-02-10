@@ -25,7 +25,7 @@ class HyperParam(tb.Struct):
     """
     subpath = tb.P('metadata/hyper_params')  # location within model directory where this will be saved.
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
             name='default_model_name_' + tb.randstr(),
@@ -46,9 +46,8 @@ class HyperParam(tb.Struct):
         )
         self._configured = False
         self.device_name = None
-        # self.update(*args, **kwargs)
-        # self.save_code()
-        # self.config_device()
+        self.save_type = ["data_only", "whole", "both"][-1]
+        self.update(**kwargs)
 
     @property
     def save_dir(self):
@@ -56,13 +55,14 @@ class HyperParam(tb.Struct):
 
     def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
         self.save_dir.joinpath(self.subpath + '.txt').create(parent_only=True).write_text(data=str(self))
-        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=False)
-        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=True)
+        if self.save_type in {"whole", "both"}:
+            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath + ".HyperParam.pkl"), itself=True, add_suffix=False)
+        if self.save_type in {"data_only", "both"}:
+            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath) + ".HyperParam.dat.pkl", itself=False, add_suffix=False)
 
     @classmethod
     def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
-        save_dir = tb.P(path)
-        return (save_dir / HyperParam.subpath + ".HyperParam.dat.pkl").readit()
+        return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath + ".HyperParam.dat.pkl")
 
     def __repr__(self):
         return tb.Struct(self.__dict__).print(config=True, return_str=True)
@@ -185,18 +185,24 @@ class DataReader(tb.Base):
         self.scaler = None
 
     def save(self, path=None, *args, **kwargs):
-        self.save(path=self.hp.save_dir.joinpath(self.subpath / "data_reader.pkl"), itself=False)
+        base = self.hp.save_dir.joinpath(self.subpath)
+        if self.hp.save_type in {"whole", "both"}:
+            super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", itself=True, add_suffix=False)
+        if self.hp.save_type in {"data", "both"}:
+            super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", itself=False, add_suffix=False)
 
     @classmethod
     def from_saved(cls, path, *args, **kwargs):
         instance = cls(*args, **kwargs)
-        instance.specs = (tb.P(path) / cls.subpath / "data_reader.pkl").readit()
+        data = (tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl").readit()
+        instance.__setstate__(data)
         return instance
 
     def __getstate__(self):
         return dict(specs=self.specs, scaler=self.scaler)
 
     def __setstate__(self, state):
+        """hp is miassing, deliberate by design."""
         return self.__dict__.update(state)
 
     def __repr__(self):
@@ -515,14 +521,21 @@ class BaseModel(ABC):
         print(f'Model class saved successfully!, check out: {self.hp.save_dir.as_uri()}')
 
     @classmethod
-    def from_class_weights(cls, path, hparam_class, data_class, device_name=None):
+    def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None):
         path = tb.P(path)
-        hp_obj = hparam_class.from_saved(path)
+
+        if hparam_class is not None: hp_obj = hparam_class.from_saved(path)
+        else: hp_obj = (path / HyperParam.subpath + ".HyperParam.pkl").readit()
         if device_name: hp_obj.device_name = device_name
-        d_obj = data_class.from_saved(path, hp=hp_obj)
+
+        if data_class is not None: d_obj = data_class.from_saved(path, hp=hp_obj)
+        else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
+        d_obj.hp = hp_obj
+
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
         model_obj.history = (path / "metadata/history.pkl").readit(notfound=tb.L())
+
         print(f"Class {model_obj.__class__} Loaded Successfully.")
         return model_obj
 
@@ -755,4 +768,5 @@ class KerasOptimizer:
 
 
 if __name__ == '__main__':
-    pass
+    d = DataReader(HyperParam())
+    d.save()

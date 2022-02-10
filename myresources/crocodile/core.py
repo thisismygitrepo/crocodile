@@ -268,30 +268,41 @@ class Base(object):
     def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
         """Pickles the object.
         :param path: destination file.
-        :param itself: `itself` means the object (self) will be pickled straight away. This is the default behaviour,
-        however, it requires (in case of composed objects) that every sub-object is well-behaved and has the appropriate
-        state methods implemented. The alternative to this option (itself=False) is to save __dict__ only
-         (assuming it is pure data rather than code, otherwise recusive flag must be set), then the class itself is
-          required later and the `from_pickled_state` method should be used to reload the instance again.
-          The disadvantage of this method is that __init__ method will be used again at reconstruction time
-           of the object before the attributes are monkey-patched.
-           It is very arduous to design __init__ method that is convenient (uses plethora of
-          default arguments) and works at the same time with no input at reconstruction time.
-          # Use only for classes with whacky behaviours or too expensive to redesign
-            # methodology: 1- Save state, 2- save code. 3- initialize from __init__, 4- populate __dict__
+        :param itself:
+        * `itself` is True: the object (self) will be pickled altogether.
+            * Ups:
+                * convenient.
+                * Dill can, by itself import all the required classes to __main__ IF the object is restored
+                 while directory is @ the same location object was created, thus,
+            * Downs:
+                * It requires (in case of composed objects) that every sub-object is well-behaved and has the appropriate
+                  state methods implemented.
+                * The libraries imported must be present at load time.
+        * `itself` is False: means to save __getstate__.
+            * Ups:
+                * very safe and unlikely to cause import errors at load time.
+                * User is responsible for loading up the class.
+            * Downs: the class itself is required later and the `from_pickled_state` method should be used to reload the instance again.
+            * __init__ method will be used again at reconstruction time of the object before the attributes are monkey-patched.
+            * It is very arduous to design __init__ method that is convenient (uses plethora of
+              default arguments) and works at the same time with no input at reconstruction time.
+
         :param include_code: `save_code` will be called.
         :param r: recursive flag.
+            * If attributes are not data, but rather objects, then, this flag should be set to True.
+            * The recusive flag is particularly relevant when `itself` is False and __dict__ is composed of objects.
+            * In pickling the object (itself=True), the recursive flag is the default.
         :param add_suffix: if True, the suffixes `.pkl` and `.py` will be added to the file name.
 
-        * Dill package manages to resconstruct the object by loading up all the appropriate libraries again
-        IF the object is restored while directory is @ the same location object was created, thus,
-        no need for saving code or even reloading it.
-        * Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
-        passwords. The best practice is to pass them again at load time.
+        * Tip: whether pickling the class or its data alone, always implement __getstate__ appropriately to
+        avoid security risk involved in pickling objects that reference sensitive information like tokens and
+        passwords.
         """
         path = path or Path.home().joinpath(f"tmp_results/tmpfiles/{randstr()}")
         if add_suffix:
-            path = str(path) + "." + self.__class__.__name__ + ("" if itself else ".dat")
+            path = str(path)
+            path += "" if self.__class__.__name__ in path else ("." + self.__class__.__name__)
+            path += "" if (itself or ".dat" in path) else ".dat"
         path = Path(path)
         # Fruthermore, .zip or .pkl will be added later depending on `include_code` value, warning will be raised.
 
@@ -321,13 +332,16 @@ class Base(object):
                   f"{result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
         else:
             result_path = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix)
-            print(f"{'Data of' if itself else ''} Object ({repr(obj)}) saved @ "
+            rep = repr(obj)
+            rep = rep if len(rep) < 50 else rep[:10] + "... "
+            print(f"{'Data of' if itself else ''} Object ({rep}) saved @ "
                   f"{result_path.absolute().as_uri()}, Directory: {result_path.parent.absolute().as_uri()}")
         return result_path
 
     @classmethod
     def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
         """Works in conjuction with save_pickle when `itself`=False, i.e. only state of object is pickled.
+        # methodology: 1- Save state, 2- save code. 3- initialize from __init__, 4- populate __dict__
 
         :param path: points to where the `data` of this class is saved
         :param r: recursive flag. If set to True, then, the directory containing the file `path` will be searched for
@@ -344,7 +358,7 @@ class Base(object):
          e.g. do NOT create some expensive attribute is this flag is raised because it will be obtained later.
         """
 
-        # ============================= step 1: load up the data
+        # ============================= step 1: unpickle the data
         assert ".dat." in str(path), f"Are you sure the path {path} is pointing to pickeld state of {cls}?"
         data = dill.loads(Path(path).read_bytes())
         # ============================= step 2: initialize the class
@@ -464,7 +478,7 @@ class Base(object):
     def print(self, typeinfo=False):
         Struct(self.__dict__).print(dtype=typeinfo)
 
-    def viz_heirarchy(self, depth=3, obj=None, filt=None):
+    def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         objgraph = install_n_import("objgraph")
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
@@ -761,17 +775,16 @@ class List(Base, list):
 
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         """
-
         :param names: path of each object.
         :param minimal: Return Dataframe structure without contents.
         :param obj_included: Include a colum for objects themselves.
         :return:
         """
-        # Display.set_pandas_display()  # removed for disentanglement
+        import pandas as pd
+        # Display.set_pandas_display()
         columns = list(self.list[0].__dict__.keys())
         if obj_included or names:
             columns = ['object'] + columns
-        import pandas as pd
         df = pd.DataFrame(columns=columns)
         if minimal:
             return df
@@ -809,9 +822,8 @@ class List(Base, list):
                 return str(x), x
         else:
             key_val = self.evalstr(key_val)
-        # return Struct.from_keys_values_pairs(self.apply(key_val))
-        # removed for disentanglement
-        return dict(self.apply(key_val))
+        return Struct.from_keys_values_pairs(self.apply(key_val))
+        # return dict(self.apply(key_val))
 
 
 class Struct(Base, dict):

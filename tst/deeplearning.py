@@ -1,12 +1,16 @@
 
 import crocodile.deeplearning as dl
 import numpy as np
-import tensorflow as tf
+# import tensorflow as tf
 
 
 class HParams(dl.HyperParam):
     def __init__(self):
         super().__init__()
+
+    def func(self):
+        _ = self
+        print("I am a special function of HParams")
 
 
 class DataReader(dl.DataReader):
@@ -16,6 +20,10 @@ class DataReader(dl.DataReader):
         x = np.random.rand(1000, 10)
         y = np.random.rand(1000, 1)
         self.split_the_data(x, y)
+
+    @staticmethod
+    def func():
+        print("I am a special function of DataReader")
 
 
 class Model(dl.BaseModel):
