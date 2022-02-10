@@ -9,8 +9,8 @@ class HParams(dl.HyperParam):
     def __init__(self):
         super().__init__(
             # ==================== Enviroment =========================
-            name='default',
-            root='tmp',
+            name='default_model_name_' + tb.randstr(),
+            root=tb.P.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=dl.Device.cpu,
             # ===================== Data ==============================

@@ -46,23 +46,25 @@ class HyperParam(tb.Struct):
         )
         self._configured = False
         self.device_name = None
-        self.save_type = ["data_only", "whole", "both"][-1]
+        self.save_type = ["data", "whole", "both"][-1]
         self.update(**kwargs)
 
     @property
     def save_dir(self):
-        return self.root / self.name
+        return tb.P(self.root) / self.name
 
     def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
-        self.save_dir.joinpath(self.subpath + '.txt').create(parent_only=True).write_text(data=str(self))
+        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(data=str(self))
         if self.save_type in {"whole", "both"}:
-            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath + ".HyperParam.pkl"), itself=True, add_suffix=False)
-        if self.save_type in {"data_only", "both"}:
-            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath) + ".HyperParam.dat.pkl", itself=False, add_suffix=False)
+            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"),
+                                         itself=True, add_suffix=False)
+        if self.save_type in {"data", "both"}:
+            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath) / "hparams.HyperParam.dat.pkl",
+                                         itself=False, add_suffix=False)
 
     @classmethod
     def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
-        return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath + ".HyperParam.dat.pkl")
+        return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl")
 
     def __repr__(self):
         return tb.Struct(self.__dict__).print(config=True, return_str=True)
@@ -483,7 +485,7 @@ class BaseModel(ABC):
         return tb.pd.DataFrame(loss_dict)
 
     def save_model(self, directory):
-        self.model.save(directory)  # In TF: send only path path. Save path is saved_model.pb
+        self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
 
     def save_weights(self, directory):
         self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
@@ -768,5 +770,4 @@ class KerasOptimizer:
 
 
 if __name__ == '__main__':
-    d = DataReader(HyperParam())
-    d.save()
+    pass
