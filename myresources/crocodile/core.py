@@ -139,14 +139,14 @@ def save_decorator(ext=""):
     """Apply default paths, add extension to path, print the saved file path"""
 
     def decorator(func):
-        def wrapper(obj, path=None, verbose=True, **kwargs):
+        def wrapper(obj, path=None, verbose=True, add_suffix=True, **kwargs):
             if path is None:
                 path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext)
                 print(f"tb.core: Warning: Path not passed to {func}. "
                       f"A default path has been chosen: {path.absolute().as_uri()}")
                 # raise ValueError
             else:
-                if not str(path).endswith(ext):
+                if add_suffix and not str(path).endswith(ext):
                     path = Path(str(path) + ext)
                     print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}")
                 else:
@@ -159,9 +159,7 @@ def save_decorator(ext=""):
                 rep = rep if len(rep) < 50 else rep[:10] + "... "
                 print(f"SAVED {rep}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`")
             return path
-
         return wrapper
-
     return decorator
 
 
@@ -267,7 +265,7 @@ class Base(object):
         Path(path).write_text(file.read_text())
         return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
-    def save(self, path=None, itself=True, r=False, include_code=False):
+    def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
         """Pickles the object.
         :param path: destination file.
         :param itself: `itself` means the object (self) will be pickled straight away. This is the default behaviour,
@@ -283,6 +281,7 @@ class Base(object):
             # methodology: 1- Save state, 2- save code. 3- initialize from __init__, 4- populate __dict__
         :param include_code: `save_code` will be called.
         :param r: recursive flag.
+        :param add_suffix: if True, the suffixes `.pkl` and `.py` will be added to the file name.
 
         * Dill package manages to resconstruct the object by loading up all the appropriate libraries again
         IF the object is restored while directory is @ the same location object was created, thus,
@@ -290,8 +289,10 @@ class Base(object):
         * Beware of the security risk involved in pickling objects that reference sensitive information like tokens and
         passwords. The best practice is to pass them again at load time.
         """
-        path = str(path or Path.home().joinpath(f"tmp_results/tmpfiles/{randstr()}"))
-        path = Path(path + "." + self.__class__.__name__ + ("" if itself else ".dat"))
+        path = path or Path.home().joinpath(f"tmp_results/tmpfiles/{randstr()}")
+        if add_suffix:
+            path = str(path) + "." + self.__class__.__name__ + ("" if itself else ".dat")
+        path = Path(path)
         # Fruthermore, .zip or .pkl will be added later depending on `include_code` value, warning will be raised.
 
         # Choosing what object to pickle:
@@ -311,7 +312,7 @@ class Base(object):
             temp_path = Path().home().joinpath(f"tmp_results/zipping/{randstr()}")
             temp_path.mkdir(parents=True, exist_ok=True)
             self.save_code(path=temp_path.joinpath(f"source_code_{randstr()}.py"))
-            Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, verbose=False)
+            Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, verbose=False, add_suffix=add_suffix)
             import shutil
             result_path = shutil.make_archive(base_name=str(path), format="zip",
                                               root_dir=str(temp_path), base_dir=".")
@@ -319,7 +320,7 @@ class Base(object):
             print(f"Code and data for the object ({repr(obj)}) saved @ "
                   f"{result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
         else:
-            result_path = Save.pickle(obj=obj, path=path, r=r, verbose=False)
+            result_path = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix)
             print(f"{'Data of' if itself else ''} Object ({repr(obj)}) saved @ "
                   f"{result_path.absolute().as_uri()}, Directory: {result_path.parent.absolute().as_uri()}")
         return result_path
@@ -845,8 +846,8 @@ class Struct(Base, dict):
         path = Save.json(obj=self.__dict__, path=path)
         return path
 
-    def save_yaml(self, path=None):
-        return Save.yaml(obj=self.__dict__, path=path)
+    # def save_yaml(self, path=None) -> str:
+    #     return Save.yaml(self.__dict__, str(path))
 
     @staticmethod
     def recursive_struct(mydict):
@@ -865,21 +866,21 @@ class Struct(Base, dict):
         return mydict
 
     @classmethod
-    def from_keys_values(cls, keys, values) -> List:
+    def from_keys_values(cls, keys, values):
         """
         :rtype: Struct
         """
         return cls(dict(zip(keys, values)))
 
     @classmethod
-    def from_keys_values_pairs(cls, my_list) -> List:
+    def from_keys_values_pairs(cls, my_list):
         res = dict()
         for k, v in my_list:
             res[k] = v
         return cls(res)
 
     @classmethod
-    def from_names(cls, names, default_=None) -> List:  # Mimick NamedTuple and defaultdict
+    def from_names(cls, names, default_=None):  # Mimick NamedTuple and defaultdict
         if default_ is None:
             default_ = [None] * len(names)
         return cls.from_keys_values(names, values=default_)
@@ -892,7 +893,7 @@ class Struct(Base, dict):
         """From the same values, generate a new Struct with different keys passed."""
         return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
 
-    def to_default(self, default=lambda: None) -> List:
+    def to_default(self, default=lambda: None):
         from collections import defaultdict
         tmp2 = defaultdict(default)
         tmp2.update(self.__dict__)
@@ -926,10 +927,10 @@ class Struct(Base, dict):
             repr_string += str(key) + ", "
         return "Struct: [" + repr_string + "]"
 
-    def print(self, sep=None, yaml=False, dtype=True, logger=False, limit=50, config=False, newline=True):
+    def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
         if config:
             repr_str = Display.config(self.__dict__, newline=newline)
-            if logger: return repr_str
+            if return_str: return repr_str
             else:
                 print(repr_str)
                 return self
@@ -957,7 +958,7 @@ class Struct(Base, dict):
             if dtype:
                 repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
-        if logger:
+        if return_str:
             return repr_string
         else:
             print(repr_string)
@@ -998,18 +999,14 @@ class Struct(Base, dict):
     def __iter__(self):  # used when list(~) is called or it is iterated over.
         return iter(self.dict.items())
 
-    @staticmethod
-    def save_yaml(path):
-        Save.yaml(path)
-
-    def update(self, *args, **kwargs) -> List:
+    def update(self, *args, **kwargs):
         """Accepts dicts and keyworded args
         """
         new_struct = Struct(*args, **kwargs)
         self.__dict__.update(new_struct.__dict__)
         return self
 
-    def apply(self, func) -> List:
+    def apply(self, func):
         func = self.evalstr(func)
         for key, val in self.items():
             self[key] = func(val)

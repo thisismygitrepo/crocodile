@@ -28,8 +28,8 @@ class HyperParam(tb.Struct):
     def __init__(self, *args, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
-            name='default_model_experiment',
-            root=tb.tmp(folder="tmp_models"),
+            name='default_model_name_' + tb.randstr(),
+            root=tb.P.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=Device.gpu0,
             # ===================== Data ==============================
@@ -37,6 +37,7 @@ class HyperParam(tb.Struct):
             shuffle=True,
             precision='float32',
             # ===================== Model =============================
+            # depth = 3
             # ===================== Training ==========================
             test_split=0.2,  # test split
             learning_rate=0.0005,
@@ -53,10 +54,10 @@ class HyperParam(tb.Struct):
     def save_dir(self):
         return self.root / self.name
 
-    def save(self, path=None, itself=True, r=False, include_code=False):
+    def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
         self.save_dir.joinpath(self.subpath + '.txt').create(parent_only=True).write_text(data=str(self))
-        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=True)
         super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=False)
+        super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath), itself=True)
 
     @classmethod
     def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
@@ -64,7 +65,7 @@ class HyperParam(tb.Struct):
         return (save_dir / HyperParam.subpath + ".HyperParam.dat.pkl").readit()
 
     def __repr__(self):
-        return self.print(config=True, logger=True)
+        return tb.Struct(self.__dict__).print(config=True, return_str=True)
 
     @property
     def pkg(self):
@@ -165,7 +166,7 @@ class HyperParam(tb.Struct):
             print(f"Device already configured, skipping ... ")
 
 
-class DataReader(object):
+class DataReader(tb.Base):
     subpath = tb.P("metadata/data_reader")
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
@@ -177,13 +178,29 @@ class DataReader(object):
     def __init__(self, hp: HyperParam = None, specs=None, split=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hp = hp
-        self.specs = specs if specs else tb.Struct()  # Summary of data to be memorized by model
-        self.scaler = None
         self.split = split
         self.plotter = None
+        # attributes to be saved.
+        self.specs = specs if specs else tb.Struct()
+        self.scaler = None
+
+    def save(self, path=None, *args, **kwargs):
+        self.save(path=self.hp.save_dir.joinpath(self.subpath / "data_reader.pkl"), itself=False)
+
+    @classmethod
+    def from_saved(cls, path, *args, **kwargs):
+        instance = cls(*args, **kwargs)
+        instance.specs = (tb.P(path) / cls.subpath / "data_reader.pkl").readit()
+        return instance
+
+    def __getstate__(self):
+        return dict(specs=self.specs, scaler=self.scaler)
+
+    def __setstate__(self, state):
+        return self.__dict__.update(state)
 
     def __repr__(self):
-        return f"DataReader Object with these keys: \n" + self.specs.keys().__str__()
+        return f"DataReader Object with these keys: \n" + tb.Struct(self.specs).print(config=True, return_str=True)
 
     def split_the_data(self, *args, strings=None, **kwargs):
         """
@@ -225,15 +242,6 @@ class DataReader(object):
         ip = np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype)
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
-
-    def save(self):
-        tb.Save.pickle(self.specs, path=self.hp.save_dir.joinpath(self.subpath / "data_reader.pkl"))
-
-    @classmethod
-    def from_saved(cls, path, *args, **kwargs):
-        instance = cls(*args, **kwargs)
-        instance.specs = (tb.P(path) / cls.subpath / "data_reader.pkl").readit()
-        return instance
 
     def preprocess(self, *args, **kwargs):
         _ = args, kwargs, self

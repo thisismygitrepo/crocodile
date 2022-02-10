@@ -790,13 +790,13 @@ class Log(object):
      is printing this message, in addition to many other concerns.
 
      Advantages of using instances of this class: You do not need to worry about object pickling process by modifing
-     the __getstate__ method of the class that will own the logger. This is the case because loggers lose access
-     to the file logger when unpickled, so it is better to instantiate them again.
+     the __getstate__ method of the class that will own the return_str. This is the case because loggers lose access
+     to the file return_str when unpickled, so it is better to instantiate them again.
      Logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
      Additionally, this class keeps track of log files used, append to them if they still exist.
 
      Implementation detail: the design favours composition over inheritence. To counter the inconvenience
-      of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
+      of having extra typing to reach the return_str, a property `return_str` was added to Base class to refer to it."""
 
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
                  name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
@@ -833,8 +833,8 @@ class Log(object):
     def critical(self, msg):
         return self.logger.critical(msg)
 
-    def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
-        if which in {"logger", "all"}: self.logger.setLevel(level)
+    def set_level(self, level, which=["return_str", "stream", "file", "all"][0]):
+        if which in {"return_str", "all"}: self.logger.setLevel(level)
         if which in {"stream", "all"}: self.get_shandler().setLevel(level)
         if which in {"file", "all"}: self.get_fhandler().setLevel(level)
 
@@ -858,7 +858,7 @@ class Log(object):
     def file(self):
         return P(self.specs["file_path"]) if self.specs["file_path"] else None
 
-    def _install(self):  # populates self.logger attribute according to specs and dielect.
+    def _install(self):  # populates self.return_str attribute according to specs and dielect.
         if self.specs["file"] is False and self.specs["stream"] is False:
             self.logger = Null()
         elif self.dialect == "colorlog":
@@ -878,11 +878,11 @@ class Log(object):
         self._install()
 
     def __getstate__(self):
-        # logger can be pickled without this method,
+        # return_str can be pickled without this method,
         # but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy()
         state["specs"] = state["specs"].copy()
-        del state["logger"]
+        del state["return_str"]
         if self.specs["file_path"] is not None:
             state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
@@ -965,7 +965,7 @@ class Log(object):
     @staticmethod
     def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
                    s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
-        """Basic Python logger."""
+        """Basic Python return_str."""
         logger = Log.get_base_logger(logging, name, l_level)
         fmt = logging.Formatter(fmt or Log.get_format(sep))
         Log.add_handlers(logger, logging, file, f_level, file_path, fmt, stream, s_level)
@@ -983,9 +983,9 @@ class Log(object):
 
     @staticmethod
     def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
-        if file or file_path:  # ==> create file handler for the logger.
+        if file or file_path:  # ==> create file handler for the return_str.
             Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
-        if stream:  # ==> create stream handler for the logger.
+        if stream:  # ==> create stream handler for the return_str.
             Log.add_streamhandler(logger, s_level, fmt, module=module)
 
     @staticmethod
@@ -1000,7 +1000,7 @@ class Log(object):
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
         if file_path is None:
-            file_path = P.tmpfile(name="logger", suffix=".log", folder="loggers")
+            file_path = P.tmpfile(name="return_str", suffix=".log", folder="loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)

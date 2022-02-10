@@ -7,7 +7,6 @@ import tensorflow as tf
 class HParams(dl.HyperParam):
     def __init__(self):
         super().__init__()
-        self.name = "test_model"
 
 
 class DataReader(dl.DataReader):

@@ -371,8 +371,10 @@ class P(type(Path()), Path):
         :return:
         """
         if not self.exists():
-            if notfound is FileNotFoundError: raise notfound
-            else: return notfound
+            if notfound is FileNotFoundError:
+                raise FileNotFoundError(f"`{self}` is no where to be found!")
+            else:
+                return notfound
 
         filename = self
         if '.zip' in str(self):
