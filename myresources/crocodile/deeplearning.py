@@ -187,7 +187,7 @@ class DataReader(tb.Base):
         self.scaler = None
 
     def save(self, path=None, *args, **kwargs):
-        base = self.hp.save_dir.joinpath(self.subpath)
+        base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath)
         if self.hp.save_type in {"whole", "both"}:
             super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", itself=True, add_suffix=False)
         if self.hp.save_type in {"data", "both"}:

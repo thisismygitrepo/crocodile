@@ -1,6 +1,7 @@
 
 
 from crocodile.toolbox import *
+from glob import glob
 
 
 class Browse(object):
@@ -77,3 +78,6 @@ def browse(path, depth=2, width=20):
     else:
         return path
 
+
+if __name__ == '__main__':
+    pass
