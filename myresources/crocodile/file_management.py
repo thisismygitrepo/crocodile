@@ -780,7 +780,7 @@ class P(type(Path()), Path):
         """Similar to `as_posix()` but returns P object"""
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
-    # ======================================== Folder management =======================================
+    # ========================== override =======================================
     def symlink_to(self, target, verbose=True, overwrite=False, orig=False):
         target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
@@ -793,6 +793,15 @@ class P(type(Path()), Path):
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
 
+    def write_text(self, data: str, **kwargs):
+        super(P, self).write_text(data, **kwargs)
+        return self
+
+    def write_bytes(self, data: bytes):
+        super(P, self).write_bytes(data)
+        return self
+
+    # ======================================== Folder management =======================================
     def create(self, parents=True, exist_ok=True, parent_only=False):
         """Creates directory while returning the same object
         """

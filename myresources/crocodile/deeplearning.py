@@ -208,7 +208,7 @@ class DataReader(tb.Base):
         return self.__dict__.update(state)
 
     def __repr__(self):
-        return f"DataReader Object with these keys: \n" + tb.Struct(self.specs).print(config=True, return_str=True)
+        return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
 
     def split_the_data(self, *args, strings=None, **kwargs):
         """

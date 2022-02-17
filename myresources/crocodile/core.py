@@ -329,13 +329,13 @@ class Base(object):
                                               root_dir=str(temp_path), base_dir=".")
             result_path = Path(result_path)
             print(f"Code and data for the object ({repr(obj)}) saved @ "
-                  f"{result_path.as_uri()}, Directory: {result_path.parent.as_uri()}")
+                  f"`{result_path.as_uri()}`, Directory: `{result_path.parent.as_uri()}`")
         else:
             result_path = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix)
             rep = repr(obj)
             rep = rep if len(rep) < 50 else rep[:10] + "... "
             print(f"{'Data of' if itself else ''} Object ({rep}) saved @ "
-                  f"{result_path.absolute().as_uri()}, Directory: {result_path.parent.absolute().as_uri()}")
+                  f"`{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`")
         return result_path
 
     @classmethod
