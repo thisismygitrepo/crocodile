@@ -15,8 +15,8 @@ from crocodile import file_management as _fm
 from crocodile import meta
 from crocodile.meta import logging, subprocess, time
 
-from crocodile import plot_management as _pm
-from crocodile.plot_management import plt, enum, FigureManager
+from crocodile import matplotlib_management as _pm
+from crocodile.matplotlib_management import plt, enum, FigureManager
 
 import pandas as pd
 _ = pd

@@ -449,7 +449,7 @@ class P(type(Path()), Path):
 
         if memory is False:
             directory = P.home().joinpath("Downloads") if directory is None else P(directory)
-            directory = directory.joinpath(name or validate_name(self.name))
+            directory = directory.joinpath(name or self.name)
             directory.write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
             # try: urllib.urlopen(url).read()
             return directory
