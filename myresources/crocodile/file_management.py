@@ -692,7 +692,7 @@ class P(type(Path()), Path):
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
             except: target = "BROKEN LINK " + str(self)
             if target == self: target = str(target)  # avoid infinite recursions for broken links.
-            rep += " Symlink '" + self.clickable() + "' ==> " + repr(target)
+            rep += " Symlink '" + self.as_uri() + "' ==> " + repr(target)
         elif self.is_absolute():
             rep += " " + self._type() + " '" + self.clickable() + "'"
             if self.exists():
@@ -792,7 +792,7 @@ class P(type(Path()), Path):
         """
         if here:
             assert target is None, "target must be None if here is True"
-            assert self.exists(), "self must exist if here is True"
+            assert self.expanduser().exists(), "self must exist if here is True"
             return self.cwd().joinpath(self.name).symlink_to(target=self, verbose=verbose, overwrite=overwrite,
                                                              orig=orig, here=False)
 
