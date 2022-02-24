@@ -702,12 +702,13 @@ path.delete(sure=True, verbose=False)
 
 
 class SSH(object):
-    def __init__(self, username, hostname, ssh_key=None, password=None):
+    def __init__(self, username, hostname, ssh_key=None, pwd=None):
         _ = False
         if _:
             super().__init__()
+        self.ssh_key = str(ssh_key) if self.ssh_key is not None else None
+
         import paramiko
-        self.ssh_key = ssh_key
         self.ssh = paramiko.SSHClient()
         self.ssh.load_system_host_keys()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -715,12 +716,17 @@ class SSH(object):
         self.username = username
         self.ssh.connect(hostname=hostname,
                          username=username,
-                         password=password,
-                         port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
+                         password=pwd,
+                         port=22, key_filename=self.ssh_key)
         self.sftp = self.ssh.open_sftp()
-        self.load_python_cmd = rf"""source ~/venvs/ve/bin/activate"""  # possible activate an env
+
         import platform
         self.platform = platform
+        if self.platform.system() == "Windows":
+            self.load_python_cmd = rf"""~/venvs/ve/Scripts/activate"""
+        else:
+            self.load_python_cmd = rf"""source ~/venvs/ve/bin/activate"""  # possible activate an env
+
         self.target_machine = self.ssh.exec_command(self.load_python_cmd +
                                                     "python -c 'import platform; platform.system()'")
 
