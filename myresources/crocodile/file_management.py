@@ -225,7 +225,7 @@ class P(type(Path()), Path):
         Furthermore, those methods are accompanied with print statement explaining what happened to the object.
     """
     def delete(self, sure=False, verbose=True):
-        slf = self.expanduser().resolve()
+        slf = self.expanduser()  # .resolve() don't resolve symlinks.
         if sure:
             if not slf.exists():
                 slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
@@ -781,13 +781,27 @@ class P(type(Path()), Path):
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
     # ========================== override =======================================
-    def symlink_to(self, target, verbose=True, overwrite=False, orig=False):
+    def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False, here=False):
+        """
+        Creates a symlink to the target.
+        :param target:
+        :param verbose:
+        :param overwrite: If True, overwrites existing symlink (self). Target path is not changed.
+        :param orig:
+        :param here: If True, creates a symlink of `self` to the current directory with same name. Useful in croshell.
+        """
+        if here:
+            assert target is None, "target must be None if here is True"
+            assert self.exists(), "self must exist if here is True"
+            return self.cwd().joinpath(self.name).symlink_to(target=self, verbose=verbose, overwrite=overwrite,
+                                                             orig=orig, here=False)
+
         target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
         if overwrite:
             if self.is_symlink() or self.exists():
-                # self.exist() is False for broken links even though they exist
+                # self.exists() is False for broken links even though they exist
                 self.delete(sure=True, verbose=verbose)
         super(P, self).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
