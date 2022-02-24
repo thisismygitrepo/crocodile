@@ -702,7 +702,7 @@ path.delete(sure=True, verbose=False)
 
 
 class SSH(object):
-    def __init__(self, username, hostname, ssh_key=None):
+    def __init__(self, username, hostname, ssh_key=None, password=None):
         _ = False
         if _:
             super().__init__()
@@ -715,6 +715,7 @@ class SSH(object):
         self.username = username
         self.ssh.connect(hostname=hostname,
                          username=username,
+                         password=password,
                          port=22, key_filename=self.ssh_key.string if self.ssh_key is not None else None)
         self.sftp = self.ssh.open_sftp()
         self.load_python_cmd = rf"""source ~/venvs/ve/bin/activate"""  # possible activate an env
@@ -731,6 +732,12 @@ class SSH(object):
             return f"""-i "{str(P(self.ssh_key.expanduser()))}" """
         else:
             return ""
+
+    @staticmethod
+    def copy_ssh_keys_to_remote(fqdn):
+        # Caveat, only windows is supported.
+        # the following is a Windows Openssh alternative to ssh-copy-id
+        Terminal().run(f'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
     def __repr__(self):
         return f"{self.local()} SSH connection to {self.remote()}"
@@ -749,16 +756,21 @@ class SSH(object):
         assert self.target_machine == "Linux"
         self.run(f"{name} = {os.environ[name]}; export {name}")
 
-    def copy_from_here(self, source, target=None, zip_n_encrypt=True):
+    def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = None
         if zip_n_encrypt:
             pwd = randstr(length=10, safe=True)
             source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
+
+        if target is None:
+            target = P(source).collapseuser()
+            assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+            target = target.as_posix()
         print(f"Step 1: Creating Target directory {target} @ remote machine.")
-        if target is None: target = P(source).collapseuser().as_posix()  # works if source is relative.
+
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
         remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
-        print(f"Send `{source}` ==> `{remotepath}` ")
+        print(f"SENT `{source}` ==> `{remotepath}`")
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt:
             resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
