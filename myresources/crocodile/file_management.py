@@ -225,7 +225,8 @@ class P(type(Path()), Path):
         Furthermore, those methods are accompanied with print statement explaining what happened to the object.
     """
     def delete(self, sure=False, verbose=True):
-        slf = self.expanduser()  # .resolve() don't resolve symlinks.
+        # slf = self.expanduser().resolve() don't resolve symlinks.
+        slf = self
         if sure:
             if not slf.exists():
                 slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
@@ -245,7 +246,7 @@ class P(type(Path()), Path):
     def send2trash(self, verbose=True):
         send2trash = install_n_import("send2trash")
         if self.exists():
-            send2trash.send2trash(self.expanduser().resolve().str)
+            send2trash.send2trash(self.resolve().str)  # do not expand user symlinks.
             if verbose: print(f"TRASHED {repr(self)}")
         else:
             if verbose: print(f"Could NOT trash {self}")
@@ -692,7 +693,7 @@ class P(type(Path()), Path):
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
             except: target = "BROKEN LINK " + str(self)
             if target == self: target = str(target)  # avoid infinite recursions for broken links.
-            rep += " Symlink '" + self.as_uri() + "' ==> " + repr(target)
+            rep += " Symlink '" + str(self) + "' ==> " + repr(target)
         elif self.is_absolute():
             rep += " " + self._type() + " '" + self.clickable() + "'"
             if self.exists():
@@ -781,20 +782,24 @@ class P(type(Path()), Path):
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
     # ========================== override =======================================
-    def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False, here=False):
+    def symlink_from(self, target=None, target_dir=None, verbose=False, overwrite=False):
+        assert self.expanduser().exists(), "self must exist if this method is used."
+        if target is not None:
+            assert target_dir is None, "You can only pass source or source_dir, not both."
+            result = P(target)
+        else:
+            if target_dir is None: target_dir = P.cwd()
+            result = P(target_dir) / self.name
+        return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
+
+    def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
         """
         Creates a symlink to the target.
         :param target:
         :param verbose:
         :param overwrite: If True, overwrites existing symlink (self). Target path is not changed.
         :param orig:
-        :param here: If True, creates a symlink of `self` to the current directory with same name. Useful in croshell.
         """
-        if here:
-            assert target is None, "target must be None if here is True"
-            assert self.expanduser().exists(), "self must exist if here is True"
-            return self.cwd().joinpath(self.name).symlink_to(target=self, verbose=verbose, overwrite=overwrite,
-                                                             orig=orig, here=False)
 
         target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
@@ -803,7 +808,7 @@ class P(type(Path()), Path):
             if self.is_symlink() or self.exists():
                 # self.exists() is False for broken links even though they exist
                 self.delete(sure=True, verbose=verbose)
-        super(P, self).symlink_to(str(target))
+        super(P, self.expanduser()).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
 
@@ -1050,6 +1055,10 @@ class P(type(Path()), Path):
     @staticmethod
     def pwd():
         return P.cwd()
+
+    def chdir(self):
+        os.chdir(str(self.expanduser()))
+        return self
 
     # ====================================== Compression ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
