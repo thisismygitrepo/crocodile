@@ -706,7 +706,8 @@ class SSH(object):
         _ = False
         if _:
             super().__init__()
-        self.ssh_key = str(ssh_key) if self.ssh_key is not None else None
+        self.ssh_key = str(ssh_key) if ssh_key is not None else None
+        # no need to pass ssh_key if it was configured properly already
 
         import paramiko
         self.ssh = paramiko.SSHClient()
@@ -719,16 +720,20 @@ class SSH(object):
                          password=pwd,
                          port=22, key_filename=self.ssh_key)
         self.sftp = self.ssh.open_sftp()
-
+        self.target_machine = "Windows" if self.run("$env:OS", printit=False).output["stdout"] == "Windows_NT" else "Linux"
+        # it must uses a python independent way to figure out the machine type to avoid circualrity below:
         import platform
         self.platform = platform
-        if self.platform.system() == "Windows":
-            self.load_python_cmd = rf"""~/venvs/ve/Scripts/activate"""
-        else:
-            self.load_python_cmd = rf"""source ~/venvs/ve/bin/activate"""  # possible activate an env
 
-        self.target_machine = self.ssh.exec_command(self.load_python_cmd +
-                                                    "python -c 'import platform; platform.system()'")
+        if self.platform.system() == "Windows":
+            self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
+        else:
+            self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
+
+        if self.target_machine == "Windows":
+            self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
+        else:
+            self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
 
     def get_key(self):
         """In SSH commands you need this:
@@ -746,7 +751,7 @@ class SSH(object):
         Terminal().run(f'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
     def __repr__(self):
-        return f"{self.local()} SSH connection to {self.remote()}"
+        return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
 
     def remote(self):
         return f"{self.username}@{self.hostname}"
@@ -787,14 +792,14 @@ class SSH(object):
         pass
 
     def run(self, cmd, printit=True):
-        print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{cmd}")
+        # if printit: print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{cmd}")
         res = self.ssh.exec_command(cmd)
         res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
         if printit: res.print()
         return res
 
     def runpy(self, cmd):
-        cmd = f"""{self.load_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """
+        cmd = f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """
         return self.run(cmd)
 
     def run_locally(self, command):

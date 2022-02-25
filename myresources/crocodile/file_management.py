@@ -676,6 +676,12 @@ class P(type(Path()), Path):
         # self._cparts
         # self._cached_cparts
 
+    def __contains__(self, item):
+        return item in self.parts
+
+    def __iter__(self):
+        return self.parts.__iter__()
+
     def __deepcopy__(self, memodict=None):
         if memodict is None:
             _ = {}
