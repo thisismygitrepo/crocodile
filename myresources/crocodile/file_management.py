@@ -806,7 +806,6 @@ class P(type(Path()), Path):
         :param overwrite: If True, overwrites existing symlink (self). Target path is not changed.
         :param orig:
         """
-
         target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
