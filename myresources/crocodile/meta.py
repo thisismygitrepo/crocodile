@@ -771,6 +771,7 @@ class SSH(object):
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = None
         if zip_n_encrypt:
+            print(f"ZIPPING & ENCRYPTING".center(80, "="))
             pwd = randstr(length=10, safe=True)
             source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
 
@@ -778,13 +779,15 @@ class SSH(object):
             target = P(source).collapseuser()
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
             target = target.as_posix()
-        print(f"Step 1: Creating Target directory {target} @ remote machine.")
 
+        print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
+
         remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
-        print(f"SENT `{source}` ==> `{remotepath}`")
+        print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="))
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt:
+            print(f"UNZIPPING & DECRYPTING".center(80, "="))
             resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
             source.delete(sure=True)
             return resp
