@@ -513,8 +513,9 @@ class Terminal:
             self.capture()
             print(f"Terminal Response:\nInput Command: {self.input}")
             for idx, (key, val) in enumerate(self.output.items()):
-                print(f"{idx} - {key} {'=' * 30}\n{val}")
-            print("-" * 50, "\n\n")
+                msg = f" {idx} - {key} "
+                print(f"{msg}".center(40, "-"), f"\n{val}")
+            print("=" * 50, "\n\n")
             return self
 
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
