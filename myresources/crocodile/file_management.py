@@ -1163,15 +1163,26 @@ class P(type(Path()), Path):
         pass
 
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True,
-                append="_encrypted", inplace=False, orig=False):
+                append="_encrypted", inplace=False, orig=False, use_7z=False):
         """
         see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
         https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
         """
         slf = self.expanduser().resolve()
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
-        code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)
         path = self._resolve_path(folder, name, path, slf.append(name=append).name)
+        if use_7z:
+            from crocodile.meta import Terminal
+            import platform
+            path = path + '.7z'
+            tm = Terminal()
+            if platform.system() == "Windows":
+                program = P(tm.run("$env:ProgramFiles", shell="powershell").op.split("\n")[0]).joinpath("7-Zip/7z.exe")
+                if not program.exists(): tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell")
+                tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
+            else: raise NotImplementedError("7z not implemented for Linux")
+            return path
+        code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)
         path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
         if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
         if inplace: slf.delete(sure=True, verbose=verbose)
