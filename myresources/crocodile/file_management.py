@@ -274,7 +274,7 @@ class P(type(Path()), Path):
         """
         path = self._resolve_path(folder=folder, name=name, path=path,
                                   default_name=self.absolute().name, rel2it=rel2it)
-        name, folder = self.name, self.parent
+        name, folder = path.name, path.parent
 
         if parents: folder.create(parents=True, exist_ok=True)
         slf = self.expanduser().resolve()
@@ -823,6 +823,11 @@ class P(type(Path()), Path):
 
     def write_bytes(self, data: bytes):
         super(P, self).write_bytes(data)
+        return self
+
+    def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):
+        if parents: self.parent.create(parents=parents)
+        super(P, self).touch(mode=mode, exist_ok=exist_ok)
         return self
 
     # ======================================== Folder management =======================================
