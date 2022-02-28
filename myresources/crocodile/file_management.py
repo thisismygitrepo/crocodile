@@ -1172,14 +1172,12 @@ class P(type(Path()), Path):
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         if use_7z:
-            from crocodile.meta import Terminal
-            import platform
+            import crocodile.enviroment as env
             path = path + '.7z'
-            tm = Terminal()
-            if platform.system() == "Windows":
-                program = P(tm.run("$env:ProgramFiles", shell="powershell").op.split("\n")[0]).joinpath("7-Zip/7z.exe")
-                if not program.exists(): tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell")
-                tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
+            if env.system == "Windows":
+                program = env.ProgramFiles.joinpath("7-Zip/7z.exe")
+                if not program.exists(): env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell")
+                env.tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
             else: raise NotImplementedError("7z not implemented for Linux")
             return path
         code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)

@@ -500,6 +500,10 @@ class Terminal:
             return self.output["stderr"]
 
         @property
+        def success(self):
+            return self.output["returncode"] == 0
+
+        @property
         def returncode(self):
             return self.output["returncode"]
 
@@ -741,7 +745,7 @@ class SSH(object):
         scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
         """
         if self.ssh_key is not None:
-            return f"""-i "{str(P(self.ssh_key.expanduser()))}" """
+            return f"""-i "{str(P(self.ssh_key).expanduser())}" """
         else:
             return ""
 
