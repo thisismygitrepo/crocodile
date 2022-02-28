@@ -652,7 +652,7 @@ class List(Base, list):
         return res
 
     # ======================= Modify Methods ===============================
-    def flatten(self):
+    def flatten(self):  # AKA combine, concatenate
         res = self.list[0]
         for item in self.list[1:]:
             res = res + item

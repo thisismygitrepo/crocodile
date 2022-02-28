@@ -816,6 +816,13 @@ class P(type(Path()), Path):
         super(P, self.expanduser()).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
+    
+    def resolve(self, strict=False):
+        try:
+            res = super(P, self).resolve(strict=strict)
+        except OSError:
+            return self
+        return res
 
     def write_text(self, data: str, **kwargs):
         super(P, self).write_text(data, **kwargs)

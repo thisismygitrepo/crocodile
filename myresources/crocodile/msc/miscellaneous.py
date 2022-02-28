@@ -9,6 +9,10 @@ def compute_num_of_lines_of_code_in_repo(path=tb.P.cwd(), extension=".py", r=Tru
     return tb.P(path).search(f"*{extension}", r=r, **kwargs).read_text().splitlines().apply(len).np.sum()
 
 
+def get_list_of_executables_defined_in_shell():
+    return tb.L(tb.os.environ["Path"].split(";")).apply(lambda x: tb.P(x).search("*.exe")).flatten().print()
+
+
 def polygon_area(points):
     """Return the area of the polygon whose vertices are given by the
     sequence points.
