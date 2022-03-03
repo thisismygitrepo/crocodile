@@ -458,8 +458,8 @@ class P(type(Path()), Path):
             return response.content
         # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8')
 
-    def read_refresh(self, refresh, expire="1w", save=Save.pickle, read=Read.read):
-        return Fridge(refresh=refresh, path=self, expire=expire, save=save, read=read)
+    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, read=Read.read):
+        return Fridge(source_func=source_func, path=self, expire=expire, save=save, read=read)
 
     # ================================ Path Object management ===========================================
     """ The default behaviour of methods that mutate the path object:
@@ -1368,13 +1368,13 @@ class Fridge:
     The class has two flavours, memory-based and disk-based variants.
     """
 
-    def __init__(self, refresh, expire="1m", time=None, logger=None, path=None, save=Save.pickle, read=Read.read):
+    def __init__(self, source_func, expire="1m", time=None, logger=None, path=None, save=Save.pickle, read=Read.read):
         """
         """
         self.cache = None  # fridge content
         self.time = time or datetime.now()  # init time
         self.expire = expire  # how much time elapsed before
-        self.refresh = refresh  # function which when called returns a fresh object to be frozen.
+        self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.logger = logger
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.save = save
@@ -1405,9 +1405,9 @@ class Fridge:
         """"""
         if self.path is None:  # Memory Fridge
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
-                self.cache = self.refresh()
+                self.cache = self.source_func()
                 self.time = datetime.now()
-                if self.logger: self.logger.debug(f"Updating / Saving data from {self.refresh}")
+                if self.logger: self.logger.debug(f"Updating / Saving data from {self.source_func}")
             else:
                 if self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
             return self.cache
@@ -1415,7 +1415,7 @@ class Fridge:
             if fresh or not self.path.exists() or self.age > str2timedelta(self.expire):
                 if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
                 # print(datetime.now() - self.path.stats().content_mod_time, str2timedelta(self.expire))
-                self.cache = self.refresh()  # fresh order, never existed or exists but expired.
+                self.cache = self.source_func()  # fresh order, never existed or exists but expired.
                 self.save(obj=self.cache, path=self.path)
             elif self.age < str2timedelta(self.expire):
                 if self.cache is None:  # this implementation favours reading over pulling fresh at instantiation.
