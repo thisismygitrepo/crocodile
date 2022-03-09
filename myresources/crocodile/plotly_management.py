@@ -65,8 +65,11 @@ class App:
         if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
             cn = func.__qualname__.split(".")[0]  # class name is obtained.
             cmd = f"import {func.__module__} as m; inst=m.{cn}(); inst.{func.__name__}()"
-        else:
-            cmd = f"import {func.__module__} as m; m.{func.__name__}()"
+        else:  # it is a standalone function.
+            # module = func.__module__  # fails if the function comes from main as it returns __main__.
+            module = tb.P(func.__code__.co_filename)
+            tb.sys.path.insert(0, module.parent)  # potentially dangerous as it leads to perplexing behaviour.
+            cmd = f"import {module.stem} as m; m.{func.__name__}()"
         resp = tm.run_async("python", "-c", cmd)
         # import crocodile.run
         return resp

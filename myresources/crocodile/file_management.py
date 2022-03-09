@@ -876,8 +876,7 @@ class P(type(Path()), Path):
             pass
 
         if not_in is not None:
-            for notin in not_in:
-                filters += [lambda x: str(notin) not in str(x)]
+            filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
 
         # ============================ get generator of search results ========================================
 
@@ -1370,6 +1369,13 @@ class Fridge:
 
     def __init__(self, source_func, expire="1m", time=None, logger=None, path=None, save=Save.pickle, read=Read.read):
         """
+        :param source_func: function that returns data
+        :param expire: time after which the data is considered expired.
+        :param time: time of the data. If not provided, it will be taken from the source_func.
+        :param logger: logger to use.
+        :param path: path to save the data.
+        :param save: save method.
+        :param read: read method.
         """
         self.cache = None  # fridge content
         self.time = time or datetime.now()  # init time
@@ -1381,6 +1387,7 @@ class Fridge:
         self.read = read
 
     def __getstate__(self):
+        """With this implementation, instances can be pickled and loaded up in different machine and still works."""
         state = self.__dict__.copy()
         if self.path is not None:
             state["path"] = self.path.rel2home()

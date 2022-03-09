@@ -677,7 +677,7 @@ tb.sys.path.insert(0, r'{wdir}')
         # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
     @staticmethod
-    def replicate_in_new_session(obj, execute=False):
+    def replicate_in_new_session(obj, execute=False, cmd=""):
         """Python brachnes off to a new window and run the function passed.
         context can be either a pickled session or the current file __file__"""
         # step 1: pickle the function
@@ -690,6 +690,7 @@ path = tb.P(r'{file}')
 obj = path.readit()
 path.delete(sure=True, verbose=False)
 obj{'()' if execute else ''}
+{cmd}
 """
         Terminal.run_script(script)
 
