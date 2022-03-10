@@ -653,6 +653,7 @@ class List(Base, list):
 
     # ======================= Modify Methods ===============================
     def flatten(self):  # AKA combine, concatenate
+        """The ouput is of unknown type. Items must support addition."""
         res = self.list[0]
         for item in self.list[1:]:
             res = res + item
@@ -851,6 +852,7 @@ class Struct(Base, dict):
                 final_dict = dictionary.__dict__
         else:  # both were passed
             final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
+            if not type(final_dict) is dict: final_dict = dict(final_dict)  # catches mappingproxy
             final_dict.update(kwargs)
         self.__dict__ = final_dict
 
@@ -1011,6 +1013,21 @@ class Struct(Base, dict):
     def __iter__(self):  # used when list(~) is called or it is iterated over.
         return iter(self.dict.items())
 
+    def __delitem__(self, key):
+        del self.__dict__[key]
+
+    def delete(self, key=None, keys=None, criterion=None):
+        if key is not None:
+            del self.__dict__[key]
+        if keys is not None:
+            for key in keys:
+                del self.__dict__[key]
+        if criterion is not None:
+            for key in self.keys().list:
+                if criterion(self[key]):
+                    del self.__dict__[key]
+        return self
+
     def update(self, *args, **kwargs):
         """Accepts dicts and keyworded args
         """
@@ -1018,11 +1035,19 @@ class Struct(Base, dict):
         self.__dict__.update(new_struct.__dict__)
         return self
 
-    def apply(self, func):
-        func = self.evalstr(func)
+    def apply_to_keys(self, key_val_func):
+        res = dict()
         for key, val in self.items():
-            self[key] = func(val)
+            res[key_val_func(key, val)] = val
+        return Struct(res)
+
+    def apply_to_values(self, key_val_func):
+        for key, val in self.items():
+            self[key] = key_val_func(val)
         return self
+
+    def filter(self, key_val_func=None):
+        return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
 
     def inverse(self):
         return Struct({v: k for k, v in self.dict.items()})
