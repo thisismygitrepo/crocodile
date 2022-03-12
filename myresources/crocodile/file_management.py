@@ -389,9 +389,10 @@ class P(type(Path()), Path):
             raise IOError
 
     def __call__(self, *args, **kwargs):
-        return self.start()
+        return self.start(*args, **kwargs)
 
-    def start(self):  # explore folders.
+    def start(self, opener=None):  # explore folders.
+        import subprocess
         if str(self).startswith("http") or str(self).startswith("www"):
             import webbrowser
             webbrowser.open(str(self))
@@ -400,14 +401,17 @@ class P(type(Path()), Path):
         # os.startfile(os.path.realpath(self))
         filename = self.expanduser().resolve().str
         if sys.platform == "win32":
-            os.startfile(filename)  # works for files and folders alike
+            if opener is None:
+                tmp = f"powershell start \"{filename}\""
+            else:
+                tmp = rf'{opener} "{self}"'
+            # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux':
-            import subprocess
             opener = "xdg-open"
             subprocess.call([opener, filename])  # works for files and folders alike
         else:  # mac
             # os.system(f"open {filename}")
-            import subprocess
             subprocess.call(["open", filename])  # works for files and folders alike
         return self
 

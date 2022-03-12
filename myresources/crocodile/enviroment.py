@@ -13,11 +13,6 @@ L = tb.List
 tm = tb.Terminal()
 DotFiles = P.home().joinpath("dotfiles")
 
-UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None
-OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
-OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
-OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
-
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
 
@@ -42,6 +37,13 @@ UserDomain = os.getenv("USERDOMAIN")
 UserName = os.getenv("USERNAME")
 OS = os.getenv("OS")  # Windows_NT
 Public = P(tmp) if (tmp := os.getenv("PUBLIC")) else None
+
+
+UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None
+OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
+OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
+OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
+OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe")
 
 
 def construct_path(path_list):
