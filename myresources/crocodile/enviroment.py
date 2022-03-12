@@ -4,6 +4,7 @@ import crocodile.toolbox as tb
 import platform
 
 system = platform.system()
+sep = ";" if system == "Windows" else ":"
 
 os = tb.os
 P = tb.P
@@ -33,8 +34,8 @@ CommonProgramW6432 = P(tmp) if (tmp := os.getenv("CommonProgramW6432")) else Non
 Tmp = P(tmp) if (tmp := os.getenv("TMP")) else None  # C:\Users\usernrame\AppData\Local\Temp
 Temp = Tmp
 
-Path = L(os.getenv("PATH").split(";")).apply(P)
-PSPath = L(os.getenv("PSModulePath").split(";")).apply(P)
+Path = L(os.getenv("PATH").split(sep)).apply(P)
+PSPath = L(os.getenv("PSModulePath").split(sep)).apply(P)
 
 HostName = os.getenv("COMPUTERNAME")
 UserDomain = os.getenv("USERDOMAIN")
@@ -45,7 +46,7 @@ Public = P(tmp) if (tmp := os.getenv("PUBLIC")) else None
 
 def construct_path(path_list):
     from functools import reduce
-    return reduce(lambda x, y: x + ";" + y, tb.L(tb.pd.unique(path_list)).apply(str))
+    return reduce(lambda x, y: x + sep + y, tb.L(tb.pd.unique(path_list)).apply(str))
 
 
 class ShellVar(object):

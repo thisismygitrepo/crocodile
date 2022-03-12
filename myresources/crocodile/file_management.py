@@ -411,10 +411,8 @@ class P(type(Path()), Path):
             subprocess.call(["open", filename])  # works for files and folders alike
         return self
 
-    def append_text(self, txt):
-        text = self.read_text()
-        text += txt
-        self.write_text(text)
+    def append_text(self, appendix):
+        self.write_text(self.read_text() + appendix)
         return self
 
     def modify_text(self, txt, alt, newline=True):
@@ -788,11 +786,11 @@ class P(type(Path()), Path):
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
     # ========================== override =======================================
-    def symlink_from(self, target=None, target_dir=None, verbose=False, overwrite=False):
+    def symlink_from(self, target_file=None, target_dir=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
-        if target is not None:
+        if target_file is not None:
             assert target_dir is None, "You can only pass source or source_dir, not both."
-            result = P(target)
+            result = P(target_file)
         else:
             if target_dir is None: target_dir = P.cwd()
             result = P(target_dir) / self.name

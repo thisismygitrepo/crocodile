@@ -839,20 +839,14 @@ class Struct(Base, dict):
         :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
         """
         super(Struct, self).__init__()
-        if type(dictionary) is Struct:
-            dictionary = dictionary.dict
-        if dictionary is None:  # only kwargs were passed
-            final_dict = kwargs
+        if type(dictionary) is Struct: dictionary = dictionary.dict
+        if dictionary is None: final_dict = kwargs  # only kwargs were passed
         elif not kwargs:  # only dictionary was passed
-            if type(dictionary) is dict:
-                final_dict = dictionary
-            elif type(dictionary) == "mappingproxy":
-                final_dict = dict(dictionary)
-            else:
-                final_dict = dictionary.__dict__
+            if type(dictionary) is dict: final_dict = dictionary
+            elif dictionary.__class__.__name__ == "mappingproxy": final_dict = dict(dictionary)
+            else: final_dict = dictionary.__dict__
         else:  # both were passed
             final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
-            if not type(final_dict) is dict: final_dict = dict(final_dict)  # catches mappingproxy
             final_dict.update(kwargs)
         self.__dict__ = final_dict
 
