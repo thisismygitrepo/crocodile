@@ -795,10 +795,10 @@ class P(type(Path()), Path):
         assert self.expanduser().exists(), "self must exist if this method is used."
         if target_file is not None:
             assert target_dir is None, "You can only pass source or source_dir, not both."
-            result = P(target_file)
+            result = P(target_file).expanduser().absolute()
         else:
             if target_dir is None: target_dir = P.cwd()
-            result = P(target_dir) / self.name
+            result = P(target_dir).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
 
     def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
