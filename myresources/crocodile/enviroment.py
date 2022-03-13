@@ -30,7 +30,7 @@ Tmp = P(tmp) if (tmp := os.getenv("TMP")) else None  # C:\Users\usernrame\AppDat
 Temp = Tmp
 
 Path = L(os.getenv("PATH").split(sep)).apply(P)
-PSPath = L(os.getenv("PSModulePath").split(sep)).apply(P)
+PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
 
 HostName = os.getenv("COMPUTERNAME")
 UserDomain = os.getenv("USERDOMAIN")
