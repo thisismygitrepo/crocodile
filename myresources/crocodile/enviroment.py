@@ -43,7 +43,7 @@ UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
 OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
 OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
-OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe")
+OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe") if LocalAppData else None
 
 
 def get_shell_profiles(shell):
