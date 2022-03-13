@@ -738,10 +738,10 @@ path.delete(sure=True, verbose=False)
             return os.getuid() == 0
 
     @staticmethod
-    def run_code_as_admin(cmd):
+    def run_code_as_admin(params):
         _ = install_n_import("win32api", name="pypiwin32")
         win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
-        win32com.shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=f" -c \"{cmd}\"")
+        win32com.shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=params)
 
     @staticmethod
     def run_as_admin(cmd_line=None, wait=True):
@@ -792,12 +792,12 @@ path.delete(sure=True, verbose=False)
 
 
 class SSH(object):
-    def __init__(self, username, hostname, ssh_key=None, pwd=None):
+    def __init__(self, username, hostname, sshkey=None, pwd=None):
         _ = False
         if _:
             super().__init__()
-        self.ssh_key = str(ssh_key) if ssh_key is not None else None
-        # no need to pass ssh_key if it was configured properly already
+        self.sshkey = str(sshkey) if sshkey is not None else None
+        # no need to pass sshkey if it was configured properly already
 
         import paramiko
         self.ssh = paramiko.SSHClient()
@@ -808,7 +808,7 @@ class SSH(object):
         self.ssh.connect(hostname=hostname,
                          username=username,
                          password=pwd,
-                         port=22, key_filename=self.ssh_key)
+                         port=22, key_filename=self.sshkey)
         self.sftp = self.ssh.open_sftp()
         self.target_machine = "Windows" if self.run("$env:OS", printit=False).output[
                                                "stdout"] == "Windows_NT" else "Linux"
@@ -830,13 +830,13 @@ class SSH(object):
         """In SSH commands you need this:
         scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
         """
-        if self.ssh_key is not None:
-            return f"""-i "{str(P(self.ssh_key).expanduser())}" """
+        if self.sshkey is not None:
+            return f"""-i "{str(P(self.sshkey).expanduser())}" """
         else:
             return ""
 
     @staticmethod
-    def copy_ssh_keys_to_remote(fqdn):
+    def copy_sshkeys_to_remote(fqdn):
         # Caveat, only windows is supported.
         # the following is a Windows Openssh alternative to ssh-copy-id
         Terminal().run(f'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
@@ -851,7 +851,7 @@ class SSH(object):
         return f"{os.getlogin()}@{self.platform.node()}"
 
     def open_console(self, new_window=True):
-        cmd = f"""ssh -i {self.ssh_key} {self.username}@{self.hostname}"""
+        cmd = f"""ssh -i {self.sshkey} {self.username}@{self.hostname}"""
         Terminal().run_async(cmd, new_window=new_window)
 
     def copy_env_var(self, name):

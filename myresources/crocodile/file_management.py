@@ -819,8 +819,8 @@ class P(type(Path()), Path):
         import platform
         from crocodile.meta import Terminal
         if platform.system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
-            Terminal.run_code_as_admin(f"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')")
-            time.sleep(0.5)
+            Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"")
+            time.sleep(0.5)  # give time for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self

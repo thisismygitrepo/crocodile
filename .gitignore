@@ -114,11 +114,10 @@ celerybeat.pid
 .env
 venv
 env/
-venv
 ENV/
 env.bak/
-venv
 pythonenv*
+myresources/crocodile/__pychache__/
 
 # Spyder project settings
 .spyderproject
