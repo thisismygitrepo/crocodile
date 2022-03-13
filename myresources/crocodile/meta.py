@@ -1,8 +1,8 @@
-
 import logging
 import subprocess
 import time
-from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save,\
+import types
+from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, \
     dill, install_n_import
 from crocodile.file_management import P
 
@@ -464,6 +464,7 @@ def batcherv2(func_type='function', order=1):
             def __call__(self, *args, **kwargs):
                 output = [self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
                 return np.array(output)
+
         return Batch
 
 
@@ -510,8 +511,10 @@ class Terminal:
         @property
         def as_path(self):
             """More often than not, the output is a path."""
-            if self.err == "": return P(self.op.split("\n")[0])
-            else: return None
+            if self.err == "":
+                return P(self.op.split("\n")[0])
+            else:
+                return None
 
         def capture(self):
             for key, val in self.std.items():
@@ -646,7 +649,8 @@ class Terminal:
         my_list += cmds
         my_list = [item for item in my_list if item != ""]
         print("Meta.Terminal.run_async: Subprocess command: ", my_list)
-        w = subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
+        w = subprocess.Popen(my_list, stdin=subprocess.PIPE,
+                             shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
         # returns Popen object, not so useful for communcation with an opened terminal
         return w
 
@@ -712,6 +716,80 @@ path.delete(sure=True, verbose=False)
 """
         Terminal().run_script(script=script)
 
+    @staticmethod
+    def is_user_admin():
+        """@return: True if the current user is an 'Admin' whatever that
+        means (root on Unix), otherwise False.
+        Warning: The inner function fails unless you have Windows XP SP2 or
+        higher. The failure causes a traceback to be printed and this
+        function to return False.
+        adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
+        """
+        if os.name == 'nt':
+            import ctypes  # WARNING: requires Windows XP SP2 or higher!
+            try:
+                return ctypes.windll.shell32.IsUserAnAdmin()
+            except:
+                import traceback
+                traceback.print_exc()
+                print("Admin check failed, assuming not an admin.")
+                return False
+        else:  # Check for root on Posix
+            return os.getuid() == 0
+
+    @staticmethod
+    def run_code_as_admin(cmd):
+        _ = install_n_import("win32api", name="pypiwin32")
+        win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
+        win32com.shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=f" -c \"{cmd}\"")
+
+    @staticmethod
+    def run_as_admin(cmd_line=None, wait=True):
+        """Attempt to relaunch the current script as an admin using the same
+        command line parameters.  Pass cmdLine in to override and set a new
+        command.  It must be a list of [command, arg1, arg2...] format.
+        Set wait to False to avoid waiting for the sub-process to finish. You
+        will not be able to fetch the exit code of the process if wait is
+        False.
+        Returns the sub-process return code, unless wait is False in which
+        case it returns None.
+        @WARNING: this function only works on Windows.
+        adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
+        """
+        if os.name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
+        _ = install_n_import("win32api", name="pypiwin32")
+        import win32con
+        win32event = install_n_import("win32event")
+        win32process = install_n_import("win32process")
+        win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
+        shell_execute_ex = win32com.shell.shell.ShellExecuteEx
+        win32com = __import__("win32com", fromlist=["shell.shellcon"])
+        shellcon = win32com.shell.shellcon
+        if cmd_line is None:
+            cmd_line = [sys.executable] + sys.argv
+        elif type(cmd_line) not in (tuple, list):
+            raise ValueError("cmdLine is not a sequence.")
+        cmd = '"%s"' % (cmd_line[0],)
+        # XXX TODO: isn't there a function or something we can call to massage command line params?
+        params = " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
+        # print "Running", cmd, params
+        # ShellExecute() doesn't seem to allow us to fetch the PID or handle
+        # of the process, so we can't get anything useful from it. Therefore
+        # the more complex ShellExecuteEx() must be used.
+        # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
+        proce_info = shell_execute_ex(nShow=win32con.SW_SHOWNORMAL,
+                                      fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
+                                      lpVerb='runas',  # causes UAC elevation prompt.
+                                      lpFile=cmd,
+                                      lpParameters=params)
+        if wait:
+            proc_handle = proce_info['hProcess']
+            _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE)
+            rc = win32process.GetExitCodeProcess(proc_handle)
+        else:
+            rc = None
+        return rc
+
 
 class SSH(object):
     def __init__(self, username, hostname, ssh_key=None, pwd=None):
@@ -732,7 +810,8 @@ class SSH(object):
                          password=pwd,
                          port=22, key_filename=self.ssh_key)
         self.sftp = self.ssh.open_sftp()
-        self.target_machine = "Windows" if self.run("$env:OS", printit=False).output["stdout"] == "Windows_NT" else "Linux"
+        self.target_machine = "Windows" if self.run("$env:OS", printit=False).output[
+                                               "stdout"] == "Windows_NT" else "Linux"
         # it must uses a python independent way to figure out the machine type to avoid circualrity below:
         import platform
         self.platform = platform
@@ -880,16 +959,20 @@ class Log(object):
         shandlers = []
         for handler in self.logger.handlers:
             if "StreamHandler" in str(handler):
-                if first: return handler
-                else: shandlers.append(handler)
+                if first:
+                    return handler
+                else:
+                    shandlers.append(handler)
         return shandlers
 
     def get_fhandler(self, first=True):
         fhandlers = []
         for handler in self.logger.handlers:
             if "FileHandler" in str(handler):
-                if first: return handler
-                else: fhandlers.append(handler)
+                if first:
+                    return handler
+                else:
+                    fhandlers.append(handler)
         return fhandlers
 
     @property

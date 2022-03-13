@@ -80,14 +80,15 @@ def validate_name(astring, replace='_'):
     return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
 
-def install_n_import(package):
+def install_n_import(package, name=None):
     """imports a package and installs it first if not."""
     try:
         pkg = __import__(package)
         return pkg
     except ImportError:
         import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        if name is None: name = package
+        subprocess.check_call([sys.executable, "-m", "pip", "install", name])
     pkg = __import__(package)
     return pkg
 

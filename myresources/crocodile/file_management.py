@@ -1,3 +1,4 @@
+import time
 
 from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, validate_name, str2timedelta,\
     Save, Path, install_n_import, dill
@@ -114,6 +115,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
 
 
 # =================================== File ============================================
+
 class Read(object):
     @staticmethod
     def read(path, **kwargs):
@@ -368,6 +370,7 @@ class P(type(Path()), Path):
         :param notfound: behaviour when file ``self`` to be read doesn't actually exist. Default: throw an error.
                 can be set to return `False` or any other value that will be returned if file not found.
         :param verbose:
+        :param readerror:
         :param kwargs:
         :return:
         """
@@ -813,7 +816,12 @@ class P(type(Path()), Path):
             if self.is_symlink() or self.exists():
                 # self.exists() is False for broken links even though they exist
                 self.delete(sure=True, verbose=verbose)
-        super(P, self.expanduser()).symlink_to(str(target))
+        import platform
+        from crocodile.meta import Terminal
+        if platform.system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
+            Terminal.run_code_as_admin(f"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')")
+            time.sleep(0.5)
+        else: super(P, self.expanduser()).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
     
