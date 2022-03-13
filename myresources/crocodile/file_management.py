@@ -401,10 +401,8 @@ class P(type(Path()), Path):
         # os.startfile(os.path.realpath(self))
         filename = self.expanduser().resolve().str
         if sys.platform == "win32":
-            if opener is None:
-                tmp = f"powershell start \"{filename}\""
-            else:
-                tmp = rf'{opener} "{self}"'
+            if opener is None: tmp = f"powershell start \"{filename}\""
+            else: tmp = rf'powershell {opener} "{self}"'
             # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux':

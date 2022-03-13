@@ -507,6 +507,12 @@ class Terminal:
         def returncode(self):
             return self.output["returncode"]
 
+        @property
+        def as_path(self):
+            """More often than not, the output is a path."""
+            if self.err == "": return P(self.op.split("\n")[0])
+            else: return None
+
         def capture(self):
             for key, val in self.std.items():
                 if val is not None and val.readable():

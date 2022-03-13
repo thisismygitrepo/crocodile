@@ -46,6 +46,36 @@ OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
 OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe")
 
 
+def get_shell_profiles(shell):
+    # following this: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.2
+    # https://devblogs.microsoft.com/scripting/understanding-the-six-powershell-profiles/
+
+    # Dynmaically obtained:
+    profiles = tb.Struct(
+        CurrentUserCurrentHost = tm.run("$PROFILE.CurrentUserCurrentHost", shell=shell).as_path,
+        CurrentUserAllHosts = tm.run("$PROFILE.CurrentUserAllHosts", shell=shell).as_path,
+        AllUsersCurrentHost = tm.run("$PROFILE.AllUsersCurrentHost", shell=shell).as_path,
+        AllUsersAllHosts = tm.run("$PROFILE.AllUsersAllHosts", shell=shell).as_path,
+    )
+
+    # Static:
+    # profiles = dict(
+    #     Windows = tb.Struct(CurrentUserCurrentHost=tb.P(r"$PSHOME\Profile.ps1"),
+    #                           CurrentUserAllHosts=tb.P(r"$Home\[My ]Documents\PowerShell\Profile.ps1"),
+    #                           AllUsersCurrentHost=tb.P(r"$PSHOME\Microsoft.PowerShell_profile.ps1"),
+    #                           AllUsersAllHosts=tb.P(r"$Home\[My ]Documents\PowerShell\Microsoft.PowerShell_profile.ps1")),
+    # Linux = tb.Struct(CurrentUserCurrentHost=tb.P(r""),
+    #                     CurrentUserAllHosts=tb.P(r""),
+    #                     AllUsersCurrentHost=tb.P(r""),
+    #                     AllUsersAllHosts=tb.P(r"")),
+    # macOS = tb.Struct(CurrentUserCurrentHost=tb.P(r""),
+    #                     CurrentUserAllHosts=tb.P(r""),
+    #                     AllUsersCurrentHost=tb.P(r""),
+    #                     AllUsersAllHosts=tb.P(r"")),
+    # )[system]
+    return profiles
+
+
 def construct_path(path_list):
     from functools import reduce
     return reduce(lambda x, y: x + sep + y, tb.L(tb.pd.unique(path_list)).apply(str))
