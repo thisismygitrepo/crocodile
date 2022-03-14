@@ -15,6 +15,7 @@ DotFiles = P.home().joinpath("dotfiles")
 
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
+WindowsApps = tmp if (tmp := P(r"C:\Users\Alex\AppData\Local\Microsoft\WindowsApps")) else None
 
 ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
 
@@ -82,7 +83,6 @@ def construct_path(path_list):
 
 
 class ShellVar(object):
-    """Not inherited by subprocess"""
     @staticmethod
     def set(key, val, run=False):
         if system == "Windows":

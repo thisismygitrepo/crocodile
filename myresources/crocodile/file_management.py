@@ -791,14 +791,14 @@ class P(type(Path()), Path):
         return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
 
     # ========================== override =======================================
-    def symlink_from(self, target_file=None, target_dir=None, verbose=False, overwrite=False):
+    def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
-        if target_file is not None:
-            assert target_dir is None, "You can only pass source or source_dir, not both."
-            result = P(target_file).expanduser().absolute()
+        if file is not None:
+            assert folder is None, "You can only pass source or source_dir, not both."
+            result = P(file).expanduser().absolute()
         else:
-            if target_dir is None: target_dir = P.cwd()
-            result = P(target_dir).expanduser().absolute() / self.name
+            if folder is None: folder = P.cwd()
+            result = P(folder).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
 
     def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
@@ -1186,7 +1186,7 @@ class P(type(Path()), Path):
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         if use_7z:
-            import crocodile.enviroment as env
+            import crocodile.environment as env
             path = path + '.7z'
             if env.system == "Windows":
                 program = env.ProgramFiles.joinpath("7-Zip/7z.exe")

@@ -512,7 +512,7 @@ class Terminal:
         def as_path(self):
             """More often than not, the output is a path."""
             if self.err == "":
-                return P(self.op.split("\n")[0])
+                return P(self.op.rstrip())
             else:
                 return None
 
@@ -539,7 +539,7 @@ class Terminal:
         Shell
         Host
         * adding `start` to the begining of the command results in launching a new console that will not
-        inherit from the console python was launched from (e.g. conda enviroment), unlike when console path is ignored.
+        inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
 
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
         * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
