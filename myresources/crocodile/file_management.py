@@ -404,8 +404,8 @@ class P(type(Path()), Path):
         # os.startfile(os.path.realpath(self))
         filename = self.expanduser().resolve().str
         if sys.platform == "win32":
-            if opener is None: tmp = f"powershell start \"{filename}\""
-            else: tmp = rf'powershell {opener} "{self}"'
+            if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
+            else: tmp = rf'powershell {opener} \'{self}\''
             # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux':
@@ -420,7 +420,7 @@ class P(type(Path()), Path):
         self.write_text(self.read_text() + appendix)
         return self
 
-    def modify_text(self, txt, alt, newline=True):
+    def modify_text(self, txt, alt, newline=False):
         """
         :param txt: text to be searched for in the file. The line in which it is found will be up for change.
         :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
