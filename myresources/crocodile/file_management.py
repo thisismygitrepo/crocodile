@@ -442,7 +442,7 @@ class P(type(Path()), Path):
                     lines[idx] = alt if type(alt) is str else alt(line)
                 else:
                     lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
-        if bingo is False:  lines.append(txt)  # txt not found, add it anyway.
+        if bingo is False:  lines.append(alt)  # txt not found, add it anyway.
         self.write_text("\n".join(lines))
         return self
 
