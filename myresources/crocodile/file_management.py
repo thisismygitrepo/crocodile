@@ -374,6 +374,7 @@ class P(type(Path()), Path):
         :param kwargs:
         :return:
         """
+        _ = readerror
         if not self.exists():
             if notfound is FileNotFoundError:
                 raise FileNotFoundError(f"`{self}` is no where to be found!")
@@ -700,7 +701,7 @@ class P(type(Path()), Path):
         rep = "P:"
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
-            except: target = "BROKEN LINK " + str(self)
+            except Exception: target = "BROKEN LINK " + str(self)
             if target == self: target = str(target)  # avoid infinite recursions for broken links.
             rep += " Symlink '" + str(self) + "' ==> " + repr(target)
         elif self.is_absolute():
@@ -735,16 +736,16 @@ class P(type(Path()), Path):
 
     def time(self, which="m", **kwargs):
         """Meaning of ``which values``
-            * ``m`` time of modifying file ``content``, i.e. the time it was created.
-            * ``c`` time of changing file status (its inode is changed like permissions, path etc, but not content)
-            * ``a`` last time the file was accessed.
+            * ``m`` time_produced of modifying file ``content``, i.e. the time_produced it was created.
+            * ``c`` time_produced of changing file status (its inode is changed like permissions, path etc, but not content)
+            * ``a`` last time_produced the file was accessed.
 
-        :param which: Determines which time to be returned. Three options are availalable:
+        :param which: Determines which time_produced to be returned. Three options are availalable:
         :param kwargs:
         :return:
         """
-        time = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
-        return datetime.fromtimestamp(time, **kwargs)
+        timestamp_ = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
+        return datetime.fromtimestamp(timestamp_, **kwargs)
 
     def stats(self):
         """A variant of `stat` method that returns a structure with human-readable values."""
@@ -820,7 +821,7 @@ class P(type(Path()), Path):
         from crocodile.meta import Terminal
         if platform.system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
             Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"")
-            time.sleep(0.5)  # give time for asynch process to conclude before returning response.
+            time.sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
@@ -1368,26 +1369,23 @@ class MemoryDB:
 
 
 class Fridge:
-    """
-    This class helps to accelrate access to latest data coming from a rather expensive function,
+    """This class helps to accelrate access to latest data coming from a rather expensive function,
     Thus, if multiple methods from superior classses requested this within 0.1 seconds,
-    there will be no problem of API being a bottleneck reducing running time to few seconds
-    The class has two flavours, memory-based and disk-based variants.
-    """
-
-    def __init__(self, source_func, expire="1m", time=None, logger=None, path=None, save=Save.pickle, read=Read.read):
+    there will be no problem of API being a bottleneck reducing running time_produced to few seconds
+    The class has two flavours, memory-based and disk-based variants."""
+    def __init__(self, source_func, expire="1m", time_produced=None, logger=None, path=None, save=Save.pickle, read=Read.read):
         """
         :param source_func: function that returns data
-        :param expire: time after which the data is considered expired.
-        :param time: time of the data. If not provided, it will be taken from the source_func.
+        :param expire: time_produced after which the data is considered expired.
+        :param time_produced: creation time. If not provided, it will be taken from the source_func.
         :param logger: logger to use.
         :param path: path to save the data.
         :param save: save method.
         :param read: read method.
         """
         self.cache = None  # fridge content
-        self.time = time or datetime.now()  # init time
-        self.expire = expire  # how much time elapsed before
+        self.time_produced = time_produced or datetime.now()  # init time_produced
+        self.expire = expire  # how much time_produced elapsed before
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.logger = logger
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
@@ -1409,19 +1407,19 @@ class Fridge:
     @property
     def age(self):
         if self.path is None:
-            return datetime.now() - self.time
+            return datetime.now() - self.time_produced
         else:
             return datetime.now() - self.path.stats().content_mod_time
 
     def reset(self):
-        self.time = datetime.now()
+        self.time_produced = datetime.now()
 
     def __call__(self, fresh=False):
         """"""
         if self.path is None:  # Memory Fridge
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
                 self.cache = self.source_func()
-                self.time = datetime.now()
+                self.time_produced = datetime.now()
                 if self.logger: self.logger.debug(f"Updating / Saving data from {self.source_func}")
             else:
                 if self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")

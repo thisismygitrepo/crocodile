@@ -250,7 +250,7 @@ class Accuracy(object):
 
     @staticmethod
     def measure(pred, correct):
-        """ This method measures the accuracy for once. Useful at test time, rather than training time.
+        """ This method measures the accuracy for once. Useful at test time_produced, rather than training time_produced.
         """
         return t.tensor(t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
 

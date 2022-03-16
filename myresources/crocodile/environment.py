@@ -18,14 +18,13 @@ AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username
 WindowsApps = tmp if (tmp := P(r"C:\Users\Alex\AppData\Local\Microsoft\WindowsApps")) else None
 
 ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
-
 ProgramFiles = P(tmp) if (tmp := os.getenv("ProgramFiles")) else None  # C:\Program Files
-ProgramFilesX86 = P(tmp) if (tmp := os.getenv("ProgramFiles(x86)")) else None  # C:\Program Files (x86)
 ProgramW6432 = P(tmp) if (tmp := os.getenv("ProgramW6432")) else None  # C:\Program Files
+ProgramFilesX86 = P(tmp) if (tmp := os.getenv("ProgramFiles(x86)")) else None  # C:\Program Files (x86)
 
 CommonProgramFiles = P(tmp) if (tmp := os.getenv("CommonProgramFiles")) else None  # C:\Program Files\Common Files
-CommonProgramFilesX86 = P(tmp) if (tmp := os.getenv("CommonProgramFiles(x86)")) else None  # C:\Program Files (x86)\Common Files
 CommonProgramW6432 = P(tmp) if (tmp := os.getenv("CommonProgramW6432")) else None  # C:\Program Files\Common Files
+CommonProgramFilesX86 = P(tmp) if (tmp := os.getenv("CommonProgramFiles(x86)")) else None  # C:\Program Files (x86)\Common Files
 
 Tmp = P(tmp) if (tmp := os.getenv("TMP")) else None  # C:\Users\usernrame\AppData\Local\Temp
 Temp = Tmp
@@ -84,10 +83,10 @@ def construct_path(path_list):
 
 class ShellVar(object):
     @staticmethod
-    def set(key, val, run=False):
+    def set(key, val, run=False, shell="powershell"):
         if system == "Windows":
             res = f"set {key} {val}"
-            return res if not run else tm.run(res, shell="powershell")
+            return res if not run else tm.run(res, shell=shell)
 
         elif system == "Linux":
             res = f"{key} = {val}"
@@ -106,6 +105,7 @@ class EnvVar:
         if system == "Windows":
             if temp is False:
                 res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters
+                # in case the variable included ";" separated paths, this limit can be exceeded.
                 return res if not run else tm.run(res, shell="powershell")
             else:
                 raise NotImplementedError

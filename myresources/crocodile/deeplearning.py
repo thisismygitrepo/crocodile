@@ -171,8 +171,8 @@ class HyperParam(tb.Struct):
 class DataReader(tb.Base):
     subpath = tb.P("metadata/data_reader")
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
-    and postprocessing. The latter is essential at inference time, but the former need not to be saved. As such,
-    at save time, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
+    and postprocessing. The latter is essential at inference time_produced, but the former need not to be saved. As such,
+    at save time_produced, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
     such type of data, make sure to keep them inside that `Struct`. Lastly, for convenience purpose, the class has
     implemented a fallback `getattr` method that allows accessing those attributes from the class itself, without the 
     need to reference `.dataspects`.

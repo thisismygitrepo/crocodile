@@ -107,7 +107,7 @@ class FigureManager:
         else:
             ax = axis
         if ax:
-            if not hasattr(ax, 'annot_obj'):  # first time
+            if not hasattr(ax, 'annot_obj'):  # first time_produced
                 ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30),
                                            textcoords="offset points",
                                            arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
@@ -278,7 +278,7 @@ class FigureManager:
     def show_cursor(self, event):
         ax = event.inaxes
         if ax:  # don't do this if c was pressed outside an axis.
-            if hasattr(ax, 'cursor_'):  # is this the first time?
+            if hasattr(ax, 'cursor_'):  # is this the first time_produced?
                 if ax.cursor_ is None:
                     from matplotlib import widgets
                     ax.cursor_ = widgets.Cursor(ax=ax, vertOn=True, horizOn=True, color='red', lw=1.0)
@@ -592,7 +592,7 @@ class SaveType:
             from collections import defaultdict
             self.container = defaultdict(lambda: [])
             self.interval = interval
-            self.fname = None  # determined at finish time.
+            self.fname = None  # determined at finish time_produced.
 
         def _save(self, afigure, aname, cla=False, **kwargs):
             fig_list = self.container[afigure.get_label()]
@@ -691,7 +691,7 @@ class SaveType:
 
             self.data_gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs)
-            plt.pause(0.5)  # give time for figures to show up before updating them
+            plt.pause(0.5)  # give time_produced for figures to show up before updating them
             from tqdm import tqdm
             for idx, datum in tqdm(enumerate(self.data_gen())):
                 self.plotter.animate(datum)
@@ -714,7 +714,7 @@ class SaveType:
 
             self.gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs)
-            plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
+            plt.pause(self.delay * 0.001)  # give time_produced for figures to show up before updating them
             # noinspection PyTypeChecker
             self.ani = animation.FuncAnimation(self.plotter.fig, self.plotter.animate, frames=self.gen,
                                                interval=interval, repeat_delay=1500, fargs=None,
@@ -769,7 +769,7 @@ class SaveType:
 
             self.data = gen_function
             self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
-            plt.pause(0.5)  # give time for figures to show up before updating them
+            plt.pause(0.5)  # give time_produced for figures to show up before updating them
 
             from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
@@ -904,7 +904,7 @@ class VisibilityViewerAuto(VisibilityViewer):
                      i.e. NumArgsPerPlot x NumInputsForAnimation x Input (possible points x signals)
         :param artist: an instance of a class that subclasses `Artist`
         :param memorize: if set to True, then axes are hidden and shown again, otherwise, plots constructed freshly
-                         every time they're shown (axes are cleaned instead of hidden)
+                         every time_produced they're shown (axes are cleaned instead of hidden)
         """
         self.kwargs = kwargs
         self.memorize = memorize
@@ -1208,7 +1208,7 @@ class Artist(FigureManager):
 
         if len(args):  # if there's something to plot in the init
             if not ax:  # no ax sent but we need to plot, we need an ax, plot will soon call get_axes.
-                self.create_new_axes = True  # just for the first time in this init method.
+                self.create_new_axes = True  # just for the first time_produced in this init method.
             self.plot(*self.args, label=label, title=title, **kwargs)
         else:  # nothing to be plotted in the init
             if not create_new_axes:  # are we going to ever create new axes?

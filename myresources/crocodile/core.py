@@ -6,7 +6,7 @@ Crocodile Philosophy:
 Make Python even friendlier, by making available the common functionality for everyday use. Specifically,
 path management, file management, and other common tasks.
 A the risk of vandalizing the concept, to make Python more MATLAB-like, in that more libraries are loaded up at
-start time than basic arithmetic, but just enought to make it more useful for everyday errands.
+start time_produced than basic arithmetic, but just enought to make it more useful for everyday errands.
 Thus, the terseness of Crocodile makes Python REPL a proper shell
 
 The focus is on ease of use, not efficiency.
@@ -225,7 +225,7 @@ class Save:
     @save_decorator(".pkl")
     def pickle(obj=None, path=None, r=False, **kwargs):
         """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are
-        loaded up and it happens implicitly. It often fails at load time and requires same packages to be reloaded first
+        loaded up and it happens implicitly. It often fails at load time_produced and requires same packages to be reloaded first
         . Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to
         dependency. Dill however, stores all the required packages for any attribute object, but not the class itself,
         or the classes that it inherits (at least at with this version)."""
@@ -278,15 +278,15 @@ class Base(object):
             * Downs:
                 * It requires (in case of composed objects) that every sub-object is well-behaved and has the appropriate
                   state methods implemented.
-                * The libraries imported must be present at load time.
+                * The libraries imported must be present at load time_produced.
         * `itself` is False: means to save __getstate__.
             * Ups:
-                * very safe and unlikely to cause import errors at load time.
+                * very safe and unlikely to cause import errors at load time_produced.
                 * User is responsible for loading up the class.
             * Downs: the class itself is required later and the `from_pickled_state` method should be used to reload the instance again.
-            * __init__ method will be used again at reconstruction time of the object before the attributes are monkey-patched.
+            * __init__ method will be used again at reconstruction time_produced of the object before the attributes are monkey-patched.
             * It is very arduous to design __init__ method that is convenient (uses plethora of
-              default arguments) and works at the same time with no input at reconstruction time.
+              default arguments) and works at the same time_produced with no input at reconstruction time_produced.
 
         :param include_code: `save_code` will be called.
         :param r: recursive flag.
@@ -702,7 +702,7 @@ class List(Base, list):
         :param verbose:
         :param desc:
         :param depth: apply the function to inner Lists
-        :param kwargs: a list of outputs each time the function is called on elements of the list.
+        :param kwargs: a list of outputs each time_produced the function is called on elements of the list.
         :return:
         """
         if depth > 1:

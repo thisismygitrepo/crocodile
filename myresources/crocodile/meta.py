@@ -1,7 +1,7 @@
 import logging
 import subprocess
 import time
-import types
+# import types
 from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, \
     dill, install_n_import
 from crocodile.file_management import P
@@ -1161,7 +1161,7 @@ def accelerate(func, ip):
     * func must be defined outside that context.
 
     To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
-    but takes a long time to be obtained like a request from server. For this, multithreading launches all threads
+    but takes a long time_produced to be obtained like a request from server. For this, multithreading launches all threads
     together, then process them in an interleaved fashion as they arrive, all will line-up for same processor,
     if it happens that they arrived quickly.
 
@@ -1195,8 +1195,8 @@ class Scheduler:
         """
         :param wait: repeat the cycle every this many minutes.
         """
-        self.routine = routine  # main routine to be repeated every `wait` time.
-        self.occasional = occasional  # routine to be repeated every `other` time.
+        self.routine = routine  # main routine to be repeated every `wait` time_produced.
+        self.occasional = occasional  # routine to be repeated every `other` time_produced.
         self.exception_handler = exception if exception is not None else lambda ex: None
         self.wind_down = wind_down
         # routine to be run when an error occurs, e.g. save object.
@@ -1205,7 +1205,7 @@ class Scheduler:
         self.cycles = runs  # how many times to run the routine. defaults to infinite.
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
         self.history = []
-        self._start_time = None  # begining of a session (local time)
+        self._start_time = None  # begining of a session (local time_produced)
         self.total_count = 0
         self.count = 0
 
@@ -1215,11 +1215,11 @@ class Scheduler:
         self._start_time = datetime.now()
         wait_time = str2timedelta(self.wait).total_seconds()
         import pandas as pd
-        until = pd.to_datetime(until)  # (local time)
+        until = pd.to_datetime(until)  # (local time_produced)
 
         while datetime.now() < until and self.count < self.cycles:
             # 1- Opening Message ==============================================================
-            time1 = datetime.now()  # time before calcs started.  # use  fstring format {x:<10}
+            time1 = datetime.now()  # time_produced before calcs started.  # use  fstring format {x:<10}
             msg = f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}."
             self.logger.info(msg + f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
 
@@ -1238,7 +1238,7 @@ class Scheduler:
 
             # 4- Conclude Message ============================================================
             self.count += 1
-            time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time.
+            time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time_produced.
             time_left = time_left if time_left > 0 else 1
             self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. "
                              f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
@@ -1253,19 +1253,19 @@ class Scheduler:
             if self.count >= self.cycles:
                 stop_reason = f"Reached maximum number of cycles ({self.cycles})"
             else:
-                stop_reason = f"Reached due stop time ({until})"
+                stop_reason = f"Reached due stop time_produced ({until})"
             self.record_session_end(reason=stop_reason)
 
     def record_session_end(self, reason="Unknown"):
-        """It is vital to record operation time to retrospectively inspect market status at session time."""
+        """It is vital to record operation time_produced to retrospectively inspect market status at session time_produced."""
         self.total_count += self.count
         end_time = datetime.now()  # end of a session.
         time_run = end_time - self._start_time
         self.history.append([self._start_time, end_time, time_run, self.count])
         self.logger.critical(f"\nScheduler has finished running a session. \n"
-                             f"start  time: {str(self._start_time)}\n"
-                             f"finish time: {str(end_time)} .\n"
-                             f"time    ran: {str(time_run)} | wait time {self.wait}  \n"
+                             f"start  time_produced: {str(self._start_time)}\n"
+                             f"finish time_produced: {str(end_time)} .\n"
+                             f"time_produced    ran: {str(time_run)} | wait time_produced {self.wait}  \n"
                              f"cycles  ran: {self.count}  |  Lifetime cycles: {self.total_count} \n"
                              f"termination: {reason} \n" + "-" * 100)
 
