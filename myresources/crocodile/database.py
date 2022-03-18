@@ -39,9 +39,9 @@ class DBMS:
         self.refresh()
 
     def close(self):
-        self.eng
         self.con.close()
         self.ses.close()
+        self.eng.dispose()
 
     def refresh(self, sch=None):
         # fails if multiple schemas are there and None is specified
@@ -72,13 +72,13 @@ class DBMS:
         if path == "memory":
             return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True)
         if path is None:
-            path = tb.P.tmpfile(folder="dbs", suffix=".db")
+            path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db")
         print(f"Linking to database at {tb.P(path).as_uri()}")
         eng = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True)
         # echo flag is just a short for the more formal way of logging sql commands.
         return eng
 
-     # ==================== QUERIES =====================================
+    # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands, res_func=lambda x: x.all()):
         with self.eng.connect() as conn:
             for command in commands:

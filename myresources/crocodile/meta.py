@@ -1120,8 +1120,7 @@ class Log(object):
 
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
-        if file_path is None:
-            file_path = P.tmpfile(name="logger", suffix=".log", folder="loggers")
+        if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt)
         fhandler.setLevel(level=f_level)
