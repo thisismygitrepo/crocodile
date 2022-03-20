@@ -553,6 +553,24 @@ class List(Base, list):
     def __setstate__(self, state):
         self.list = state
 
+    def __repr__(self):
+        if len(self.list) > 0:
+            tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
+            tmp2 = f"{repr(self.list[0])}"
+            return tmp1 + tmp2
+        else:
+            return f"An Empty List []"
+
+    def __len__(self):
+        return len(self.list)
+
+    @property
+    def len(self):
+        return self.list.__len__()
+
+    def __iter__(self):
+        return iter(self.list)
+
     # ================= call methods =====================================
     def method(self, name, *args, **kwargs):
         return List([getattr(i, name)(*args, **kwargs) for i in self.list])
@@ -675,24 +693,6 @@ class List(Base, list):
         self.list = self.list + list(other)
         return self
 
-    def __repr__(self):
-        if len(self.list) > 0:
-            tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
-            tmp2 = f"{self.list[0].__repr__()}"
-            return tmp1 + tmp2
-        else:
-            return f"An Empty List []"
-
-    def __len__(self):
-        return len(self.list)
-
-    @property
-    def len(self):
-        return self.list.__len__()
-
-    def __iter__(self):
-        return iter(self.list)
-
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         """
         :param jobs:
@@ -761,6 +761,11 @@ class List(Base, list):
 
     def insert(self, __index: int, __object):
         self.list.insert(__index, __object)
+        return self
+
+    def remove(self, value=None, values=None):
+        if value is not None: self.list.remove(value)
+        if values is not None: [self.list.remove(value) for value in values]
         return self
 
     def print(self, nl=1, sep=False, style=repr):
