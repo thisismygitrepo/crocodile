@@ -173,8 +173,7 @@ class Save:
 
     @staticmethod
     @save_decorator(".npy")
-    def npy(obj, path, **kwargs):
-        np.save(path, obj, **kwargs)
+    def npy(obj, path, **kwargs): np.save(path, obj, **kwargs)
 
     @staticmethod
     @save_decorator(".mat")
@@ -203,7 +202,6 @@ class Save:
         E.g. arrays or any other structure. An example of that is settings dictionary.
         It is useful for to generate human-readable file."""
         import json
-
         with open(str(path), "w") as file:
             json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
@@ -476,8 +474,7 @@ class Base(object):
         else:
             return string_
 
-    def print(self, typeinfo=False):
-        Struct(self.__dict__).print(dtype=typeinfo)
+    def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
 
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         objgraph = install_n_import("objgraph")
@@ -485,8 +482,7 @@ class Base(object):
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
         import sys
-        if sys.platform == "win32":
-            os.startfile(str(filename.absolute()))  # works for files and folders alike
+        if sys.platform == "win32": os.startfile(str(filename.absolute()))  # works for files and folders alike
         return filename
 
 
@@ -499,12 +495,6 @@ class List(Base, list):
     def __init__(self, obj_list=None):
         super().__init__()
         self.list = list(obj_list) if obj_list is not None else []
-
-    def __bool__(self):
-        return bool(self.list)
-    
-    def __contains__(self, key):
-        return key in self.list
 
     @classmethod
     def from_copies(cls, obj, count):
@@ -531,12 +521,9 @@ class List(Base, list):
             return cls(result)
 
     def save_items(self, directory, names=None, saver=None):
-        if saver is None:
-            saver = Save.pickle
-        if names is None:
-            names = range(len(self))
-        for name, item in zip(names, self.list):
-            saver(path=directory / name, obj=item)
+        if saver is None: saver = Save.pickle
+        if names is None: names = range(len(self))
+        for name, item in zip(names, self.list): saver(path=directory / name, obj=item)
 
     def __deepcopy__(self, memodict=None):
         if memodict is None:
@@ -544,39 +531,34 @@ class List(Base, list):
             _ = memodict
         return List([copy.deepcopy(i) for i in self.list])
 
-    def __copy__(self):
-        return List(self.list.copy())
+    def __bool__(self): return bool(self.list)
 
-    def __getstate__(self):
-        return self.list
+    def __contains__(self, key): return key in self.list
 
-    def __setstate__(self, state):
-        self.list = state
+    def __copy__(self): return List(self.list.copy())
+
+    def __getstate__(self): return self.list
+
+    def __setstate__(self, state): self.list = state
 
     def __repr__(self):
         if len(self.list) > 0:
             tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
             tmp2 = f"{repr(self.list[0])}"
             return tmp1 + tmp2
-        else:
-            return f"An Empty List []"
+        else: return f"An Empty List []"
 
-    def __len__(self):
-        return len(self.list)
+    def __len__(self): return len(self.list)
 
     @property
-    def len(self):
-        return self.list.__len__()
+    def len(self): return self.list.__len__()
 
-    def __iter__(self):
-        return iter(self.list)
+    def __iter__(self): return iter(self.list)
 
     # ================= call methods =====================================
-    def method(self, name, *args, **kwargs):
-        return List([getattr(i, name)(*args, **kwargs) for i in self.list])
+    def method(self, name, *args, **kwargs): return List([getattr(i, name)(*args, **kwargs) for i in self.list])
 
-    def attr(self, name):
-        return List([getattr(i, name) for i in self.list])
+    def attr(self, name): return List([getattr(i, name) for i in self.list])
 
     # def __getattribute__(self, item):
     #     # you can dispense with this method. Its only purpose is to make eaisr experience qwith the linter
@@ -602,10 +584,8 @@ class List(Base, list):
         return result
 
     def __call__(self, *args, lest=True, **kwargs):
-        if lest:
-            return List([i(*args, **kwargs) for i in self.list])
-        else:
-            return [i(*args, **kwargs) for i in self.list]
+        if lest: return List([i(*args, **kwargs) for i in self.list])
+        else: return [i(*args, **kwargs) for i in self.list]
 
     # ======================== Access Methods ==========================================
     def __getitem__(self, key):
@@ -621,8 +601,7 @@ class List(Base, list):
             else:
                 return List(result)
 
-    def __setitem__(self, key, value):
-        self.list[key] = value
+    def __setitem__(self, key, value): self.list[key] = value
 
     def sample(self, size=1, replace=False, p=None):
         """Select at random"""
@@ -652,8 +631,7 @@ class List(Base, list):
     #             return item
     # return None
 
-    def index_items(self, idx):
-        return List([item[idx] for item in self.list])
+    def index_items(self, idx): return List([item[idx] for item in self.list])
 
     def index(self, func, *args, **kwargs) -> list:
         """ A generalization of the `.index` method of `list`. It takes in a function rather than an
@@ -682,12 +660,9 @@ class List(Base, list):
         self.list.append(item)
         return self
 
-    def __add__(self, other):
-        # implement coersion
-        return List(self.list + list(other))
+    def __add__(self, other): return List(self.list + list(other))  # implement coersion
 
-    def __radd__(self, other):
-        return List(self.list + list(other))
+    def __radd__(self, other): return List(self.list + list(other))
 
     def __iadd__(self, other):  # inplace add.
         self.list = self.list + list(other)
@@ -743,25 +718,18 @@ class List(Base, list):
                 exec(func)
         return self
 
-    def sort(self, *args, **kwargs):
-        self.list.sort(*args, **kwargs)
-        return self
+    def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
 
-    def sorted(self, *args, **kwargs):
-        return List(sorted(self.list, *args, **kwargs))
+    def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
 
     def filter(self, func):
-        if type(func) is str:
-            func = eval("lambda x: " + func)
+        if type(func) is str: func = eval("lambda x: " + func)
         result = List()
         for item in self.list:
-            if func(item):
-                result.append(item)
+            if func(item): result.append(item)
         return result
 
-    def insert(self, __index: int, __object):
-        self.list.insert(__index, __object)
-        return self
+    def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
 
     def remove(self, value=None, values=None):
         if value is not None: self.list.remove(value)
@@ -771,10 +739,8 @@ class List(Base, list):
     def print(self, nl=1, sep=False, style=repr):
         for idx, item in enumerate(self.list):
             print(f"{idx:2}- {style(item)}", end=' ')
-            for _ in range(nl):
-                print('', end='\n')
-            if sep:
-                print(sep * 100)
+            for _ in range(nl): print('', end='\n')
+            if sep: print(sep * 100)
 
     def to_series(self):
         import pandas as pd
@@ -812,12 +778,10 @@ class List(Base, list):
         """Matches `to_list` from Pandas Series."""
         return self.list
 
-    def to_numpy(self):
-        return self.np
+    def to_numpy(self): return self.np
 
     @property
-    def np(self):
-        return np.array(self.list)
+    def np(self): return np.array(self.list)
 
     def to_struct(self, key_val=None):
         """
@@ -825,8 +789,7 @@ class List(Base, list):
         :return:
         """
         if key_val is None:
-            def key_val(x):
-                return str(x), x
+            def key_val(x): return str(x), x
         else:
             key_val = self.evalstr(key_val)
         return Struct.from_keys_values_pairs(self.apply(key_val))
@@ -875,23 +838,14 @@ class Struct(Base, dict):
     def recursive_dict(struct):
         mydict = struct.dict
         for key, val in mydict.items():
-            if type(val) is Struct:
-                mydict[key] = Struct.recursive_dict(val)
+            if type(val) is Struct: mydict[key] = Struct.recursive_dict(val)
         return mydict
 
     @classmethod
-    def from_keys_values(cls, keys, values):
-        """
-        :rtype: Struct
-        """
-        return cls(dict(zip(keys, values)))
+    def from_keys_values(cls, keys, values): return cls(dict(zip(keys, values)))
 
     @classmethod
-    def from_keys_values_pairs(cls, my_list):
-        res = dict()
-        for k, v in my_list:
-            res[k] = v
-        return cls(res)
+    def from_keys_values_pairs(cls, my_list): return cls({k: v for k, v in my_list})
 
     @classmethod
     def from_names(cls, names, default_=None):  # Mimick NamedTuple and defaultdict
@@ -915,14 +869,11 @@ class Struct(Base, dict):
         return self
 
     # ================ magic ==========================
-    def __bool__(self):
-        return bool(self.__dict__)
+    def __bool__(self): return bool(self.__dict__)
 
-    def __contains__(self, key):
-        return key in self.__dict__
+    def __contains__(self, key): return key in self.__dict__
 
-    def __len__(self):
-        return len(self.keys())
+    def __len__(self): return len(self.keys())
 
     # =========================== print ===========================
     @property
@@ -991,8 +942,7 @@ class Struct(Base, dict):
     def __getitem__(self, item):  # allows indexing into entries of __dict__ attribute
         return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
 
-    def __setitem__(self, key, value):
-        self.__dict__[key] = value
+    def __setitem__(self, key, value): self.__dict__[key] = value
 
     def __getattr__(self, item):  # this works better with the linter.
         try:
@@ -1004,53 +954,36 @@ class Struct(Base, dict):
             # except AttributeError:
             raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
 
-    def __getstate__(self):  # serialize
-        return self.__dict__
+    def __getstate__(self): return self.__dict__  # serialization
 
-    def __setstate__(self, state):  # deserialize
-        self.__dict__ = state
+    def __setstate__(self, state): self.__dict__ = state
 
-    def __iter__(self):  # used when list(~) is called or it is iterated over.
-        return iter(self.dict.items())
+    def __iter__(self): return iter(self.dict.items())
 
-    def __delitem__(self, key):
-        del self.__dict__[key]
+    def __delitem__(self, key): del self.__dict__[key]
 
     def delete(self, key=None, keys=None, criterion=None):
-        if key is not None:
-            del self.__dict__[key]
+        if key is not None: del self.__dict__[key]
         if keys is not None:
-            for key in keys:
-                del self.__dict__[key]
+            for key in keys: del self.__dict__[key]
         if criterion is not None:
             for key in self.keys().list:
-                if criterion(self[key]):
-                    del self.__dict__[key]
+                if criterion(self[key]): del self.__dict__[key]
         return self
 
     def update(self, *args, **kwargs):
-        """Accepts dicts and keyworded args
-        """
-        new_struct = Struct(*args, **kwargs)
-        self.__dict__.update(new_struct.__dict__)
-        return self
+        """Accepts dicts and keyworded args"""
+        self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
 
-    def apply_to_keys(self, key_val_func):
-        res = dict()
-        for key, val in self.items():
-            res[key_val_func(key, val)] = val
-        return Struct(res)
+    def apply_to_keys(self, key_val_func): return Struct({key_val_func(key, val): val for key, val in self.items()})
 
     def apply_to_values(self, key_val_func):
-        for key, val in self.items():
-            self[key] = key_val_func(val)
+        for key, val in self.items(): self[key] = key_val_func(val)
         return self
 
-    def filter(self, key_val_func=None):
-        return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
+    def filter(self, key_val_func=None): return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
 
-    def inverse(self):
-        return Struct({v: k for k, v in self.dict.items()})
+    def inverse(self): return Struct({v: k for k, v in self.dict.items()})
 
     # def append_values(self, *others, **kwargs):
     #     """ """
@@ -1058,20 +991,15 @@ class Struct(Base, dict):
 
     @staticmethod
     def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
-        if method is None:
-            method = list.__add__
+        if method is None: method = list.__add__
         if not lenient:
             keys = dicts[0].keys()
-            for i in dicts[1:]:
-                assert i.keys() == keys
+            for i in dicts[1:]: assert i.keys() == keys
         # else if lenient, take the union
-        if clone:
-            total_dict = copy.deepcopy(dicts[0])  # take first dict in the tuple
-        else:
-            total_dict = dicts[0]  # take first dict in the tuple
+        if clone: total_dict = copy.deepcopy(dicts[0])  # take first dict in the tuple
+        else: total_dict = dicts[0]  # take first dict in the tuple
         if collect_items:
-            for key, val in total_dict.item():
-                total_dict[key] = [val]
+            for key, val in total_dict.item(): total_dict[key] = [val]
 
             def method(tmp1, tmp2):
                 return tmp1 + [tmp2]
@@ -1082,39 +1010,27 @@ class Struct(Base, dict):
                     try:  # may be the key exists in the total dict already.
                         total_dict[key] = method(total_dict[key], adict[key])
                     except KeyError:  # key does not exist in total dict
-                        if collect_items:
-                            total_dict[key] = [adict[key]]
-                        else:
-                            total_dict[key] = adict[key]
+                        if collect_items: total_dict[key] = [adict[key]]
+                        else: total_dict[key] = adict[key]
         return Struct(total_dict)
 
-    def keys(self) -> List:
-        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
-        return List(list(self.dict.keys()))
+    def keys(self) -> List: return List(list(self.dict.keys()))
 
-    def values(self) -> List:
-        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
-        return List(list(self.dict.values()))
+    def values(self) -> List: return List(list(self.dict.values()))
 
-    def items(self) -> List:
-        """Same behaviour as that of `dict`, except that is doesn't produce a generator."""
-        return List(self.dict.items())
+    def items(self) -> List: return List(self.dict.items())
 
-    def get_values(self, keys) -> List:
-        return List([self[key] for key in keys])
+    def get_values(self, keys) -> List: return List([self[key] for key in keys])
 
     def to_dataframe(self, *args, **kwargs):
-        # return self.values().to_dataframe(names=self.keys())
         import pandas as pd
         return pd.DataFrame(self.__dict__, *args, **kwargs)
 
     @property
-    def dict(self):  # allows getting dictionary version without accessing private memebers explicitly.
-        return self.__dict__
+    def dict(self): return self.__dict__  # allows getting dictionary version without accessing private memebers explicitly.
 
     @dict.setter
-    def dict(self, adict):
-        self.__dict__ = adict
+    def dict(self, adict): self.__dict__ = adict
 
     def plot(self, artist=None):
         if artist is None:
@@ -1126,10 +1042,8 @@ class Struct(Base, dict):
             # if xdata is None:
             #     xdata = np.arange(len(val))
             artist.plot(val, label=key)
-        try:
-            artist.fig.legend()
-        except AttributeError:
-            pass
+        try: artist.fig.legend()
+        except AttributeError: pass
         return artist
 
 
@@ -1161,15 +1075,12 @@ class Display:
     @staticmethod
     def get_repr(data, limit=50):
         """A well-behaved repr function for all data types."""
-        if type(data) is np.ndarray:
-            string_ = f"shape = {data.shape}, dtype = {data.dtype}."
-        elif type(data) is str:
-            string_ = data
+        if type(data) is np.ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
+        elif type(data) is str: string_ = data
         elif type(data) is list:
             example = ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
             string_ = f"length = {len(data)}. " + example
-        else:
-            string_ = repr(data)
+        else: string_ = repr(data)
         if len(string_) > limit: string_ = string_[:limit]
         return string_
 

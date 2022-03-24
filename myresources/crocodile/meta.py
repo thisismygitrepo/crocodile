@@ -8,25 +8,12 @@ from crocodile.file_management import P
 
 
 class Null:
-    def __init__(self):
-        pass
-
-    def __repr__(self):
-        return "Welcome to the labyrinth!"
-
-    def __getattr__(self, item):
-        _ = item
-        return self
-
-    def __getitem__(self, item):
-        _ = item
-        return self
-
-    def __call__(self, *args, **kwargs):
-        return self
-
-    def __len__(self):
-        return 0
+    def __init__(self): pass
+    def __repr__(self): return "Welcome to the labyrinth!"
+    def __getattr__(self, item): return self
+    def __getitem__(self, item): _ = item; return self
+    def __call__(self, *args, **kwargs): return self
+    def __len__(self): return 0
 
 
 class Cycle:
@@ -34,9 +21,6 @@ class Cycle:
         self.c = c  # a list of values.
         self.index = -1
         self.name = name
-
-    def __str__(self):
-        return self.name
 
     def next(self):
         self.index += 1
@@ -50,23 +34,13 @@ class Cycle:
             self.index = len(self.c) - 1
         return self.c[self.index]
 
-    def set(self, value):
-        self.index = self.c.index(value)
-
-    def get(self):
-        return self.c[self.index]
-
-    def get_index(self):
-        return self.index
-
-    def set_index(self, index):
-        self.index = index
-
-    def sample(self, size=1):
-        return np.random.choice(self.c, size)
-
-    def __add__(self, other):
-        pass  # see behviour of matplotlib cyclers.
+    def set(self, value): self.index = self.c.index(value)
+    def get(self): return self.c[self.index]
+    def get_index(self): return self.index
+    def set_index(self, index): self.index = index
+    def sample(self, size=1): return np.random.choice(self.c, size)
+    def __add__(self, other): pass  # see behviour of matplotlib cyclers.
+    def __str__(self): return self.name
 
 
 class DictCycle(Cycle):
@@ -75,8 +49,7 @@ class DictCycle(Cycle):
         super(DictCycle, self).__init__(c=strct.items(), **kwargs)
         self.keys = strct.keys()
 
-    def set_key(self, key):
-        self.index = list(self.keys).index(key)
+    def set_key(self, key): self.index = list(self.keys).index(key)
 
 
 class Experimental:
@@ -485,28 +458,17 @@ class Terminal:
             self.output = dict(stdin="", stdout="", stderr="", returncode=None)
             self.input = cmd  # input command
 
-        def __call__(self, *args, **kwargs):
-            return self.op.rstrip() if type(self.op) is str else None
-
+        def __call__(self, *args, **kwargs): return self.op.rstrip() if type(self.op) is str else None
         @property
-        def op(self):
-            return self.output["stdout"]
-
+        def op(self): return self.output["stdout"]
         @property
-        def ip(self):
-            return self.output["stdin"]
-
+        def ip(self): return self.output["stdin"]
         @property
-        def err(self):
-            return self.output["stderr"]
-
+        def err(self): return self.output["stderr"]
         @property
-        def success(self):
-            return self.output["returncode"] == 0
-
+        def success(self): return self.output["returncode"] == 0
         @property
-        def returncode(self):
-            return self.output["returncode"]
+        def returncode(self): return self.output["returncode"]
 
         @property
         def as_path(self):
@@ -818,22 +780,17 @@ class SSH(object):
 
         if self.platform.system() == "Windows":
             self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
-        else:
-            self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
+        else: self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
 
-        if self.target_machine == "Windows":
-            self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
-        else:
-            self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
+        if self.target_machine == "Windows": self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
+        else: self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
 
     def get_key(self):
         """In SSH commands you need this:
         scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
         """
-        if self.sshkey is not None:
-            return f"""-i "{str(P(self.sshkey).expanduser())}" """
-        else:
-            return ""
+        if self.sshkey is not None: return f"""-i "{str(P(self.sshkey).expanduser())}" """
+        else: return ""
 
     @staticmethod
     def copy_sshkeys_to_remote(fqdn):
@@ -844,11 +801,8 @@ class SSH(object):
     def __repr__(self):
         return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
 
-    def remote(self):
-        return f"{self.username}@{self.hostname}"
-
-    def local(self):
-        return f"{os.getlogin()}@{self.platform.node()}"
+    def remote(self):return f"{self.username}@{self.hostname}"
+    def local(self):return f"{os.getlogin()}@{self.platform.node()}"
 
     def open_console(self, new_window=True):
         cmd = f"""ssh -i {self.sshkey} {self.username}@{self.hostname}"""
@@ -932,23 +886,16 @@ class Log(object):
         if file:  # first handler is a file handler
             self.specs["file_path"] = self.logger.handlers[0].baseFilename
 
-    def __getattr__(self, item):  # makes it twice as slower as direct access 300 ns vs 600 ns
-        return getattr(self.logger, item)
-
-    def debug(self, msg):  # to speed up the process and avoid falling back to __getattr__
-        return self.logger.debug(msg)
-
-    def info(self, msg):
-        return self.logger.info(msg)
-
-    def warn(self, msg):
-        return self.logger.warn(msg)
-
-    def error(self, msg):
-        return self.logger.error(msg)
-
-    def critical(self, msg):
-        return self.logger.critical(msg)
+    def __getattr__(self, item): return getattr(self.logger, item)  # makes it twice as slower as direct access 300 ns vs 600 ns
+    def debug(self, msg): return self.logger.debug(msg)  # to speed up the process and avoid falling back to __getattr__
+    def info(self, msg): return self.logger.info(msg)
+    def warn(self, msg): return self.logger.warn(msg)
+    def error(self, msg): return self.logger.error(msg)
+    def critical(self, msg): return self.logger.critical(msg)
+    @property
+    def file(self): return P(self.specs["file_path"]) if self.specs["file_path"] else None
+    @staticmethod
+    def get_basic_format(): return logging.BASIC_FORMAT
 
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
         if which in {"logger", "all"}: self.logger.setLevel(level)
@@ -974,10 +921,6 @@ class Log(object):
                 else:
                     fhandlers.append(handler)
         return fhandlers
-
-    @property
-    def file(self):
-        return P(self.specs["file_path"]) if self.specs["file_path"] else None
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
         if self.specs["file"] is False and self.specs["stream"] is False:
@@ -1023,10 +966,6 @@ class Log(object):
               f"{sep}%(message)s{sep}"
         # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
         return fmt
-
-    @staticmethod
-    def get_basic_format():
-        return logging.BASIC_FORMAT
 
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",

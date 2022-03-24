@@ -201,12 +201,9 @@ class Read(object):
         return obj
 
     @staticmethod
-    def pkl(*args, **kwargs):
-        return Read.pickle(*args, **kwargs)
-
+    def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
     @staticmethod
-    def pickles(bytes_obj):
-        return dill.loads(bytes_obj)
+    def pickles(bytes_obj): return dill.loads(bytes_obj)
 
 
 class P(type(Path()), Path):
@@ -316,7 +313,7 @@ class P(type(Path()), Path):
         :param name:
         :param append:
         :param folder: copy the file to this directory (filename remains the same).
-        :param path: full path of destination (including -potentially different-  file name).
+        :param path: full path of destination (including -potentially different file name).
         :param content: copy the parent directory or its content (relevant only if copying a directory)
         :param verbose:
         :return: path to copied file or directory.
@@ -392,8 +389,7 @@ class P(type(Path()), Path):
         except IOError:
             raise IOError
 
-    def __call__(self, *args, **kwargs):
-        return self.start(*args, **kwargs)
+    def __call__(self, *args, **kwargs): return self.start(*args, **kwargs)
 
     def start(self, opener=None):  # explore folders.
         import subprocess
@@ -421,8 +417,10 @@ class P(type(Path()), Path):
         self.write_text(self.read_text() + appendix)
         return self
 
-    def modify_text(self, txt, alt, newline=False):
+    def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding="utf-8"):
         """
+        :param notfound_append: if file not found, append the text to it.
+        :param encoding:
         :param txt: text to be searched for in the file. The line in which it is found will be up for change.
         :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
         :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
@@ -434,7 +432,7 @@ class P(type(Path()), Path):
         """
         self.parent.create()
         if not self.exists(): self.write_text(txt)
-        lines = self.read_text().split("\n")
+        lines = self.read_text(encoding=encoding).split("\n")
         bingo = False
         for idx, line in enumerate(lines):
             if txt in line:
@@ -443,8 +441,8 @@ class P(type(Path()), Path):
                     lines[idx] = alt if type(alt) is str else alt(line)
                 else:
                     lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
-        if bingo is False:  lines.append(alt)  # txt not found, add it anyway.
-        self.write_text("\n".join(lines))
+        if bingo is False and notfound_append is True:  lines.append(alt)  # txt not found, add it anyway.
+        self.write_text("\n".join(lines), encoding=encoding)
         return self
 
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
@@ -538,25 +536,19 @@ class P(type(Path()), Path):
     # ============================= attributes of object ======================================
     @property
     def trunk(self):
-        """ useful if you have multiple dots in file path where `.stem` fails.
-        """
+        """ useful if you have multiple dots in file path where `.stem` fails."""
         return self.name.split('.')[0]
 
-    def __len__(self):
-        return len(self.parts)
-
+    def __len__(self): return len(self.parts)
     @property
-    def len(self):
-        return self.__len__()
+    def len(self): return self.__len__()
+    @property
+    def str(self): return str(self)  # or self._str
 
     @property
     def items(self):
         """Behaves like `.parts` but returns a List."""
         return List(self.parts)
-
-    @property
-    def str(self):  # this method is used by other functions to get string representation of path
-        return str(self)  # or self._str
 
     def __add__(self, other):  # called when P + other
         """Behaves like adding strings"""
@@ -591,8 +583,7 @@ class P(type(Path()), Path):
                                                           f" OR one path is relative and the other is absolute.")
         return self._return("~" / (self - P.home()), inlieu)
 
-    def rel2cwd(self, inlieu=False):
-        return self._return(P(self.relative_to(Path.cwd())), inlieu)
+    def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -643,10 +634,8 @@ class P(type(Path()), Path):
         return one, two
 
     def __getitem__(self, slici):  # tested.
-        if type(slici) is slice:
-            return P(*self.parts[slici])
-        elif type(slici) is list or type(slici) is np.ndarray:
-            return P(*[self[item] for item in slici])
+        if type(slici) is slice: return P(*self.parts[slici])
+        elif type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
         else:  # it is an integer
             return P(self.parts[slici])
 
@@ -674,28 +663,13 @@ class P(type(Path()), Path):
                 fullparts = fullparts[:key.start] + new + fullparts[key.stop:]
         obj = P(*fullparts)
         self._str = str(obj)
-        # similar attributes:
-        # self._parts
-        # self._pparts
-        # self._cparts
-        # self._cached_cparts
+        # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
 
-    def __contains__(self, item):
-        return item in self.parts
-
-    def __iter__(self):
-        return self.parts.__iter__()
-
-    def __deepcopy__(self, memodict=None):
-        if memodict is None:
-            _ = {}
-        return P(str(self))
-
-    def __getstate__(self):
-        return str(self)
-
-    def __setstate__(self, state):
-        self._str = str(state)
+    def __contains__(self, item): return item in self.parts
+    def __iter__(self): return self.parts.__iter__()
+    def __deepcopy__(self): return P(str(self))
+    def __getstate__(self): return str(self)
+    def __setstate__(self, state): self._str = str(state)
 
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
@@ -827,19 +801,12 @@ class P(type(Path()), Path):
         return P(target) if not orig else self
     
     def resolve(self, strict=False):
-        try:
-            res = super(P, self).resolve(strict=strict)
-        except OSError:
-            return self
+        try: res = super(P, self).resolve(strict=strict)
+        except OSError: return self
         return res
 
-    def write_text(self, data: str, **kwargs):
-        super(P, self).write_text(data, **kwargs)
-        return self
-
-    def write_bytes(self, data: bytes):
-        super(P, self).write_bytes(data)
-        return self
+    def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
+    def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
 
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):
         if parents: self.parent.create(parents=parents)
@@ -855,8 +822,7 @@ class P(type(Path()), Path):
         return self
 
     @property
-    def browse(self):
-        return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
+    def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
 
     def search(self, pattern='*', r=False, generator=False, files=True, folders=True, compressed=False,
                dotfiles=False,
@@ -971,9 +937,6 @@ class P(type(Path()), Path):
                 processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
             return List(processed)
 
-    def listdir(self):
-        return List(os.listdir(self.expanduser().resolve())).apply(P)
-
     def tree(self, level: int = -1, limit_to_directories: bool = False,
              length_limit: int = 1000, stats=False, desc=None):
         """Given a directory Path object print a visual tree structure
@@ -1039,13 +1002,13 @@ class P(type(Path()), Path):
         else: return None
 
     @staticmethod
-    def tempdir():
-        import tempfile
-        return P(tempfile.mktemp())
-
+    def pwd(): return P.cwd()
     @staticmethod
-    def tmpdir(prefix=""):
-        return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
+    def tempdir(): import tempfile; return P(tempfile.mktemp())
+    @staticmethod
+    def tmpdir(prefix=""): return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
+    def chdir(self): os.chdir(str(self.expanduser())); return self
+    def listdir(self): return List(os.listdir(self.expanduser().resolve())).apply(P)
 
     @staticmethod
     def temp(*args, **kwargs):
@@ -1076,14 +1039,6 @@ class P(type(Path()), Path):
     def tmpfile(name=None, suffix="", folder=None, tstamp=False):
         return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix,
                      folder="tmp_files" if folder is None else folder)
-
-    @staticmethod
-    def pwd():
-        return P.cwd()
-
-    def chdir(self):
-        os.chdir(str(self.expanduser()))
-        return self
 
     # ====================================== Compression ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
@@ -1357,12 +1312,10 @@ class MemoryDB:
         if self.len > self.size:
             self.list = self.list[-self.size:]  # take latest frames and drop the older ones.
 
-    def __getitem__(self, item):
-        return self.list[item]
+    def __getitem__(self, item): return self.list[item]
 
     @property
-    def len(self):
-        return len(self.list)
+    def len(self): return len(self.list)
 
     def detect_market_correction(self):
         """Market correction is when there is a 10% movement in prices of all tickers."""
@@ -1411,8 +1364,7 @@ class Fridge:
         else:
             return datetime.now() - self.path.stats().content_mod_time
 
-    def reset(self):
-        self.time_produced = datetime.now()
+    def reset(self): self.time_produced = datetime.now()
 
     def __call__(self, fresh=False):
         """"""

@@ -2,11 +2,13 @@
 
 import crocodile.toolbox as tb
 import platform
+import os
+
 
 system = platform.system()
-sep = ";" if system == "Windows" else ":"
+OS = os.getenv("OS")  # Windows_NT
+sep = ";" if system == "Windows" else ":"  # path separator, not to be confused with P.sep
 
-os = tb.os
 P = tb.P
 L = tb.List
 
@@ -17,7 +19,7 @@ DotFiles = P.home().joinpath("dotfiles")
 
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
-WindowsApps = tmp if (tmp := P(r"C:\Users\Alex\AppData\Local\Microsoft\WindowsApps")) else None
+WindowsApps = AppData.joinpath(r"Microsoft\WindowsApps") if AppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
 
 ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
 ProgramFiles = P(tmp) if (tmp := os.getenv("ProgramFiles")) else None  # C:\Program Files
@@ -34,14 +36,16 @@ Temp = Tmp
 Path = L(os.getenv("PATH").split(sep)).apply(P)
 PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
 
-HostName = os.getenv("COMPUTERNAME")
-UserDomain = os.getenv("USERDOMAIN")
-UserName = os.getenv("USERNAME")
-OS = os.getenv("OS")  # Windows_NT
-Public = P(tmp) if (tmp := os.getenv("PUBLIC")) else None
+HostName = os.getenv("COMPUTERNAME")  # e.g. "MY-SURFACE"
+LogonServer = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
+UserDomain = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
+UserDomainRoaming = P(tmp) if (tmp := os.getenv("USERDOMAIN_ROAMINGPROFILE")) else None  # e.g. SURFACE
+UserName = os.getenv("USERNAME")  # e.g: alex
+UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\eng_a
+HomePath = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\eng_a
+Public = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
 
 
-UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
 OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
 OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
@@ -182,6 +186,7 @@ class PathVar:
 
 
 # ============================== Shells =========================================
+
 
 def get_shell_profiles(shell):
     # following this: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.2
