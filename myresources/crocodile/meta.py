@@ -88,11 +88,9 @@ class Experimental:
         import inspect
         path = P(path)
         readmepath = path / f"README.md" if path.is_dir() else path
-
         separator = "\n" + "-----" + "\n\n"
         text = "# Meta\n"
-        if meta is not None:
-            text = text + meta
+        if meta is not None: text = text + meta
         text += separator
 
         if obj is not None:
@@ -164,21 +162,17 @@ class Experimental:
             self = ".".join(func.split(".")[:-1])
             _ = self
             func = eval(func, modules)
-
         # TODO: add support for lambda functions.  ==> use dill for powerfull inspection
         import inspect
         import textwrap
-
         codelines = textwrap.dedent(inspect.getsource(func))
         if codelines.startswith("@staticmethod\n"): codelines = codelines[14:]
         assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
         # remove def func_name() line from the list
         idx = codelines.find("):\n")
         codelines = codelines[idx + 3:]
-
         # remove any indentation (4 for funcs and 8 for classes methods, etc)
         codelines = textwrap.dedent(codelines)
-
         # remove return statements
         lines = codelines.split("\n")
         codelines = []
@@ -190,16 +184,10 @@ class Experimental:
 
         code_string = ''.join(codelines)  # convert list to string.
         args_kwargs = ""
-        if include_args:
-            args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
-        if code is not None:
-            args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
-        if include_args or code:
-            code_string = args_kwargs + code_string
-
-        if copy2clipboard:
-            clipboard = install_n_import("clipboard")
-            clipboard.copy(code_string)
+        if include_args:  args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
+        if code is not None: args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
+        if include_args or code: code_string = args_kwargs + code_string
+        if copy2clipboard: install_n_import("clipboard").copy(code_string)
         if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
         return code_string  # ready to be run with exec()
 
@@ -280,12 +268,10 @@ class Experimental:
         #     sourcecells = P(module).read_text().split("#%%")
         # else:
         sourcecells = P(module.__file__).read_text().split("#%%")
-
         for cell in sourcecells:
             if pointer in cell.split('\n')[0]:
                 break  # bingo
-        else:
-            raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
+        else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
         print(cell)
         clipboard = install_n_import("clipboard")
         clipboard.copy(cell)
@@ -305,10 +291,8 @@ class Manipulator:
         shape = array.shape
         sz1, sz2 = shape[ax1], shape[ax2]
         new_shape = shape[:ax1] + (sz1 * sz2,)
-        if ax2 == -1 or ax2 == len(shape):
-            pass
-        else:
-            new_shape = new_shape + shape[ax2 + 1:]
+        if ax2 == -1 or ax2 == len(shape): pass
+        else: new_shape = new_shape + shape[ax2 + 1:]
         return array.reshape(new_shape)
 
     @staticmethod
@@ -503,11 +487,8 @@ class Terminal:
         import platform
         self.machine = platform.system()  # Windows, Linux, Darwin
 
-    def set_std_system(self):
-        self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
-
-    def set_std_pipe(self):
-        self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
+    def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
+    def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
 
     def set_std_null(self):
         """Equivalent to `echo 'foo' &> /dev/null`"""
@@ -734,11 +715,9 @@ path.delete(sure=True, verbose=False)
 class SSH(object):
     def __init__(self, username, hostname, sshkey=None, pwd=None):
         _ = False
-        if _:
-            super().__init__()
+        if _: super().__init__()
         self.sshkey = str(sshkey) if sshkey is not None else None
         # no need to pass sshkey if it was configured properly already
-
         import paramiko
         self.ssh = paramiko.SSHClient()
         self.ssh.load_system_host_keys()
@@ -755,11 +734,8 @@ class SSH(object):
         # it must uses a python independent way to figure out the machine type to avoid circualrity below:
         import platform
         self.platform = platform
-
-        if self.platform.system() == "Windows":
-            self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
+        if self.platform.system() == "Windows": self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
         else: self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
-
         if self.target_machine == "Windows": self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
         else: self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
 
@@ -767,8 +743,7 @@ class SSH(object):
         """In SSH commands you need this:
         scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
         """
-        if self.sshkey is not None: return f"""-i "{str(P(self.sshkey).expanduser())}" """
-        else: return ""
+        return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""
 
     @staticmethod
     def copy_sshkeys_to_remote(fqdn):
@@ -776,19 +751,11 @@ class SSH(object):
         # the following is a Windows Openssh alternative to ssh-copy-id
         Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
-    def __repr__(self):
-        return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
-
-    def remote(self):return f"{self.username}@{self.hostname}"
-    def local(self):return f"{os.getlogin()}@{self.platform.node()}"
-
-    def open_console(self, new_window=True):
-        cmd = f"""ssh -i {self.sshkey} {self.username}@{self.hostname}"""
-        Terminal().run_async(cmd, new_window=new_window)
-
-    def copy_env_var(self, name):
-        assert self.target_machine == "Linux"
-        self.run(f"{name} = {os.environ[name]}; export {name}")
+    def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
+    def remote(self): return f"{self.username}@{self.hostname}"
+    def local(self): return f"{os.getlogin()}@{self.platform.node()}"
+    def open_console(self, new_window=True):Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
+    def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {os.environ[name]}; export {name}")
 
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = None
@@ -814,8 +781,8 @@ class SSH(object):
             source.delete(sure=True)
             return resp
 
-    def copy_to_here(self, source, target=None):
-        pass
+    def copy_to_here(self, source, target=None): pass
+    def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
 
     def run(self, cmd, printit=True):
         # if printit: print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{cmd}")
@@ -823,10 +790,6 @@ class SSH(object):
         res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
         if printit: res.print()
         return res
-
-    def runpy(self, cmd):
-        cmd = f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """
-        return self.run(cmd)
 
     def run_locally(self, command):
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
@@ -998,20 +961,16 @@ class Log(object):
 
     @staticmethod
     def get_base_logger(module, name, l_level):
-        if name is None:
-            print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
-        else:
-            print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
+        if name is None: print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
+        else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
         logger = module.getLogger(name=name or randstr())
         logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
         return logger
 
     @staticmethod
     def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
-        if file or file_path:  # ==> create file handler for the logger.
-            Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)
-        if stream:  # ==> create stream handler for the logger.
-            Log.add_streamhandler(logger, s_level, fmt, module=module)
+        if file or file_path:  Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)  # create file handler for the logger.
+        if stream: Log.add_streamhandler(logger, s_level, fmt, module=module)  # ==> create stream handler for the logger.
 
     @staticmethod
     def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
@@ -1046,9 +1005,6 @@ class Log(object):
         for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]:
             Log.test_logger(logger)
             print("=" * 100)
-
-    # def config_root_logger(self):
-    #     logging.basicConfig(filename=None, filemode="w", level=None, format=None)
 
     @staticmethod
     def manual_degug(path):  # man
@@ -1126,17 +1082,13 @@ class Scheduler:
             self.logger.info(msg + f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
 
             # 2- Perform logic ======================================================
-            try:
-                self.routine()
-            except Exception as ex:
-                self.handle_exceptions(ex)
+            try: self.routine()
+            except Exception as ex: self.handle_exceptions(ex)
 
             # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
-                try:
-                    self.occasional()
-                except Exception as ex:
-                    self.handle_exceptions(ex)
+                try: self.occasional()
+                except Exception as ex: self.handle_exceptions(ex)
 
             # 4- Conclude Message ============================================================
             self.count += 1
@@ -1144,18 +1096,12 @@ class Scheduler:
             time_left = time_left if time_left > 0 else 1
             self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. "
                              f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
-
             # 5- Sleep ===============================================================
-            try:
-                time.sleep(time_left)  # consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex:
-                self.handle_exceptions(ex)
-
+            try: time.sleep(time_left)  # consider replacing by Asyncio.sleep
+            except KeyboardInterrupt as ex: self.handle_exceptions(ex)
         else:  # while loop finished due to condition satisfaction (rather than breaking)
-            if self.count >= self.cycles:
-                stop_reason = f"Reached maximum number of cycles ({self.cycles})"
-            else:
-                stop_reason = f"Reached due stop time_produced ({until})"
+            if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
+            else: stop_reason = f"Reached due stop time_produced ({until})"
             self.record_session_end(reason=stop_reason)
 
     def record_session_end(self, reason="Unknown"):
@@ -1184,13 +1130,7 @@ class Scheduler:
         # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 
-def qr(txt):
-    qrcode = install_n_import("qrcode")
-    img = qrcode.make(txt)
-    file = P.tmpfile(suffix=".png")
-    img.save(file.__str__())
-    file()
-    return file
+def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
 
 
 if __name__ == '__main__':

@@ -87,7 +87,6 @@ class FigureManager:
     def maximize_fig(self):
         """The command required is backend-dependent and also OS dependent."""
         _ = self
-        # plt.get_current_fig_manager().window.state('zoom')
         plt.get_current_fig_manager().full_screen_toggle()
 
     def toggle_annotate(self, event):
@@ -155,8 +154,7 @@ class FigureManager:
         self.message = f'Next {self.index}'
         self.animate()
 
-    def animate(self):
-        pass  # a method of the artist child class that is inheriting from this class
+    def animate(self): pass  # a method of the artist child class that is inheriting from this class
 
     def text_info(self, event):
         _ = event
@@ -256,8 +254,7 @@ class FigureManager:
             fig.canvas.draw()
 
     def update_info_text(self, message):
-        if self.message_obj:
-            self.message_obj.remove()
+        if self.message_obj: self.message_obj.remove()
         self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
 
     @staticmethod
@@ -267,12 +264,9 @@ class FigureManager:
             ncols = int(np.ceil(np.sqrt(num_plots)))
             while nrows * ncols < num_plots:
                 ncols += 1
-        elif not ncols and nrows:
-            ncols = int(np.ceil(num_plots / nrows))
-        elif not nrows and ncols:
-            nrows = int(np.ceil(num_plots / ncols))
-        else:
-            pass
+        elif not ncols and nrows: ncols = int(np.ceil(num_plots / nrows))
+        elif not nrows and ncols: nrows = int(np.ceil(num_plots / ncols))
+        else: pass
         return nrows, ncols
 
     def show_cursor(self, event):
@@ -297,26 +291,18 @@ class FigureManager:
                 # event.inaxes.axis(['off', 'on'][self.boundaries_flag])
                 self.toggle_ticks(axis)
                 self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
-
         else:
-            for ax in self.ax:
-                # ax.axis(['off', 'on'][self.boundaries_flag])
-                self.toggle_ticks(ax)
+            for ax in self.ax: self.toggle_ticks(ax)
 
     @staticmethod
     def toggle_ticks(an_ax, state=None):
-        for line in an_ax.get_yticklines():
-            line.set_visible(not line.get_visible() if state is None else state)
-        for line in an_ax.get_xticklines():
-            line.set_visible(not line.get_visible() if state is None else state)
-        for line in an_ax.get_xticklabels():
-            line.set_visible(not line.get_visible() if state is None else state)
-        for line in an_ax.get_yticklabels():
-            line.set_visible(not line.get_visible() if state is None else state)
+        for line in an_ax.get_yticklines(): line.set_visible(not line.get_visible() if state is None else state)
+        for line in an_ax.get_xticklines(): line.set_visible(not line.get_visible() if state is None else state)
+        for line in an_ax.get_xticklabels(): line.set_visible(not line.get_visible() if state is None else state)
+        for line in an_ax.get_yticklabels(): line.set_visible(not line.get_visible() if state is None else state)
 
     def clear_axes(self):
-        for ax in self.ax:
-            ax.cla()
+        for ax in self.ax: ax.cla()
 
     @staticmethod
     def show_pixels_values(ax):
@@ -512,8 +498,7 @@ class SaveType:
             for afig, aname in zip(self.watch_figs, names):
                 self._save(afig, aname, **kwargs)
 
-        def _save(self, *args, **kwargs):
-            pass
+        def _save(self, *args, **kwargs): pass
 
     class Null(GenericSave):
         """ Use this when you do not want to save anything. This class will help plot to work faster
@@ -597,7 +582,6 @@ class SaveType:
         def _save(self, afigure, aname, cla=False, **kwargs):
             fig_list = self.container[afigure.get_label()]
             subcontainer = []
-
             search = FigureManager.findobj(afigure, 'neo')
             for item in search:
                 item.set_label('processed')
@@ -644,8 +628,7 @@ class SaveType:
                                     "be setup. Did you mean to use an autosaver?"
             self.writer.setup(fig=self.watch_figs[0], outfile=self.fname, dpi=dpi)
 
-        def _save(self, afig, aname, **kwargs):
-            self.writer.grab_frame(**kwargs)
+        def _save(self, afig, aname, **kwargs): self.writer.grab_frame(**kwargs)
 
         def finish(self):
             print('Saving results ...')
@@ -654,16 +637,13 @@ class SaveType:
             return self.fname
 
     class GIFPipeBased(GIFFileBased):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
     class MPEGFileBased(GIFFileBased):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
     class MPEGPipeBased(GIFFileBased):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
     """
     Parses the data automatically.
@@ -686,8 +666,7 @@ class SaveType:
 
         def animate(self):
             def gen_function():
-                for i in zip(*self.data):
-                    yield i
+                for i in zip(*self.data): yield i
 
             self.data_gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs)
@@ -703,14 +682,11 @@ class SaveType:
             super().__init__(plotter_class, data, **kwargs)
             writer = None
             from matplotlib import animation
-            if extension == 'gif':
-                writer = animation.PillowWriter(fps=fps)
-            elif extension == 'mp4':
-                writer = animation.FFMpegWriter(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=2500)
+            if extension == 'gif': writer = animation.PillowWriter(fps=fps)
+            elif extension == 'mp4': writer = animation.FFMpegWriter(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=2500)
 
             def gen_function():
-                for i in zip(*self.data):
-                    yield i
+                for i in zip(*self.data): yield i
 
             self.gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs)
@@ -780,16 +756,13 @@ class SaveType:
             print(f"Results saved successfully @ {self.fname}")
 
     class GIFPipeBasedAuto(GIFFileBasedAuto):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
     class MPEGFileBasedAuto(GIFFileBasedAuto):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
     class MPEGPipeBasedAuto(GIFFileBasedAuto):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
 
 class VisibilityViewer(FigureManager):
@@ -869,27 +842,21 @@ class VisibilityViewer(FigureManager):
             self.hide_artist_axes()
 
     def hide_artist_axes(self):
-        for ax in self.artist.ax:
-            ax.set_visible(False)
-        for text in self.artist.txt:
-            text.set_visible(False)
+        for ax in self.artist.ax: ax.set_visible(False)
+        for text in self.artist.txt: text.set_visible(False)
+
+    def animate(self):
+        # remove current axes and set self.index as visible.
+        for ax in self.axes_repo[self.current]: ax.set_visible(False)
+        for text in self.texts_repo[self.current]: text.set_visible(False)
+        for ax in self.axes_repo[self.index]: ax.set_visible(True)
+        for text in self.texts_repo[self.index]: text.set_visible(True)
+        self.current = self.index
+        self.fig.canvas.draw()
 
     def finish(self):  # simply: undo the last hiding
         self.current = self.index
         self.animate()
-
-    def animate(self):
-        # remove current axes and set self.index as visible.
-        for ax in self.axes_repo[self.current]:
-            ax.set_visible(False)
-        for text in self.texts_repo[self.current]:
-            text.set_visible(False)
-        for ax in self.axes_repo[self.index]:
-            ax.set_visible(True)
-        for text in self.texts_repo[self.index]:
-            text.set_visible(True)
-        self.current = self.index
-        self.fig.canvas.draw()
 
 
 class VisibilityViewerAuto(VisibilityViewer):
@@ -909,13 +876,10 @@ class VisibilityViewerAuto(VisibilityViewer):
         self.kwargs = kwargs
         self.memorize = memorize
         self.max_index_memorized = 0
-
-        if transpose:
-            data = np.array(list(zip(*data)))
+        if transpose: data = np.array(list(zip(*data)))
         self.data = data
         self.legends = legends
-        if legends is None:
-            self.legends = [f"Curve {i}" for i in range(len(self.data))]
+        if legends is None: self.legends = [f"Curve {i}" for i in range(len(self.data))]
         self.titles = titles if titles is not None else np.arange(len(self.data))
         self.lables = x_labels
 
@@ -924,8 +888,7 @@ class VisibilityViewerAuto(VisibilityViewer):
                             **kwargs)
         else:
             artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
-            if memorize:
-                assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new " \
+            if memorize: assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new " \
                                                        "axes from the artist with every plot"
         self.artist = artist
         super().__init__(artist=self.artist, hide_artist_axes=False)
@@ -953,16 +916,13 @@ class VisibilityViewerAuto(VisibilityViewer):
                 self.artist.plot(*datum, title=self.titles[i], legends=self.legends)
                 # replot the new data point on a new axis.
             self.saver.add()
-            if self.pause:
-                break
-            else:
-                self.index = i
+            if self.pause: break
+            else: self.index = i
         if self.index == self.index_max - 1 and not self.pause:  # arrived at last image and not in manual mode
             self.fname = self.saver.finish()
 
     @staticmethod
-    def test():
-        return VisibilityViewerAuto(data=np.random.randn(1, 10, 100, 3))
+    def test(): return VisibilityViewerAuto(data=np.random.randn(1, 10, 100, 3))
 
 
 class ImShow(FigureManager):
@@ -1054,8 +1014,7 @@ class ImShow(FigureManager):
                 self.ax = []
                 for ags in gs[1:]:
                     self.ax.append(self.fig.add_subplot(gs[ags[0], ags[1]]))
-            else:
-                self.ax = self.fig.subplots(nrows=nrows, ncols=ncols)
+            else: self.ax = self.fig.subplots(nrows=nrows, ncols=ncols)
         else:
             self.ax = ax
             try:
@@ -1065,10 +1024,8 @@ class ImShow(FigureManager):
 
         self.fig.canvas.mpl_connect('key_press_event', self.process_key)
         self.fig.canvas.mpl_connect("pick_event", self.annotate)
-        if tight:
-            self.fig.tight_layout()
-        if subplots_adjust is not None:
-            self.fig.subplots_adjust(**subplots_adjust)
+        if tight: self.fig.tight_layout()
+        if subplots_adjust is not None: self.fig.subplots_adjust(**subplots_adjust)
 
         # if save_type.parser == "internal":
         #     raise TypeError("Requires external data parser")
@@ -1078,8 +1035,7 @@ class ImShow(FigureManager):
                                delay=delay, fps=1000 / delay, **save_kwargs)
         if nrows == 1 and ncols == 1:
             self.ax = [self.ax]  # make a list out of it.
-        else:
-            self.ax = self.ax.ravel()  # make a 1D  list out of a 2D array.
+        else: self.ax = self.ax.ravel()  # make a 1D  list out of a 2D array.
         for an_ax in self.ax:
             # an_ax.set_xticks([])
             # an_ax.set_yticks([])
@@ -1116,8 +1072,7 @@ class ImShow(FigureManager):
             self.fname = self.saver.finish()
 
     def annotate(self, event, axis=None, data=None):
-        for ax in self.ax:
-            super().annotate(event, axis=ax, data=ax.images[0].get_array())
+        for ax in self.ax: super().annotate(event, axis=ax, data=ax.images[0].get_array())
 
     @classmethod
     def from_saved_images_path_lists(cls, *image_list, **kwargs):
@@ -1136,17 +1091,14 @@ class ImShow(FigureManager):
     @classmethod
     def from_directories(cls, *directories, extension='png', **kwargs):
         paths = []
-        for a_dir in directories:
-            paths.append(P(a_dir).search(f"*.{extension}", win_order=True))
+        for a_dir in directories: paths.append(P(a_dir).search(f"*.{extension}", win_order=True))
         return cls.from_saved_images_path_lists(*paths, **kwargs)
 
     @classmethod
     def from_saved(cls, *things, **kwargs):
         example_item = things[0]
-        if isinstance(example_item, list):
-            return cls.from_saved_images_path_lists(*things, **kwargs)
-        else:
-            return cls.from_directories(*things, **kwargs)
+        if isinstance(example_item, list): return cls.from_saved_images_path_lists(*things, **kwargs)
+        else: return cls.from_directories(*things, **kwargs)
 
     @staticmethod
     def cm(im, nrows=3, ncols=7, **kwargs):
@@ -1172,8 +1124,7 @@ class ImShow(FigureManager):
         pass
 
     @staticmethod
-    def test():
-        return ImShow(*np.random.randn(12, 101, 100, 100))
+    def test(): return ImShow(*np.random.randn(12, 101, 100, 100))
 
     @classmethod
     def complex(cls, data, pause=True, **kwargs):

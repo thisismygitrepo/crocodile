@@ -38,28 +38,18 @@ _ = dt
 def timestamp(fmt=None, name=None):
     """isoformat is not compatible with file naming convention, this function provides compatible fmt
     tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
-    if fmt is None:
-        fmt = '%Y-%m-%d-%I-%M-%S-%p-%f'
-    _ = datetime.now().strftime(fmt)
-    if name:
-        name = name + '_' + _
-    else:
-        name = _
-    return name
+    if fmt is None: fmt = '%Y-%m-%d-%I-%M-%S-%p-%f'
+    tmp_res = datetime.now().strftime(fmt)
+    return (name + '_' + tmp_res) if name is not None else tmp_res
 
 
 def str2timedelta(past):
     """Converts a human readable string like '1m' or '1d' to a timedate object.
     In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
-    sc = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks",
-          "M": "months", "y": "years"}
+    sc = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}
     key, val = sc[past[-1]], eval(past[:-1])
-    if key == "months":
-        key = "days"
-        val = val * 30
-    elif key == "years":
-        key = "weeks"
-        val = val * 52
+    if key == "months": key, val = "days", val * 30
+    elif key == "years": key, val = "weeks", val * 52
     return dt.timedelta(**{key: val})
 
 
@@ -75,9 +65,7 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
     return result_str
 
 
-def validate_name(astring, replace='_'):
-    import re
-    return re.sub(r'^(?=\d)|\W', replace, str(astring))
+def validate_name(astring, replace='_'): import re; return re.sub(r'^(?=\d)|\W', replace, str(astring))
 
 
 def install_n_import(package, name=None):
@@ -87,8 +75,7 @@ def install_n_import(package, name=None):
         return pkg
     except ImportError:
         import subprocess
-        if name is None: name = package
-        subprocess.check_call([sys.executable, "-m", "pip", "install", name])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", name or package])
     pkg = __import__(package)
     return pkg
 
@@ -167,6 +154,8 @@ class Save:
     @staticmethod
     @save_decorator(".npy")
     def npy(obj, path, **kwargs): np.save(path, obj, **kwargs)
+    @staticmethod
+    def pickles(obj): return dill.dumps(obj)
 
     @staticmethod
     @save_decorator(".mat")
@@ -222,9 +211,6 @@ class Save:
         or the classes that it inherits (at least at with this version)."""
         with open(str(path), 'wb') as file:
             dill.dump(obj, file, recurse=r, **kwargs)
-
-    @staticmethod
-    def pickles(obj): return dill.dumps(obj)
 
 
 class Base(object):
@@ -425,12 +411,8 @@ class Base(object):
         if not fields:  # logic (questionable): anything that is not a method is a field
             attrs = list(filter(lambda x: inspect.ismethod(getattr(self, x)), attrs))
         
-        if not methods:
-            attrs = list(filter(lambda x: not inspect.ismethod(getattr(self, x)), attrs))
-
-        if return_objects:
-            # attrs = attrs.apply(lambda x: getattr(self, x))
-            attrs = [getattr(self, x) for x in attrs]
+        if not methods: attrs = list(filter(lambda x: not inspect.ismethod(getattr(self, x)), attrs))
+        if return_objects: attrs = [getattr(self, x) for x in attrs]
         return List(attrs)
 
     def __deepcopy__(self, *args, **kwargs):
@@ -455,23 +437,18 @@ class Base(object):
         # be wary of unintended behaciour if a string had `self` in it by coincidence.
         _ = self
         if type(string_) is str:
-            if expected == 'func':
-                return eval("lambda x: " + string_)
+            if expected == 'func': return eval("lambda x: " + string_)
             elif expected == 'self':
-                if "self" in string_:
-                    return eval(string_)
-                else:
-                    return string_
-        else:
-            return string_
+                if "self" in string_: return eval(string_)
+                else: return string_
+        else: return string_
 
     def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
 
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
-        objgraph = install_n_import("objgraph")
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
-        objgraph.show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
+        install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
         import sys
         if sys.platform == "win32": os.startfile(str(filename.absolute()))  # works for files and folders alike
         return filename
@@ -587,18 +564,13 @@ class List(Base, list):
         :return: List of indices of items where the function returns `True`.
         """
         func = self.evalstr(func, expected='func')
-        res = []
-        for idx, x in enumerate(self.list):
-            if func(x):
-                res.append(idx)
-        return res
+        return [idx for idx, x in enumerate(self.list) if func(x)]
 
     # ======================= Modify Methods ===============================
     def flatten(self):  # AKA combine, concatenate
         """The ouput is of unknown type. Items must support addition."""
         res = self.list[0]
-        for item in self.list[1:]:
-            res = res + item
+        for item in self.list[1:]: res = res + item
         return res
 
     def append(self, item): self.list.append(item); return self
@@ -661,10 +633,7 @@ class List(Base, list):
 
     def filter(self, func):
         if type(func) is str: func = eval("lambda x: " + func)
-        result = List()
-        for item in self.list:
-            if func(item): result.append(item)
-        return result
+        return List([item for item in self.list if func(item)])
 
     def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
@@ -700,10 +669,8 @@ class List(Base, list):
         # Populate the dataframe:
         for i, obj in enumerate(self.list):
             if obj_included or names:
-                if names is None:
-                    name = [obj]
-                else:
-                    name = [names[i]]
+                if names is None: name = [obj]
+                else: name = [names[i]]
                 df.loc[i] = name + list(self.list[i].__dict__.values())
             else:
                 df.loc[i] = list(self.list[i].__dict__.values())
@@ -918,10 +885,7 @@ class Struct(Base, dict):
             # removed for disentanglement
             import matplotlib.pyplot as plt
             fig, artist = plt.subplots()
-        for key, val in self:
-            # if xdata is None:
-            #     xdata = np.arange(len(val))
-            artist.plot(val, label=key)
+        for key, val in self: artist.plot(val, label=key)
         try: artist.fig.legend()
         except AttributeError: pass
         return artist
