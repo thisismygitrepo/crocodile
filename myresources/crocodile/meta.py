@@ -10,10 +10,11 @@ from crocodile.file_management import P
 class Null:
     def __init__(self): pass
     def __repr__(self): return "Welcome to the labyrinth!"
-    def __getattr__(self, item): return self
+    def __getattr__(self, item): _ = item; return self
     def __getitem__(self, item): _ = item; return self
     def __call__(self, *args, **kwargs): return self
     def __len__(self): return 0
+    def __bool__(self): return False
 
 
 class Cycle:
@@ -24,14 +25,12 @@ class Cycle:
 
     def next(self):
         self.index += 1
-        if self.index >= len(self.c):
-            self.index = 0
+        if self.index >= len(self.c): self.index = 0
         return self.c[self.index]
 
     def previous(self):
         self.index -= 1
-        if self.index < 0:
-            self.index = len(self.c) - 1
+        if self.index < 0: self.index = len(self.c) - 1
         return self.c[self.index]
 
     def set(self, value): self.index = self.c.index(value)
@@ -65,11 +64,8 @@ class Experimental:
 
     @staticmethod
     def try_this(func, otherwise=None):
-        try:
-            return func()
-        except BaseException as e:
-            _ = e
-            return otherwise
+        try: return func()
+        except BaseException as e: _ = e; return otherwise
 
     @staticmethod
     def show_globals(scope, **kwargs):
@@ -124,11 +120,8 @@ class Experimental:
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
         tmpdir.delete(sure=delete, verbose=False)
-        if obj is not None:
-            loaded = getattr(sourcefile, obj)
-            return loaded
-        else:
-            return sourcefile
+        if obj is not None: return getattr(sourcefile, obj)
+        else: return sourcefile
 
     @staticmethod
     def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
@@ -138,8 +131,7 @@ class Experimental:
         :param args: dict of what you would like to pass to the function as arguments.
         :param self: relevant only if the function is a method of a class. self refers to the path of the instance
         :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
-        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False,
-                                         )
+        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
         print(code)
         res = dict()
         exec(code, scope, res)  # run the function within the scope `res`
@@ -418,7 +410,6 @@ def batcherv2(func_type='function', order=1):
     if func_type == 'method':
         def batch(func):
             # from functools import wraps
-            #
             # @wraps(func)
             def wrapper(self, *args, **kwargs):
                 output = [func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
@@ -469,14 +460,8 @@ class Terminal:
         def success(self): return self.output["returncode"] == 0
         @property
         def returncode(self): return self.output["returncode"]
-
         @property
-        def as_path(self):
-            """More often than not, the output is a path."""
-            if self.err == "":
-                return P(self.op.rstrip())
-            else:
-                return None
+        def as_path(self): return P(self.op.rstrip()) if self.err == "" else None
 
         def capture(self):
             for key, val in self.std.items():
@@ -519,20 +504,14 @@ class Terminal:
         self.machine = platform.system()  # Windows, Linux, Darwin
 
     def set_std_system(self):
-        self.stdout = sys.stdout
-        self.stderr = sys.stderr
-        self.stdin = sys.stdin
+        self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
 
     def set_std_pipe(self):
-        self.stdout = subprocess.PIPE
-        self.stderr = subprocess.PIPE
-        self.stdin = subprocess.PIPE
+        self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
 
     def set_std_null(self):
         """Equivalent to `echo 'foo' &> /dev/null`"""
-        self.stdout = subprocess.DEVNULL
-        self.stderr = subprocess.DEVNULL
-        self.stdin = subprocess.DEVNULL
+        self.stdout = subprocess.DEVNULL; self.stderr = subprocess.DEVNULL; self.stdin = subprocess.DEVNULL
 
     @staticmethod
     def is_admin():
@@ -748,8 +727,7 @@ path.delete(sure=True, verbose=False)
             proc_handle = proce_info['hProcess']
             _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE)
             rc = win32process.GetExitCodeProcess(proc_handle)
-        else:
-            rc = None
+        else: rc = None
         return rc
 
 
@@ -796,7 +774,7 @@ class SSH(object):
     def copy_sshkeys_to_remote(fqdn):
         # Caveat, only windows is supported.
         # the following is a Windows Openssh alternative to ssh-copy-id
-        Terminal().run(f'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
+        Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
     def __repr__(self):
         return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
@@ -896,6 +874,7 @@ class Log(object):
     def file(self): return P(self.specs["file_path"]) if self.specs["file_path"] else None
     @staticmethod
     def get_basic_format(): return logging.BASIC_FORMAT
+    def close(self): raise NotImplementedError
 
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
         if which in {"logger", "all"}: self.logger.setLevel(level)
@@ -906,33 +885,24 @@ class Log(object):
         shandlers = []
         for handler in self.logger.handlers:
             if "StreamHandler" in str(handler):
-                if first:
-                    return handler
-                else:
-                    shandlers.append(handler)
+                if first: return handler
+                else: shandlers.append(handler)
         return shandlers
 
     def get_fhandler(self, first=True):
         fhandlers = []
         for handler in self.logger.handlers:
             if "FileHandler" in str(handler):
-                if first:
-                    return handler
-                else:
-                    fhandlers.append(handler)
+                if first: return handler
+                else: fhandlers.append(handler)
         return fhandlers
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
-        if self.specs["file"] is False and self.specs["stream"] is False:
-            self.logger = Null()
-        elif self.dialect == "colorlog":
-            self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
-        elif self.dialect == "logging":
-            self.logger = Log.get_logger(**self.specs)
-        elif self.dialect == "coloredlogs":
-            self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
-        else:  # default
-            self.logger = Log.get_colorlog(**self.specs)
+        if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
+        elif self.dialect == "colorlog": self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
+        elif self.dialect == "logging": self.logger = Log.get_logger(**self.specs)
+        elif self.dialect == "coloredlogs": self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
+        else: self.logger = Log.get_colorlog(**self.specs)
 
     def __setstate__(self, state):
         self.__dict__ = state
@@ -947,17 +917,12 @@ class Log(object):
         state = self.__dict__.copy()
         state["specs"] = state["specs"].copy()
         del state["logger"]
-        if self.specs["file_path"] is not None:
-            state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
+        if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
-
-    def close(self):  # close file.
-        raise NotImplementedError
 
     def __repr__(self):
         tmp = f"{self.logger} with handlers: \n"
-        for h in self.logger.handlers:
-            tmp += repr(h) + "\n"
+        for h in self.logger.handlers: tmp += repr(h) + "\n"
         return tmp
 
     @staticmethod
@@ -1074,8 +1039,7 @@ class Log(object):
         logger.warning("this is a warning message")
         logger.error("this is an error message")
         logger.critical("this is a critical message")
-        for level in range(0, 60, 5):
-            logger.log(msg=f"This is a message of level {level}", level=level)
+        for level in range(0, 60, 5): logger.log(msg=f"This is a message of level {level}", level=level)
 
     @staticmethod
     def test_all():

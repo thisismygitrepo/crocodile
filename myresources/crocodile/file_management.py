@@ -539,20 +539,19 @@ class P(type(Path()), Path):
         """ useful if you have multiple dots in file path where `.stem` fails."""
         return self.name.split('.')[0]
 
-    def __len__(self): return len(self.parts)
     @property
     def len(self): return self.__len__()
     @property
     def str(self): return str(self)  # or self._str
-
     @property
-    def items(self):
-        """Behaves like `.parts` but returns a List."""
-        return List(self.parts)
-
-    def __add__(self, other):  # called when P + other
-        """Behaves like adding strings"""
-        return self.parent.joinpath(self.stem + str(other))
+    def items(self): return List(self.parts)
+    def __len__(self): return len(self.parts)
+    def __contains__(self, item): return item in self.parts
+    def __iter__(self): return self.parts.__iter__()
+    def __deepcopy__(self): return P(str(self))
+    def __getstate__(self): return str(self)
+    def __setstate__(self, state): self._str = str(state)
+    def __add__(self, other): return self.parent.joinpath(self.stem + str(other))
 
     def __radd__(self, other):  # called when other + P and `other` doesn't know how to make this addition.
         return self.parent.joinpath(str(other) + self.stem)
@@ -560,8 +559,7 @@ class P(type(Path()), Path):
     def __sub__(self, other):
         """removes all similar characters from the string form of the path"""
         res = P(str(self).replace(str(other), ""))
-        if str(res[0]) in {"\\", "/"}:
-            res = res[1:]  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
+        if str(res[0]) in {"\\", "/"}: res = res[1:]  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
         return res
 
     # def __rtruediv__(self, other):
@@ -570,9 +568,8 @@ class P(type(Path()), Path):
     #         tmp = tmp[1:]
     #     return P(other) / tmp
 
-    def rel2home(self, inlieu=False):
-        """Exact opposite of `expanduser`"""
-        return self._return(P(self.relative_to(Path.home())), inlieu)
+    def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
+    def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
 
     def collapseuser(self, strict=True, inlieu=False):
         """same as rel2home except that it adds the tilde `~` to indicated home at the beginning.
@@ -582,8 +579,6 @@ class P(type(Path()), Path):
             assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}"
                                                           f" OR one path is relative and the other is absolute.")
         return self._return("~" / (self - P.home()), inlieu)
-
-    def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -664,12 +659,6 @@ class P(type(Path()), Path):
         obj = P(*fullparts)
         self._str = str(obj)
         # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
-
-    def __contains__(self, item): return item in self.parts
-    def __iter__(self): return self.parts.__iter__()
-    def __deepcopy__(self): return P(str(self))
-    def __getstate__(self): return str(self)
-    def __setstate__(self, state): self._str = str(state)
 
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
@@ -825,8 +814,7 @@ class P(type(Path()), Path):
     def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
 
     def search(self, pattern='*', r=False, generator=False, files=True, folders=True, compressed=False,
-               dotfiles=False,
-               absolute=True, filters: list = None, not_in: list = None, win_order=False):
+               dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
         """
         :param pattern:  linux search pattern
         :param r: recursive search flag
@@ -836,25 +824,17 @@ class P(type(Path()), Path):
         :param compressed: search inside compressed files.
         :param dotfiles: flag to indicate whether the search should include those or not.
         :param filters: list of filters
-        :param absolute: return relative paths or abosolute ones.
         :param not_in: list of strings that search results should not contain them (short for filter with simple lambda)
+        :param exts: list of extensions to search for.
         :param win_order: return search results in the order of files as they appear on a Windows machine.
 
         :return: search results.
-
-        # :param visible: exclude hidden files and folders (Windows)
         """
         # ================= Get concrete values for default arguments ========================================
-        if filters is None:
-            filters = []
-        else:
-            pass
-
-        if not_in is not None:
-            filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
-
+        filters = filters or []
+        if not_in is not None: filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
+        if exts is not None: filters += [lambda x: any([ext in x.name for ext in exts])]
         # ============================ get generator of search results ========================================
-
         slf = self.expanduser().resolve()
         if compressed and slf.suffix == ".zip":
             import zipfile
@@ -862,9 +842,7 @@ class P(type(Path()), Path):
                 content = List(z.namelist())
             from fnmatch import fnmatch
             raw = content.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: slf / x)
-
-        elif dotfiles:
-            raw = slf.glob(pattern) if not r else self.rglob(pattern)
+        elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else:  # glob ignroes dot and hidden files
             from glob import glob
             if r:
@@ -879,56 +857,31 @@ class P(type(Path()), Path):
             for comp_file in comp_files:
                 raw += P(comp_file).search(pattern=pattern, r=r, generator=generator, files=files, folders=folders,
                                            compressed=compressed,
-                                           dotfiles=dotfiles,
-                                           absolute=absolute, filters=filters, not_in=not_in, win_order=win_order)
-
-            # if os.path == 'nt':
-
-        #     import win32api, win32con
-
-        # def folder_is_hidden(p):
-        #     if os.path == 'nt':
-        #         attribute = win32api.GetFileAttributes(p)
-        #         return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
+                                           dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
 
         def run_filter(item_):
             flags = [True]
-            if not files:
-                flags.append(item_.is_dir())
-            if not folders:
-                flags.append(item_.is_file())
-            for afilter in filters:
-                flags.append(afilter(item_))
+            if not files: flags.append(item_.is_dir())
+            if not folders: flags.append(item_.is_file())
+            for afilter in filters: flags.append(afilter(item_))
             return all(flags)
-
-        def do_screening(item_):
-            item_ = P(item_)  # because some filters needs advanced functionalities of P objects.
-            if absolute:
-                item_ = item_.absolute()
-
-            if run_filter(item_):
-                return item_
-            else:
-                return None
 
         if generator:
             def gen():
                 flag = False
                 while not flag:
                     item_ = next(raw)
-                    flag = do_screening(item_)
+                    flag = P(item_) if run_filter(P(item_)) else None
                     if flag:
                         yield item_
-
             return gen
         else:
             # unpack the generator and vet the items (the function also returns P objects)
             # processed = [result for item in raw if (result := do_screening(item))]
             processed = []
             for item in raw:
-                result = do_screening(item)
-                if result:
-                    processed.append(result)
+                result = P(item) if run_filter(P(item)) else None
+                if result: processed.append(result)
 
             if not processed:  # if empty, don't proceeed
                 return List(processed)
