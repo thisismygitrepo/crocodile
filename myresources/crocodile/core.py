@@ -38,8 +38,7 @@ _ = dt
 def timestamp(fmt=None, name=None):
     """isoformat is not compatible with file naming convention, this function provides compatible fmt
     tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
-    if fmt is None: fmt = '%Y-%m-%d-%I-%M-%S-%p-%f'
-    tmp_res = datetime.now().strftime(fmt)
+    tmp_res = datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')
     return (name + '_' + tmp_res) if name is not None else tmp_res
 
 
@@ -57,12 +56,11 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
     if safe:
         import secrets  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
         return secrets.token_urlsafe(length)
-    pool = "" + (string.ascii_lowercase if lower else "")
-    pool = pool + (string.ascii_uppercase if upper else "")
-    pool = pool + (string.digits if digits else "")
-    pool = pool + (string.punctuation if punctuation else "")
-    result_str = ''.join(random.choice(pool) for _ in range(length))
-    return result_str
+    pool = string.ascii_lowercase if lower else ""
+    if upper: pool += string.ascii_uppercase
+    if digits: pool += string.digits
+    if punctuation: pool += string.punctuation
+    return ''.join(random.choices(pool, k=length))
 
 
 def validate_name(astring, replace='_'): import re; return re.sub(r'^(?=\d)|\W', replace, str(astring))
@@ -70,14 +68,11 @@ def validate_name(astring, replace='_'): import re; return re.sub(r'^(?=\d)|\W',
 
 def install_n_import(package, name=None):
     """imports a package and installs it first if not."""
-    try:
-        pkg = __import__(package)
-        return pkg
+    try: return __import__(package)
     except ImportError:
         import subprocess
         subprocess.check_call([sys.executable, "-m", "pip", "install", name or package])
-    pkg = __import__(package)
-    return pkg
+    return __import__(package)
 
 
 # ====================================== Classes ====================================
@@ -97,7 +92,6 @@ class SaveDecorator(object):
         if func is None:  # User instantiated the class with no func argument and specified kwargs.
             def wrapper(func_):
                 return cls(func_, **kwargs)
-
             return wrapper  # a function ready to be used by Python (pass func to it to instantiate it)
         else:  # called by Python with func passed and user did not specify non-default kwargs:
             return cls(func)  # return instance of the class.
@@ -133,9 +127,7 @@ def save_decorator(ext=""):
                 if add_suffix and not str(path).endswith(ext):
                     path = Path(str(path) + ext)
                     print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}")
-                else:
-                    path = Path(path)
-
+                else: path = Path(path)
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path=path, obj=obj, **kwargs)
             if verbose:
@@ -163,17 +155,14 @@ class Save:
         """
         .. note::
             Avoid using mat for saving results because of incompatiblity:
-
             * `None` type is not accepted.
             * Scalars are conveteed to [1 x 1] arrays.
             * etc. As such, there is no gaurantee that you restore what you saved.
-
             Unless you want to pass the results to Matlab animals, avoid this format.
         """
         from scipy.io import savemat
         for key, value in mdict.items():
-            if value is None:
-                mdict[key] = []
+            if value is None: mdict[key] = []
         savemat(str(path), mdict, **kwargs)
 
     @staticmethod
@@ -183,23 +172,17 @@ class Save:
          but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary.
         It is useful for to generate human-readable file."""
-        import json
-        with open(str(path), "w") as file:
-            json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
+        import json; with open(str(path), "w") as file: json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
     @staticmethod
     @save_decorator
     def yaml(obj, path, **kwargs):
-        import yaml
-        with open(str(path), "w") as file:
-            yaml.dump(obj, file, **kwargs)
+        import yaml; with open(str(path), "w") as file:  yaml.dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
     def vanilla_pickle(obj, path, **kwargs):
-        import pickle
-        with open(str(path), 'wb') as file:
-            pickle.dump(obj, file, **kwargs)
+        import pickle; with open(str(path), 'wb') as file: pickle.dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
@@ -209,26 +192,14 @@ class Save:
         . Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to
         dependency. Dill however, stores all the required packages for any attribute object, but not the class itself,
         or the classes that it inherits (at least at with this version)."""
-        with open(str(path), 'wb') as file:
-            dill.dump(obj, file, recurse=r, **kwargs)
+        with open(str(path), 'wb') as file: dill.dump(obj, file, recurse=r, **kwargs)
 
 
 class Base(object):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __getstate__(self):
-        """This method is used by Python internally when an instance of the class is pickled.
-        attributes that you do not want to be pickled for one reason or the other, should be omitted from the
-        returned dictionary (as opposed to setting them to None)."""
-        return self.__dict__.copy()
-
-    def __setstate__(self, state):
-        """The solution to recover missing objects from state, is dependent on where it came from.
-        If the attribute was instantiated by the class itself, then, similar thing should happen here.
-        If the object was passed to the __init__ by the caller, it should be passed again. For the meanwhile it should
-        be set to None."""
-        self.__dict__.update(state)
+    def __init__(self, *args, **kwargs): pass
+    def __getstate__(self): return self.__dict__.copy()
+    def __setstate__(self, state): self.__dict__.update(state)
+    def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
 
     def save_code(self, path):
         """a usecase for including code in the save is when the source code is continously
@@ -292,8 +263,7 @@ class Base(object):
                     if Base in val.__class__.__mro__:  # a class instance rather than pure data
                         val.save(itself=itself, include_code=include_code, path=path, r=r)
                         obj[key] = None  # this tough object is finished, the rest should be easy.
-                    else:
-                        pass  # leave this object as is.
+                    else: pass  # leave this object as is.
 
         if include_code is True:
             temp_path = Path().home().joinpath(f"tmp_results/zipping/{randstr()}")
@@ -301,8 +271,7 @@ class Base(object):
             self.save_code(path=temp_path.joinpath(f"source_code_{randstr()}.py"))
             Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, verbose=False, add_suffix=add_suffix)
             import shutil
-            result_path = shutil.make_archive(base_name=str(path), format="zip",
-                                              root_dir=str(temp_path), base_dir=".")
+            result_path = shutil.make_archive(base_name=str(path), format="zip", root_dir=str(temp_path), base_dir=".")
             result_path = Path(result_path)
             print(f"Code and data for the object ({repr(obj)}) saved @ "
                   f"`{result_path.as_uri()}`, Directory: `{result_path.parent.as_uri()}`")
@@ -333,21 +302,17 @@ class Base(object):
         a flag (e.g. from_saved) to init method to require the special behaviour indicated above when it is raised,
          e.g. do NOT create some expensive attribute is this flag is raised because it will be obtained later.
         """
-
         # ============================= step 1: unpickle the data
         assert ".dat." in str(path), f"Are you sure the path {path} is pointing to pickeld state of {cls}?"
         data = dill.loads(Path(path).read_bytes())
-        # ============================= step 2: initialize the class
-        inst = cls(*args, **kwargs)
-        # ============================= step 3: update / populate instance attributes with data.
-        inst.__setstate__(dict(data))
+        inst = cls(*args, **kwargs)  # ============================= step 2: initialize the class
+        inst.__setstate__(dict(data))  # ===========step 3: update / populate instance attributes with data.
         # ============================= step 4: check for saved attributes.
         if r:  # add further attributes to `inst`, if any.
             contents = [item.stem for item in Path(path).parent.glob("*.zip")]
             for key, _ in data.items():  # val is probably None (if init was written properly)
                 if key in contents:  # if key is not an attribute of the object, skip it.
-                    setattr(inst, key, Base.from_zipped_code_state(path=Path(path).parent.joinpath(key + ".zip"),
-                                                                   r=True, scope=scope, **kwargs))
+                    setattr(inst, key, Base.from_zipped_code_state(path=Path(path).parent.joinpath(key + ".zip"), r=True, scope=scope, **kwargs))
         return inst
 
     @staticmethod
@@ -416,15 +381,11 @@ class Base(object):
         return List(attrs)
 
     def __deepcopy__(self, *args, **kwargs):
-        """Literally creates a new copy of values of old object, rather than referencing them.
-        similar to copy.deepcopy()"""
         obj = self.__class__(*args, **kwargs)
         obj.__dict__.update(copy.deepcopy(self.__dict__))
         return obj
 
     def __copy__(self, *args, **kwargs):
-        """Shallow copy. New object, but the keys of which are referencing the values from the old object.
-        Does similar functionality to copy.copy"""
         obj = self.__class__(*args, **kwargs)
         obj.__dict__.update(self.__dict__.copy())
         return obj
@@ -443,8 +404,6 @@ class Base(object):
                 else: return string_
         else: return string_
 
-    def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
-
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
@@ -454,18 +413,12 @@ class Base(object):
         return filename
 
 
-class List(Base, list):
-    """Use this class to keep items of the same type.
-    # Inheriting from Base gives save method.
-    """
-
+class List(Base, list):  # Inheriting from Base gives save method.
+    """Use this class to keep items of the same type."""
     # =============================== Constructor Methods ====================
     def __init__(self, obj_list=None):
         super().__init__()
         self.list = list(obj_list) if obj_list is not None else []
-
-    @classmethod
-    def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
 
     @classmethod
     def from_replicating(cls, func, *args, replicas=None, **kwargs):
@@ -474,7 +427,6 @@ class List(Base, list):
         :param kwargs: those could be structures:
         :param replicas:
         :param func:
-
         """
         if not args and not kwargs:  # empty args list and kwargs list
             return cls([func() for _ in range(replicas)])
@@ -487,6 +439,9 @@ class List(Base, list):
                 result.append(func(*an_arg, **a_kwarg))
             return cls(result)
 
+    @classmethod
+    def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
+
     def save_items(self, directory, names=None, saver=None):
         if saver is None: saver = Save.pickle
         if names is None: names = range(len(self))
@@ -495,8 +450,7 @@ class List(Base, list):
     def __repr__(self):
         if len(self.list) > 0:
             tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
-            tmp2 = f"{repr(self.list[0])}"
-            return tmp1 + tmp2
+            return tmp1 + f"{repr(self.list[0])}"
         else: return f"An Empty List []"
 
     def __deepcopy__(self): return List([copy.deepcopy(i) for i in self.list])
@@ -510,29 +464,16 @@ class List(Base, list):
     @property
     def len(self): return self.list.__len__()
     # ================= call methods =====================================
-    def method(self, name, *args, **kwargs): return List([getattr(i, name)(*args, **kwargs) for i in self.list])
-    def attr(self, name): return List([getattr(i, name) for i in self.list])
-    def __getattr__(self, name): return List([getattr(i, name) for i in self.list])  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args, **kwargs): return List([i(*args, **kwargs) for i in self.list])
-
+    def method(self, name, *args, **kwargs): return List(getattr(i, name)(*args, **kwargs) for i in self.list)
+    def attr(self, name): return List(getattr(i, name) for i in self.list)
+    def __getattr__(self, name): return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
+    def __call__(self, *args, **kwargs): return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
-    def __getitem__(self, key):
-        if type(key) is list or type(key) is np.ndarray:  # to allow fancy indexing like List[1, 5, 6]
-            return List([self[item] for item in key])
-        elif type(key) is str:  # access keys like dictionaries.
-            return List(item[key] for item in self.list)
-        else:  # must be an integer or slice
-            # behaves similarly to Numpy A[1] vs A[1:2]
-            result = self.list[key]  # return the required item only (not a List)
-            if type(key) is not slice: return result  # choose one item
-            else: return List(result)
 
-    # def find(self, patt, match="fnmatch"):
-    #     """Looks up the string representation of all items in the list and finds the one that partially matches
-    #     the argument passed. This method is a short for ``self.filter(lambda x: string_ in str(x))`` If you need more
-    #     complicated logic in the search, revert to filter method.
-    #     """
-    #
+    def __getitem__(self, key):
+        if type(key) is list or type(key) is np.ndarray: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
+        elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
+        else: return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
     # if match == "string" or None:
     #     for idx, item in enumerate(self.list):
@@ -549,36 +490,24 @@ class List(Base, list):
     #     for idx, item in enumerate(self.list):
     #         if compiled.search(str(item)) is not None:
     #             return item
-    # return None
-
-    def index_items(self, idx): return List([item[idx] for item in self.list])
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None): return self[np.random.choice(len(self), size, replace=replace, p=p)]
-
-    def index(self, func, *args, **kwargs) -> list:
-        """ A generalization of the `.index` method of `list`. It takes in a function rather than an
-         item to find its index. Additionally, it returns full list of results, not just the first result.
-        If you wanted the original index method, refer to .list attribute to use it.
-
-        :param func:
-        :return: List of indices of items where the function returns `True`.
-        """
-        func = self.evalstr(func, expected='func')
-        return [idx for idx, x in enumerate(self.list) if func(x)]
-
+    def index_items(self, idx): return List([item[idx] for item in self.list])
+    def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func, expected='func')(x)])
+    def filter(self, func): return List([item for item in self.list if self.evalstr(func, expected='func')(item)])
     # ======================= Modify Methods ===============================
-    def flatten(self):  # AKA combine, concatenate
-        """The ouput is of unknown type. Items must support addition."""
-        res = self.list[0]
-        for item in self.list[1:]: res = res + item
-        return res
-
+    def reduce(self, func): from functools import reduce; return reduce(func, self.list)
     def append(self, item): self.list.append(item); return self
     def __add__(self, other): return List(self.list + list(other))  # implement coersion
     def __radd__(self, other): return List(self.list + list(other))
+    def __iadd__(self, other): self.list = self.list + list(other); return self  # inplace add.
+    def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
+    def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
+    def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
 
-    def __iadd__(self, other):  # inplace add.
-        self.list = self.list + list(other)
+    def remove(self, value=None, values=None):
+        if value is not None: self.list.remove(value)
+        if values is not None: [self.list.remove(value) for value in values]
         return self
 
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
@@ -593,11 +522,7 @@ class List(Base, list):
         :param kwargs: a list of outputs each time_produced the function is called on elements of the list.
         :return:
         """
-        if depth > 1:
-            depth -= 1
-            # assert type(self.list[0]) == List, "items are not Lists".
-            self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth, **kwargs))
-
+        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs))
         func = self.evalstr(func, expected='func')
         tqdm = install_n_import("tqdm").tqdm
         if other is None:
@@ -605,43 +530,24 @@ class List(Base, list):
             if jobs:
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in iterator))
-            else:
-                return List([func(x, *args, **kwargs) for x in iterator])
+            else: return List([func(x, *args, **kwargs) for x in iterator])
         else:
             iterator = zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc)
             if jobs:
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
-            else:
-                return List([func(x, y) for x, y in iterator])
+            else: return List([func(x, y) for x, y in iterator])
 
-    def modify(self, func, lest=None):
-        """Modifies objects rather than returning new list of objects, hence the path of the method.
+    def modify(self, func: str, other=None):
+        """Modifies objects rather than returning new list of objects
         :param func: a string that will be executed, assuming idx, x and y are given.
-        :param lest:
+        :param other:
         :return:
         """
-        if lest is None:
-            for x in self.list:
-                _ = x
-                exec(func)
+        if other is None:
+            for idx, x in enumerate(self.list): _ = x, idx; exec(func)
         else:
-            for idx, (x, y) in enumerate(zip(self.list, lest)):
-                _ = idx, x, y
-                exec(func)
-        return self
-
-    def filter(self, func):
-        if type(func) is str: func = eval("lambda x: " + func)
-        return List([item for item in self.list if func(item)])
-
-    def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
-    def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
-    def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
-
-    def remove(self, value=None, values=None):
-        if value is not None: self.list.remove(value)
-        if values is not None: [self.list.remove(value) for value in values]
+            for idx, (x, y) in enumerate(zip(self.list, other)): _ = idx, x, y; exec(func)
         return self
 
     def print(self, nl=1, sep=False, style=repr):
@@ -649,6 +555,13 @@ class List(Base, list):
             print(f"{idx:2}- {style(item)}", end=' ')
             for _ in range(nl): print('', end='\n')
             if sep: print(sep * 100)
+
+    def to_series(self): import pandas as pd; return pd.Series(self.list)
+    def to_list(self): return self.list
+    def to_numpy(self): return self.np
+    @property
+    def np(self): return np.array(self.list)
+    def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
 
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         """
@@ -658,35 +571,18 @@ class List(Base, list):
         :return:
         """
         import pandas as pd
-        # Display.set_pandas_display()
         columns = list(self.list[0].__dict__.keys())
-        if obj_included or names:
-            columns = ['object'] + columns
+        if obj_included or names: columns = ['object'] + columns
         df = pd.DataFrame(columns=columns)
-        if minimal:
-            return df
-
+        if minimal: return df
         # Populate the dataframe:
         for i, obj in enumerate(self.list):
             if obj_included or names:
                 if names is None: name = [obj]
                 else: name = [names[i]]
                 df.loc[i] = name + list(self.list[i].__dict__.values())
-            else:
-                df.loc[i] = list(self.list[i].__dict__.values())
+            else: df.loc[i] = list(self.list[i].__dict__.values())
         return df
-
-    def to_series(self): import pandas as pd; return pd.Series(self.list)
-    def to_list(self): return self.list
-    def to_numpy(self): return self.np
-    @property
-    def np(self): return np.array(self.list)
-
-    def to_struct(self, key_val=None):
-        """
-        :param key_val: function that returns (key, value) pair.
-        """
-        return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
 
 
 class Struct(Base, dict):
@@ -731,20 +627,10 @@ class Struct(Base, dict):
     def from_keys_values(cls, keys, values): return cls(dict(zip(keys, values)))
     @classmethod
     def from_keys_values_pairs(cls, my_list): return cls({k: v for k, v in my_list})
-
     @classmethod
-    def from_names(cls, names, default_=None):  # Mimick NamedTuple and defaultdict
-        if default_ is None:
-            default_ = [None] * len(names)
-        return cls.from_keys_values(names, values=default_)
-
-    def spawn_from_values(self, values):
-        """From the same keys, generate a new Struct with different values passed."""
-        return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
-
-    def spawn_from_keys(self, keys):
-        """From the same values, generate a new Struct with different keys passed."""
-        return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
+    def from_names(cls, names, default_=None): return cls.from_keys_values(names, values=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
+    def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
+    def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
 
     def to_default(self, default=lambda: None):
         from collections import defaultdict
@@ -763,11 +649,6 @@ class Struct(Base, dict):
         temp = Temp()
         temp.__dict__ = self.__dict__
         return temp
-
-    def __repr__(self):
-        repr_string = ""
-        for key in self.keys().to_list(): repr_string += str(key) + ", "
-        return "Struct: [" + repr_string + "]"
 
     def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
         if config:
@@ -818,6 +699,7 @@ class Struct(Base, dict):
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
 
+    def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key, value): self.__dict__[key] = value
     def __bool__(self): return bool(self.__dict__)

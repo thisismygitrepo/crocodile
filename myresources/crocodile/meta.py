@@ -869,8 +869,7 @@ class Log(object):
 
     def __setstate__(self, state):
         self.__dict__ = state
-        if self.specs["file_path"] is not None:  # this way of creating relative path makes transferrable
-            # across machines.
+        if self.specs["file_path"] is not None:  # this way of creating relative path makes transferrable across machines.
             self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
         self._install()
 
@@ -883,17 +882,9 @@ class Log(object):
         if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
 
-    def __repr__(self):
-        tmp = f"{self.logger} with handlers: \n"
-        for h in self.logger.handlers: tmp += repr(h) + "\n"
-        return tmp
-
-    @staticmethod
-    def get_format(sep):
-        fmt = f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s" \
-              f"{sep}%(message)s{sep}"
-        # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
-        return fmt
+    def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
+    @staticmethod  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
+    def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
 
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
@@ -1002,12 +993,10 @@ class Log(object):
 
     @staticmethod
     def test_all():
-        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]:
-            Log.test_logger(logger)
-            print("=" * 100)
+        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger);  print("=" * 100)
 
     @staticmethod
-    def manual_degug(path):  # man
+    def manual_degug(path):
         sys.stdout = open(path, 'w')  # all print statements will write to this file.
         sys.stdout.close()
         print(f"Finished ... have a look @ \n {path}")
@@ -1030,20 +1019,9 @@ def accelerate(func, ip):
     Fast method using Concurrent module
     """
     split = np.array_split(ip, os.cpu_count())
-    # make each thread process multiple inputs to avoid having obscene number of threads with simple fast
-    # operations
-
-    # vectorize the function so that it now accepts lists of ips.
-    # def my_func(ip):
-    #     return [func(tmp) for tmp in ip]
-
     import concurrent.futures
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        op = executor.map(func, split)
-        op = list(op)  # convert generator to list
-    op = np.concatenate(op, axis=0)
-    # op = self.reader.assign_resize(op, f=0.8, nrp=56, ncp=47, interpolation=True)
-    return op
+    with concurrent.futures.ProcessPoolExecutor() as executor: op = list(executor.map(func, split))
+    return np.concatenate(op, axis=0)
 
 
 class Scheduler:
