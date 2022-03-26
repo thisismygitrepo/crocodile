@@ -92,15 +92,12 @@ class Experimental:
         text = "# Meta\n"
         if meta is not None: text = text + meta
         text += separator
-
         if obj is not None:
             lines = inspect.getsource(obj)
             text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
-
         readmepath.write_text(text)
         print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
-
         if save_source_code:
             P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
             print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
@@ -118,8 +115,7 @@ class Experimental:
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
         tmpdir.delete(sure=delete, verbose=False)
-        if obj is not None: return getattr(sourcefile, obj)
-        else: return sourcefile
+        return getattr(sourcefile, obj) if obj is not None else sourcefile
 
     @staticmethod
     def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
@@ -133,8 +129,7 @@ class Experimental:
         print(code)
         res = dict()
         exec(code, scope, res)  # run the function within the scope `res`
-        if update_scope:
-            scope.update(res)
+        if update_scope: scope.update(res)
         return res
 
     @staticmethod
@@ -173,15 +168,11 @@ class Experimental:
         codelines = codelines[idx + 3:]
         # remove any indentation (4 for funcs and 8 for classes methods, etc)
         codelines = textwrap.dedent(codelines)
-        # remove return statements
-        lines = codelines.split("\n")
+        lines = codelines.split("\n")  # remove return statements
         codelines = []
         for aline in lines:
-            if not textwrap.dedent(aline).startswith("return "):  # normal statement
-                codelines.append(aline + "\n")  # keep as is
-            else:  # a return statement
-                codelines.append(aline.replace("return ", "return_ = ") + "\n")
-
+            if not textwrap.dedent(aline).startswith("return "): codelines.append(aline + "\n")  # keep as is, normal statement
+            else: codelines.append(aline.replace("return ", "return_ = ") + "\n")  # a return statement
         code_string = ''.join(codelines)  # convert list to string.
         args_kwargs = ""
         if include_args:  args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
@@ -200,13 +191,11 @@ class Experimental:
             self = ".".join(func.split(".")[:-1])
             _ = self
             func = eval(func, modules)
-
         from crocodile.file_management import Struct
         import inspect
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default)
         ak = ak.update(kwargs)
-
         res = """"""
         for key, val in ak.items():
             if key != "args" and key != "kwargs":
@@ -219,16 +208,10 @@ class Experimental:
                         print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
                 if not flag:
                     res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
-
         ak = inspect.getfullargspec(func)
-        if ak.varargs:
-            res += f"{ak.varargs} = (,)\n"
-        if ak.varkw:
-            res += f"{ak.varkw} = " + "{}\n"
-
-        if copy2clipboard:
-            clipboard = install_n_import("clipboard")
-            clipboard.copy(res)
+        if ak.varargs: res += f"{ak.varargs} = (,)\n"
+        if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
+        if copy2clipboard: install_n_import("clipboard").copy(res)
         if verbose: print("Finished. Paste code now.")
         return res
 
@@ -260,21 +243,12 @@ class Experimental:
 
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):
-        # update the module by reading it again.
-        # if type(module) is str:
-        #     module = __import__(module)
-        # importlib.reload(module)
-        # if type(module) is str:
-        #     sourcecells = P(module).read_text().split("#%%")
-        # else:
         sourcecells = P(module.__file__).read_text().split("#%%")
         for cell in sourcecells:
-            if pointer in cell.split('\n')[0]:
-                break  # bingo
+            if pointer in cell.split('\n')[0]: break  # bingo
         else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
         print(cell)
-        clipboard = install_n_import("clipboard")
-        clipboard.copy(cell)
+        install_n_import("clipboard").copy(cell)
         return cell
 
 
@@ -368,8 +342,7 @@ def batcher(func_type='function'):
                 for counter, item in enumerate(x):
                     if per_instance_kwargs is not None:
                         mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()}
-                    else:
-                        mykwargs = {}
+                    else: mykwargs = {}
                     output.append(func(self, item, *args, **mykwargs, **kwargs))
                 return np.array(output)
 
@@ -386,7 +359,6 @@ def batcher(func_type='function'):
             def __call__(self, x, **kwargs):
                 output = [self.func(item, **kwargs) for item in x]
                 return np.array(output)
-
         return Batch
 
 
@@ -412,7 +384,6 @@ def batcherv2(func_type='function', order=1):
             def __call__(self, *args, **kwargs):
                 output = [self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
                 return np.array(output)
-
         return Batch
 
 
@@ -421,9 +392,6 @@ class Terminal:
         @staticmethod
         def from_completed_process(cp: subprocess.CompletedProcess):
             tmp = dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)
-            # for key, val in tmp:
-            #     if val is str:
-            #         tmp[key] = val.rstrip()
             resp = Terminal.Response(cmd=cp.args)
             resp.output.update(tmp)
             return resp
@@ -522,8 +490,7 @@ class Terminal:
                 my_list = [shell, "-Command"]  # alternatively, one can run "cmd"
                 """ The advantage of addig `powershell -Command` is to give access to wider range of options.
             Other wise, command prompt shell doesn't recognize commands like `ls`."""
-            else:
-                pass  # that is, use command prompt as a shell, which is the default.
+            else: pass  # that is, use command prompt as a shell, which is the default.
         my_list += list(cmds)
         if self.elevated is False or self.is_admin():
             resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout,
@@ -548,33 +515,20 @@ class Terminal:
 
         https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html
         """
-        if terminal is None:
-            terminal = ""  # this means that cmd is the default console. alternative is "wt"
+        if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None:
-            if self.machine == "Windows":
-                shell = ""  # other options are "powershell" and "cmd"
-                # if terminal is wt, then it will pick powershell by default anyway.
-            else:
-                shell = ""
-        if new_window is True:  # start is alias for Start-Process which launches a new window.
-            new_window = "start"
-        else:
-            new_window = ""
-        if shell in {"powershell", "pwsh"}:
-            extra = "-Command"
-        else:
-            extra = ""
+            if self.machine == "Windows": shell = ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
+            else: shell = ""
+        new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
+        extra = "-Command" if shell in {"powershell", "pwsh"} else ""
         my_list = []
-        if self.machine == "Windows":
-            my_list += [new_window, terminal, shell, extra]  # by having a list,
-            # it is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
+        if self.machine == "Windows": my_list += [new_window, terminal, shell, extra]  # by having a list,
+        # it is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         my_list += cmds
         my_list = [item for item in my_list if item != ""]
         print("Meta.Terminal.run_async: Subprocess command: ", my_list)
-        w = subprocess.Popen(my_list, stdin=subprocess.PIPE,
-                             shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
-        # returns Popen object, not so useful for communcation with an opened terminal
-        return w
+        w = subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
+        return w  # returns Popen object, not so useful for communcation with an opened terminal
 
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
@@ -649,15 +603,13 @@ path.delete(sure=True, verbose=False)
         """
         if os.name == 'nt':
             import ctypes  # WARNING: requires Windows XP SP2 or higher!
-            try:
-                return ctypes.windll.shell32.IsUserAnAdmin()
+            try: return ctypes.windll.shell32.IsUserAnAdmin()
             except:
                 import traceback
                 traceback.print_exc()
                 print("Admin check failed, assuming not an admin.")
                 return False
-        else:  # Check for root on Posix
-            return os.getuid() == 0
+        else: return os.getuid() == 0  # Check for root on Posix
 
     @staticmethod
     def run_code_as_admin(params):
@@ -785,7 +737,6 @@ class SSH(object):
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
 
     def run(self, cmd, printit=True):
-        # if printit: print(f"\nExecuting on remote {self.username}@{self.hostname}:\n{cmd}")
         res = self.ssh.exec_command(cmd)
         res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
         if printit: res.print()

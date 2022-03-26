@@ -172,17 +172,23 @@ class Save:
          but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary.
         It is useful for to generate human-readable file."""
-        import json; with open(str(path), "w") as file: json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
+        import json
+        with open(str(path), "w") as file:
+            json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
     @staticmethod
     @save_decorator
     def yaml(obj, path, **kwargs):
-        import yaml; with open(str(path), "w") as file:  yaml.dump(obj, file, **kwargs)
+        import yaml
+        with open(str(path), "w") as file:
+            yaml.dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
     def vanilla_pickle(obj, path, **kwargs):
-        import pickle; with open(str(path), 'wb') as file: pickle.dump(obj, file, **kwargs)
+        import pickle
+        with open(str(path), 'wb') as file:
+            pickle.dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
@@ -358,9 +364,8 @@ class Base(object):
         else:  # file points to pickled object:
             if scope:
                 import runpy
-                mods = runpy.run_path(str(code_path))
                 print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
-                scope.update(mods)  # Dill will no longer complain.
+                scope.update(runpy.run_path(str(code_path)))  # Dill will no longer complain.
             obj = dill.loads(data_path.read_bytes())
             return obj
 
@@ -729,7 +734,7 @@ class Struct(Base, dict):
             for key in keys: del self.__dict__[key]
         if criterion is not None:
             for key in self.keys().list:
-                if criterion(self[key]): del self.__dict__[key]
+                if criterion(self[key]): self.__dict__.__delitem__(key)
         return self
 
     def apply_to_values(self, key_val_func):
@@ -763,8 +768,7 @@ class Struct(Base, dict):
 
     def plot(self, artist=None):
         if artist is None:
-            # artist = Artist(figname='Structure Plot')
-            # removed for disentanglement
+            # artist = Artist(figname='Structure Plot')  # removed for disentanglement
             import matplotlib.pyplot as plt
             fig, artist = plt.subplots()
         for key, val in self: artist.plot(val, label=key)

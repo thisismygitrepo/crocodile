@@ -59,24 +59,20 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         key = pwd2key(pwd, salt, iteration)
     elif key is None:  # generate a new key: discouraged, always make your keys/pwd before invoking the func.
         key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
-        key_path = P.tmpdir().joinpath("key.bytes")
-        key_path.write_bytes(key)
-        print(f"KEY SAVED @ {repr(key_path)}")  # without verbosity check:
+        print(f"KEY SAVED @ {repr(P.tmpdir().joinpath('key.bytes').write_bytes(key))}")  # without verbosity check:
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
     # if type(msg) is str: msg = msg.encode("utf-8")
     code = Fernet(key).encrypt(msg)
     if pwd is not None and salted is True:
-        from base64 import urlsafe_b64encode as b64e
-        from base64 import urlsafe_b64decode as b64d
+        from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
         return b64e(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), b64d(code)))
     else: return code
 
 
 def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
-    from base64 import urlsafe_b64encode as b64e
-    from base64 import urlsafe_b64decode as b64d
+    from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
     from cryptography.fernet import Fernet
     if pwd is not None:
         assert key is None, f"You can either pass key or pwd, or none of them, but not both."
@@ -101,7 +97,6 @@ class Read(object):
         # if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']:
         #     # plt.gcf().canvas.get_supported_filetypes().keys():
         #     return plt.imread(path, **kwargs)
-        # else:
         try: reader = getattr(Read, suffix)
         except AttributeError: raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
         return reader(str(path), **kwargs)
@@ -129,10 +124,7 @@ class Read(object):
         except Exception:  # file has C-style comments.
             with open(str(path), "r") as file:
                 mydict = install_n_import("pyjson5").load(file, **kwargs)
-        if r:
-            return Struct.recursive_struct(mydict)
-        else:
-            return Struct(mydict)
+        return Struct.recursive_struct(mydict) if r else Struct(mydict)
 
     @staticmethod
     def yaml(path, r=False):
@@ -206,8 +198,7 @@ class P(type(Path()), Path):
         :param verbose:
         :return:
         """
-        path = self._resolve_path(folder=folder, name=name, path=path,
-                                  default_name=self.absolute().name, rel2it=rel2it)
+        path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
         name, folder = path.name, path.parent
         if parents: folder.create(parents=True, exist_ok=True)
         slf = self.expanduser().resolve()
@@ -216,7 +207,6 @@ class P(type(Path()), Path):
                                                      f"It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False))
             return path  # contents live within this directory.
-
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
             path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
             slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict.
@@ -251,9 +241,7 @@ class P(type(Path()), Path):
         :return: path to copied file or directory.
 
         .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
-
-        """
-        # tested %100
+        """ # tested %100
         if folder is not None and path is None:
             if name is None: dest = P(folder).expanduser().resolve().create()
             else:
@@ -299,9 +287,7 @@ class P(type(Path()), Path):
             else: return notfound
         filename = self
         if '.zip' in str(self): filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose)
-        try:
-            if reader is None: return Read.read(filename, **kwargs)  # infer the reader
-            else: return reader(str(filename), **kwargs)
+        try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
 
     def start(self, opener=None):  # explore folders.
@@ -316,9 +302,7 @@ class P(type(Path()), Path):
         elif sys.platform == 'linux':
             opener = "xdg-open"
             subprocess.call([opener, filename])  # works for files and folders alike
-        else:  # mac
-            # os.system(f"open {filename}")
-            subprocess.call(["open", filename])  # works for files and folders alike
+        else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
         return self
 
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
@@ -528,15 +512,12 @@ class P(type(Path()), Path):
             fullparts.remove(key)
             fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
         elif type(key) is int or type(key) is slice:
-            if type(key) is int:  # replace this entry
-                fullparts = fullparts[:key] + new + fullparts[key + 1:]
+            if type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]  # replace this entry
             elif type(key) is slice:
                 if key.stop is None: key = slice(key.start, len(fullparts), key.step)
                 if key.start is None: key = slice(0, key.stop, key.step)
                 fullparts = fullparts[:key.start] + new + fullparts[key.stop:]
-        obj = P(*fullparts)
-        self._str = str(obj)
-        # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
+        self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
 
     def __repr__(self):  # this is useful only for the console
         rep = "P:"
@@ -622,11 +603,11 @@ class P(type(Path()), Path):
         return P(target) if not orig else self
     
     def resolve(self, strict=False):
-        try: res = super(P, self).resolve(strict=strict)
+        try: return super(P, self).resolve(strict=strict)
         except OSError: return self
-        return res
 
     def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
+    def read_text(self, lines=False, encoding=None): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
 
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):
@@ -674,12 +655,7 @@ class P(type(Path()), Path):
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else:  # glob ignroes dot and hidden files
             from glob import glob
-            if r:
-                path = slf / "**" / pattern
-                raw = glob(str(path), recursive=r)
-            else:
-                path = slf.joinpath(pattern)
-                raw = glob(str(path))
+            raw = glob(str(slf / "**" / pattern), recursive=r) if r else glob(str(slf.joinpath(pattern)))
 
         if compressed:
             comp_files = List(raw).filter(lambda x: '.zip' in str(x))
@@ -689,11 +665,8 @@ class P(type(Path()), Path):
                                            dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
 
         def run_filter(item_):
-            flags = [True]
-            if not files: flags.append(item_.is_dir())
-            if not folders: flags.append(item_.is_file())
-            for afilter in filters: flags.append(afilter(item_))
-            return all(flags)
+            flags = [item_.is_dir() if not files else True, item_.is_file() if not folders else True]
+            return all(flags + [afilter(item_) for afilter in filters])
 
         if generator:
             def gen():
@@ -703,8 +676,7 @@ class P(type(Path()), Path):
                     flag = P(item_) if run_filter(P(item_)) else None
                     if flag: yield item_
             return gen
-        else:
-            # unpack the generator and vet the items (the function also returns P objects)
+        else:  # unpack the generator and vet the items (the function also returns P objects)
             processed = [P(item) for item in raw if run_filter(P(item))]
             if not processed: return List(processed)  # if empty, don't proceeed
             if win_order:  # this option only supported in non-generator mode.
@@ -811,18 +783,12 @@ class P(type(Path()), Path):
         path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
         slf = self.expanduser().resolve()
         arcname = P(arcname or slf.name)
-        if arcname.name != slf.name:
-            arcname /= slf.name  # arcname has to start from somewhere and end with filename
+        if arcname.name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
         if slf.is_file():
             if path.suffix != ".zip": path = path + f".zip"
             path = Compression.zip_file(ip_path=slf, op_path=path, arcname=arcname, **kwargs)
         else:
-            if content:
-                root_dir = slf
-                base_dir = "."
-            else:
-                root_dir = slf.split(at=str(arcname[0]))[0]
-                base_dir = arcname
+            root_dir, base_dir = (slf, ".") if content else slf.split(at=str(arcname[0]))[0], arcname
             path = Compression.compress_folder(root_dir=root_dir, op_path=path,
                                                base_dir=base_dir, fmt='zip', **kwargs)
         if verbose: print(f"ZIPPED {repr(slf)} ==>  {repr(path)}")
@@ -852,9 +818,7 @@ class P(type(Path()), Path):
             print(folder)
         if content: folder = folder.parent
         result = Compression.unzip(zipfile, folder, fname, **kwargs)
-        if verbose:
-            msg = f"UNZIPPED {repr(zipfile)} ==> {repr(result)}"
-            print(msg)
+        if verbose: print(f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
         if inplace: slf.delete(sure=True, verbose=verbose)
         return result if not orig else self
 
@@ -953,8 +917,7 @@ class P(type(Path()), Path):
         else:
             if name is None: name = default_name
             else: name = str(name)  # good for edge cases of path with single part.
-            if folder is None:  # means same directory, just different name
-                folder = self.parent
+            if folder is None: folder = self.parent  # means same directory, just different name
             if rel2it: folder = self.joinpath(folder).resolve()
             path = P(folder).expanduser().resolve() / name
         return path
