@@ -607,7 +607,7 @@ class P(type(Path()), Path):
         except OSError: return self
 
     def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
-    def read_text(self, lines=False, encoding=None): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
+    def read_text(self, encoding="utf-8", lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
 
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):

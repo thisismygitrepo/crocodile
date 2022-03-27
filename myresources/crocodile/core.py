@@ -449,12 +449,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
         if names is None: names = range(len(self))
         for name, item in zip(names, self.list): saver(path=directory / name, obj=item)
 
-    def __repr__(self):
-        if len(self.list) > 0:
-            tmp1 = f"List object with {len(self.list)} elements. One example of those elements: \n"
-            return tmp1 + f"{repr(self.list[0])}"
-        else: return f"An Empty List []"
-
+    def __repr__(self): return f"List object with {len(self.list)} elements. First item of those is: \n" + f"{repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
     def __deepcopy__(self): return List([copy.deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
