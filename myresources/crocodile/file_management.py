@@ -789,8 +789,7 @@ class P(type(Path()), Path):
             path = Compression.zip_file(ip_path=slf, op_path=path, arcname=arcname, **kwargs)
         else:
             root_dir, base_dir = (slf, ".") if content else slf.split(at=str(arcname[0]))[0], arcname
-            path = Compression.compress_folder(root_dir=root_dir, op_path=path,
-                                               base_dir=base_dir, fmt='zip', **kwargs)
+            path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         if verbose: print(f"ZIPPED {repr(slf)} ==>  {repr(path)}")
         if inplace: slf.delete(sure=True, verbose=verbose)
         return path if not orig else self
@@ -812,10 +811,7 @@ class P(type(Path()), Path):
         if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(slf): return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
-        if folder is None: folder = (zipfile.parent / zipfile.stem)
-        else:
-            folder = P(folder).joinpath(zipfile.stem).expanduser().resolve()
-            print(folder)
+        folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).joinpath(zipfile.stem).expanduser().resolve()
         if content: folder = folder.parent
         result = Compression.unzip(zipfile, folder, fname, **kwargs)
         if verbose: print(f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")

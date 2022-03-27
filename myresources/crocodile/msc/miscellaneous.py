@@ -1,16 +1,49 @@
 
-import crocodile.toolbox as tb
+from crocodile.file_management import P, List, install_n_import
 import datetime
 import time
 import sys
+import os
+import numpy as np
 
 
-def compute_num_of_lines_of_code_in_repo(path=tb.P.cwd(), extension=".py", r=True, **kwargs):
-    return tb.P(path).search(f"*{extension}", r=r, **kwargs).read_text().splitlines().apply(len).np.sum()
+def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
+def compute_num_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True, **kwargs): return P(path).search(f"*{extension}", r=r, **kwargs).read_text().splitlines().apply(len).np.sum()
+def get_list_of_executables_defined_in_shell(): return List(os.environ["Path"].split(";")).apply(lambda x: P(x).search("*.exe")).flatten().print()
 
 
-def get_list_of_executables_defined_in_shell():
-    return tb.L(tb.os.environ["Path"].split(";")).apply(lambda x: tb.P(x).search("*.exe")).flatten().print()
+class Cycle:
+    def __init__(self, c=None, name=''):
+        self.c = c  # a list of values.
+        self.index = -1
+        self.name = name
+
+    def next(self):
+        self.index += 1
+        if self.index >= len(self.c): self.index = 0
+        return self.c[self.index]
+
+    def previous(self):
+        self.index -= 1
+        if self.index < 0: self.index = len(self.c) - 1
+        return self.c[self.index]
+
+    def set(self, value): self.index = self.c.index(value)
+    def get(self): return self.c[self.index]
+    def get_index(self): return self.index
+    def set_index(self, index): self.index = index
+    def sample(self, size=1): return np.random.choice(self.c, size)
+    def __add__(self, other): pass  # see behviour of matplotlib cyclers.
+    def __str__(self): return self.name
+
+
+class DictCycle(Cycle):
+    def __init__(self, strct, **kwargs):
+        strct = dict(strct)
+        super(DictCycle, self).__init__(c=strct.items(), **kwargs)
+        self.keys = strct.keys()
+
+    def set_key(self, key): self.index = list(self.keys).index(key)
 
 
 def polygon_area(points):
@@ -55,14 +88,11 @@ class Pomodoro:
     @staticmethod
     def beep(duration=1, frequency=3000):
         duration = 1000 * duration
-        try:
-            import winsound
+        try: import winsound
         except ImportError:
-            import os
-            # apt-get install beep
+            import os # apt-get install beep
             os.system('beep -f %s -l %s' % (frequency, duration))
-        else:
-            winsound.Beep(frequency, duration)
+        else: winsound.Beep(frequency, duration)
 
 
 if __name__ == '__main__':

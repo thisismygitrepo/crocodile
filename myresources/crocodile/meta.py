@@ -1,9 +1,9 @@
+
 import logging
 import subprocess
 import time
 # import types
-from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, \
-    dill, install_n_import
+from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, dill, install_n_import, List
 from crocodile.file_management import P
 
 
@@ -15,40 +15,6 @@ class Null:
     def __call__(self, *args, **kwargs): return self
     def __len__(self): return 0
     def __bool__(self): return False
-
-
-class Cycle:
-    def __init__(self, c=None, name=''):
-        self.c = c  # a list of values.
-        self.index = -1
-        self.name = name
-
-    def next(self):
-        self.index += 1
-        if self.index >= len(self.c): self.index = 0
-        return self.c[self.index]
-
-    def previous(self):
-        self.index -= 1
-        if self.index < 0: self.index = len(self.c) - 1
-        return self.c[self.index]
-
-    def set(self, value): self.index = self.c.index(value)
-    def get(self): return self.c[self.index]
-    def get_index(self): return self.index
-    def set_index(self, index): self.index = index
-    def sample(self, size=1): return np.random.choice(self.c, size)
-    def __add__(self, other): pass  # see behviour of matplotlib cyclers.
-    def __str__(self): return self.name
-
-
-class DictCycle(Cycle):
-    def __init__(self, strct, **kwargs):
-        strct = dict(strct)
-        super(DictCycle, self).__init__(c=strct.items(), **kwargs)
-        self.keys = strct.keys()
-
-    def set_key(self, key): self.index = list(self.keys).index(key)
 
 
 class Experimental:
@@ -201,13 +167,11 @@ class Experimental:
             if key != "args" and key != "kwargs":
                 flag = False
                 if val is inspect._empty:  # not passed argument.
-                    if exclude_args:
-                        flag = True
+                    if exclude_args: flag = True
                     else:
                         val = None
                         print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
-                if not flag:
-                    res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
+                if not flag: res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
         ak = inspect.getfullargspec(func)
         if ak.varargs: res += f"{ak.varargs} = (,)\n"
         if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
@@ -224,12 +188,10 @@ class Experimental:
                 if f"here{edit_idx}" in line:
                     new_line = line.replace(edit[0], edit[1])
                     print(f"Old Line: {line}\nNew Line: {new_line}")
-                    if new_line == line:
-                        raise KeyError(f"Text Not found.")
+                    if new_line == line: raise KeyError(f"Text Not found.")
                     sourcelines[line_idx] = new_line
                     break
-            else:
-                raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
+            else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
         newsource = "\n".join(sourcelines)
         P(module.__file__).write_text(newsource)
         import importlib
@@ -292,8 +254,7 @@ class Manipulator:
         total_shape = list(array.shape)
         size = total_shape.pop(ax_idx)
         new_shape = (int(size / factor), factor)
-        for index, item in enumerate(new_shape):
-            total_shape.insert(ax_idx + index, item)
+        for index, item in enumerate(new_shape): total_shape.insert(ax_idx + index, item)
         # should be same as return np.split(array, new_shape, ax_idx)
         return array.reshape(tuple(total_shape))
 
@@ -319,8 +280,7 @@ class Manipulator:
         changed in April 2021 without testing.
         """
         everything = slice(None, None, None)  # `:`
-        if rank is None:
-            rank = axis + 1
+        if rank is None:  rank = axis + 1
         indices = [everything] * rank
         indices[axis] = myslice
         # noinspection PyTypeChecker
@@ -328,14 +288,10 @@ class Manipulator:
         return tuple(indices)
 
 
-M = Manipulator
-
-
 def batcher(func_type='function'):
     if func_type == 'method':
         def batch(func):
             # from functools import wraps
-            #
             # @wraps(func)
             def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):
                 output = []
@@ -353,8 +309,7 @@ def batcher(func_type='function'):
         raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
-            def __init__(self, func):
-                self.func = func
+            def __init__(self, func): self.func = func
 
             def __call__(self, x, **kwargs):
                 output = [self.func(item, **kwargs) for item in x]
@@ -457,10 +412,7 @@ class Terminal:
 
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
-
-    def set_std_null(self):
-        """Equivalent to `echo 'foo' &> /dev/null`"""
-        self.stdout = subprocess.DEVNULL; self.stderr = subprocess.DEVNULL; self.stdin = subprocess.DEVNULL
+    def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
 
     @staticmethod
     def is_admin():
@@ -547,8 +499,7 @@ tb.sys.path.insert(0, r'{wdir}')
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
 
         script = header_script + script if header else script
-        if terminal in {"wt", "powershell", "pwsh"}:
-            script += "\ntb.DisplayData.set_pandas_auto_width()\n"
+        if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts")
         file.write_text(script)
@@ -697,11 +648,10 @@ class SSH(object):
         """
         return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""
 
-    @staticmethod
-    def copy_sshkeys_to_remote(fqdn):
-        # Caveat, only windows is supported.
-        # the following is a Windows Openssh alternative to ssh-copy-id
-        Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
+    def copy_sshkeys_to_remote(self, fqdn):
+        """Windows Openssh alternative to ssh-copy-id"""
+        assert self.platform.system() == "Windows"
+        return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
     def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
     def remote(self): return f"{self.username}@{self.hostname}"
@@ -735,16 +685,13 @@ class SSH(object):
 
     def copy_to_here(self, source, target=None): pass
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
+    def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
 
     def run(self, cmd, printit=True):
         res = self.ssh.exec_command(cmd)
         res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
         if printit: res.print()
         return res
-
-    def run_locally(self, command):
-        print(f"Executing Locally @ {self.platform.node()}:\n{command}")
-        return Terminal.Response(os.system(command))
 
 
 class Log(object):
@@ -796,20 +743,12 @@ class Log(object):
         if which in {"file", "all"}: self.get_fhandler().setLevel(level)
 
     def get_shandler(self, first=True):
-        shandlers = []
-        for handler in self.logger.handlers:
-            if "StreamHandler" in str(handler):
-                if first: return handler
-                else: shandlers.append(handler)
-        return shandlers
+        shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler))
+        return shandlers[0] if first else shandlers
 
     def get_fhandler(self, first=True):
-        fhandlers = []
-        for handler in self.logger.handlers:
-            if "FileHandler" in str(handler):
-                if first: return handler
-                else: fhandlers.append(handler)
-        return fhandlers
+        fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler))
+        return fhandlers[0] if first else fhandlers
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
         if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
@@ -819,14 +758,12 @@ class Log(object):
         else: self.logger = Log.get_colorlog(**self.specs)
 
     def __setstate__(self, state):
-        self.__dict__ = state
-        if self.specs["file_path"] is not None:  # this way of creating relative path makes transferrable across machines.
-            self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
+        self.__dict__ = state   # this way of creating relative path makes transferrable across machines.
+        if self.specs["file_path"] is not None: self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
         self._install()
 
     def __getstate__(self):
-        # logger can be pickled without this method,
-        # but its handlers are lost, so what's the point? no perfect reconstruction.
+        # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy()
         state["specs"] = state["specs"].copy()
         del state["logger"]
@@ -1059,9 +996,5 @@ class Scheduler:
         # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 
-def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
-
-
 if __name__ == '__main__':
-    # Terminal().run("$profile", shell="pwsh").print()
     pass

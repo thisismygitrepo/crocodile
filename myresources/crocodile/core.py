@@ -53,13 +53,10 @@ def str2timedelta(past):
 
 
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False):
-    if safe:
-        import secrets  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
-        return secrets.token_urlsafe(length)
-    pool = string.ascii_lowercase if lower else ""
-    if upper: pool += string.ascii_uppercase
-    if digits: pool += string.digits
-    if punctuation: pool += string.punctuation
+    if safe:  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
+        import secrets; return secrets.token_urlsafe(length)
+    pool = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "")
+    pool = pool + (string.digits if digits else "") + (string.punctuation if punctuation else "")
     return ''.join(random.choices(pool, k=length))
 
 
@@ -820,24 +817,18 @@ class Display:
 
     @staticmethod
     def config(mydict, newline=True):
-        rep = ""  # returns json repr
-        for key, val in mydict.items():
-            rep += f"{key} = {val}"
-            rep += "\n" if newline else ", "
+        rep = ""
+        for key, val in mydict.items(): rep += f"{key} = {val}" + ("\n" if newline else ", ")
         return rep
 
     @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):
-        counter = 0
-        index = 0
+        counter, index = 0, 0
         while index < len(mylist):
             item = mylist[index]
             print(item, end=sep)
             counter += len(item)
-            if counter <= char_per_row: pass
-            else:
-                counter = 0
-                print("\n")
+            if not counter <= char_per_row: counter = 0; print("\n")
             index += 1
 
 

@@ -5,7 +5,7 @@ from crocodile.core import np, List, timestamp, os, Save
 from crocodile.file_management import P
 import typing
 import pandas as pd
-from crocodile.meta import Cycle
+from crocodile.msc.miscellaneous import Cycle
 
 
 class FigurePolicy(enum.Enum):
@@ -309,43 +309,25 @@ class FigureManager:
         im = ax.images[0].get_array()
         xmin, xmax = ax.get_xlim()
         ymin, ymax = ax.get_ylim()
-        if ymin > ymax:  # default imshow settings
-            ymin, ymax = ymax, ymin
+        if ymin > ymax: ymin, ymax = ymax, ymin  # default imshow settings
         for (j, i), label in np.ndenumerate(im):
-            if (xmin < i < xmax) and (ymin < j < ymax):
-                ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8)
+            if (xmin < i < xmax) and (ymin < j < ymax): ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8)
 
     @staticmethod
     def update(figname, obj_name, data=None):
         """Fastest update ever. But, you need access to label path.
         Using this function external to the plotter. But inside the plotter you need to define labels to objects
         The other alternative is to do the update inside the plotter, but it will become very verbose.
-
-        :param figname:
-        :param obj_name:
-        :param data:
-        :return:
         """
-        obj = FigureManager.findobj(figname, obj_name)
-        if data is not None:
-            obj.set_data(data)
-            # update scale:
-            # obj.axes.relim()
-            # obj.axes.autoscale()
+        if data is not None: FigureManager.findobj(figname, obj_name).set_data(data)
 
     @staticmethod
     def findobj(figname, obj_name):
-        if type(figname) is str:
-            fig = plt.figure(num=figname)
-        else:
-            fig = figname
-        search_results = fig.findobj(lambda x: x.get_label() == obj_name)
-        if len(search_results) > 0:  # list of length 1, 2 ...
-            search_results = search_results[0]  # the first one is good enough.
-        return search_results
+        search_results = (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
+        return search_results[0] if len(search_results) > 0 else search_results
 
-    def get_fig(self, figname='', suffix=None, **kwargs):
-        return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
+    def get_fig(self, figname='', suffix=None, **kwargs): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
+    def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
 
     @staticmethod
     def get_fig_static(figpolicy, figname='', suffix=None, **kwargs):
@@ -371,9 +353,6 @@ class FigureManager:
                 plt.close(figname)
             fig = plt.figure(num=figname, **kwargs)
         return fig
-
-    def transperent_fig(self):
-        self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
 
     @staticmethod
     def set_ax_size(ax, w, h):
@@ -445,11 +424,9 @@ class FigureManager:
         plt.rc('axes', prop_cycle=default_cycler)
         if test:
             temp = np.random.randn(10, 10)
-            for idx, aq in enumerate(temp):
-                plt.plot(aq + idx * 2)
+            for idx, aq in enumerate(temp): plt.plot(aq + idx * 2)
 
-    def close(self):
-        plt.close(self.fig)
+    def close(self): plt.close(self.fig)
 
 
 class SaveType:
@@ -483,20 +460,15 @@ class SaveType:
                 print('Turning off IO')
                 plt.ioff()
 
-            if fignames:  # path sent explicitly
-                self.watch_figs = [plt.figure(figname) for figname in fignames]
+            if fignames: self.watch_figs = [plt.figure(figname) for figname in fignames]  # path sent explicitly
             else:  # tow choices:
                 if self.watch_figs is None:  # None exist ==> add all
                     figure_names = plt.get_figlabels()  # add all.
                     self.watch_figs = [plt.figure(k) for k in figure_names]
-                else:  # they exist already.
-                    pass
+                else: pass  # they exist already.
 
-            if names is None:  # individual save path, useful for PNG.
-                names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]
-
-            for afig, aname in zip(self.watch_figs, names):
-                self._save(afig, aname, **kwargs)
+            if names is None: names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]  # individual save path, useful for PNG.
+            for afig, aname in zip(self.watch_figs, names): self._save(afig, aname, **kwargs)
 
         def _save(self, *args, **kwargs): pass
 
@@ -547,8 +519,7 @@ class SaveType:
 
         def _save(self, afigure, aname, dpi=150, **kwargs):
             aname = P(aname).make_valid_filename()
-            afigure.savefig(os.path.join(self.save_dir, aname), bbox_inches='tight', pad_inches=0.3,
-                            dpi=dpi, **kwargs)
+            afigure.savefig(os.path.join(self.save_dir, aname), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
 
         def finish(self):
             print(f"PNGs Saved @", P(self.fname).absolute().as_uri())
@@ -746,7 +717,6 @@ class SaveType:
             self.data = gen_function
             self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
             plt.pause(0.5)  # give time_produced for figures to show up before updating them
-
             from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
                 for datum in tqdm(self.data()):
@@ -830,10 +800,7 @@ class VisibilityViewer(FigureManager):
         if self.fig is None:
             self.fig = artist.fig
             self.fig.canvas.mpl_connect('key_press_event', self.process_key)
-
-        if increment_index:
-            self.index += 1
-            self.index_max += 1
+        if increment_index: self.index += 1; self.index_max += 1
         self.current = self.index
         self.axes_repo.append(self.artist.ax if type(self.artist.ax) is list else self.artist.ax.tolist())
         self.texts_repo.append(self.artist.txt if type(self.artist.txt) is list else self.artist.txt.tolist())
@@ -956,7 +923,6 @@ class ImShow(FigureManager):
         Tip: Use np.arrray_split to get sublists and have multiple plots per frame. Useful for very long lists.
         """
         super(ImShow, self).__init__(info_loc=info_loc)
-
         num_plots = len(images_list)  # Number of images in each plot
         self.num_plots = num_plots
         lengths = [len(images_list[i]) for i in range(num_plots)]
@@ -983,13 +949,9 @@ class ImShow(FigureManager):
         # bprev = Button(axprev, 'Previous')
         # bprev.on_clicked(callback.prev)
 
-        if sup_titles is None:
-            sup_titles = [str(i) for i in np.arange(self.index_max)]
-
-        if labels:
-            sub_labels = [[a_label for _ in np.arange(self.index_max)] for a_label in labels]
-        elif sub_labels is None:
-            sub_labels = [[str(i) for i in np.arange(self.index_max)] for _ in range(self.num_plots)]
+        if sup_titles is None: sup_titles = [str(i) for i in np.arange(self.index_max)]
+        if labels: sub_labels = [[a_label for _ in np.arange(self.index_max)] for a_label in labels]
+        elif sub_labels is None: sub_labels = [[str(i) for i in np.arange(self.index_max)] for _ in range(self.num_plots)]
 
         self.image_list = images_list
         self.sub_labels = sub_labels
@@ -1012,8 +974,7 @@ class ImShow(FigureManager):
             if gridspec is not None:
                 gs = self.fig.add_gridspec(gridspec[0])
                 self.ax = []
-                for ags in gs[1:]:
-                    self.ax.append(self.fig.add_subplot(gs[ags[0], ags[1]]))
+                for ags in gs[1:]: self.ax.append(self.fig.add_subplot(gs[ags[0], ags[1]]))
             else: self.ax = self.fig.subplots(nrows=nrows, ncols=ncols)
         else:
             self.ax = ax
@@ -1057,10 +1018,8 @@ class ImShow(FigureManager):
                 if i == 0 and self.ims.__len__() < self.num_plots:
                     im = an_ax.imshow(an_image, animated=True, **self.kwargs)
                     self.ims.append(im)
-                else:
-                    self.ims[j].set_data(an_image)
-                if self.auto_brightness:
-                    self.ims[j].norm.autoscale(an_image)
+                else: self.ims[j].set_data(an_image)
+                if self.auto_brightness: self.ims[j].norm.autoscale(an_image)
                 an_ax.set_xlabel(f'{a_label}')
             self.fig.suptitle(self.titles[i], fontsize=8)
             self.saver.add(names=[self.titles[i]])
@@ -1175,18 +1134,11 @@ class Artist(FigureManager):
 
     def accessorize(self, *args, legends=None, title=None, **kwargs):
         self.line = self.ax[0].plot(*args, **kwargs)
-        if legends is not None:
-            self.ax[0].legend(legends)
-        if title is not None:
-            self.ax[0].set_title(title)
+        if legends is not None: self.ax[0].legend(legends)
+        if title is not None: self.ax[0].set_title(title)
         self.ax[0].grid('on')
 
-    def get_axes(self):
-        if self.create_new_axes:
-            axis = self.fig.subplots()
-            self.ax = np.array([axis])
-        else:  # use same old axes
-            pass
+    def get_axes(self): self.ax = np.array([self.fig.subplots()]) if self.create_new_axes else self.ax
 
     def suptitle(self, title):
         self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
