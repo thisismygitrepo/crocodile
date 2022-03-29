@@ -589,10 +589,7 @@ class P(type(Path()), Path):
         target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
-        if overwrite:
-            if self.is_symlink() or self.exists():
-                # self.exists() is False for broken links even though they exist
-                self.delete(sure=True, verbose=verbose)
+        if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         import platform
         from crocodile.meta import Terminal
         if platform.system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
@@ -607,7 +604,7 @@ class P(type(Path()), Path):
         except OSError: return self
 
     def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
-    def read_text(self, encoding="utf-8", lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
+    def read_text(self, encoding=None, lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
 
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):
@@ -676,13 +673,12 @@ class P(type(Path()), Path):
                     flag = P(item_) if run_filter(P(item_)) else None
                     if flag: yield item_
             return gen
-        else:  # unpack the generator and vet the items (the function also returns P objects)
-            processed = [P(item) for item in raw if run_filter(P(item))]
-            if not processed: return List(processed)  # if empty, don't proceeed
-            if win_order:  # this option only supported in non-generator mode.
-                import re
-                processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
-            return List(processed)
+        processed = [P(item) for item in raw if run_filter(P(item))]
+        if not processed: return List(processed)  # if empty, don't proceeed
+        if win_order:  # this option only supported in non-generator mode.
+            import re
+            processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
+        return List(processed)
 
     def tree(self, level: int = -1, limit_to_directories: bool = False,
              length_limit: int = 1000, stats=False, desc=None):
@@ -703,7 +699,7 @@ class P(type(Path()), Path):
                 result = f" {sts.size} MB. {sts.content_mod_time}. "
                 if desc is not None: result += desc(apath)
                 return result
-            else: return ""
+            return ""
 
         def inner(apath: P, prefix: str = '', level_=-1):
             nonlocal files, directories
@@ -741,7 +737,6 @@ class P(type(Path()), Path):
             result = results[0]
             if ".zip" in str(result): return result.unzip()
             return result
-        else: return None
 
     @staticmethod
     def pwd(): return P.cwd()
@@ -757,23 +752,19 @@ class P(type(Path()), Path):
     def tmpfile(name=None, suffix="", folder=None, tstamp=False): return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files")
 
     @staticmethod
-    def tmp(folder=None, file=None, path="home", verbose=False):
+    def tmp(folder=None, file=None, root="~/tmp_results", verbose=False):
         """
         :param folder: this param is created automatically.
         :param file: this param is appended to path, but not created.
-        :param path:
+        :param root:
         :param verbose:
         :return:
         """
-        if str(path) == "home":
-            path = P.home() / f"tmp_results"
-            path.mkdir(exist_ok=True, parents=True)
-        if folder is not None:
-            path = path / folder
-            path.mkdir(exist_ok=True, parents=True)
-        if file is not None:  path = path / file
-        if verbose: print(f"TMPDIR {repr(path)}. Parent: {repr(path.parent)}")
-        return path
+        root = P(root).expanduser().create()
+        if folder is not None: root = (root / folder).create()
+        if file is not None: root = root / file
+        if verbose: print(f"TMPDIR {repr(root)}. Parent: {repr(root.parent)}")
+        return root
 
     # ====================================== Compression ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
@@ -1051,27 +1042,18 @@ class Fridge:
     def reset(self): self.time_produced = datetime.now()
 
     def __call__(self, fresh=False):
-        """"""
         if self.path is None:  # Memory Fridge
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
                 self.cache = self.source_func()
                 self.time_produced = datetime.now()
                 if self.logger: self.logger.debug(f"Updating / Saving data from {self.source_func}")
-            else:
-                if self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
-            return self.cache
-        else:  # disk fridge
-            if fresh or not self.path.exists() or self.age > str2timedelta(self.expire):
-                if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
-                # print(datetime.now() - self.path.stats().content_mod_time, str2timedelta(self.expire))
-                self.cache = self.source_func()  # fresh order, never existed or exists but expired.
-                self.save(obj=self.cache, path=self.path)
-            elif self.age < str2timedelta(self.expire):
-                if self.cache is None:  # this implementation favours reading over pulling fresh at instantiation.
-                    self.cache = self.read(self.path)  # exists and not expired.
-                else:  # use the one in memory self.cache
-                    pass
-            return self.cache
+            elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
+        elif fresh or not self.path.exists() or self.age > str2timedelta(self.expire):  # disk fridge
+            if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
+            self.cache = self.source_func()  # fresh order, never existed or exists but expired.
+            self.save(obj=self.cache, path=self.path)
+        elif self.age < str2timedelta(self.expire) and self.cache is None: self.cache = self.read(self.path)  # this implementation favours reading over pulling fresh at instantiation.  # exists and not expired. else # use the one in memory self.cache
+        return self.cache
 
 
 if __name__ == '__main__':

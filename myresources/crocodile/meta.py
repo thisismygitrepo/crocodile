@@ -29,9 +29,12 @@ class Experimental:
         print(f"Memory used = {(after.used - before.used) / 1e6}")
 
     @staticmethod
-    def try_this(func, otherwise=None):
+    def try_this(func, return_=None, raise_=None, run=None, handle=None):
         try: return func()
-        except BaseException as e: _ = e; return otherwise
+        except BaseException as e:  # or Exception
+            if raise_ is not None: raise raise_
+            if handle is not None: return handle(e)
+            return run() if run is not None else return_
 
     @staticmethod
     def show_globals(scope, **kwargs):
@@ -199,9 +202,7 @@ class Experimental:
         return module
 
     @staticmethod
-    def monkey_patch(class_inst, func):
-        """On the fly, attach a function as a method of an instantiated class."""
-        setattr(class_inst.__class__, func.__name__, func)
+    def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):
@@ -255,19 +256,16 @@ class Manipulator:
         size = total_shape.pop(ax_idx)
         new_shape = (int(size / factor), factor)
         for index, item in enumerate(new_shape): total_shape.insert(ax_idx + index, item)
-        # should be same as return np.split(array, new_shape, ax_idx)
-        return array.reshape(tuple(total_shape))
+        return array.reshape(tuple(total_shape))  # should be same as return np.split(array, new_shape, ax_idx)
 
     @staticmethod
     def slicer(array, a_slice: slice, axis=0):
         """Extends Numpy slicing by allowing rotation if index went beyond size."""
-        lower_ = a_slice.start
-        upper_ = a_slice.stop
+        lower_, upper_ = a_slice.start, a_slice.stop
         n = array.shape[axis]
         lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
         roll = lower_
-        lower_ = lower_ - roll
-        upper_ = upper_ - roll
+        lower_, upper_ = lower_ - roll, upper_ - roll
         array_ = np.roll(array, -roll, axis=axis)
         upper_ = upper_ % n
         new_slice = slice(lower_, upper_, a_slice.step)
@@ -296,24 +294,16 @@ def batcher(func_type='function'):
             def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):
                 output = []
                 for counter, item in enumerate(x):
-                    if per_instance_kwargs is not None:
-                        mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()}
-                    else: mykwargs = {}
+                    mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()} if per_instance_kwargs is not None else {}
                     output.append(func(self, item, *args, **mykwargs, **kwargs))
                 return np.array(output)
-
             return wrapper
-
         return batch
-    elif func_type == 'class':
-        raise NotImplementedError
+    elif func_type == 'class': raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
             def __init__(self, func): self.func = func
-
-            def __call__(self, x, **kwargs):
-                output = [self.func(item, **kwargs) for item in x]
-                return np.array(output)
+            def __call__(self, x, **kwargs): return np.array([self.func(item, **kwargs) for item in x])
         return Batch
 
 
@@ -322,23 +312,14 @@ def batcherv2(func_type='function', order=1):
         def batch(func):
             # from functools import wraps
             # @wraps(func)
-            def wrapper(self, *args, **kwargs):
-                output = [func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
-                return np.array(output)
-
+            def wrapper(self, *args, **kwargs): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
             return wrapper
-
         return batch
-    elif func_type == 'class':
-        raise NotImplementedError
+    elif func_type == 'class': raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
-            def __int__(self, func):
-                self.func = func
-
-            def __call__(self, *args, **kwargs):
-                output = [self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])]
-                return np.array(output)
+            def __int__(self, func): self.func = func
+            def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
         return Batch
 
 
@@ -795,34 +776,21 @@ class Log(object):
                         'programname': {'color': 'cyan'},
                         'username': {'color': 'yellow'}}
         coloredlogs = install_n_import("coloredlogs")
-        if verbose:
+        if verbose:  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
             verboselogs = install_n_import("verboselogs")
-            # https://github.com/xolox/python-verboselogs
-            # verboselogs.install()  # hooks into logging module.
-            logger = verboselogs.VerboseLogger(name=name)
-            logger.setLevel(l_level)
+            logger = verboselogs.VerboseLogger(name=name); logger.setLevel(l_level)
         else:
             logger = Log.get_base_logger(logging, name=name, l_level=l_level)
-            # new step, not tested:
             Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path,
-                             fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)
-        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET,
-                            level_styles=level_styles, field_styles=field_styles,
+                             fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
+        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles,
                             fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
         return logger
 
     @staticmethod
-    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
-                     s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
-                     log_colors=None,
-                     ):
-        if log_colors is None:
-            log_colors = {'DEBUG': 'bold_cyan',
-                          'INFO': 'green',
-                          'WARNING': 'yellow',
-                          'ERROR': 'thin_red',
-                          'CRITICAL': 'fg_bold_red,bg_white',
-                          }  # see here for format: https://pypi.org/project/colorlog/
+    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG,
+                     f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
+        log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
         colorlog = install_n_import("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
         fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
@@ -842,8 +810,7 @@ class Log(object):
     def get_base_logger(module, name, l_level):
         if name is None: print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
         else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
-        logger = module.getLogger(name=name or randstr())
-        logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+        logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
         return logger
 
     @staticmethod
@@ -853,35 +820,26 @@ class Log(object):
 
     @staticmethod
     def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
-        shandler = module.StreamHandler()
-        shandler.setLevel(level=s_level)
-        shandler.setFormatter(fmt=fmt)
-        shandler.set_name(name)
-        logger.addHandler(shandler)
+        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler)
         print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
 
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
         if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
-        fhandler.setFormatter(fmt=fmt)
-        fhandler.setLevel(level=f_level)
-        fhandler.set_name(name)
-        logger.addHandler(fhandler)
+        fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
         print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
 
     @staticmethod
     def test_logger(logger):
-        logger.debug("this is a debugging message")
-        logger.info("this is an informational message")
-        logger.warning("this is a warning message")
-        logger.error("this is an error message")
+        logger.debug("this is a debugging message"); logger.info("this is an informational message")
+        logger.warning("this is a warning message"); logger.error("this is an error message")
         logger.critical("this is a critical message")
         for level in range(0, 60, 5): logger.log(msg=f"This is a message of level {level}", level=level)
 
     @staticmethod
     def test_all():
-        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger);  print("=" * 100)
+        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger); print("=" * 100)
 
     @staticmethod
     def manual_degug(path):
@@ -894,12 +852,10 @@ def accelerate(func, ip):
     """ Conditions for this to work:
     * Must run under __main__ context
     * func must be defined outside that context.
-
     To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
     but takes a long time_produced to be obtained like a request from server. For this, multithreading launches all threads
     together, then process them in an interleaved fashion as they arrive, all will line-up for same processor,
     if it happens that they arrived quickly.
-
     To accelerate processing-bound process use multiprocessing, even better, use Numba.
     Method1 use: multiprocessing / multithreading.
     Method2: using joblib (still based on multiprocessing)
@@ -938,24 +894,20 @@ class Scheduler:
         self.count = 0
         self._start_time = datetime.now()
         wait_time = str2timedelta(self.wait).total_seconds()
-        import pandas as pd
+        import pandas as pd  # TODO remove this dependency
         until = pd.to_datetime(until)  # (local time_produced)
-
         while datetime.now() < until and self.count < self.cycles:
             # 1- Opening Message ==============================================================
             time1 = datetime.now()  # time_produced before calcs started.  # use  fstring format {x:<10}
             msg = f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}."
             self.logger.info(msg + f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
-
             # 2- Perform logic ======================================================
             try: self.routine()
             except Exception as ex: self.handle_exceptions(ex)
-
             # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
                 try: self.occasional()
                 except Exception as ex: self.handle_exceptions(ex)
-
             # 4- Conclude Message ============================================================
             self.count += 1
             time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time_produced.
@@ -990,9 +942,7 @@ class Scheduler:
         self.exception_handler(ex)
         raise ex
         # import signal
-        # def keyboard_interrupt_handler(signum, frame):
-        #     print(signum, frame)
-        #     raise KeyboardInterrupt
+        # def keyboard_interrupt_handler(signum, frame): print(signum, frame); raise KeyboardInterrupt
         # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 

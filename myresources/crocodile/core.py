@@ -149,18 +149,12 @@ class Save:
     @staticmethod
     @save_decorator(".mat")
     def mat(mdict, path=None, **kwargs):
-        """
-        .. note::
-            Avoid using mat for saving results because of incompatiblity:
-            * `None` type is not accepted.
+        """ Avoid using mat for saving results because of incompatiblity: * `None` type is not accepted.
             * Scalars are conveteed to [1 x 1] arrays.
-            * etc. As such, there is no gaurantee that you restore what you saved.
-            Unless you want to pass the results to Matlab animals, avoid this format.
+            * As such, there is no gaurantee that you restore what you saved. Unless you want to pass the results to Matlab animals, avoid this format.
         """
-        from scipy.io import savemat
-        for key, value in mdict.items():
-            if value is None: mdict[key] = []
-        savemat(str(path), mdict, **kwargs)
+        [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]
+        from scipy.io import savemat; savemat(str(path), mdict, **kwargs)
 
     @staticmethod
     @save_decorator(".json")
@@ -174,7 +168,7 @@ class Save:
             json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
     @staticmethod
-    @save_decorator
+    @save_decorator(".yml")
     def yaml(obj, path, **kwargs):
         import yaml
         with open(str(path), "w") as file:
@@ -255,7 +249,6 @@ class Base(object):
             path += "" if (itself or ".dat" in path) else ".dat"
         path = Path(path)
         # Fruthermore, .zip or .pkl will be added later depending on `include_code` value, warning will be raised.
-
         # Choosing what object to pickle:
         if itself: obj = self
         else:
@@ -352,11 +345,8 @@ class Base(object):
         data_path = list(temp_path.glob("class_data*"))[0]
         if ".dat." in str(data_path):  # loading the state and initializing the class
             class_name = class_name or str(data_path).split(".")[1]
-            if scope is None:  # load from source code
-                return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name,
-                                                r=r, **kwargs)
-            else:  # use fresh scope passed.
-                return scope[class_name].from_saved()
+            if scope is None: return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **kwargs)
+            return scope[class_name].from_saved()  # use fresh scope passed.
 
         else:  # file points to pickled object:
             if scope:
@@ -370,14 +360,10 @@ class Base(object):
                        fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
         _ = check_ownership
-        if remove_base_attrs:
-            [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
-        # if exclude is not None:
-        #     [attrs.remove(x) for x in exlcude]
+        if remove_base_attrs: [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
         import inspect
         if not fields:  # logic (questionable): anything that is not a method is a field
             attrs = list(filter(lambda x: inspect.ismethod(getattr(self, x)), attrs))
-        
         if not methods: attrs = list(filter(lambda x: not inspect.ismethod(getattr(self, x)), attrs))
         if return_objects: attrs = [getattr(self, x) for x in attrs]
         return List(attrs)
@@ -397,20 +383,16 @@ class Base(object):
         This is a next level walrus operator where you can always refer to the object on the fly visa `self`
         string. It comes particularly handy during chaining in one-liners. There is no need to break chaining to
         get a handle of the latest object to reference it in a subsequent method."""
-        # be wary of unintended behaciour if a string had `self` in it by coincidence.
+        # be wary of unintended behaciour if a string had `self` in it **by coincidence.**
         _ = self
-        if type(string_) is str:
-            if expected == 'func': return eval("lambda x: " + string_)
-            elif expected == 'self':
-                if "self" in string_: return eval(string_)
-                else: return string_
-        else: return string_
+        if type(string_) is not str: return string_
+        if expected == 'func': return eval("lambda x: " + string_)
+        elif expected == 'self': return eval(string_) if "self" in string_ else string_
 
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
-        import sys
         if sys.platform == "win32": os.startfile(str(filename.absolute()))  # works for files and folders alike
         return filename
 
@@ -430,16 +412,14 @@ class List(Base, list):  # Inheriting from Base gives save method.
         :param replicas:
         :param func:
         """
-        if not args and not kwargs:  # empty args list and kwargs list
-            return cls([func() for _ in range(replicas)])
-        else:
-            result = []
-            for params in zip(*(args + tuple(kwargs.values()))):
-                an_arg = params[:len(args)]
-                a_val = params[len(args):]
-                a_kwarg = dict(zip(kwargs.keys(), a_val))
-                result.append(func(*an_arg, **a_kwarg))
-            return cls(result)
+        if not args and not kwargs: return cls([func() for _ in range(replicas)])  # empty args list and kwargs list
+        result = []
+        for params in zip(*(args + tuple(kwargs.values()))):
+            an_arg = params[:len(args)]
+            a_val = params[len(args):]
+            a_kwarg = dict(zip(kwargs.keys(), a_val))
+            result.append(func(*an_arg, **a_kwarg))
+        return cls(result)
 
     @classmethod
     def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
@@ -470,7 +450,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __getitem__(self, key):
         if type(key) is list or type(key) is np.ndarray: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
-        else: return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
+        return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
     # if match == "string" or None:
     #     for idx, item in enumerate(self.list):
@@ -501,6 +481,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
+    def exec(self, func: str): _ = self; return exec(func)  # enables reference to self
 
     def remove(self, value=None, values=None):
         if value is not None: self.list.remove(value)
@@ -509,10 +490,10 @@ class List(Base, list):  # Inheriting from Base gives save method.
 
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         """
-        :param jobs:
         :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
         :param args:
         :param other: other list
+        :param jobs:
         :param verbose:
         :param desc:
         :param depth: apply the function to inner Lists
@@ -527,13 +508,13 @@ class List(Base, list):  # Inheriting from Base gives save method.
             if jobs:
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in iterator))
-            else: return List([func(x, *args, **kwargs) for x in iterator])
+            return List([func(x, *args, **kwargs) for x in iterator])
         else:
             iterator = zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc)
             if jobs:
                 from joblib import Parallel, delayed
                 return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
-            else: return List([func(x, y) for x, y in iterator])
+            return List([func(x, y) for x, y in iterator])
 
     def modify(self, func: str, other=None):
         """Modifies objects rather than returning new list of objects
@@ -608,15 +589,13 @@ class Struct(Base, dict):
     @staticmethod
     def recursive_struct(mydict):
         struct = Struct(mydict)
-        for key, val in struct.items():
-            if type(val) is dict: struct[key] = Struct.recursive_struct(val)
+        for key, val in struct.items(): struct[key] = Struct.recursive_struct(val) if type(val) is dict else val
         return struct
 
     @staticmethod
     def recursive_dict(struct):
         mydict = struct.dict
-        for key, val in mydict.items():
-            if type(val) is Struct: mydict[key] = Struct.recursive_dict(val)
+        for key, val in mydict.items(): mydict[key] = Struct.recursive_dict(val) if type(val) is Struct else val
         return mydict
 
     def save_json(self, path=None): return Save.json(obj=self.__dict__, path=path)
@@ -649,23 +628,17 @@ class Struct(Base, dict):
 
     def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
         if config:
-            repr_str = Display.config(self.__dict__, newline=newline)
-            if return_str: return repr_str
-            else:
-                print(repr_str)
-                return self
-
-        if bool(self) is False:
-            print(f"Empty Struct.")
-            return None  # break out of the function.
+            if return_str: return Display.config(self.__dict__, newline=newline)
+            print(Display.config(self.__dict__, newline=newline))
+            return self
+        if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
         if yaml:
             # removed for disentanglement
             # self.save_yaml(P.tmp(file="__tmp.yaml"))
             # txt = P.tmp(file="__tmp.yaml").read_text()
             # print(txt)
             return None
-        if sep is None:
-            sep = 5 + max(self.keys().apply(str).apply(len).list)
+        if sep is None: sep = 5 + max(self.keys().apply(str).apply(len).list)
         repr_string = ""
         repr_string += "Structure, with following entries:\n"
         repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if dtype else "") + "Item Details\n"
@@ -675,12 +648,10 @@ class Struct(Base, dict):
             type_str = str(type(self[key])).split("'")[1]
             val_str = Display.get_repr(self[key], limit=limit).replace("\n", " ")
             repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
-            if dtype:
-                repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
+            if dtype: repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
         if return_str: return repr_string
-        else: print(repr_string)
-        return self
+        else: print(repr_string); return self
 
     def __str__(self, sep=",", newline="\n", breaklines=None):
         mystr = str(self.__dict__)
@@ -721,12 +692,8 @@ class Struct(Base, dict):
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
 
     def delete(self, key=None, keys=None, criterion=None):
-        if key is not None: del self.__dict__[key]
-        if keys is not None:
-            for key in keys: del self.__dict__[key]
-        if criterion is not None:
-            for key in self.keys().list:
-                if criterion(self[key]): self.__dict__.__delitem__(key)
+        [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]
+        if criterion is not None: [self.__dict__.__delitem__(key) for key in self.keys().list if criterion(self[key])]
         return self
 
     def apply_to_values(self, key_val_func):
@@ -811,10 +778,7 @@ class Display:
         return str_
 
     @staticmethod
-    def config(mydict, newline=True):
-        rep = ""
-        for key, val in mydict.items(): rep += f"{key} = {val}" + ("\n" if newline else ", ")
-        return rep
+    def config(mydict, newline=True): return "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
 
     @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):
