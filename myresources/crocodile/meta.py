@@ -3,7 +3,7 @@ import logging
 import subprocess
 import time
 import platform
-from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, dill, install_n_import, List
+from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, dill, install_n_import, List, Struct
 from crocodile.file_management import P
 
 
@@ -19,7 +19,6 @@ class Null:
 
 class Experimental:
     """Debugging and Meta programming tools"""
-
     @staticmethod
     def profile_memory(command):
         psutil = install_n_import("psutil")
@@ -37,17 +36,15 @@ class Experimental:
             return run() if run is not None else return_
 
     @staticmethod
-    def show_globals(scope, **kwargs):
-        """Returns a struct with variables that are defined in the globals passed."""
-        res = scope.keys()
-        res = res.filter(lambda x: "__" not in x).filter(lambda x: not x.startswith("_"))
-        res = res.filter(lambda x: x not in {"In", "Out", "get_ipython", "quit", "exit", "sys"})
-        res.print(**kwargs)
+    def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
+    @staticmethod
+    def run_globally(func, scope, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
+    @staticmethod
+    def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 
     @staticmethod
     def generate_readme(path, obj=None, meta=None, save_source_code=True):
         """Generates a readme file to contextualize any binary files.
-
         :param path: directory or file path. If directory is passed, README.md will be the filename.
         :param obj: Python module, class, method or function used to generate the result data.
          (dot not pass the data itself or an instance of any class)
@@ -55,10 +52,7 @@ class Experimental:
         :param save_source_code:
         """
         import inspect
-        path = P(path)
-        readmepath = path / f"README.md" if path.is_dir() else path
-        separator = "\n" + "-----" + "\n\n"
-        text = "# Meta\n"
+        readmepath, separator, text = P(path) / f"README.md" if P(path).is_dir() else P(path), "\n" + "-----" + "\n\n", "# Meta\n"
         if meta is not None: text = text + meta
         text += separator
         if obj is not None:
@@ -95,15 +89,9 @@ class Experimental:
         :param self: relevant only if the function is a method of a class. self refers to the path of the instance
         :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
         code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
-        print(code)
-        res = dict()
-        exec(code, scope, res)  # run the function within the scope `res`
+        exec(code, scope, res := dict())  # run the function within the scope `res`
         if update_scope: scope.update(res)
         return res
-
-    @staticmethod
-    def run_globally(func, scope, args=None, self: str = None):
-        return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
 
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None,
@@ -200,9 +188,6 @@ class Experimental:
         import importlib
         importlib.reload(module)
         return module
-
-    @staticmethod
-    def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):
@@ -326,16 +311,11 @@ class Terminal:
     class Response:
         @staticmethod
         def from_completed_process(cp: subprocess.CompletedProcess):
-            tmp = dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)
             resp = Terminal.Response(cmd=cp.args)
-            resp.output.update(tmp)
+            resp.output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode))
             return resp
 
-        def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None):
-            self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)  # streams go here.
-            self.output = dict(stdin="", stdout="", stderr="", returncode=None)
-            self.input = cmd  # input command
-
+        def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None): self.std, self.output, self.input = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd  # input command
         def __call__(self, *args, **kwargs): return self.op.rstrip() if type(self.op) is str else None
         @property
         def op(self): return self.output["stdout"]
@@ -349,21 +329,8 @@ class Terminal:
         def returncode(self): return self.output["returncode"]
         @property
         def as_path(self): return P(self.op.rstrip()) if self.err == "" else None
-
-        def capture(self):
-            for key, val in self.std.items():
-                if val is not None and val.readable():
-                    string = val.read().decode()
-                    self.output[key] = string.rstrip()  # move ending spaces and new lines.
-
-        def print(self):
-            self.capture()
-            print(f"Terminal Response:\nInput Command: {self.input}")
-            for idx, (key, val) in enumerate(self.output.items()):
-                msg = f" {idx} - {key} "
-                print(f"{msg}".center(40, "-"), f"\n{val}")
-            print("=" * 50, "\n\n")
-            return self
+        def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
+        def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}" + "".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "=" * 50, "\n\n"); return self
 
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
@@ -382,47 +349,31 @@ class Terminal:
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-
     @staticmethod
-    def is_admin():  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
-        import ctypes
-        return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), return_=False)
+    def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
 
     def run(self, *cmds, shell=None, check=False, ip=None):
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
         won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
         Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
-
         * This method is short for:
         res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
         * Unlike `os.system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run.
             Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
         * `text=True` converts the bytes objects returned in stdout to text by default.
-
         :param shell:
         :param ip:
         :param check: throw an exception is the execution of the external command failed (non zero returncode)
         """
-        my_list = []
-        if self.machine == "win32":
-            if shell in {"powershell", "pwsh"}:
-                my_list = [shell, "-Command"]  # alternatively, one can run "cmd"
-                """ The advantage of addig `powershell -Command` is to give access to wider range of options.
-            Other wise, command prompt shell doesn't recognize commands like `ls`."""
-            else: pass  # that is, use command prompt as a shell, which is the default.
-        my_list += list(cmds)
-        if self.elevated is False or self.is_admin():
-            resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout,
-                                  text=True, shell=True, check=check, input=ip)
-            """
-            `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will
-        be stored in the Response object returned.
-            # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`
-            """
-        else:
-            import ctypes
-            resp = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        my_list = list(cmds)
+        if self.machine == "win32" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
+        if self.elevated is False or self.is_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
+        else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        """ The advantage of addig `powershell -Command` is to give access to wider range of options. Other wise, command prompt shell doesn't recognize commands like `ls`.
+        `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned.
+        # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`
+        """
         return self.Response.from_completed_process(resp)
 
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
@@ -469,13 +420,9 @@ tb.sys.path.insert(0, r'{wdir}')
         script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
-        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts")
-        file.write_text(script)
+        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
-        Terminal().run_async(f"{'ipython' if ipython else 'python'}",
-                             f"{'-i' if interactive else ''}",
-                             f"{file}",
-                             terminal=terminal, shell=shell, new_window=new_window)
+        Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(sure=delete, verbose=False)
         _ = delete
@@ -483,11 +430,8 @@ tb.sys.path.insert(0, r'{wdir}')
 
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
-        """Python brachnes off to a new window and run the function passed.
-        context can be either a pickled session or the current file __file__"""
-        # step 1: pickle the function
-        # step 2: create a script that unpickles it.
-        # step 3: run the script that runs the function.
+        """Python brachnes off to a new window and run the function passed. context can be either a pickled session or the current file __file__"""
+        # step 1: pickle the function # step 2: create a script that unpickles it. # step 3: run the script that runs the function.
         file = P.tmpfile(tstamp=False, suffix=".pkl")
         Save.pickle(obj=obj, path=file, verbose=False)
         script = f"""
@@ -558,8 +502,7 @@ path.delete(sure=True, verbose=False)
         shell_execute_ex = win32com.shell.shell.ShellExecuteEx
         win32com = __import__("win32com", fromlist=["shell.shellcon"])
         shellcon = win32com.shell.shellcon
-        if cmd_line is None:
-            cmd_line = [sys.executable] + sys.argv
+        if cmd_line is None: cmd_line = [sys.executable] + sys.argv
         elif type(cmd_line) not in (tuple, list):
             raise ValueError("cmdLine is not a sequence.")
         cmd = '"%s"' % (cmd_line[0],)
@@ -601,9 +544,7 @@ class SSH(object):
         else: self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
 
     def get_key(self):
-        """In SSH commands you need this:
-        scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'"
-        """
+        """In SSH commands you need this: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}' """
         return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""
 
     @staticmethod
@@ -614,7 +555,8 @@ class SSH(object):
 
     def __repr__(self): return f"{self.local()} [{platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
     def remote(self): return f"{self.username}@{self.hostname}"
-    def local(self): return f"{os.getlogin()}@{platform.node()}"
+    @staticmethod
+    def local(): return f"{os.getlogin()}@{platform.node()}"
     def open_console(self, new_window=True):Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
     def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {os.environ[name]}; export {name}")
 
@@ -713,8 +655,7 @@ class Log(object):
         if self.specs["file_path"] is not None: self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
         self._install()
 
-    def __getstate__(self):
-        # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
+    def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy()
         state["specs"] = state["specs"].copy()
         del state["logger"]
@@ -726,9 +667,7 @@ class Log(object):
     def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
 
     @staticmethod
-    def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
-                        s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
-                        verbose=False):
+    def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         level_styles = {'spam': {'color': 'green', 'faint': True},
                         'debug': {'color': 'white'},
@@ -751,10 +690,8 @@ class Log(object):
             logger = verboselogs.VerboseLogger(name=name); logger.setLevel(l_level)
         else:
             logger = Log.get_base_logger(logging, name=name, l_level=l_level)
-            Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path,
-                             fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
-        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles,
-                            fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
+            Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
+        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
         return logger
 
     @staticmethod
@@ -802,10 +739,8 @@ class Log(object):
 
     @staticmethod
     def test_logger(logger):
-        logger.debug("this is a debugging message"); logger.info("this is an informational message")
-        logger.warning("this is a warning message"); logger.error("this is an error message")
-        logger.critical("this is a critical message")
-        for level in range(0, 60, 5): logger.log(msg=f"This is a message of level {level}", level=level)
+        logger.debug("this is a debugging message"); logger.info("this is an informational message"); logger.warning("this is a warning message")
+        logger.error("this is an error message"); logger.critical("this is a critical message"); [logger.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
 
     @staticmethod
     def test_all():

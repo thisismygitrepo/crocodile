@@ -1,7 +1,6 @@
-import time
 
-from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, validate_name, str2timedelta,\
-    Save, Path, install_n_import, dill
+import time
+from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, dill
 
 
 # =============================== Security ================================================
@@ -212,21 +211,15 @@ class P(type(Path()), Path):
         :param content: copy the parent directory or its content (relevant only if copying a directory)
         :param verbose:
         :return: path to copied file or directory.
-
         .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
-        """ # tested %100
+        """  # tested %100
         if folder is not None and path is None:
             if name is None: dest = P(folder).expanduser().resolve().create()
-            else:
-                dest = P(folder).expanduser().resolve() / name
-                content = True
-        elif path is not None and folder is None:
-            dest = P(path)
-            content = True  # this way, the destination will be filled with contents of `self`
+            else: dest, content = P(folder).expanduser().resolve() / name, True
+        elif path is not None and folder is None: dest, content = P(path), True  # this way, the destination will be filled with contents of `self`
         elif path is None and folder is None: dest = self.with_name(str(name)) if name is not None else self.append(append)
         else: raise NotImplementedError
-        dest = dest.expanduser().resolve()
-        slf = self.expanduser().resolve()
+        dest, slf = dest.expanduser().resolve(), self.expanduser().resolve()
         dest.parent.create()
         if overwrite and dest.exists(): dest.delete(sure=True)
         if slf.is_file():
@@ -236,24 +229,20 @@ class P(type(Path()), Path):
             from distutils.dir_util import copy_tree
             if content: copy_tree(str(slf), str(dest))
             else: copy_tree(str(slf), str(P(dest).joinpath(slf.name).create()))
-            if verbose:
-                preface = "Content of " if content else ""
-                print(f"COPIED {preface} {repr(slf)} ==> {repr(dest)}")
+            if verbose: print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}")
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest / slf.name if not orig else self
 
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, notfound=FileNotFoundError, readerror=IOError, verbose=False, **kwargs):
+    def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
         """
         :param reader: function that reads this file format, if not passed it will be inferred from extension.
         :param notfound: behaviour when file ``self`` to be read doesn't actually exist. Default: throw an error.
                 can be set to return `False` or any other value that will be returned if file not found.
         :param verbose:
-        :param readerror:
         :param kwargs:
         :return:
         """
-        _ = readerror
         if not self.exists():
             if notfound is FileNotFoundError: raise FileNotFoundError(f"`{self}` is no where to be found!")
             else: return notfound
@@ -262,18 +251,16 @@ class P(type(Path()), Path):
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
 
-    def start(self, opener=None):  # explore folders.
+    def start(self, opener=None):
         import subprocess
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
         filename = self.expanduser().resolve().str
         if sys.platform == "win32":
             if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
-            else: tmp = rf'powershell {opener} \'{self}\''
-            # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            else: tmp = rf'powershell {opener} \'{self}\'' # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux':
-            opener = "xdg-open"
-            subprocess.call([opener, filename])  # works for files and folders alike
+            subprocess.call(["xdg-open", filename])  # works for files and folders alike
         else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
         return self
 

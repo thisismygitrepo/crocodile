@@ -24,7 +24,6 @@ class HyperParam(tb.Struct):
     * Ease of saving settings of experiments! and also replicating it later.
     """
     subpath = tb.P('metadata/hyper_params')  # location within model directory where this will be saved.
-
     def __init__(self, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
@@ -49,35 +48,18 @@ class HyperParam(tb.Struct):
         self.save_type = ["data", "whole", "both"][-1]
         self.update(**kwargs)
 
-    @property
-    def save_dir(self):
-        return tb.P(self.root) / self.name
-
     def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
         self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(data=str(self))
-        if self.save_type in {"whole", "both"}:
-            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"),
-                                         itself=True, add_suffix=False)
-        if self.save_type in {"data", "both"}:
-            super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath) / "hparams.HyperParam.dat.pkl",
-                                         itself=False, add_suffix=False)
+        if self.save_type in {"whole", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), itself=True, add_suffix=False)
+        if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath) / "hparams.HyperParam.dat.pkl", itself=False, add_suffix=False)
 
     @classmethod
-    def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
-        return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl")
-
-    def __repr__(self):
-        return tb.Struct(self.__dict__).print(config=True, return_str=True)
-
+    def from_saved(cls, path, *args, r=False, scope=None, **kwargs):  return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl")
+    def __repr__(self): return tb.Struct(self.__dict__).print(config=True, return_str=True)
     @property
-    def pkg(self):
-        if self.pkg_name == "tensorflow":
-            handle = __import__("tensorflow")
-        elif self.pkg_name == "torch":
-            handle = __import__("torch")
-        else:
-            raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
-        return handle
+    def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
+    @property
+    def save_dir(self): return tb.P(self.root) / self.name
 
     @property
     def device(self):
@@ -127,8 +109,7 @@ class HyperParam(tb.Struct):
             elif device is Device.cpu:
                 return handle.device('cpu')
             # How to run Torch model on 2 GPUs ?
-        else:
-            raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
+        else: raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
 
     def config_device(self):
         """
@@ -136,8 +117,7 @@ class HyperParam(tb.Struct):
         handle = self.pkg
         device_str = self.device_name.value
         device = self.device
-        if handle.__name__ == 'torch':
-            return None
+        if handle.__name__ == 'torch': return None
         try:
             # Now we want only one device to be seen:
             if device_str in ['gpu0', 'gpu1']:
@@ -159,9 +139,7 @@ class HyperParam(tb.Struct):
             print(f"Trying again with auto-device {Device.auto}")
             self.device_name = Device.auto
             self.config_device()
-
-        except ValueError:
-            print("Cannot set memory growth on non-GPU devices")
+        except ValueError: print("Cannot set memory growth on non-GPU devices")
 
         except RuntimeError as e:
             print(e)
@@ -200,15 +178,9 @@ class DataReader(tb.Base):
         instance.__setstate__(data)
         return instance
 
-    def __getstate__(self):
-        return dict(specs=self.specs, scaler=self.scaler)
-
-    def __setstate__(self, state):
-        """hp is miassing, deliberate by design."""
-        return self.__dict__.update(state)
-
-    def __repr__(self):
-        return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
+    def __getstate__(self): return dict(specs=self.specs, scaler=self.scaler)
+    def __setstate__(self, state): return self.__dict__.update(state)
+    def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
 
     def split_the_data(self, *args, strings=None, **kwargs):
         """
@@ -217,13 +189,10 @@ class DataReader(tb.Base):
         :param strings:
         :return:
         """
-        # import sklearn.preprocessing as preprocessing
         from sklearn.model_selection import train_test_split
-        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle,
-                                  random_state=self.hp.seed, **kwargs)
+        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = tb.Struct(train_loader=None, test_loader=None)
-        if strings is None:
-            strings = ["x", "y"]
+        if strings is None: strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         self.specs.ip_shape = self.split.x_train.shape[1:]  # useful info for instantiating models.
@@ -232,9 +201,7 @@ class DataReader(tb.Base):
         self.split.print()
 
     def sample_dataset(self, aslice=None, dataset="test"):
-        if aslice is None:
-            aslice = slice(0, self.hp.batch_size)
-        # returns a tuple containing a slice of data (x_test, x_test, names_test, index_test etc)
+        if aslice is None: aslice = slice(0, self.hp.batch_size)
         keys = self.split.keys().filter(f"'_{dataset}' in x")
         return tuple([self.split[key][aslice] for key in keys])
 
@@ -293,9 +260,7 @@ class BaseModel(ABC):
     * :func:`BaseModel.predict` expects a processed input, uese infer and does postprocessing.
     * :func:`BaseModel.predict_from_s` reads, preprocess, then uses predict method.
     * :func:`BseModel.evaluate` Expects processed input and internally calls infer and postprocess methods.
-
     """
-
     @abstractmethod
     def __init__(self, hp=None, data=None, model=None, compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
@@ -309,38 +274,26 @@ class BaseModel(ABC):
 
     def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True, **kwargs):
         """ Updates compiler attributes. This acts like a setter.
-
         .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
                   * In case of TF, this is not the case as TF requires actual futher different
                     compilation before changes take effect.
-
         Remember:
-
         * Must be run prior to fit method.
         * Can be run only after defining model attribute.
-
         """
         pkg = self.hp.pkg
         if self.hp.pkg_name == 'tensorflow':
-            if loss is None:
-                loss = pkg.keras.losses.MeanSquaredError()
-            if optimizer is None:
-                optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
-            if metrics is None:
-                metrics = tb.List()  # [pkg.keras.metrics.MeanSquaredError()]
+            if loss is None: loss = pkg.keras.losses.MeanSquaredError()
+            if optimizer is None: optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
+            if metrics is None: metrics = tb.List()  # [pkg.keras.metrics.MeanSquaredError()]
         elif self.hp.pkg_name == 'torch':
-            if loss is None:
-                loss = pkg.nn.MSELoss()
-            if optimizer is None:
-                optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
-            if metrics is None:
-                metrics = tb.List()  # [tmp.MeanSquareError()]
+            if loss is None: loss = pkg.nn.MSELoss()
+            if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
+            if metrics is None: metrics = tb.List()  # [tmp.MeanSquareError()]
         # Create a new compiler object
         self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=tb.L(metrics), **kwargs)
-
         # in both cases: pass the specs to the compiler if we have TF framework
-        if self.hp.pkg.__name__ == "tensorflow" and compile_model:
-            self.model.compile(**self.compiler.__dict__)
+        if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
     def fit(self, viz=False, **kwargs):
         default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train,
@@ -351,8 +304,7 @@ class BaseModel(ABC):
         hist = self.model.fit(**default_settings.dict)
         self.history.append(tb.Struct(tb.copy.deepcopy(hist.history)))
         # it is paramount to copy, cause source can change.
-        if viz:
-            self.plot_loss()
+        if viz: self.plot_loss()
         return self
 
     def plot_loss(self):
@@ -360,13 +312,9 @@ class BaseModel(ABC):
         total_hist.plot()
 
     def switch_to_sgd(self, epochs=10):
-        # if self.hp.pkg.__name__ == 'tensorflow':
-        #     self.model.reset_metrics()
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
-        if self.hp.pkg.__name__ == 'tensorflow':
-            new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
-        else:
-            new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
+        if self.hp.pkg.__name__ == 'tensorflow': new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
+        else: new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
@@ -386,25 +334,19 @@ class BaseModel(ABC):
         """Converts an object to a numerical form consumable by the NN."""
         return self.data.preprocess(*args, **kwargs)
 
-    def postprocess(self, *args, **kwargs):
-        return self.data.postprocess(*args, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-        return self.model(*args, **kwargs)
+    def postprocess(self, *args, **kwargs): return self.data.postprocess(*args, **kwargs)
+    def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
 
     def infer(self, x):
         """
         This method assumes numpy input, datatype-wise and is also preprocessed.
         NN is put in eval mode.
-
         :param x:
         :return: prediction as numpy
         """
         return self.model.predict(x)  # Keras automatically handles special layers.
 
-    def predict(self, x, **kwargs):
-        inferred = self.infer(x)
-        return self.postprocess(inferred, **kwargs)
+    def predict(self, x, **kwargs): return self.postprocess(self.infer(x), **kwargs)
 
     def deduce(self, obj, viz=True, **kwargs):
         """Assumes that contents of the object are in the form of a batch."""
@@ -416,8 +358,7 @@ class BaseModel(ABC):
             self.viz(postprocessed, **kwargs)
         return result
 
-    def viz(self, *args, **kwargs):
-        self.data.viz(*args, **kwargs)
+    def viz(self, *args, **kwargs): self.data.viz(*args, **kwargs)
 
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
@@ -430,26 +371,21 @@ class BaseModel(ABC):
                 idx_ = np.random.choice(len(x) - sample)
                 return x[idx_:idx_ + sample], y[idx_:idx_ + sample], \
                     names_test[idx_: idx_ + sample], np.arange(idx_, idx_ + sample)
-
             assert self.data is not None, 'Data attribute is not defined'
             x_test, y_test, names_test, idx = get_rand(x_test, y_test)  # already processed S's
         else:
             if type(idx) is int:
                 assert idx < len(x_test), f"Index passed {idx} exceeds length of x_test {len(x_test)}"
                 x_test, y_test, names_test = x_test[idx: idx + 1], y_test[idx: idx + 1], names_test[idx: idx + 1]
-                # idx = [idx]
-            else:
-                x_test, y_test, names_test = x_test[idx], y_test[idx], names_test[idx]
+            else: x_test, y_test, names_test = x_test[idx], y_test[idx], names_test[idx]
         # ==========================================================================
 
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
-        if loss_dict is not None:
-            loss_dict['names'] = names_test
+        if loss_dict is not None: loss_dict['names'] = names_test
         pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
-        results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test,
-                            names=names_test, loss_df=loss_dict, )
+        results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test, names=names_test, loss_df=loss_dict, )
         if viz:
             loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
@@ -458,18 +394,13 @@ class BaseModel(ABC):
         return results
 
     def get_metrics_evaluations(self, prediction, groun_truth):
-        if self.compiler is None:
-            return None
-
+        if self.compiler is None: return None
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
         loss_dict = dict()
         for a_metric in metrics:
-            if hasattr(a_metric, "path"):
-                name = a_metric.name
-            elif hasattr(a_metric, "__name__"):
-                name = a_metric.__name__
-            else:
-                name = "unknown"
+            if hasattr(a_metric, "path"): name = a_metric.name
+            elif hasattr(a_metric, "__name__"): name = a_metric.__name__
+            else: name = "unknown"
             # try:  # EAFP principle.
             #     path = a_metric.path  # works for subclasses Metrics
             # except AttributeError:
@@ -484,11 +415,8 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return tb.pd.DataFrame(loss_dict)
 
-    def save_model(self, directory):
-        self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
-
-    def save_weights(self, directory):
-        self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
+    def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
+    def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
 
     @staticmethod
     def load_model(directory):
@@ -550,13 +478,10 @@ class BaseModel(ABC):
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
-    def summary(self):
-        return self.model.summary()
+    def summary(self): return self.model.summary()
 
     def config(self):
-        for layer in self.model.layers:
-            print(layer.get_config())
-            print("==============================")
+        for layer in self.model.layers: print(layer.get_config(), "\n==============================")
 
     def plot_model(self, **kwargs):
         """
@@ -664,7 +589,6 @@ class Losses:
                 super().__init__(*args, **kwargs)
                 self.name = "LogSquareLoss"
 
-            # @staticmethod
             def call(self, y_true, y_pred):
                 _ = self
                 factor = (20 / tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype)))
@@ -676,24 +600,15 @@ class Losses:
         """
         For Tensorflow
         """
-
         class MeanMaxError(tf.keras.metrics.Metric):
             def __init__(self, name='MeanMaximumError', **kwargs):
                 super(MeanMaxError, self).__init__(name=name, **kwargs)
                 self.mme = self.add_weight(name='mme', initializer='zeros')
                 self.__name__ = name
 
-            def update_state(self, y_true, y_pred, sample_weight=None):
-                if sample_weight is None:
-                    sample_weight = 1.0
-                self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight * tf.abs(y_pred - y_true), axis=1)))
-
-            def result(self):
-                return self.mme
-
-            def reset_states(self):
-                self.mme.assign(0.0)
-
+            def update_state(self, y_true, y_pred, sample_weight=None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
+            def result(self): return self.mme
+            def reset_states(self): self.mme.assign(0.0)
         return MeanMaxError
 
 
@@ -756,17 +671,11 @@ class KerasOptimizer:
         self.data = d
         self.tuner = None
 
-    def __call__(self, ktp):
-        pass
+    def __call__(self, ktp): pass
 
     def tune(self):
         kt = tb.core.install_n_import("kerastuner")
-        self.tuner = kt.Hyperband(self,
-                                  objective='loss',
-                                  max_epochs=10,
-                                  factor=3,
-                                  directory=tb.P.tmp('my_dir'),
-                                  project_name='intro_to_kt')
+        self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=tb.P.tmp('my_dir'), project_name='intro_to_kt')
 
 
 if __name__ == '__main__':

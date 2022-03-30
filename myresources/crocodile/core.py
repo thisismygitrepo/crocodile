@@ -40,8 +40,7 @@ def timestamp(fmt=None, name=None):
 
 
 def str2timedelta(past):
-    """Converts a human readable string like '1m' or '1d' to a timedate object.
-    In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
+    """Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[past[-1]], eval(past[:-1])
     if key == "months": key, val = "days", val * 30
     elif key == "years": key, val = "weeks", val * 52
@@ -67,10 +66,8 @@ def install_n_import(package, name=None):
 # ====================================== Classes ====================================
 
 
-class SaveDecorator(object):
-    def __init__(self, func, ext=""):
-        # TODO: migrate from save_decorator to SaveDecorator
-        self.func, self.ext = func, ext
+class SaveDecorator(object):  # TODO: migrate from save_decorator to SaveDecorator
+    def __init__(self, func, ext=""): self.func, self.ext = func, ext
 
     @classmethod
     def init(cls, func=None, **kwargs):
@@ -128,10 +125,8 @@ class Save:
     def mat(mdict, path=None, **kwargs):
         """ Avoid using mat for saving results because of incompatiblity: * `None` type is not accepted.
             * Scalars are conveteed to [1 x 1] arrays.
-            * As such, there is no gaurantee that you restore what you saved. Unless you want to pass the results to Matlab animals, avoid this format.
-        """
-        [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]
-        from scipy.io import savemat; savemat(str(path), mdict, **kwargs)
+            * As such, there is no gaurantee that you restore what you saved. Unless you want to pass the results to Matlab animals, avoid this format."""
+        [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)
 
     @staticmethod
     @save_decorator(".json")
@@ -169,6 +164,8 @@ class Base(object):
     def __getstate__(self): return self.__dict__.copy()
     def __setstate__(self, state): self.__dict__.update(state)
     def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
+    def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(copy.deepcopy(self.__dict__)); return obj
+    def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
 
     def save_code(self, path):
         """a usecase for including code in the save is when the source code is continously
@@ -212,15 +209,11 @@ class Base(object):
         avoid security risk involved in pickling objects that reference sensitive information like tokens and
         passwords.
         """
-        path = path or Path.home().joinpath(f"tmp_results/tmpfiles/{randstr()}")
-        if add_suffix:
-            path = str(path)
-            path += "" if self.__class__.__name__ in path else ("." + self.__class__.__name__)
-            path += "" if (itself or ".dat" in path) else ".dat"
+        path = str(path or Path.home().joinpath(f"tmp_results/tmpfiles/{randstr()}"))
+        if add_suffix: path += "" if self.__class__.__name__ in path else ("." + self.__class__.__name__) + "" if (itself or ".dat" in path) else ".dat"
         path = Path(path)
         # Fruthermore, .zip or .pkl will be added later depending on `include_code` value, warning will be raised.
-        # Choosing what object to pickle:
-        if itself: obj = self
+        if itself: obj = self  # Choosing what object to pickle:
         else:
             obj = self.__getstate__()
             if r:
@@ -230,23 +223,17 @@ class Base(object):
                         val.save(itself=itself, include_code=include_code, path=path, r=r)
                         obj[key] = None  # this tough object is finished, the rest should be easy.
                     else: pass  # leave this object as is.
-
         if include_code is True:
             temp_path = Path().home().joinpath(f"tmp_results/zipping/{randstr()}")
             temp_path.mkdir(parents=True, exist_ok=True)
             self.save_code(path=temp_path.joinpath(f"source_code_{randstr()}.py"))
             Save.pickle(path=temp_path.joinpath("class_data"), obj=obj, r=r, verbose=False, add_suffix=add_suffix)
-            import shutil
-            result_path = shutil.make_archive(base_name=str(path), format="zip", root_dir=str(temp_path), base_dir=".")
-            result_path = Path(result_path)
-            print(f"Code and data for the object ({repr(obj)}) saved @ "
-                  f"`{result_path.as_uri()}`, Directory: `{result_path.parent.as_uri()}`")
+            result_path = Path(__import__("shutil").make_archive(base_name=str(path), format="zip", root_dir=str(temp_path), base_dir="."))
+            print(f"Code and data for the object ({repr(obj)}) saved @ `{result_path.as_uri()}`, Directory: `{result_path.parent.as_uri()}`")
         else:
-            result_path = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix)
-            rep = repr(obj)
+            result_path, rep = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix), repr(obj)
             rep = rep if len(rep) < 50 else rep[:10] + "... "
-            print(f"{'Data of' if itself else ''} Object ({rep}) saved @ "
-                  f"`{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`")
+            print(f"{'Data of' if itself else ''} Object ({rep}) saved @ `{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`")
         return result_path
 
     @classmethod
@@ -318,29 +305,15 @@ class Base(object):
             if scope:
                 print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
                 scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
-            obj = dill.loads(data_path.read_bytes())
-            return obj
+            return dill.loads(data_path.read_bytes())
 
-    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
+    def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
-        _ = check_ownership
         if remove_base_attrs: [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
-        import inspect
-        if not fields:  # logic (questionable): anything that is not a method is a field
-            attrs = list(filter(lambda x: inspect.ismethod(getattr(self, x)), attrs))
-        if not methods: attrs = list(filter(lambda x: not inspect.ismethod(getattr(self, x)), attrs))
+        if not fields: attrs = list(filter(lambda x: __import__("inspect").ismethod(getattr(self, x)), attrs))  # logic (questionable): anything that is not a method is a field
+        if not methods: attrs = list(filter(lambda x: not __import__("inspect").ismethod(getattr(self, x)), attrs))
         if return_objects: attrs = [getattr(self, x) for x in attrs]
         return List(attrs)
-
-    def __deepcopy__(self, *args, **kwargs):
-        obj = self.__class__(*args, **kwargs)
-        obj.__dict__.update(copy.deepcopy(self.__dict__))
-        return obj
-
-    def __copy__(self, *args, **kwargs):
-        obj = self.__class__(*args, **kwargs)
-        obj.__dict__.update(self.__dict__.copy())
-        return obj
 
     def evalstr(self, string_, expected='self'):
         """This method allows other methods to parse strings that refer to the object themselves via `self`.
@@ -376,13 +349,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
         :param func:
         """
         if not args and not kwargs: return cls([func() for _ in range(replicas)])  # empty args list and kwargs list
-        result = []
-        for params in zip(*(args + tuple(kwargs.values()))):
-            an_arg = params[:len(args)]
-            a_val = params[len(args):]
-            a_kwarg = dict(zip(kwargs.keys(), a_val))
-            result.append(func(*an_arg, **a_kwarg))
-        return cls(result)
+        return cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
 
     def save_items(self, directory, names=None, saver=None):
         if saver is None: saver = Save.pickle
@@ -412,21 +379,6 @@ class List(Base, list):  # Inheriting from Base gives save method.
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
-    # if match == "string" or None:
-    #     for idx, item in enumerate(self.list):
-    #         if patt in str(item):
-    #             return item
-    # elif match == "fnmatch":
-    #     import fnmatch
-    #     for idx, item in enumerate(self.list):
-    #         if fnmatch.fnmatch(str(item), patt):
-    #             return item
-    # else:  # "regex"
-    #     # escaped = re.escape(string_)
-    #     compiled = re.compile(patt)
-    #     for idx, item in enumerate(self.list):
-    #         if compiled.search(str(item)) is not None:
-    #             return item
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None): return self[np.random.choice(len(self), size, replace=replace, p=p)]
     def index_items(self, idx): return List([item[idx] for item in self.list])
@@ -442,11 +394,24 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
     def exec(self, func: str): _ = self; return exec(func)  # enables reference to self
+    def modify(self, func: str, other=None): [exec(func) for idx, x in enumerate(self.list)] if other is None else [exec(func) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
+    def remove(self, value=None, values=None): [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
 
-    def remove(self, value=None, values=None):
-        if value is not None: self.list.remove(value)
-        if values is not None: [self.list.remove(value) for value in values]
-        return self
+    # if match == "string" or None:
+    #     for idx, item in enumerate(self.list):
+    #         if patt in str(item):
+    #             return item
+    # elif match == "fnmatch":
+    #     import fnmatch
+    #     for idx, item in enumerate(self.list):
+    #         if fnmatch.fnmatch(str(item), patt):
+    #             return item
+    # else:  # "regex"
+    #     # escaped = re.escape(string_)
+    #     compiled = re.compile(patt)
+    #     for idx, item in enumerate(self.list):
+    #         if compiled.search(str(item)) is not None:
+    #             return item
 
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         """
@@ -476,24 +441,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
                 return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
             return List([func(x, y) for x, y in iterator])
 
-    def modify(self, func: str, other=None):
-        """Modifies objects rather than returning new list of objects
-        :param func: a string that will be executed, assuming idx, x and y are given.
-        :param other:
-        :return:
-        """
-        if other is None:
-            for idx, x in enumerate(self.list): _ = x, idx; exec(func)
-        else:
-            for idx, (x, y) in enumerate(zip(self.list, other)): _ = idx, x, y; exec(func)
-        return self
-
-    def print(self, nl=1, sep=False, style=repr):
-        for idx, item in enumerate(self.list):
-            print(f"{idx:2}- {style(item)}", end=' ')
-            for _ in range(nl): print('', end='\n')
-            if sep: print(sep * 100)
-
+    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * nl, sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self): return self.list
     def to_numpy(self): return self.np
@@ -577,43 +525,35 @@ class Struct(Base, dict):
     def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
         if config:
             if return_str: return Display.config(self.__dict__, newline=newline)
-            print(Display.config(self.__dict__, newline=newline))
-            return self
+            print(Display.config(self.__dict__, newline=newline)); return self
         if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
-        if yaml:
-            # removed for disentanglement
+        if yaml:  # removed for disentanglement
             # self.save_yaml(P.tmp(file="__tmp.yaml"))
             # txt = P.tmp(file="__tmp.yaml").read_text()
             # print(txt)
             return None
         if sep is None: sep = 5 + max(self.keys().apply(str).apply(len).list)
-        repr_string = ""
-        repr_string += "Structure, with following entries:\n"
+        repr_string = "Structure, with following entries:\n"
         repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if dtype else "") + "Item Details\n"
         repr_string += "---" + " " * sep + (("---------" + " " * sep) if dtype else "") + "------------\n"
         for key in self.keys().list:
-            key_str = str(key)
             type_str = str(type(self[key])).split("'")[1]
             val_str = Display.get_repr(self[key], limit=limit).replace("\n", " ")
-            repr_string += key_str + " " * abs(sep - len(key_str)) + " " * len("Key")
+            repr_string += str(key) + " " * abs(sep - len(str(key))) + " " * len("Key")
             if dtype: repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
             repr_string += val_str + "\n"
         if return_str: return repr_string
         else: print(repr_string); return self
 
     def __str__(self, sep=",", newline="\n", breaklines=None):
-        mystr = str(self.__dict__)
-        mystr = mystr[1:-1].replace(":", " =").replace("'", "").replace(",", sep)
+        mystr = str(self.__dict__)[1:-1].replace(":", " =").replace("'", "").replace(",", sep)
         if breaklines:
             res = np.array(mystr.split(sep))
             res = List(np.array_split(res, int(np.ceil((len(res) / breaklines))))).apply(lambda x: sep.join(x))
             mystr = __import__("functools").reduce(lambda a, b: a + newline + b, res) if len(res) > 1 else res[0]
         return mystr
 
-    def __getattr__(self, item):  # this works better with the linter.
-        try: return self.__dict__[item]
-        except KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
-
+    def __getattr__(self, item): return self.__dict__[item]  # this works better with the linter. KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
     @property
     def clean_view(self): return type("TempClass", (object,), self.__dict__)
     def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
@@ -639,14 +579,11 @@ class Struct(Base, dict):
     def filter(self, key_val_func=None): return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
+    def apply_to_values(self, key_val_func): [self.__setitem__(key, key_val_func(val))for key, val in self.items()]; return self
 
     def delete(self, key=None, keys=None, criterion=None):
         [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]
         if criterion is not None: [self.__dict__.__delitem__(key) for key in self.keys().list if criterion(self[key])]
-        return self
-
-    def apply_to_values(self, key_val_func):
-        for key, val in self.items(): self[key] = key_val_func(val)
         return self
 
     @staticmethod
@@ -691,28 +628,22 @@ class Display:
     @staticmethod
     def set_pandas_auto_width():
         """For fixed width host windows, this is recommended to avoid chaos due to line-wrapping."""
-        import pandas as pd
-        pd.options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
+        __import__("pandas").options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
 
     @staticmethod
     def eng():
-        import pandas as pd
-        pd.set_eng_float_format(accuracy=3, use_eng_prefix=True)
-        pd.options.display.float_format = '{:, .5f}'.format
-        pd.set_option('precision', 7)
-        # np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True)
+        __import__("pandas").options.display.float_format = '{:, .5f}'.format
+        __import__("pandas").set_option('precision', 7)
+        # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
     @staticmethod
     def get_repr(data, limit=50):
-        """A well-behaved repr function for all data types."""
         if type(data) is np.ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
         elif type(data) is str: string_ = data
-        elif type(data) is list:
-            example = ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
-            string_ = f"length = {len(data)}. " + example
+        elif type(data) is list: string_ = f"length = {len(data)}. " + ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
         else: string_ = repr(data)
-        if len(string_) > limit: string_ = string_[:limit]
-        return string_
+        return string_[:limit] if len(string_) > limit else string_
 
     @staticmethod
     def outline(array, name="Array", printit=True):
@@ -727,9 +658,8 @@ class Display:
     def print_string_list(mylist, char_per_row=125, sep=" "):
         counter, index = 0, 0
         while index < len(mylist):
-            item = mylist[index]
-            print(item, end=sep)
-            counter += len(item)
+            print(mylist[index], end=sep)
+            counter += len(mylist[index])
             if not counter <= char_per_row: counter = 0; print("\n")
             index += 1
 
