@@ -1,15 +1,12 @@
 """
 A collection of classes extending the functionality of Python's builtins.
-email programmer@usa.com
 
 Crocodile Philosophy:
-Make Python even friendlier, by making available the common functionality for everyday use. Specifically,
-path management, file management, and other common tasks.
-A the risk of vandalizing the concept, to make Python more MATLAB-like, in that more libraries are loaded up at
-start time_produced than basic arithmetic, but just enought to make it more useful for everyday errands.
+Make Python even friendlier, by making available the common functionality for everyday use, e.g., path management, file management
+At the risk of vandalizing the concept, Crocodile is about making Python more MATLAB-like, in that more libraries are loaded up at
+start time than mere basic arithmetic, but just enought to make it more useful for everyday errands.
 Thus, the terseness of Crocodile makes Python REPL a proper shell
-
-The focus is on ease of use, not efficiency.
+In implementation, the focus is on ease of use, not efficiency.
 """
 
 # Typing
@@ -45,30 +42,25 @@ def timestamp(fmt=None, name=None):
 def str2timedelta(past):
     """Converts a human readable string like '1m' or '1d' to a timedate object.
     In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
-    sc = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}
-    key, val = sc[past[-1]], eval(past[:-1])
+    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[past[-1]], eval(past[:-1])
     if key == "months": key, val = "days", val * 30
     elif key == "years": key, val = "weeks", val * 52
     return dt.timedelta(**{key: val})
 
 
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False):
-    if safe:  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
-        import secrets; return secrets.token_urlsafe(length)
+    if safe: return __import__("secrets").token_urlsafe(length) # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     pool = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "")
     pool = pool + (string.digits if digits else "") + (string.punctuation if punctuation else "")
     return ''.join(random.choices(pool, k=length))
 
 
-def validate_name(astring, replace='_'): import re; return re.sub(r'^(?=\d)|\W', replace, str(astring))
+def validate_name(astring, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
 
 
 def install_n_import(package, name=None):
-    """imports a package and installs it first if not."""
     try: return __import__(package)
-    except ImportError:
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", name or package])
+    except ImportError: __import__("subprocess").check_call([sys.executable, "-m", "pip", "install", name or package])
     return __import__(package)
 
 
@@ -78,32 +70,18 @@ def install_n_import(package, name=None):
 class SaveDecorator(object):
     def __init__(self, func, ext=""):
         # TODO: migrate from save_decorator to SaveDecorator
-        # Called with func argumen when constructing the decorated function.
-        # func argument is passed implicitly by Python.
-        self.func = func
-        self.ext = ext
+        self.func, self.ext = func, ext
 
     @classmethod
     def init(cls, func=None, **kwargs):
         """Always use this method for construction."""
         if func is None:  # User instantiated the class with no func argument and specified kwargs.
-            def wrapper(func_):
-                return cls(func_, **kwargs)
+            def wrapper(func_): return cls(func_, **kwargs)
             return wrapper  # a function ready to be used by Python (pass func to it to instantiate it)
-        else:  # called by Python with func passed and user did not specify non-default kwargs:
-            return cls(func)  # return instance of the class.
+        else: return cls(func)  # return instance of the class. # called by Python with func passed and user did not specify non-default kwargs:
 
     def __call__(self, path=None, obj=None, **kwargs):
-        # Called when calling the decorated function (instance of this called).
-        if path is None:
-            import tempfile
-            path = Path(tempfile.mkdtemp() + "-" + timestamp() + self.ext)
-            # raise ValueError
-        else:
-            if not str(path).endswith(self.ext): raise ValueError
-            else: raise ValueError
-
-        # noinspection PyUnreachableCode
+        path = Path(__import__("tempfile") .mkdtemp() + "-" + timestamp() + self.ext) if path is None else Path(path)
         path.parent.mkdir(exist_ok=True, parents=True)
         self.func(path, obj, **kwargs)
         print(f"File {obj} saved @ ", path.absolute().as_uri(), ". Directory: ", path.parent.absolute().as_uri())
@@ -119,7 +97,6 @@ def save_decorator(ext=""):
                 path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext)
                 print(f"tb.core: Warning: Path not passed to {func}. "
                       f"A default path has been chosen: {path.absolute().as_uri()}")
-                # raise ValueError
             else:
                 if add_suffix and not str(path).endswith(ext):
                     path = Path(str(path) + ext)
@@ -163,23 +140,18 @@ class Save:
          but nothing more than that.
         E.g. arrays or any other structure. An example of that is settings dictionary.
         It is useful for to generate human-readable file."""
-        import json
         with open(str(path), "w") as file:
-            json.dump(obj, file, default=lambda x: x.__dict__, **kwargs)
+            __import__("json").dump(obj, file, default=lambda x: x.__dict__, **kwargs)
 
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj, path, **kwargs):
-        import yaml
-        with open(str(path), "w") as file:
-            yaml.dump(obj, file, **kwargs)
+        with open(str(path), "w") as file: __import__("yaml").dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
     def vanilla_pickle(obj, path, **kwargs):
-        import pickle
-        with open(str(path), 'wb') as file:
-            pickle.dump(obj, file, **kwargs)
+        with open(str(path), 'wb') as file: __import__("pickle").dump(obj, file, **kwargs)
 
     @staticmethod
     @save_decorator(".pkl")
@@ -201,8 +173,7 @@ class Base(object):
     def save_code(self, path):
         """a usecase for including code in the save is when the source code is continously
          changing and still you want to reload an old version."""
-        import inspect
-        module = inspect.getmodule(self)
+        module = __import__("inspect").getmodule(self)
         if hasattr(module, "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! "
                                       f"module should be imported instead.")
@@ -325,8 +296,7 @@ class Base(object):
         """
         code_path = Path(code_path)
         sys.path.insert(0, str(code_path.parent))
-        import importlib
-        sourcefile = importlib.import_module(code_path.stem)
+        sourcefile = __import__("importlib").import_module(code_path.stem)
         return getattr(sourcefile, class_name).from_state(data_path, *args, r=r, **kwargs)
 
     @staticmethod
@@ -350,9 +320,8 @@ class Base(object):
 
         else:  # file points to pickled object:
             if scope:
-                import runpy
                 print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
-                scope.update(runpy.run_path(str(code_path)))  # Dill will no longer complain.
+                scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
             obj = dill.loads(data_path.read_bytes())
             return obj
 
@@ -390,8 +359,7 @@ class Base(object):
         elif expected == 'self': return eval(string_) if "self" in string_ else string_
 
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
-        import tempfile
-        filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
+        filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
         if sys.platform == "win32": os.startfile(str(filename.absolute()))  # works for files and folders alike
         return filename
@@ -400,9 +368,9 @@ class Base(object):
 class List(Base, list):  # Inheriting from Base gives save method.
     """Use this class to keep items of the same type."""
     # =============================== Constructor Methods ====================
-    def __init__(self, obj_list=None):
-        super().__init__()
-        self.list = list(obj_list) if obj_list is not None else []
+    def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
+    @classmethod
+    def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
 
     @classmethod
     def from_replicating(cls, func, *args, replicas=None, **kwargs):
@@ -420,9 +388,6 @@ class List(Base, list):  # Inheriting from Base gives save method.
             a_kwarg = dict(zip(kwargs.keys(), a_val))
             result.append(func(*an_arg, **a_kwarg))
         return cls(result)
-
-    @classmethod
-    def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
 
     def save_items(self, directory, names=None, saver=None):
         if saver is None: saver = Save.pickle
@@ -473,7 +438,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func, expected='func')(x)])
     def filter(self, func): return List([item for item in self.list if self.evalstr(func, expected='func')(item)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func): from functools import reduce; return reduce(func, self.list)
+    def reduce(self, func): return __import__("functools").reduce(func, self.list)
     def append(self, item): self.list.append(item); return self
     def __add__(self, other): return List(self.list + list(other))  # implement coersion
     def __radd__(self, other): return List(self.list + list(other))
@@ -534,7 +499,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
             for _ in range(nl): print('', end='\n')
             if sep: print(sep * 100)
 
-    def to_series(self): import pandas as pd; return pd.Series(self.list)
+    def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self): return self.list
     def to_numpy(self): return self.np
     @property
@@ -548,10 +513,9 @@ class List(Base, list):  # Inheriting from Base gives save method.
         :param obj_included: Include a colum for objects themselves.
         :return:
         """
-        import pandas as pd
         columns = list(self.list[0].__dict__.keys())
         if obj_included or names: columns = ['object'] + columns
-        df = pd.DataFrame(columns=columns)
+        df = __import__("pandas").DataFrame(columns=columns)
         if minimal: return df
         # Populate the dataframe:
         for i, obj in enumerate(self.list):
@@ -609,8 +573,7 @@ class Struct(Base, dict):
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
 
     def to_default(self, default=lambda: None):
-        from collections import defaultdict
-        tmp2 = defaultdict(default)
+        tmp2 = __import__("collections").defaultdict(default)
         tmp2.update(self.__dict__)
         self.__dict__ = tmp2
         return self
@@ -659,8 +622,7 @@ class Struct(Base, dict):
         if breaklines:
             res = np.array(mystr.split(sep))
             res = List(np.array_split(res, int(np.ceil((len(res) / breaklines))))).apply(lambda x: sep.join(x))
-            import functools
-            mystr = functools.reduce(lambda a, b: a + newline + b, res) if len(res) > 1 else res[0]
+            mystr = __import__("functools").reduce(lambda a, b: a + newline + b, res) if len(res) > 1 else res[0]
         return mystr
 
     def __getattr__(self, item):  # this works better with the linter.
@@ -685,7 +647,7 @@ class Struct(Base, dict):
     def values(self) -> List: return List(list(self.dict.values()))
     def items(self) -> List: return List(self.dict.items())
     def get_values(self, keys) -> List: return List([self[key] for key in keys])
-    def to_dataframe(self, *args, **kwargs): import pandas as pd; return pd.DataFrame(self.__dict__, *args, **kwargs)
+    def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
     def apply_to_keys(self, key_val_func): return Struct({key_val_func(key, val): val for key, val in self.items()})
     def filter(self, key_val_func=None): return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})

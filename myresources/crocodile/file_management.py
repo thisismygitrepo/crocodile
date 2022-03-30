@@ -6,25 +6,15 @@ from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, rands
 
 # =============================== Security ================================================
 
-def obscure(msg: bytes) -> bytes:
-    # if type(msg) is str: msg = msg.encode()
-    import zlib
-    from base64 import urlsafe_b64encode as b64e
-    return b64e(zlib.compress(msg, 9))
-
-
-def unobscure(obscured: bytes) -> bytes:
-    import zlib
-    from base64 import urlsafe_b64decode as b64d
-    return zlib.decompress(b64d(obscured))
+def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
+def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
 
 
 def pwd2key(password: str, salt=None, iterations=None) -> bytes:
     """Derive a secret key from a given password and salt"""
     import base64
     if salt is None:
-        import hashlib
-        m = hashlib.sha256()  # converts anything to fixed length 32 bytes
+        m = __import__("hashlib").sha256()  # converts anything to fixed length 32 bytes
         m.update(password.encode("utf-8"))
         return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     """Adding salt and iterations to the password. The salt and iteration numbers will be stored explicitly
@@ -72,20 +62,17 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
 
 
 def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
-    from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
-    from cryptography.fernet import Fernet
     if pwd is not None:
         assert key is None, f"You can either pass key or pwd, or none of them, but not both."
-        assert type(pwd) is str
         if salted:
-            decoded = b64d(token)
-            salt, iterations, token = decoded[:16], decoded[16:20], b64e(decoded[20:])
+            decoded = __import__("base64").urlsafe_b64decode(token)
+            salt, iterations, token = decoded[:16], decoded[16:20], __import__("base64").urlsafe_b64encode(decoded[20:])
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
         else: key = pwd2key(pwd)
     if type(key) is bytes: pass   # passsed explicitly
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
-    return Fernet(key).decrypt(token)
+    return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 
 
 # =================================== File ============================================
@@ -109,18 +96,16 @@ class Read(object):
 
     @staticmethod
     def mat(path, remove_meta=False, **kwargs):
-        from scipy.io import loadmat
-        res = Struct(loadmat(path, **kwargs))
+        res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs))
         if remove_meta: List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
         return res
 
     @staticmethod
     def json(path, r=False, **kwargs):
         """Returns a Structure"""
-        import json
         try:
             with open(str(path), "r") as file:
-                mydict = json.load(file, **kwargs)
+                mydict = __import__("json").load(file, **kwargs)
         except Exception:  # file has C-style comments.
             with open(str(path), "r") as file:
                 mydict = install_n_import("pyjson5").load(file, **kwargs)
@@ -133,9 +118,9 @@ class Read(object):
         return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 
     @staticmethod
-    def py(path): import runpy; return Struct(runpy.run_path(path))
+    def py(path): return Struct(__import__("runpy").run_path(path))
     @staticmethod
-    def csv(path, **kwargs): import pandas as pd; return pd.read_csv(path, **kwargs)
+    def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
     @staticmethod
     def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
     @staticmethod
@@ -171,9 +156,7 @@ class P(type(Path()), Path):
                 if verbose: print(f"Could NOT DELETE nonexisting file {repr(slf)}. ")
                 return slf  # terminate the function.
             if slf.is_file() or slf.is_symlink(): slf.unlink(missing_ok=True)
-            else:
-                import shutil
-                shutil.rmtree(slf, ignore_errors=True)
+            else: __import__("shutil").rmtree(slf, ignore_errors=True)
             if verbose: print(f"DELETED {repr(slf)}.")
         elif verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
         return self
@@ -257,8 +240,7 @@ class P(type(Path()), Path):
         dest.parent.create()
         if overwrite and dest.exists(): dest.delete(sure=True)
         if slf.is_file():
-            import shutil
-            shutil.copy(str(slf), str(dest))  # str() only there for Python < (3.6)
+            __import__("shitil").copy(str(slf), str(dest))  # str() only there for Python < (3.6)
             if verbose: print(f"COPIED {repr(slf)} ==> {repr(dest)}")
         elif slf.is_dir():
             from distutils.dir_util import copy_tree
@@ -292,7 +274,7 @@ class P(type(Path()), Path):
 
     def start(self, opener=None):  # explore folders.
         import subprocess
-        if str(self).startswith("http") or str(self).startswith("www"): import webbrowser; webbrowser.open(str(self)); return self
+        if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
         filename = self.expanduser().resolve().str
         if sys.platform == "win32":
             if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
@@ -590,9 +572,8 @@ class P(type(Path()), Path):
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
-        import platform
         from crocodile.meta import Terminal
-        if platform.system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
+        if __import__("platform").system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
             Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"")
             time.sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
@@ -650,9 +631,7 @@ class P(type(Path()), Path):
             from fnmatch import fnmatch
             raw = content.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: slf / x)
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
-        else:  # glob ignroes dot and hidden files
-            from glob import glob
-            raw = glob(str(slf / "**" / pattern), recursive=r) if r else glob(str(slf.joinpath(pattern)))
+        else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
 
         if compressed:
             comp_files = List(raw).filter(lambda x: '.zip' in str(x))
@@ -676,15 +655,13 @@ class P(type(Path()), Path):
         processed = [P(item) for item in raw if run_filter(P(item))]
         if not processed: return List(processed)  # if empty, don't proceeed
         if win_order:  # this option only supported in non-generator mode.
-            import re
-            processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', x.stem)])
+            processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
         return List(processed)
 
     def tree(self, level: int = -1, limit_to_directories: bool = False,
              length_limit: int = 1000, stats=False, desc=None):
         """Given a directory Path object print a visual tree structure
         Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
-        from itertools import islice
         space = '    '
         branch = '│   '
         tee = '├── '
@@ -718,7 +695,7 @@ class P(type(Path()), Path):
 
         print(dir_path.name)
         iterator = inner(dir_path, level_=level)
-        for line in islice(iterator, length_limit): print(line)
+        for line in __import__("itertools").islice(iterator, length_limit): print(line)
         if next(iterator, None): print(f'... length_limit, {length_limit}, reached, counted:')
         print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
@@ -741,9 +718,9 @@ class P(type(Path()), Path):
     @staticmethod
     def pwd(): return P.cwd()
     @staticmethod
-    def tempdir(): import tempfile; return P(tempfile.mktemp())
+    def tempdir(): return P(__import__("tempfile").mktemp())
     @staticmethod
-    def temp(): import tempfile; return P(tempfile.gettempdir())
+    def temp(): return P(__import__("tempfile").gettempdir())
     @staticmethod
     def tmpdir(prefix=""): return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     def chdir(self): os.chdir(str(self.expanduser())); return self
@@ -929,8 +906,7 @@ class Compression(object):
         """
         assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}
         assert P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
-        import shutil
-        result_path = shutil.make_archive(base_name=op_path, format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs)
+        result_path = __import__('shutil').make_archive(base_name=op_path, format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs)
         return P(result_path)  # same as path but (possibly) with format extension
 
     @staticmethod
@@ -959,29 +935,23 @@ class Compression(object):
 
     @staticmethod
     def gz(file, op_file):
-        import gzip
-        import shutil
         with open(file, 'rb') as f_in:
-            with gzip.open(op_file, 'wb') as f_out: shutil.copyfileobj(f_in, f_out)
+            with __import__("gzip").open(op_file, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
         return op_file
 
     @staticmethod
     def ungz(self, op_path=None):
-        import gzip
-        import shutil
-        with gzip.open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: shutil.copyfileobj(f_in, f_out)
+        with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
         return P(op_path)
 
     @staticmethod
     def tar(self, op_path):
-        import tarfile
-        with tarfile.open(op_path, "w:gz") as tar: tar.add(str(self), arcname=os.path.basename(str(self)))
+        with __import__("tarfile").open(op_path, "w:gz") as tar: tar.add(str(self), arcname=os.path.basename(str(self)))
         return op_path
 
     @staticmethod
     def untar(self, op_path, fname=None, mode='r', **kwargs):
-        import tarfile
-        with tarfile.open(str(self), mode) as file:
+        with __import__("tarfile").open(str(self), mode) as file:
             if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
             else: file.extract(fname, **kwargs)
         return P(op_path)
@@ -989,11 +959,7 @@ class Compression(object):
 
 class MemoryDB:
     """This class holds the historical data. It acts like a database, except that is memory based."""
-
-    def __init__(self, size=5, ):
-        self.size = size
-        self.list = List()
-
+    def __init__(self, size=5): self.size, self.list = size, List()
     def __repr__(self): return f"MemoryDB. Size={self.size}. Current length = {self.len}"
     def __getitem__(self, item): return self.list[item]
     @property
@@ -1021,12 +987,9 @@ class Fridge:
         """
         self.cache = None  # fridge content
         self.time_produced = time_produced or datetime.now()  # init time_produced
-        self.expire = expire  # how much time_produced elapsed before
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
-        self.logger = logger
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
-        self.save = save
-        self.read = read
+        self.save, self.read, self.logger, self.expire = save, read, logger, expire
 
     def __getstate__(self):
         state = self.__dict__.copy()

@@ -2,7 +2,7 @@
 import logging
 import subprocess
 import time
-# import types
+import platform
 from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, dill, install_n_import, List
 from crocodile.file_management import P
 
@@ -277,9 +277,8 @@ class Manipulator:
         Returns a tuple of slicers.
         changed in April 2021 without testing.
         """
-        everything = slice(None, None, None)  # `:`
-        if rank is None:  rank = axis + 1
-        indices = [everything] * rank
+        if rank is None: rank = axis + 1
+        indices = [slice(None, None, None)] * rank  # slice(None, None, None) is equivalent to `:` `everything`
         indices[axis] = myslice
         # noinspection PyTypeChecker
         indices.append(Ellipsis)  # never hurts to add this in the end.
@@ -368,38 +367,26 @@ class Terminal:
 
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
-        Console
-        Terminal
-        Bash
-        Shell
-        Host
         * adding `start` to the begining of the command results in launching a new console that will not
         inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
-
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
         * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
         * `suprocess.call` is an archaic command for pre-Python-3.5.
         * In both `Popen` and `run`, the (shell=True) argument, implies that shell-specific commands are loaded up,
         e.g. `start` or `conda`.
-        * To launch a new window, either use
         """
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
-        self.elevated = elevated
-        self.stdout = stdout
-        self.stderr = stderr
-        self.stdin = stdin
-        import platform
-        self.machine = platform.system()  # Windows, Linux, Darwin
+        self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
+        self.machine = sys.platform  # 'win32', 'linux' OR: import platform; platform.system(): Windows, Linux, Darwin
 
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
 
     @staticmethod
-    def is_admin():
-        # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
+    def is_admin():  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
         import ctypes
-        return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), otherwise=False)
+        return Experimental.try_this(lambda: ctypes.windll.shell32.IsUserAnAdmin(), return_=False)
 
     def run(self, *cmds, shell=None, check=False, ip=None):
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
@@ -418,7 +405,7 @@ class Terminal:
         :param check: throw an exception is the execution of the external command failed (non zero returncode)
         """
         my_list = []
-        if self.machine == "Windows":
+        if self.machine == "win32":
             if shell in {"powershell", "pwsh"}:
                 my_list = [shell, "-Command"]  # alternatively, one can run "cmd"
                 """ The advantage of addig `powershell -Command` is to give access to wider range of options.
@@ -450,12 +437,12 @@ class Terminal:
         """
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None:
-            if self.machine == "Windows": shell = ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
+            if self.machine == "win32": shell = ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
             else: shell = ""
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
         extra = "-Command" if shell in {"powershell", "pwsh"} else ""
         my_list = []
-        if self.machine == "Windows": my_list += [new_window, terminal, shell, extra]  # by having a list,
+        if self.machine == "win32": my_list += [new_window, terminal, shell, extra]  # by having a list,
         # it is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         my_list += cmds
         my_list = [item for item in my_list if item != ""]
@@ -600,25 +587,15 @@ class SSH(object):
     def __init__(self, username, hostname, sshkey=None, pwd=None):
         _ = False
         if _: super().__init__()
-        self.sshkey = str(sshkey) if sshkey is not None else None
-        # no need to pass sshkey if it was configured properly already
+        self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         import paramiko
-        self.ssh = paramiko.SSHClient()
-        self.ssh.load_system_host_keys()
-        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.hostname = hostname
-        self.username = username
-        self.ssh.connect(hostname=hostname,
-                         username=username,
-                         password=pwd,
-                         port=22, key_filename=self.sshkey)
+        self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.hostname, self.username = hostname, username
+        self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
         self.sftp = self.ssh.open_sftp()
-        self.target_machine = "Windows" if self.run("$env:OS", printit=False).output[
-                                               "stdout"] == "Windows_NT" else "Linux"
+        self.target_machine = "Windows" if self.run("$env:OS", verbose=False).output["stdout"] == "Windows_NT" else "Linux"
         # it must uses a python independent way to figure out the machine type to avoid circualrity below:
-        import platform
-        self.platform = platform
-        if self.platform.system() == "Windows": self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
+        if platform.system() == "Windows": self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
         else: self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
         if self.target_machine == "Windows": self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
         else: self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
@@ -629,32 +606,29 @@ class SSH(object):
         """
         return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""
 
-    def copy_sshkeys_to_remote(self, fqdn):
+    @staticmethod
+    def copy_sshkeys_to_remote(fqdn):
         """Windows Openssh alternative to ssh-copy-id"""
-        assert self.platform.system() == "Windows"
+        assert platform.system() == "Windows"
         return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
-    def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
+    def __repr__(self): return f"{self.local()} [{platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
     def remote(self): return f"{self.username}@{self.hostname}"
-    def local(self): return f"{os.getlogin()}@{self.platform.node()}"
+    def local(self): return f"{os.getlogin()}@{platform.node()}"
     def open_console(self, new_window=True):Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
     def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {os.environ[name]}; export {name}")
 
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
-        pwd = None
+        pwd = randstr(length=10, safe=True)
         if zip_n_encrypt:
             print(f"ZIPPING & ENCRYPTING".center(80, "="))
-            pwd = randstr(length=10, safe=True)
             source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
-
         if target is None:
             target = P(source).collapseuser()
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
             target = target.as_posix()
-
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
-
         remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
         print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="))
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
@@ -666,12 +640,13 @@ class SSH(object):
 
     def copy_to_here(self, source, target=None): pass
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
-    def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
+    @staticmethod
+    def run_locally(command): print(f"Executing Locally @ {platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
 
-    def run(self, cmd, printit=True):
+    def run(self, cmd, verbose=True):
         res = self.ssh.exec_command(cmd)
         res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
-        if printit: res.print()
+        if verbose: res.print()
         return res
 
 
@@ -688,23 +663,18 @@ class Log(object):
 
      Implementation detail: the design favours composition over inheritence. To counter the inconvenience
       of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
-
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
                  name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
                  verbose=False, log_colors=None):
-        # save speces that are essential to re-create the object at
-        self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep,
-                          s_level=s_level, f_level=f_level, l_level=l_level)
+        self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
         self.dialect = dialect  # specific to this class
         self.verbose = verbose  # specific to coloredlogs dialect
         self.log_colors = log_colors  # specific kwarg to colorlog dialect
         self.owners = []  # list of objects using this object to log. It won't be pickled anyway, no circularity prob
-        self._install()
-        # update specs after intallation.
+        self._install()  # update specs after intallation.
         self.specs["path"] = self.logger.name
-        if file:  # first handler is a file handler
-            self.specs["file_path"] = self.logger.handlers[0].baseFilename
+        if file: self.specs["file_path"] = self.logger.handlers[0].baseFilename  # first handler is a file handler
 
     def __getattr__(self, item): return getattr(self.logger, item)  # makes it twice as slower as direct access 300 ns vs 600 ns
     def debug(self, msg): return self.logger.debug(msg)  # to speed up the process and avoid falling back to __getattr__
@@ -884,10 +854,8 @@ class Scheduler:
         self.other = other  # number of routine cycles before `occasional` get executed once.
         self.cycles = runs  # how many times to run the routine. defaults to infinite.
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
-        self.history = []
         self._start_time = None  # begining of a session (local time_produced)
-        self.total_count = 0
-        self.count = 0
+        self.history, self.count, self.total_count = [], 0, 0
 
     def run(self, until="2050-01-01", cycles=None):
         self.cycles = cycles or self.cycles
