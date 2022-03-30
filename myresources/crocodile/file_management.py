@@ -5,7 +5,6 @@ from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, rands
 
 
 # =============================== Security ================================================
-
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
 
@@ -32,8 +31,6 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
     * It behoves you to try decrypting it to err on the side of safety.
     * Don't forget to delete OR store key file safely.
     """
-    # if type(msg) is str: msg = msg.encode()
-    from cryptography.fernet import Fernet
     salt = None  # silence the linter.
     # step 1: get the key:
     if pwd is not None:  # generate it from password
@@ -48,17 +45,13 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         else: salt = iteration = None
         key = pwd2key(pwd, salt, iteration)
     elif key is None:  # generate a new key: discouraged, always make your keys/pwd before invoking the func.
-        key = Fernet.generate_key()  # uses random bytes, more secure but no string representation
+        key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key()  # uses random bytes, more secure but no string representation
         print(f"KEY SAVED @ {repr(P.tmpdir().joinpath('key.bytes').write_bytes(key))}")  # without verbosity check:
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
-    # if type(msg) is str: msg = msg.encode("utf-8")
-    code = Fernet(key).encrypt(msg)
-    if pwd is not None and salted is True:
-        from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
-        return b64e(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), b64d(code)))
-    else: return code
+    code = __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).encrypt(msg)
+    return __import__("base64").urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), __import__("base64").urlsafe_b64decode(code))) if pwd is not None and salted is True else code
 
 
 def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
@@ -104,11 +97,9 @@ class Read(object):
     def json(path, r=False, **kwargs):
         """Returns a Structure"""
         try:
-            with open(str(path), "r") as file:
-                mydict = __import__("json").load(file, **kwargs)
+            with open(str(path), "r") as file: mydict = __import__("json").load(file, **kwargs)
         except Exception:  # file has C-style comments.
-            with open(str(path), "r") as file:
-                mydict = install_n_import("pyjson5").load(file, **kwargs)
+            with open(str(path), "r") as file: mydict = install_n_import("pyjson5").load(file, **kwargs)
         return Struct.recursive_struct(mydict) if r else Struct(mydict)
 
     @staticmethod
@@ -186,8 +177,7 @@ class P(type(Path()), Path):
         if parents: folder.create(parents=True, exist_ok=True)
         slf = self.expanduser().resolve()
         if content:
-            assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. "
-                                                     f"It is not: `{repr(self)}`")
+            assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False))
             return path  # contents live within this directory.
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
@@ -289,8 +279,9 @@ class P(type(Path()), Path):
 
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
+    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, read=Read.read): return Fridge(source_func=source_func, path=self, expire=expire, save=save, read=read)
 
-    def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding="utf-8"):
+    def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
         """
         :param notfound_append: if file not found, append the text to it.
         :param encoding:
@@ -313,23 +304,17 @@ class P(type(Path()), Path):
                 if newline is True: lines[idx] = alt if type(alt) is str else alt(line)
                 else: lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
         if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
-        self.write_text("\n".join(lines), encoding=encoding)
-        return self
+        return self.write_text("\n".join(lines), encoding=encoding)
 
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         """Assuming URL points to anything but html page."""
-        import requests
-        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, params=params)
+        response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)
         if memory is False:
             directory = P.home().joinpath("Downloads") if directory is None else P(directory)
             directory = directory.joinpath(name or self.name)
             directory.write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
             return directory
-        else: return response.content
-        # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8')
-
-    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, read=Read.read):
-        return Fridge(source_func=source_func, path=self, expire=expire, save=save, read=read)
+        else: return response.content  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8')
 
     # ================================ Path Object management ===========================================
     """ The default behaviour of methods that mutate the path object:
@@ -341,67 +326,33 @@ class P(type(Path()), Path):
         `Inplace` flag might still be offered in some of those methods and is relevant only if path exists
         The default for this flag is False in those methods.
     """
-    def prepend(self, prefix, suffix=None, inlieu=False, inplace=False):
-        """Add extra text before file path
-        e.g: blah\blah.extenion ==> becomes ==> blah/name_blah.extension.
-        notice that `__add__` method removes the extension, while this one preserves it.
-        """
-        if suffix is None: suffix = ''.join(self.suffixes)
-        result = self._return(self.parent.joinpath(prefix + self.trunk + suffix), inlieu)
-        if inplace:
-            assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
-            self.retitle(result.name)
-        return result
+    def prepend(self, prefix, suffix=None, inlieu=False, inplace=False): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(self.suffixes))), inlieu=inlieu, inplace=inplace, operation="rename")
+    def append(self, name='', suffix=None, inplace=False, inlieu=False): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(self.suffixes))), inlieu=inlieu, inplace=inplace, operation="rename")
+    def append_time_stamp(self, fmt=None, inlieu=False, inplace=False): return self._return(self.append(name="_" + timestamp(fmt=fmt)), inlieu=inlieu, inplace=inplace, operation="rename")
+    def with_trunk(self, name, inlieu=False, inplace=False): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), inlieu=inlieu, inplace=inplace, operation="rename")  # Complementary to `with_stem` and `with_suffix`
+    def switch(self, key: str, val: str, inlieu=False, inplace=False): return self._return(P(str(self).replace(key, val)), inlieu=inlieu, inplace=inplace, operation="rename")  # Like string replce method, but `replace` is an already defined method."""
 
-    def append(self, name='', suffix=None, inplace=False, inlieu=False):
-        """Add extra text after file path, and optionally add extra suffix. e.g: blah\blah.extenion ==> becomes ==> blah/blah_name.extension"""
-        result = self._return(self.parent.joinpath(self.trunk + name + suffix or ''.join(self.suffixes)), inlieu)
-        if inplace and self.exists(): self.retitle(result.name)
-        return result
-
-    def with_trunk(self, name, inlieu=False, inplace=False):
-        """Complementary to `with_stem` and `with_suffic`"""
-        res = self.parent.joinpath(name + "".join(self.suffixes))
-        if inplace and self.exists(): self.retitle(name=res.name)
-        return self._return(res, inlieu)
-
-    def append_time_stamp(self, fmt=None, inlieu=False, inplace=False):
-        result = self._return(self.append(name="_" + timestamp(fmt=fmt)), inlieu)
-        if inplace and self.exists(): self.retitle(result.name)
-        return result
-
-    def switch(self, key: str, val: str, inlieu=False, inplace=False):
-        """Changes a given part of the path to another given one. `replace` is an already defined method."""
-        result = self._return(P(str(self).replace(key, val)), inlieu)
-        if inplace and self.exists(): self.retitle(result)
-        return result
-
-    def switch_by_index(self, key: int, val: str, inplace=False, inlieu=False):
+    def switch_by_index(self, idx: int, val: str, inplace=False, inlieu=False):
         """Changes a given index of the path to another given one"""
         fullparts = list(self.parts)
-        fullparts[key] = val
-        result = self._return(P(*fullparts), inlieu)
-        if inplace and self.exists(): self.retitle(result)
-        return result
+        fullparts[idx] = val
+        return self._return(P(*fullparts), inlieu=inlieu, inplace=inplace, operation="rename")
 
-    def _return(self, res, inlieu: bool):
+    def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False):
         """
         :param res: result path, could exists or not.
         :params inlieu: decides on whether the current object `self` is mutated to be the result `res`
         or the result is returned as a separate object.
         """
-        if not inlieu: return res
-        else:
-            if self.exists(): self.rename(str(res))
-            self._str = str(res)
-            return self
+        if inlieu: self._str = str(res)
+        if inplace:
+            assert res.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
+            if operation == "rename": self.rename(res)
+        return self if orig else res
 
     # ============================= attributes of object ======================================
     @property
-    def trunk(self):
-        """ useful if you have multiple dots in file path where `.stem` fails."""
-        return self.name.split('.')[0]
-
+    def trunk(self): return self.name.split('.')[0]  # """ useful if you have multiple dots in file path where `.stem` fails."""
     @property
     def len(self): return self.__len__()
     @property
@@ -433,13 +384,8 @@ class P(type(Path()), Path):
     def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
 
     def collapseuser(self, strict=True, inlieu=False):
-        """same as rel2home except that it adds the tilde `~` to indicated home at the beginning.
-         Thus, it is a self-contained absolute path, bar a `expanduser` method."""
-        if "~" in self: return self
-        if strict:
-            assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}"
-                                                          f" OR one path is relative and the other is absolute.")
-        return self._return("~" / (self - P.home()), inlieu)
+        if strict: assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)} OR one path is relative and the other is absolute.")
+        return self if "~" in self else self._return("~" / (self - P.home()), inlieu)
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -457,18 +403,15 @@ class P(type(Path()), Path):
             if mode == "lenient":
                 items = str(self).split(sep=str(at))
                 one, two = items[0], items[1]
-                one = one[:-1] if one.endswith("/") else one
-                two = two[1:] if two.startswith("/") else two
+                one, two = one[:-1] if one.endswith("/") else one, two[1:] if two.startswith("/") else two
             else:  # "strict"
                 index = self.parts.index(str(at))  # raises an error if exact match is not found.
                 one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
             one, two = P(one), P(two)
         elif index is not None and (at is None):  # index is provided
-            one = self[:index]
-            two = P(*self.parts[index + 1:])
+            one, two = self[:index], P(*self.parts[index + 1:])
             at = self[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
-
         # ================================  appending `at` to one of the portions
         if sep == 0: pass  # neither of the portions get the sperator appended to it.
         elif sep == 1: two = at / two   # append it to right portion
@@ -481,12 +424,7 @@ class P(type(Path()), Path):
         elif type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
         else: return P(self.parts[slici])  # it is an integer
 
-    def __setitem__(self, key, value):
-        """
-        :param key: typing.Union[str, int, slice]
-        :param value: typing.Union[str, Path]
-        :return:
-        """
+    def __setitem__(self, key, value): # key: typing.Union[str, int, slice] # value: typing.Union[str, Path]
         fullparts = list(self.parts)
         new = list(P(value).parts)
         if type(key) is str:
@@ -527,23 +465,15 @@ class P(type(Path()), Path):
         return round(total_size / factor, 1)
 
     def time(self, which="m", **kwargs):
-        """Meaning of ``which values``
-            * ``m`` time_produced of modifying file ``content``, i.e. the time_produced it was created.
+        """* ``m`` time_produced of modifying file ``content``, i.e. the time_produced it was created.
             * ``c`` time_produced of changing file status (its inode is changed like permissions, path etc, but not content)
-            * ``a`` last time_produced the file was accessed.
+            * ``a`` last time_produced the file was accessed."""
+        return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)
 
-        :param which: Determines which time_produced to be returned. Three options are availalable:
-        :param kwargs:
-        """
-        timestamp_ = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
-        return datetime.fromtimestamp(timestamp_, **kwargs)
-
-    def stats(self):
-        """A variant of `stat` method that returns a structure with human-readable values."""
-        return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"),
-                      last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
+    def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
 
     # ================================ String Nature management ====================================
+    def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
     def clickable(self, inlieu=False): return self._return(self.expanduser().resolve().as_uri(), inlieu)
     def as_url_str(self, inlieu=False): return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
     def as_url_obj(self, inlieu=False): return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
@@ -561,13 +491,6 @@ class P(type(Path()), Path):
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
 
     def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
-        """
-        Creates a symlink to the target.
-        :param target:
-        :param verbose:
-        :param overwrite: If True, overwrites existing symlink (self). Target path is not changed.
-        :param orig:
-        """
         target = P(target).expanduser().resolve()
         assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         self.parent.create()
@@ -594,20 +517,10 @@ class P(type(Path()), Path):
         return self
 
     # ======================================== Folder management =======================================
-    def create(self, parents=True, exist_ok=True, parent_only=False):
-        if parent_only: self.parent.mkdir(parents=parents, exist_ok=exist_ok)
-        else: self.mkdir(parents=parents, exist_ok=exist_ok)
-        return self
-
-    @property
-    def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
-
-    def search(self, pattern='*', r=False, generator=False, files=True, folders=True, compressed=False,
-               dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
+    def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
         """
         :param pattern:  linux search pattern
         :param r: recursive search flag
-        :param generator: output format, list or generator.
         :param files: include files in search.
         :param folders: include directories in search.
         :param compressed: search inside compressed files.
@@ -616,59 +529,27 @@ class P(type(Path()), Path):
         :param not_in: list of strings that search results should not contain them (short for filter with simple lambda)
         :param exts: list of extensions to search for.
         :param win_order: return search results in the order of files as they appear on a Windows machine.
-
-        :return: search results.
         """
-        # ================= Get concrete values for default arguments ========================================
         filters = filters or []
         if not_in is not None: filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
         if exts is not None: filters += [lambda x: any([ext in x.name for ext in exts])]
-        # ============================ get generator of search results ========================================
         slf = self.expanduser().resolve()
         if compressed and slf.suffix == ".zip":
-            import zipfile
-            with zipfile.ZipFile(str(slf)) as z: content = List(z.namelist())
-            from fnmatch import fnmatch
-            raw = content.filter(lambda x: fnmatch(x, pattern)).apply(lambda x: slf / x)
+            with __import__("zipfile").ZipFile(str(slf)) as z: content = List(z.namelist())
+            raw = content.filter(lambda x: __import__("fnmatch").fnmatch(x, pattern)).apply(lambda x: slf / x)
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
-
         if compressed:
             comp_files = List(raw).filter(lambda x: '.zip' in str(x))
-            for comp_file in comp_files:
-                raw += P(comp_file).search(pattern=pattern, r=r, generator=generator, files=files, folders=folders,
-                                           compressed=compressed,
-                                           dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
+            for comp_file in comp_files: raw += P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=compressed, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
 
-        def run_filter(item_):
-            flags = [item_.is_dir() if not files else True, item_.is_file() if not folders else True]
-            return all(flags + [afilter(item_) for afilter in filters])
+        def run_filter(item_): return all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters])
+        processed = List([P(item) for item in raw if run_filter(P(item))])
+        return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
 
-        if generator:
-            def gen():
-                flag = False
-                while not flag:
-                    item_ = next(raw)
-                    flag = P(item_) if run_filter(P(item_)) else None
-                    if flag: yield item_
-            return gen
-        processed = [P(item) for item in raw if run_filter(P(item))]
-        if not processed: return List(processed)  # if empty, don't proceeed
-        if win_order:  # this option only supported in non-generator mode.
-            processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
-        return List(processed)
-
-    def tree(self, level: int = -1, limit_to_directories: bool = False,
-             length_limit: int = 1000, stats=False, desc=None):
-        """Given a directory Path object print a visual tree structure
-        Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
-        space = '    '
-        branch = '│   '
-        tee = '├── '
-        last = '└── '
-        dir_path = self
-        files = 0
-        directories = 0
+    def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
+        """Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
+        space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
 
         def get_stats(apath):
             if stats or desc:
@@ -692,7 +573,6 @@ class P(type(Path()), Path):
                 elif not limit_to_directories:
                     yield prefix + pointer + path.name + get_stats(path)
                     files += 1
-
         print(dir_path.name)
         iterator = inner(dir_path, level_=level)
         for line in __import__("itertools").islice(iterator, length_limit): print(line)
@@ -700,21 +580,14 @@ class P(type(Path()), Path):
         print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
     def find(self, *args, r=True, compressed=True, **kwargs):
-        """short for the method ``search`` then pick first item from results.
-        useful for superflous directories or zip archives containing a single file.
-
-        Behaviour:
-        * if path (self) is a file, it returns itself.
-        * unless this path is an archive file, in which case it is parsed as a directory.
-        * Return None in case the directory is empty.
-        """
+        """short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
         if compressed is False and self.is_file(): return self
         results = self.search(*args, r=r, compressed=compressed, **kwargs)
-        if len(results) > 0:
-            result = results[0]
-            if ".zip" in str(result): return result.unzip()
-            return result
+        if len(results) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
 
+    def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
+    @property
+    def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
     @staticmethod
     def pwd(): return P.cwd()
     @staticmethod
@@ -730,13 +603,6 @@ class P(type(Path()), Path):
 
     @staticmethod
     def tmp(folder=None, file=None, root="~/tmp_results", verbose=False):
-        """
-        :param folder: this param is created automatically.
-        :param file: this param is appended to path, but not created.
-        :param root:
-        :param verbose:
-        :return:
-        """
         root = P(root).expanduser().create()
         if folder is not None: root = (root / folder).create()
         if file is not None: root = root / file
@@ -744,10 +610,8 @@ class P(type(Path()), Path):
         return root
 
     # ====================================== Compression ===========================================
-    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True,
-            orig=False, **kwargs):
-        """
-        """
+    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True, orig=False, **kwargs):
+        """"""
         path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
         slf = self.expanduser().resolve()
         arcname = P(arcname or slf.name)
@@ -780,29 +644,15 @@ class P(type(Path()), Path):
             if ".zip" not in str(slf): return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).joinpath(zipfile.stem).expanduser().resolve()
-        if content: folder = folder.parent
-        result = Compression.unzip(zipfile, folder, fname, **kwargs)
+        result = Compression.unzip(zipfile, folder if not content else folder.parent, fname, **kwargs)
         if verbose: print(f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
         if inplace: slf.delete(sure=True, verbose=verbose)
         return result if not orig else self
 
-    def tar(self, path=None):
-        if path is None: path = self + '.gz'
-        result = Compression.untar(self, op_path=path)
-        return result
-
-    def untar(self, path, verbose=True):
-        _ = self, path, verbose
-        return P()
-
-    def gz(self, path, verbose=True):
-        _ = self, path, verbose
-        return P()
-
-    def ungz(self, path, verbose=True):
-        _ = self, path, verbose
-        return P()
-
+    def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
+    def untar(self, path, verbose=True): _ = self, path, verbose; return P()
+    def gz(self, path, verbose=True): _ = self, path, verbose; return P()
+    def ungz(self, path, verbose=True): _ = self, path, verbose; return P()
     def tar_gz(self): pass
 
     def untar_ungz(self, folder=None, inplace=False, verbose=True):
@@ -819,15 +669,10 @@ class P(type(Path()), Path):
         _ = self, path, base_dir, kwargs, inplace
         pass
 
-    def decompress(self):
-        pass
+    def decompress(self): pass
 
-    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True,
-                append="_encrypted", inplace=False, orig=False, use_7z=False):
-        """
-        see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python
-        https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
-        """
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):
+        """see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve()
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         path = self._resolve_path(folder, name, path, slf.append(name=append).name)
@@ -846,8 +691,7 @@ class P(type(Path()), Path):
         if inplace: slf.delete(sure=True, verbose=verbose)
         return path if not orig else self
 
-    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted",
-                inplace=False, orig=False):
+    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", inplace=False, orig=False):
         slf = self.expanduser().resolve()
         path = self._resolve_path(folder, name, path, slf.switch(append, "").name)
         path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
@@ -875,9 +719,7 @@ class P(type(Path()), Path):
             if rel2it: path = self.joinpath(path).resolve()
             path = P(path).expanduser().resolve()
             assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
-            folder = path.parent
-            name = path.name
-            _ = name, folder
+            folder, name = path.parent, path.name; _ = name, folder
         else:
             if name is None: name = default_name
             else: name = str(name)  # good for edge cases of path with single part.
@@ -886,23 +728,12 @@ class P(type(Path()), Path):
             path = P(folder).expanduser().resolve() / name
         return path
 
-    def _type(self):
-        if self.absolute():
-            if self.is_file(): return "File"
-            elif self.is_dir(): return "Dir"
-            else: return "NotExist"  # there is no tell if it is a file or directory.
-        else: return "Relative"      # there is no tell if it is a file or directory.
-
 
 class Compression(object):
-    """Provides consistent behaviour across all methods ...
-    Both files and folders when compressed, default is being under the root of archive."""
+    """Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
     @staticmethod
     def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):
-        """
-        shutil works with folders nicely (recursion is done interally)
-        # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path.
-        # when archive opened; base_dir will be found.
+        """shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found.
         """
         assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}
         assert P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
@@ -925,12 +756,9 @@ class Compression(object):
 
     @staticmethod
     def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
-        from zipfile import ZipFile
-        with ZipFile(str(ip_path), 'r') as zipObj:
+        with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
             if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
-            else:
-                zipObj.extract(member=str(fname), path=str(op_path), pwd=password)
-                op_path = P(op_path) / fname
+            else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); op_path = P(op_path) / fname
         return P(op_path)
 
     @staticmethod

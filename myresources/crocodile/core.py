@@ -175,8 +175,7 @@ class Base(object):
          changing and still you want to reload an old version."""
         module = __import__("inspect").getmodule(self)
         if hasattr(module, "__file__"): file = Path(module.__file__)
-        else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! "
-                                      f"module should be imported instead.")
+        else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         Path(path).write_text(file.read_text())
         return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
@@ -308,16 +307,13 @@ class Base(object):
         """
         fname = Path(path).name.split(".zip")[1]
         temp_path = Path.home().joinpath(f"tmp_results/unzipped/{fname}_{randstr()}")
-        from zipfile import ZipFile
-        with ZipFile(str(path), 'r') as zipObj:
-            zipObj.extractall(temp_path)
+        with __import__("ZipFile").ZipFile(str(path), 'r') as zipObj: zipObj.extractall(temp_path)
         code_path = list(temp_path.glob("source_code*"))[0]
         data_path = list(temp_path.glob("class_data*"))[0]
         if ".dat." in str(data_path):  # loading the state and initializing the class
             class_name = class_name or str(data_path).split(".")[1]
             if scope is None: return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **kwargs)
             return scope[class_name].from_saved()  # use fresh scope passed.
-
         else:  # file points to pickled object:
             if scope:
                 print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
@@ -325,8 +321,7 @@ class Base(object):
             obj = dill.loads(data_path.read_bytes())
             return obj
 
-    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False,
-                       fields=True, methods=True):
+    def get_attributes(self, check_ownership=False, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
         _ = check_ownership
         if remove_base_attrs: [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
@@ -579,16 +574,6 @@ class Struct(Base, dict):
         return self
 
     # =========================== print ===========================
-    @property
-    def clean_view(self):
-
-        class Temp:
-            pass
-
-        temp = Temp()
-        temp.__dict__ = self.__dict__
-        return temp
-
     def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
         if config:
             if return_str: return Display.config(self.__dict__, newline=newline)
@@ -629,6 +614,8 @@ class Struct(Base, dict):
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
 
+    @property
+    def clean_view(self): return type("TempClass", (object,), self.__dict__)
     def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key, value): self.__dict__[key] = value
@@ -673,25 +660,19 @@ class Struct(Base, dict):
         else: total_dict = dicts[0]  # take first dict in the tuple
         if collect_items:
             for key, val in total_dict.item(): total_dict[key] = [val]
-
-            def method(tmp1, tmp2):
-                return tmp1 + [tmp2]
-
+            def method(tmp1, tmp2): return tmp1 + [tmp2]
         if len(dicts) > 1:  # are there more dicts?
             for adict in dicts[1:]:
                 for key in adict.keys():  # get everything from this dict
-                    try:  # may be the key exists in the total dict already.
-                        total_dict[key] = method(total_dict[key], adict[key])
+                    try: total_dict[key] = method(total_dict[key], adict[key])  # may be the key exists in the total dict already.
                     except KeyError:  # key does not exist in total dict
                         if collect_items: total_dict[key] = [adict[key]]
                         else: total_dict[key] = adict[key]
         return Struct(total_dict)
 
     def plot(self, artist=None):
-        if artist is None:
-            # artist = Artist(figname='Structure Plot')  # removed for disentanglement
-            import matplotlib.pyplot as plt
-            fig, artist = plt.subplots()
+        if artist is None:  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
+            fig, artist = __import__("matplotlib.pyplot").subplots()
         for key, val in self: artist.plot(val, label=key)
         try: artist.fig.legend()
         except AttributeError: pass
