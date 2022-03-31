@@ -32,13 +32,6 @@ _ = dt
 # ============================== Accessories ============================================
 
 
-def timestamp(fmt=None, name=None):
-    """isoformat is not compatible with file naming convention, this function provides compatible fmt
-    tip: do not use this to create random addresses as it fails at high speed runs. Random string is better."""
-    tmp_res = datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')
-    return (name + '_' + tmp_res) if name is not None else tmp_res
-
-
 def str2timedelta(past):
     """Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[past[-1]], eval(past[:-1])
@@ -48,13 +41,12 @@ def str2timedelta(past):
 
 
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False):
-    if safe: return __import__("secrets").token_urlsafe(length) # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
-    pool = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "")
-    pool = pool + (string.digits if digits else "") + (string.punctuation if punctuation else "")
-    return ''.join(random.choices(pool, k=length))
+    if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
+    return ''.join(random.choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
 
 def validate_name(astring, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
+def timestamp(fmt=None, name=None): return (name + '_' + datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, this function provides compatible fmt
 
 
 def install_n_import(package, name=None):
@@ -90,10 +82,7 @@ def save_decorator(ext=""):
 
     def decorator(func):
         def wrapper(obj, path=None, verbose=True, add_suffix=True, **kwargs):
-            if path is None:
-                path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext)
-                print(f"tb.core: Warning: Path not passed to {func}. "
-                      f"A default path has been chosen: {path.absolute().as_uri()}")
+            if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}")
             else:
                 if add_suffix and not str(path).endswith(ext):
                     path = Path(str(path) + ext)
@@ -101,10 +90,7 @@ def save_decorator(ext=""):
                 else: path = Path(path)
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path=path, obj=obj, **kwargs)
-            if verbose:
-                rep = repr(obj)
-                rep = rep if len(rep) < 50 else rep[:10] + "... "
-                print(f"SAVED {rep}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`")
+            if verbose: print(f"SAVED {repr(obj) if len(repr(obj)) < 50 else repr(obj)[:10] + '... '}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`")
             return path
         return wrapper
     return decorator
@@ -270,20 +256,8 @@ class Base(object):
 
     @staticmethod
     def from_code_and_state(code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
-        """A simple wrapper on tops of the class method `from_state`, where the class is to be loaded from
-        a source code file.
-        :param code_path:
-        :param data_path:
-        :param class_name: Assumed to inherit from `Base`, so it has mthod `from_state`.
-        :param r:
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        code_path = Path(code_path)
-        sys.path.insert(0, str(code_path.parent))
-        sourcefile = __import__("importlib").import_module(code_path.stem)
-        return getattr(sourcefile, class_name).from_state(data_path, *args, r=r, **kwargs)
+        sys.path.insert(0, str(Path(code_path).parent))
+        return getattr(__import__("importlib").import_module(Path(code_path).stem), class_name).from_state(data_path, *args, r=r, **kwargs)
 
     @staticmethod
     def from_zipped_code_state(path, *args, class_name=None, r=False, scope=None, **kwargs):
@@ -608,8 +582,7 @@ class Struct(Base, dict):
         return Struct(total_dict)
 
     def plot(self, artist=None):
-        if artist is None:  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
-            fig, artist = __import__("matplotlib.pyplot").subplots()
+        if artist is None: fig, artist = __import__("matplotlib.pyplot").subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
         for key, val in self: artist.plot(val, label=key)
         try: artist.fig.legend()
         except AttributeError: pass
@@ -626,16 +599,15 @@ class Display:
         pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
 
     @staticmethod
-    def set_pandas_auto_width():
-        """For fixed width host windows, this is recommended to avoid chaos due to line-wrapping."""
-        __import__("pandas").options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.
+    def set_pandas_auto_width(): __import__("pandas").options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
+    @staticmethod
+    def config(mydict, newline=True): return "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
 
     @staticmethod
     def eng():
         __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True)
         __import__("pandas").options.display.float_format = '{:, .5f}'.format
-        __import__("pandas").set_option('precision', 7)
-        # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        __import__("pandas").set_option('precision', 7) # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
     @staticmethod
     def get_repr(data, limit=50):
@@ -650,9 +622,6 @@ class Display:
         str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"
         if printit: print(str_)
         return str_
-
-    @staticmethod
-    def config(mydict, newline=True): return "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
 
     @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):

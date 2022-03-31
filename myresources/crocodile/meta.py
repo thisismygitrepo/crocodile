@@ -407,16 +407,13 @@ class Terminal:
         """This method is a wrapper on top of `run_async" except that the command passed will launch python
         terminal that will run script passed by user.
         * Regular Python is much lighter than IPython. Consider using it while not debugging.
-        """
-        # TODO: add option whether to add prepend to the script or not.
-        wdir = wdir or P.cwd()
+        """  # TODO: add option whether to add prepend to the script or not.
         header_script = f"""
 # ======================== Code prepended by Terminal.run_script =========================
 import crocodile.toolbox as tb
-tb.sys.path.insert(0, r'{wdir}')
+tb.sys.path.insert(0, r'{wdir or P.cwd()}')
 # ======================== End of header, start of script passed: ========================
-"""  # this header is necessary so import statements in the script passed are identified relevant to wdir.
-
+"""     # this header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
@@ -425,8 +422,7 @@ tb.sys.path.insert(0, r'{wdir}')
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)
         # python will use the same dir as the one from console this method is called.
         # file.delete(sure=delete, verbose=False)
-        _ = delete
-        # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
+        _ = delete  # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
@@ -439,8 +435,7 @@ path = tb.P(r'{file}')
 obj = path.readit()
 path.delete(sure=True, verbose=False)
 obj{'()' if execute else ''}
-{cmd}
-"""
+{cmd}"""
         Terminal.run_script(script)
 
     @staticmethod
@@ -451,8 +446,7 @@ obj{'()' if execute else ''}
 path = tb.P(r'{file}')
 tb.dill.load_session(str(path)); 
 path.delete(sure=True, verbose=False)
-{cmd}
-"""
+{cmd}"""
         Terminal().run_script(script=script)
 
     @staticmethod
@@ -508,16 +502,11 @@ path.delete(sure=True, verbose=False)
         cmd = '"%s"' % (cmd_line[0],)
         # XXX TODO: isn't there a function or something we can call to massage command line params?
         params = " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
-        # print "Running", cmd, params
-        # ShellExecute() doesn't seem to allow us to fetch the PID or handle
-        # of the process, so we can't get anything useful from it. Therefore
-        # the more complex ShellExecuteEx() must be used.
+        # ShellExecute() doesn't seem to allow us to fetch the PID or handle of the process, so we can't get anything useful from it. Therefore the more complex ShellExecuteEx() must be used.
         # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
-        proce_info = shell_execute_ex(nShow=win32con.SW_SHOWNORMAL,
-                                      fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
+        proce_info = shell_execute_ex(nShow=win32con.SW_SHOWNORMAL, fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
                                       lpVerb='runas',  # causes UAC elevation prompt.
-                                      lpFile=cmd,
-                                      lpParameters=params)
+                                      lpFile=cmd, lpParameters=params)
         if wait:
             proc_handle = proce_info['hProcess']
             _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE)
@@ -695,8 +684,7 @@ class Log(object):
         return logger
 
     @staticmethod
-    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG,
-                     f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
+    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
         log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
         colorlog = install_n_import("colorlog")
         logger = Log.get_base_logger(colorlog, name, l_level)
@@ -705,8 +693,7 @@ class Log(object):
         return logger
 
     @staticmethod
-    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ",
-                   s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
+    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
         """Basic Python logger."""
         logger = Log.get_base_logger(logging, name, l_level)
         fmt = logging.Formatter(fmt or Log.get_format(sep))
@@ -748,8 +735,7 @@ class Log(object):
 
     @staticmethod
     def manual_degug(path):
-        sys.stdout = open(path, 'w')  # all print statements will write to this file.
-        sys.stdout.close()
+        sys.stdout = open(path, 'w'); sys.stdout.close()  # all print statements will write to this file.
         print(f"Finished ... have a look @ \n {path}")
 
 

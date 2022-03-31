@@ -484,8 +484,7 @@ class P(type(Path()), Path):
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         from crocodile.meta import Terminal
         if __import__("platform").system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
-            Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"")
-            time.sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
+            Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); time.sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
         if verbose: print(f"LINKED {repr(self)}")
         return P(target) if not orig else self
@@ -603,11 +602,9 @@ class P(type(Path()), Path):
         slf = self.expanduser().resolve()
         arcname = P(arcname or slf.name)
         if arcname.name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
-        if slf.is_file():
-            if path.suffix != ".zip": path = path + f".zip"
-            path = Compression.zip_file(ip_path=slf, op_path=path, arcname=arcname, **kwargs)
+        if slf.is_file(): Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, **kwargs)
         else:
-            root_dir, base_dir = (slf, ".") if content else slf.split(at=str(arcname[0]))[0], arcname
+            root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
             path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         if verbose: print(f"ZIPPED {repr(slf)} ==>  {repr(path)}")
         if inplace: slf.delete(sure=True, verbose=verbose)
@@ -625,8 +622,7 @@ class P(type(Path()), Path):
         :param kwargs:
         :return: path if content=False, else, path.parent. Default path = self.parent / self.stem
         """
-        slf = self.expanduser().resolve()
-        zipfile = slf
+        slf = zipfile = self.expanduser().resolve()
         if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(slf): return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
@@ -672,35 +668,25 @@ class P(type(Path()), Path):
                 env.tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
             else: raise NotImplementedError("7z not implemented for Linux")
             return path
-        code = encrypt(msg=slf.read_bytes(), key=key, pwd=pwd)
-        path.write_bytes(code)  # Fernet(key).encrypt(self.read_bytes()))
+        path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
         if inplace: slf.delete(sure=True, verbose=verbose)
         return path if not orig else self
 
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", inplace=False, orig=False):
         slf = self.expanduser().resolve()
-        path = self._resolve_path(folder, name, path, slf.switch(append, "").name)
-        path.write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))  # Fernet(key).decrypt(self.read_bytes()))
+        path = self._resolve_path(folder, name, path, slf.switch(append, "").name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
         if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(path)}.")
         if inplace: slf.delete(sure=True, verbose=verbose)
         return path if not orig else self
 
-    def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False):
-        zipped = self.zip(inplace=inplace, verbose=verbose)
-        zipped_secured = zipped.encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True)
-        return zipped_secured if not orig else self
-
-    def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False):
-        deciphered = self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace)
-        unzipped = deciphered.unzip(folder=None, inplace=True, content=False)
-        return unzipped if not orig else self
+    def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.zip(inplace=inplace, verbose=verbose).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
+    def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
 
     # ========================== Helpers =========================================
     def _resolve_path(self, folder, name, path, default_name, rel2it=False):
         """From all arguments, figure out what is the final path.
-        :param rel2it: `folder` or `path` are relative to `self` as opposed to cwd.
-        """
+        :param rel2it: `folder` or `path` are relative to `self` as opposed to cwd."""
         if path is not None:
             assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."
             if rel2it: path = self.joinpath(path).resolve()
@@ -720,12 +706,9 @@ class Compression(object):
     """Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
     @staticmethod
     def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):
-        """shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found.
-        """
-        assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}
-        assert P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
-        result_path = __import__('shutil').make_archive(base_name=op_path, format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs)
-        return P(result_path)  # same as path but (possibly) with format extension
+        """shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
+        assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"} and P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
+        return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
 
     @staticmethod
     def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
