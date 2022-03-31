@@ -108,13 +108,11 @@ class Read(object):
         return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 
     @staticmethod
-    def py(path): return Struct(__import__("runpy").run_path(path))
-    @staticmethod
     def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
     @staticmethod
     def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
-    @staticmethod
-    def pickles(bytes_obj): return dill.loads(bytes_obj)
+    py = staticmethod(lambda path: Struct(__import__("runpy").run_path(path)))
+    pickles = staticmethod(lambda bytes_obj: dill.loads(bytes_obj))
 
     @staticmethod
     def pickle(path, **kwargs):
@@ -338,14 +336,10 @@ class P(type(Path()), Path):
         return self if orig else res
 
     # ============================= attributes of object ======================================
-    @property
-    def trunk(self): return self.name.split('.')[0]  # """ useful if you have multiple dots in file path where `.stem` fails."""
-    @property
-    def len(self): return self.__len__()
-    @property
-    def str(self): return str(self)  # or self._str
-    @property
-    def items(self): return List(self.parts)
+    trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
+    len = property(lambda self: self.__len__())
+    str = property(lambda self: str(self))  # or self._str
+    items = property(lambda self: List(self.parts))
     def __len__(self): return len(self.parts)
     def __contains__(self, item): return item in self.parts
     def __iter__(self): return self.parts.__iter__()
@@ -458,7 +452,6 @@ class P(type(Path()), Path):
         return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)
 
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
-
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
     def clickable(self, inlieu=False): return self._return(self.expanduser().resolve().as_uri(), inlieu)
@@ -572,8 +565,7 @@ class P(type(Path()), Path):
         if len(results) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
 
     def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
-    @property
-    def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view
+    browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
     @staticmethod
     def pwd(): return P.cwd()
     @staticmethod
@@ -760,8 +752,7 @@ class MemoryDB:
     def __init__(self, size=5): self.size, self.list = size, List()
     def __repr__(self): return f"MemoryDB. Size={self.size}. Current length = {self.len}"
     def __getitem__(self, item): return self.list[item]
-    @property
-    def len(self): return len(self.list)
+    len = property(lambda self: len(self.list))
 
     def append(self, item):
         self.list.append(item)
@@ -794,12 +785,8 @@ class Fridge:
         if self.path is not None: state["path"] = self.path.rel2home()  # With this implementation, instances can be pickled and loaded up in different machine and still works.
         return state
 
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        if self.path is not None: self.path = P.home() / self.path
-
-    @property
-    def age(self): return datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time
+    def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
+    age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
     def reset(self): self.time_produced = datetime.now()
 
     def __call__(self, fresh=False):

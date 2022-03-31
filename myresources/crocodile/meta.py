@@ -317,18 +317,12 @@ class Terminal:
 
         def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None): self.std, self.output, self.input = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd  # input command
         def __call__(self, *args, **kwargs): return self.op.rstrip() if type(self.op) is str else None
-        @property
-        def op(self): return self.output["stdout"]
-        @property
-        def ip(self): return self.output["stdin"]
-        @property
-        def err(self): return self.output["stderr"]
-        @property
-        def success(self): return self.output["returncode"] == 0
-        @property
-        def returncode(self): return self.output["returncode"]
-        @property
-        def as_path(self): return P(self.op.rstrip()) if self.err == "" else None
+        op = property(lambda self: self.output["stdout"])
+        ip = property(lambda self: self.output["stdin"])
+        err = property(lambda self: self.output["stderr"])
+        success = property(lambda self: self.output["returncode"] == 0)
+        returncode = property(lambda self: self.output["returncode"])
+        as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
         def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}" + "".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "=" * 50, "\n\n"); return self
 
@@ -613,8 +607,7 @@ class Log(object):
     def warn(self, msg): return self.logger.warn(msg)
     def error(self, msg): return self.logger.error(msg)
     def critical(self, msg): return self.logger.critical(msg)
-    @property
-    def file(self): return P(self.specs["file_path"]) if self.specs["file_path"] else None
+    file = property(lambda self: P(self.specs["file_path"]) if self.specs["file_path"] else None)
     @staticmethod
     def get_basic_format(): return logging.BASIC_FORMAT
     def close(self): raise NotImplementedError

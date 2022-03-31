@@ -90,7 +90,7 @@ def save_decorator(ext=""):
                 else: path = Path(path)
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path=path, obj=obj, **kwargs)
-            if verbose: print(f"SAVED {repr(obj) if len(repr(obj)) < 50 else repr(obj)[:10] + '... '}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`")
+            if verbose: print(f"SAVED {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`")
             return path
         return wrapper
     return decorator
@@ -217,9 +217,8 @@ class Base(object):
             result_path = Path(__import__("shutil").make_archive(base_name=str(path), format="zip", root_dir=str(temp_path), base_dir="."))
             print(f"Code and data for the object ({repr(obj)}) saved @ `{result_path.as_uri()}`, Directory: `{result_path.parent.as_uri()}`")
         else:
-            result_path, rep = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix), repr(obj)
-            rep = rep if len(rep) < 50 else rep[:10] + "... "
-            print(f"{'Data of' if itself else ''} Object ({rep}) saved @ `{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`")
+            result_path = Save.pickle(obj=obj, path=path, r=r, verbose=False, add_suffix=add_suffix)
+            print(f"{'Data of' if itself else ''} Object ({Display.f(repr(obj), 50)}) saved @ `{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`")
         return result_path
 
     @classmethod
@@ -275,11 +274,10 @@ class Base(object):
             class_name = class_name or str(data_path).split(".")[1]
             if scope is None: return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **kwargs)
             return scope[class_name].from_saved()  # use fresh scope passed.
-        else:  # file points to pickled object:
-            if scope:
-                print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
-                scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
-            return dill.loads(data_path.read_bytes())
+        if scope:  # file points to pickled object:
+            print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
+            scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
+        return dill.loads(data_path.read_bytes())
 
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
@@ -313,23 +311,9 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     @classmethod
     def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
-
     @classmethod
-    def from_replicating(cls, func, *args, replicas=None, **kwargs):
-        """
-        :param args: could be one item repeated for all instances, or iterable. If iterable, it can by a Cycle object.
-        :param kwargs: those could be structures:
-        :param replicas:
-        :param func:
-        """
-        if not args and not kwargs: return cls([func() for _ in range(replicas)])  # empty args list and kwargs list
-        return cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
-
-    def save_items(self, directory, names=None, saver=None):
-        if saver is None: saver = Save.pickle
-        if names is None: names = range(len(self))
-        for name, item in zip(names, self.list): saver(path=directory / name, obj=item)
-
+    def from_replicating(cls, func, *args, replicas=None, **kwargs): return cls([func() for _ in range(replicas)]) if not args and not kwargs else cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
+    def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
     def __repr__(self): return f"List object with {len(self.list)} elements. First item of those is: \n" + f"{repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
     def __deepcopy__(self): return List([copy.deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
@@ -339,8 +323,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __setstate__(self, state): self.list = state
     def __len__(self): return len(self.list)
     def __iter__(self): return iter(self.list)
-    @property
-    def len(self): return self.list.__len__()
+    len = property(lambda self: self.list.__len__())
     # ================= call methods =====================================
     def method(self, name, *args, **kwargs): return List(getattr(i, name)(*args, **kwargs) for i in self.list)
     def attr(self, name): return List(getattr(i, name) for i in self.list)
@@ -371,6 +354,29 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def modify(self, func: str, other=None): [exec(func) for idx, x in enumerate(self.list)] if other is None else [exec(func) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value=None, values=None): [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
 
+    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
+        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs))
+        func = self.evalstr(func, expected='func')
+        iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
+        if jobs:
+            from joblib import Parallel, delayed
+            return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
+        return List([func(x, *args, **kwargs) for x in iterator]) if other is None else List([func(x, y) for x, y in iterator])
+
+    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * nl, sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
+    def to_series(self): return __import__("pandas").Series(self.list)
+    def to_list(self): return self.list
+    def to_numpy(self): return self.np
+    np = property(lambda self: np.array(self.list))
+    def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
+
+    def to_dataframe(self, names=None, minimal=False, obj_included=True):
+        df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
+        if minimal: return df
+        for i, obj in enumerate(self.list):  # Populate the dataframe:
+            if obj_included or names: df.loc[i] = ([obj] if names is None else [names[i]]) + list(self.list[i].__dict__.values())
+            else: df.loc[i] = list(self.list[i].__dict__.values())
+        return df
     # if match == "string" or None:
     #     for idx, item in enumerate(self.list):
     #         if patt in str(item):
@@ -386,62 +392,6 @@ class List(Base, list):  # Inheriting from Base gives save method.
     #     for idx, item in enumerate(self.list):
     #         if compiled.search(str(item)) is not None:
     #             return item
-
-    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
-        """
-        :param func: func has to be a function, possibly a lambda function. At any rate, it should return something.
-        :param args:
-        :param other: other list
-        :param jobs:
-        :param verbose:
-        :param desc:
-        :param depth: apply the function to inner Lists
-        :param kwargs: a list of outputs each time_produced the function is called on elements of the list.
-        :return:
-        """
-        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs))
-        func = self.evalstr(func, expected='func')
-        tqdm = install_n_import("tqdm").tqdm
-        if other is None:
-            iterator = self.list if not verbose else tqdm(self.list, desc=desc)
-            if jobs:
-                from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(i, *args, **kwargs) for i in iterator))
-            return List([func(x, *args, **kwargs) for x in iterator])
-        else:
-            iterator = zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc)
-            if jobs:
-                from joblib import Parallel, delayed
-                return List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
-            return List([func(x, y) for x, y in iterator])
-
-    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * nl, sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
-    def to_series(self): return __import__("pandas").Series(self.list)
-    def to_list(self): return self.list
-    def to_numpy(self): return self.np
-    @property
-    def np(self): return np.array(self.list)
-    def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
-
-    def to_dataframe(self, names=None, minimal=False, obj_included=True):
-        """
-        :param names: path of each object.
-        :param minimal: Return Dataframe structure without contents.
-        :param obj_included: Include a colum for objects themselves.
-        :return:
-        """
-        columns = list(self.list[0].__dict__.keys())
-        if obj_included or names: columns = ['object'] + columns
-        df = __import__("pandas").DataFrame(columns=columns)
-        if minimal: return df
-        # Populate the dataframe:
-        for i, obj in enumerate(self.list):
-            if obj_included or names:
-                if names is None: name = [obj]
-                else: name = [names[i]]
-                df.loc[i] = name + list(self.list[i].__dict__.values())
-            else: df.loc[i] = list(self.list[i].__dict__.values())
-        return df
 
 
 class Struct(Base, dict):
@@ -468,17 +418,9 @@ class Struct(Base, dict):
         self.__dict__ = final_dict
 
     @staticmethod
-    def recursive_struct(mydict):
-        struct = Struct(mydict)
-        for key, val in struct.items(): struct[key] = Struct.recursive_struct(val) if type(val) is dict else val
-        return struct
-
+    def recursive_struct(mydict): struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     @staticmethod
-    def recursive_dict(struct):
-        mydict = struct.dict
-        for key, val in mydict.items(): mydict[key] = Struct.recursive_dict(val) if type(val) is Struct else val
-        return mydict
-
+    def recursive_dict(struct): [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path=None): return Save.json(obj=self.__dict__, path=path)
     @classmethod
     def from_keys_values(cls, keys, values): return cls(dict(zip(keys, values)))
@@ -488,12 +430,7 @@ class Struct(Base, dict):
     def from_names(cls, names, default_=None): return cls.from_keys_values(names, values=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
     def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
-
-    def to_default(self, default=lambda: None):
-        tmp2 = __import__("collections").defaultdict(default)
-        tmp2.update(self.__dict__)
-        self.__dict__ = tmp2
-        return self
+    def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
 
     # =========================== print ===========================
     def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
@@ -528,8 +465,7 @@ class Struct(Base, dict):
         return mystr
 
     def __getattr__(self, item): return self.__dict__[item]  # this works better with the linter. KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
-    @property
-    def clean_view(self): return type("TempClass", (object,), self.__dict__)
+    clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key, value): self.__dict__[key] = value
@@ -541,8 +477,7 @@ class Struct(Base, dict):
     def __iter__(self): return iter(self.dict.items())
     def __delitem__(self, key): del self.__dict__[key]
     def copy(self): return Struct(self.__dict__.copy())
-    @property
-    def dict(self): return self.__dict__  # allows getting dictionary version without accessing private memebers explicitly.
+    dict = property(lambda self: self.__dict__)   # allows getting dictionary version without accessing private memebers explicitly.
     @dict.setter
     def dict(self, adict): self.__dict__ = adict
     def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
@@ -563,7 +498,6 @@ class Struct(Base, dict):
 
     @staticmethod
     def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
-        if method is None: method = list.__add__
         if not lenient:
             keys = dicts[0].keys()
             for i in dicts[1:]: assert i.keys() == keys
@@ -576,7 +510,7 @@ class Struct(Base, dict):
         if len(dicts) > 1:  # are there more dicts?
             for adict in dicts[1:]:
                 for key in adict.keys():  # get everything from this dict
-                    try: total_dict[key] = method(total_dict[key], adict[key])  # may be the key exists in the total dict already.
+                    try: total_dict[key] = (method or list.__add__)(total_dict[key], adict[key])  # may be the key exists in the total dict already.
                     except KeyError:  # key does not exist in total dict
                         if collect_items: total_dict[key] = [adict[key]]
                         else: total_dict[key] = adict[key]
@@ -608,7 +542,7 @@ class Display:
     def eng():
         __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True)
         __import__("pandas").options.display.float_format = '{:, .5f}'.format
-        __import__("pandas").set_option('precision', 7) # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+        __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
     @staticmethod
     def get_repr(data, limit=50):
@@ -617,6 +551,9 @@ class Display:
         elif type(data) is list: string_ = f"length = {len(data)}. " + ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
         else: string_ = repr(data)
         return string_[:limit] if len(string_) > limit else string_
+
+    @staticmethod
+    def f(str_, limit=50): return f'{str_[:limit - 4] + " ..." if len(str_) > limit else str_}:>{limit}'
 
     @staticmethod
     def outline(array, name="Array", printit=True):

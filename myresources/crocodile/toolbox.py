@@ -41,6 +41,7 @@ L = List
 tmp = P.tmp
 E = Experimental
 M = Manipulator
+D = Display
 
 
 _ = Base, timestamp, Save, Terminal, List, Struct, Display
