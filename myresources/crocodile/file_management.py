@@ -217,16 +217,13 @@ class P(type(Path()), Path):
         elif path is not None and folder is None: dest, content = P(path), True  # this way, the destination will be filled with contents of `self`
         elif path is None and folder is None: dest = self.with_name(str(name)) if name is not None else self.append(append)
         else: raise NotImplementedError
-        dest, slf = dest.expanduser().resolve(), self.expanduser().resolve()
-        dest.parent.create()
+        dest, slf = dest.expanduser().resolve().create(parent_only=True), self.expanduser().resolve()
         if overwrite and dest.exists(): dest.delete(sure=True)
         if slf.is_file():
-            __import__("shitil").copy(str(slf), str(dest))  # str() only there for Python < (3.6)
+            __import__("shutil").copy(str(slf), str(dest))
             if verbose: print(f"COPIED {repr(slf)} ==> {repr(dest)}")
         elif slf.is_dir():
-            from distutils.dir_util import copy_tree
-            if content: copy_tree(str(slf), str(dest))
-            else: copy_tree(str(slf), str(P(dest).joinpath(slf.name).create()))
+            __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()))
             if verbose: print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}")
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest / slf.name if not orig else self
@@ -257,8 +254,7 @@ class P(type(Path()), Path):
             if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
             else: tmp = rf'powershell {opener} \'{self}\'' # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
-        elif sys.platform == 'linux':
-            subprocess.call(["xdg-open", filename])  # works for files and folders alike
+        elif sys.platform == 'linux': subprocess.call(["xdg-open", filename])  # works for files and folders alike
         else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
         return self
 
@@ -291,15 +287,9 @@ class P(type(Path()), Path):
         if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
         return self.write_text("\n".join(lines), encoding=encoding)
 
-    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
-        """Assuming URL points to anything but html page."""
-        response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)
-        if memory is False:
-            directory = P.home().joinpath("Downloads") if directory is None else P(directory)
-            directory = directory.joinpath(name or self.name)
-            directory.write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
-            return directory
-        else: return response.content  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8')
+    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):  # fails at html.
+        response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
+        return (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content) if memory is False else response.content  # r.contents is bytes encoded as per docs of requests.
 
     # ================================ Path Object management ===========================================
     """ The default behaviour of methods that mutate the path object:
@@ -348,19 +338,8 @@ class P(type(Path()), Path):
     def __setstate__(self, state): self._str = str(state)
     def __add__(self, other): return self.parent.joinpath(self.stem + str(other))
     def __radd__(self, other): return self.parent.joinpath(str(other) + self.stem)  # other + P and `other` doesn't know how to make this addition.
-
-    def __sub__(self, other):
-        """removes all similar characters from the string form of the path"""
-        res = P(str(self).replace(str(other), ""))
-        if str(res[0]) in {"\\", "/"}: res = res[1:]  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
-        return res
-
-    # def __rtruediv__(self, other):
-    #     tmp = str(self)
-    #     if tmp[0] == "/":  # if dir starts with this, all Path methods fail.
-    #         tmp = tmp[1:]
-    #     return P(other) / tmp
-
+    def __rtruediv__(self, other): super(P, self).__rtruediv__(other)
+    def __sub__(self, other): res = P(str(self).replace(str(other), "")); return res[1:] if str(res[0]) in {"\\", "/"} else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
 
@@ -753,10 +732,7 @@ class MemoryDB:
     def __repr__(self): return f"MemoryDB. Size={self.size}. Current length = {self.len}"
     def __getitem__(self, item): return self.list[item]
     len = property(lambda self: len(self.list))
-
-    def append(self, item):
-        self.list.append(item)
-        if self.len > self.size: self.list = self.list[-self.size:]  # take latest frames and drop the older ones.
+    def append(self, item): self.list.append(item); self.list = self.list[-self.size:] if self.len > self.size else self.list  # take latest frames and drop the older ones.
 
 
 class Fridge:

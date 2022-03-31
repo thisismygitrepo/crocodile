@@ -9,8 +9,6 @@ Thus, the terseness of Crocodile makes Python REPL a proper shell
 In implementation, the focus is on ease of use, not efficiency.
 """
 
-# Typing
-# Path
 import os
 import sys
 from pathlib import Path
@@ -79,10 +77,9 @@ class SaveDecorator(object):  # TODO: migrate from save_decorator to SaveDecorat
 
 def save_decorator(ext=""):
     """Apply default paths, add extension to path, print the saved file path"""
-
     def decorator(func):
         def wrapper(obj, path=None, verbose=True, add_suffix=True, **kwargs):
-            if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}")
+            if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
             else:
                 if add_suffix and not str(path).endswith(ext):
                     path = Path(str(path) + ext)
@@ -394,17 +391,10 @@ class List(Base, list):  # Inheriting from Base gives save method.
     #             return item
 
 
-class Struct(Base, dict):
-    """Use this class to keep bits and sundry items.
-    Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience
-    # inheriting from dict gives `get` method, should give `__contains__` but not working.
-    # Inheriting from Base gives `save` method.
-    """
-
+class Struct(Base, dict):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
+    """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
     def __init__(self, dictionary=None, **kwargs):
-        """
-        :param dictionary: a dict, a Struct, None or an object with __dict__ attribute.
-        """
+        """:param dictionary: a dict, a Struct, None or an object with __dict__ attribute."""
         super(Struct, self).__init__()
         if type(dictionary) is Struct: dictionary = dictionary.dict
         if dictionary is None: final_dict = kwargs  # only kwargs were passed
@@ -433,28 +423,15 @@ class Struct(Base, dict):
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
 
     # =========================== print ===========================
-    def print(self, sep=None, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
+    def print(self, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
+        if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
         if config:
             if return_str: return Display.config(self.__dict__, newline=newline)
             print(Display.config(self.__dict__, newline=newline)); return self
-        if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
-        if yaml:  # removed for disentanglement
-            # self.save_yaml(P.tmp(file="__tmp.yaml"))
-            # txt = P.tmp(file="__tmp.yaml").read_text()
-            # print(txt)
-            return None
-        if sep is None: sep = 5 + max(self.keys().apply(str).apply(len).list)
-        repr_string = "Structure, with following entries:\n"
-        repr_string += "Key" + " " * sep + (("Item Type" + " " * sep) if dtype else "") + "Item Details\n"
-        repr_string += "---" + " " * sep + (("---------" + " " * sep) if dtype else "") + "------------\n"
-        for key in self.keys().list:
-            type_str = str(type(self[key])).split("'")[1]
-            val_str = Display.get_repr(self[key], limit=limit).replace("\n", " ")
-            repr_string += str(key) + " " * abs(sep - len(str(key))) + " " * len("Key")
-            if dtype: repr_string += type_str + " " * abs(sep - len(type_str)) + " " * len("Item Type")
-            repr_string += val_str + "\n"
-        if return_str: return repr_string
-        else: print(repr_string); return self
+        if yaml: print(__import__("yaml").dump(self.__dict__))
+        df = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+        if return_str: return repr(df)
+        else: print(df); return self
 
     def __str__(self, sep=",", newline="\n", breaklines=None):
         mystr = str(self.__dict__)[1:-1].replace(":", " =").replace("'", "").replace(",", sep)
@@ -547,7 +524,7 @@ class Display:
     def get_repr(data, limit=50, justify=False):
         if type(data) is np.ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
         elif type(data) is str: string_ = data
-        elif type(data) is list: string_ = f"length = {len(data)}. " + ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
+        elif type(data) is list: string_ = f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
         else: string_ = repr(data)
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 
