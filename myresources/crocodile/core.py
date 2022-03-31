@@ -533,10 +533,9 @@ class Display:
         pd.set_option('display.width', width)  # to avoid wrapping the table.
         pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
 
-    @staticmethod
-    def set_pandas_auto_width(): __import__("pandas").options.display.width = 0  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-    @staticmethod
-    def config(mydict, newline=True): return "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
+    set_pandas_auto_width = staticmethod(lambda : __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
+    config = staticmethod(lambda mydict, newline=True: "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
+    f = staticmethod(lambda str_, limit=50: f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):>{limit}}')
 
     @staticmethod
     def eng():
@@ -545,15 +544,12 @@ class Display:
         __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
     @staticmethod
-    def get_repr(data, limit=50):
+    def get_repr(data, limit=50, justify=False):
         if type(data) is np.ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
         elif type(data) is str: string_ = data
         elif type(data) is list: string_ = f"length = {len(data)}. " + ("1st item type: " + str(type(data[0]))) if len(data) > 0 else " "
         else: string_ = repr(data)
-        return string_[:limit] if len(string_) > limit else string_
-
-    @staticmethod
-    def f(str_, limit=50): return f'{str_[:limit - 4] + " ..." if len(str_) > limit else str_}:>{limit}'
+        return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 
     @staticmethod
     def outline(array, name="Array", printit=True):
