@@ -540,20 +540,21 @@ class Struct(Base, dict):
     def __setstate__(self, state): self.__dict__ = state
     def __iter__(self): return iter(self.dict.items())
     def __delitem__(self, key): del self.__dict__[key]
+    def copy(self): return self.__class__(self.__dict__.copy())
     @property
     def dict(self): return self.__dict__  # allows getting dictionary version without accessing private memebers explicitly.
     @dict.setter
     def dict(self, adict): self.__dict__ = adict
+    def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
     def keys(self) -> List: return List(list(self.dict.keys()))
     def values(self) -> List: return List(list(self.dict.values()))
     def items(self) -> List: return List(self.dict.items())
     def get_values(self, keys) -> List: return List([self[key] for key in keys])
-    def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
     def apply_to_keys(self, key_val_func): return Struct({key_val_func(key, val): val for key, val in self.items()})
+    def apply_to_values(self, key_val_func): [self.__setitem__(key, key_val_func(key, val)) for key, val in self.items()]; return self
     def filter(self, key_val_func=None): return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
-    def apply_to_values(self, key_val_func): [self.__setitem__(key, key_val_func(val))for key, val in self.items()]; return self
 
     def delete(self, key=None, keys=None, criterion=None):
         [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]
