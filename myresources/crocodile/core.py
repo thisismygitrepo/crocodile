@@ -533,9 +533,9 @@ class Display:
         pd.set_option('display.width', width)  # to avoid wrapping the table.
         pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
 
-    set_pandas_auto_width = staticmethod(lambda : __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
+    set_pandas_auto_width = staticmethod(lambda: __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
     config = staticmethod(lambda mydict, newline=True: "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
-    f = staticmethod(lambda str_, limit=50: f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):>{limit}}')
+    f = staticmethod(lambda str_, limit=50, direc="<": f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):{direc}{limit}}')
 
     @staticmethod
     def eng():
