@@ -33,7 +33,7 @@ Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImSho
 VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
 
 Experimental, Terminal, Manipulator = meta.Experimental, meta.Terminal, meta.Manipulator
-batcher, batcherv2, Log, accelerate, Null = meta.batcher, meta.batcherv2, meta.Log, meta.accelerate, meta.Null
+Log, Null = meta.Log, meta.Null
 Scheduler, SSH = meta.Scheduler, meta.SSH
 
 
@@ -48,7 +48,7 @@ _ = Base, timestamp, Save, Terminal, List, Struct, Display
 _ = datetime, dt, os, sys, np, copy, random, dill
 
 _ = P, Read, Compression, string, sys  # , Path
-_ = Experimental, batcher, batcherv2, accelerate
+_ = Experimental
 _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
 _ = logging, subprocess, time
 

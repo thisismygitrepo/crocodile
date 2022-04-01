@@ -24,6 +24,7 @@ class HyperParam(tb.Struct):
     * Ease of saving settings of experiments! and also replicating it later.
     """
     subpath = tb.P('metadata/hyper_params')  # location within model directory where this will be saved.
+
     def __init__(self, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
@@ -676,6 +677,43 @@ class KerasOptimizer:
     def tune(self):
         kt = tb.core.install_n_import("kerastuner")
         self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=tb.P.tmp('my_dir'), project_name='intro_to_kt')
+
+
+def batcher(func_type='function'):
+    if func_type == 'method':
+        def batch(func):
+            # from functools import wraps
+            # @wraps(func)
+            def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):
+                output = []
+                for counter, item in enumerate(x):
+                    mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()} if per_instance_kwargs is not None else {}
+                    output.append(func(self, item, *args, **mykwargs, **kwargs))
+                return np.array(output)
+            return wrapper
+        return batch
+    elif func_type == 'class': raise NotImplementedError
+    elif func_type == 'function':
+        class Batch(object):
+            def __init__(self, func): self.func = func
+            def __call__(self, x, **kwargs): return np.array([self.func(item, **kwargs) for item in x])
+        return Batch
+
+
+def batcherv2(func_type='function', order=1):
+    if func_type == 'method':
+        def batch(func):
+            # from functools import wraps
+            # @wraps(func)
+            def wrapper(self, *args, **kwargs): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+            return wrapper
+        return batch
+    elif func_type == 'class': raise NotImplementedError
+    elif func_type == 'function':
+        class Batch(object):
+            def __int__(self, func): self.func = func
+            def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+        return Batch
 
 
 if __name__ == '__main__':

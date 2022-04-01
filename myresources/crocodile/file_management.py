@@ -374,7 +374,7 @@ class P(type(Path()), Path):
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
-        factor = dict(zip(sizes + sizes.apply("x.swapcase()"), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
+        factor = dict(zip(sizes + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         return round(total_size / factor, 1)
 

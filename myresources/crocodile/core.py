@@ -13,8 +13,6 @@ import copy
 from datetime import datetime
 import datetime as dt  # useful for deltatime and timezones.
 
-_ = dt
-
 
 # ============================== Accessories ============================================
 
@@ -137,6 +135,7 @@ class Base(object):
     def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(copy.deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
+    def evalstr(self, string_, func=True, other=False): return string_ if type(string) is not str else eval(("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "" + string_ + (self if False else ''))
 
     def save_code(self, path):
         """a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
@@ -263,10 +262,6 @@ class Base(object):
         if return_objects: attrs = [getattr(self, x) for x in attrs]
         return List(attrs)
 
-    def evalstr(self, string_, expected='self', other=False):
-        if type(string_) is not str or expected == 'func' : return string_ if type(string) is not str else eval(("lambda x, y: " if other else "lambda x:") + string_)
-        elif expected == 'self': return eval(string_) if "self" in string_ else string_
-
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
@@ -300,8 +295,8 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None): return self[np.random.choice(len(self), size, replace=replace, p=p)]
     def index_items(self, idx): return List([item[idx] for item in self.list])
-    def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func, expected='func')(x)])
-    def filter(self, func): return List([item for item in self.list if self.evalstr(func, expected='func')(item)])
+    def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
+    def filter(self, func): return List([item for item in self.list if self.evalstr(func)(item)])
     # ======================= Modify Methods ===============================
     def reduce(self, func): return __import__("functools").reduce(func, self.list)
     def append(self, item): self.list.append(item); return self
@@ -311,8 +306,8 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
-    def exec(self, func: str): _ = self; return exec(func)  # enables reference to self
-    def modify(self, func: str, other=None): [exec(func) for idx, x in enumerate(self.list)] if other is None else [exec(func) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
+    def exec(self, expr: str): _ = self; return exec(expr)
+    def modify(self, expr: str, other=None): [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value=None, values=None): [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
     def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
@@ -328,7 +323,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
 
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs))
-        func = self.evalstr(func, expected='func')
+        func = self.evalstr(func, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs:
             from joblib import Parallel, delayed
@@ -360,8 +355,8 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
     def from_names(cls, names, default_=None): return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
-    def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
-    def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
+    def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, func=False))
+    def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
     def __getattr__(self, item): return self.__dict__[item]  # this works better with the linter. KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
@@ -390,14 +385,10 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     def filter(self, kv_func=None): return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
-
-    def delete(self, key=None, keys=None, kv_func=None):
-        [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]
-        if kv_func is not None: [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)]
-        return self
+    def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
 
     def print(self, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
-        if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
+        if bool(self) is False: print(f"Empty Struct."); return None
         if yaml or config: res = (__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline))
         else: res = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
         if return_str: return repr(res)
@@ -433,28 +424,17 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
 
 class Display:
     @staticmethod
-    def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40):
-        import pandas as pd
-        pd.set_option('display.max_colwidth', colwidth)
-        pd.set_option('display.max_columns', columns)  # to avoid replacing them with ...
-        pd.set_option('display.width', width)  # to avoid wrapping the table.
-        pd.set_option('display.max_rows', rows)  # to avoid replacing rows with ...
-
+    def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
     set_pandas_auto_width = staticmethod(lambda: __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
     config = staticmethod(lambda mydict, newline=True: "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
     f = staticmethod(lambda str_, limit=50, direc="<": f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):{direc}{limit}}')
-
     @staticmethod
-    def eng():
-        __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True)
-        __import__("pandas").options.display.float_format = '{:, .5f}'.format
-        __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+    def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.display.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 
     @staticmethod
     def get_repr(data, limit=50, justify=False):
         if type(data) is np.ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
-        elif type(data) is str: string_ = data
-        elif type(data) is list: string_ = f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+        elif type(data) in {list, str}: string_ = data if type(data) is str else f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
         else: string_ = repr(data)
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 
