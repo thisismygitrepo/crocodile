@@ -18,7 +18,7 @@ jupyterlab  # for jupyter notebook
 fire  # for automatic CLI interface
 tqdm  # for progress bar
 send2trash  # move to recycle bin
-clipboard
+clipboard  # copy to clipboard
 dill  # extends pickle
 cryptography  # for encoding
 paramiko  # for SSH
@@ -26,7 +26,7 @@ requests  # interacting with web
 pyyaml  # storing yaml files.
 cycler
 
-scikit-image  # image processing.
+scikit-image  # image processing.  heavy weight library.
 
 # torch  # for deep learning
 # tensorflow  # for deep learning

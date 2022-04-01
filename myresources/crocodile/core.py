@@ -322,12 +322,9 @@ class List(Base, list):  # Inheriting from Base gives save method.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
-        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs))
-        func = self.evalstr(func, other=bool(other))
+        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.evalstr(func, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
-        if jobs:
-            from joblib import Parallel, delayed
-            return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
+        if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator]) if other is None else List([func(x, y) for x, y in iterator])
 
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
@@ -386,13 +383,8 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
-
-    def print(self, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
-        if bool(self) is False: print(f"Empty Struct."); return None
-        if yaml or config: res = (__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline))
-        else: res = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-        if return_str: return repr(res)
-        else: print(res); return self
+    def _pandas_repr(self, limit): return __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+    def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
 
     @staticmethod
     def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
@@ -430,6 +422,8 @@ class Display:
     f = staticmethod(lambda str_, limit=50, direc="<": f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):{direc}{limit}}')
     @staticmethod
     def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.display.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+    @staticmethod
+    def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
 
     @staticmethod
     def get_repr(data, limit=50, justify=False):
@@ -439,19 +433,11 @@ class Display:
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 
     @staticmethod
-    def outline(array, name="Array", printit=True):
-        str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"
-        if printit: print(str_)
-        return str_
-
-    @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):
-        counter, index = 0, 0
-        while index < len(mylist):
-            print(mylist[index], end=sep)
-            counter += len(mylist[index])
+        counter = 0
+        for item in mylist:
+            print(item, end=sep); counter += len(item)
             if not counter <= char_per_row: counter = 0; print("\n")
-            index += 1
 
 
 if __name__ == '__main__':

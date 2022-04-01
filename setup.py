@@ -46,8 +46,6 @@ setup(
         "ipython",  # interactive python
         "fire",  # for automatic CLI interface
         "tqdm",  # for progress bar
-        "send2trash",  # move to recycle bin
-        "clipboard",
         "dill",  # extends pickle
         "cryptography",  # for encoding
         "paramiko",  # for SSH
