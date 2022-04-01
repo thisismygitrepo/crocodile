@@ -270,13 +270,11 @@ class P(type(Path()), Path):
         :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
         :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
         :return:
-
         * This method is suitable for config files and simple scripts that has one-liners in it,
         * File is created if it doesn't exist.
         * Text is simply appended if not found in the text file.
         """
-        self.parent.create()
-        if not self.exists(): self.write_text(txt)
+        if not self.exists(): self.create(parent_only=True).write_text(txt)
         lines = self.read_text(encoding=encoding).split("\n")
         bingo = False
         for idx, line in enumerate(lines):
@@ -289,7 +287,7 @@ class P(type(Path()), Path):
 
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):  # fails at html.
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content) if memory is False else response.content  # r.contents is bytes encoded as per docs of requests.
+        return response.content if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
 
     # ================================ Path Object management ===========================================
     """ The default behaviour of methods that mutate the path object:
@@ -306,18 +304,12 @@ class P(type(Path()), Path):
     def append_time_stamp(self, fmt=None, inlieu=False, inplace=False): return self._return(self.append(name="_" + timestamp(fmt=fmt)), inlieu=inlieu, inplace=inplace, operation="rename")
     def with_trunk(self, name, inlieu=False, inplace=False): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), inlieu=inlieu, inplace=inplace, operation="rename")  # Complementary to `with_stem` and `with_suffix`
     def switch(self, key: str, val: str, inlieu=False, inplace=False): return self._return(P(str(self).replace(key, val)), inlieu=inlieu, inplace=inplace, operation="rename")  # Like string replce method, but `replace` is an already defined method."""
-
-    def switch_by_index(self, idx: int, val: str, inplace=False, inlieu=False):
-        """Changes a given index of the path to another given one"""
-        fullparts = list(self.parts)
-        fullparts[idx] = val
-        return self._return(P(*fullparts), inlieu=inlieu, inplace=inplace, operation="rename")
+    def switch_by_index(self, idx: int, val: str, inplace=False, inlieu=False): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), inlieu=inlieu, inplace=inplace, operation="rename")
 
     def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False):
         """
         :param res: result path, could exists or not.
-        :params inlieu: decides on whether the current object `self` is mutated to be the result `res`
-        or the result is returned as a separate object.
+        :param inlieu: decides on whether the current object `self` is mutated to be the result `res` or the result is returned as a separate object.
         """
         if inlieu: self._str = str(res)
         if inplace:
@@ -384,9 +376,8 @@ class P(type(Path()), Path):
         elif type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
         else: return P(self.parts[slici])  # it is an integer
 
-    def __setitem__(self, key, value): # key: typing.Union[str, int, slice] # value: typing.Union[str, Path]
-        fullparts = list(self.parts)
-        new = list(P(value).parts)
+    def __setitem__(self, key, value):  # key: typing.Union[str, int, slice] # value: typing.Union[str, Path]
+        fullparts, new = list(self.parts), list(P(value).parts)
         if type(key) is str:
             idx = fullparts.index(key)
             fullparts.remove(key)
@@ -419,9 +410,7 @@ class P(type(Path()), Path):
     def size(self, units='mb'):
         sizes = List(['b', 'kb', 'mb', 'gb'])
         factor = dict(zip(sizes + sizes.apply("x.swapcase()"), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
-        if self.is_file(): total_size = self.stat().st_size
-        elif self.is_dir(): total_size = sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
-        else: raise FileNotFoundError(self.absolute().as_uri())
+        total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         return round(total_size / factor, 1)
 
     def time(self, which="m", **kwargs):
@@ -439,8 +428,11 @@ class P(type(Path()), Path):
     def as_unix(self, inlieu=False): return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
-
     # ========================== override =======================================
+    def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
+    def read_text(self, encoding=None, lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
+    def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
+
     def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
         if file is not None:
@@ -464,10 +456,6 @@ class P(type(Path()), Path):
     def resolve(self, strict=False):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
-
-    def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
-    def read_text(self, encoding=None, lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
-    def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
 
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):
         if parents: self.parent.create(parents=parents)
@@ -768,8 +756,7 @@ class Fridge:
     def __call__(self, fresh=False):
         if self.path is None:  # Memory Fridge
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
-                self.cache = self.source_func()
-                self.time_produced = datetime.now()
+                self.cache, self.time_produced = self.source_func(), datetime.now()
                 if self.logger: self.logger.debug(f"Updating / Saving data from {self.source_func}")
             elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
         elif fresh or not self.path.exists() or self.age > str2timedelta(self.expire):  # disk fridge

@@ -8,8 +8,8 @@ import numpy as np
 
 
 def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
-def compute_num_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True, **kwargs): return P(path).search(f"*{extension}", r=r, **kwargs).read_text().splitlines().apply(len).np.sum()
-def get_list_of_executables_defined_in_shell(): return List(os.environ["Path"].split(";")).apply(lambda x: P(x).search("*.exe")).flatten().print()
+def count_number_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True, **kwargs): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
+def get_list_of_executables_defined_in_shell(): return List(os.environ["Path"].split(";")).apply(lambda x: P(x).search("*.exe")).reduce(lambda x, y: x+y).print()
 
 
 class Cycle:

@@ -1,12 +1,5 @@
-"""
-A collection of classes extending the functionality of Python's builtins.
 
-Crocodile Philosophy:
-Make Python even friendlier, by making available the common functionality for everyday use, e.g., path management, file management
-At the risk of vandalizing the concept, Crocodile is about making Python more MATLAB-like, in that more libraries are loaded up at
-start time than mere basic arithmetic, but just enought to make it more useful for everyday errands.
-Thus, the terseness of Crocodile makes Python REPL a proper shell
-In implementation, the focus is on ease of use, not efficiency.
+"""
 """
 
 import os
@@ -14,12 +7,8 @@ import sys
 from pathlib import Path
 import string
 import random
-
-# Numerical
-import numpy as np
-# import pandas as pd  # heavy weight, avoid unless necessary.
-# Meta
-import dill
+import numpy as np  # Numerical
+import dill  # Meta
 import copy
 from datetime import datetime
 import datetime as dt  # useful for deltatime and timezones.
@@ -44,7 +33,7 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
 
 
 def validate_name(astring, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
-def timestamp(fmt=None, name=None): return (name + '_' + datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, this function provides compatible fmt
+def timestamp(fmt=None, name=None): return (name + '_' + datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 
 
 def install_n_import(package, name=None):
@@ -100,8 +89,7 @@ class Save:
     @staticmethod
     @save_decorator(".npy")
     def npy(obj, path, **kwargs): np.save(path, obj, **kwargs)
-    @staticmethod
-    def pickles(obj): return dill.dumps(obj)
+    pickles = staticmethod(lambda obj: dill.dumps(obj))
 
     @staticmethod
     @save_decorator(".mat")
@@ -151,13 +139,11 @@ class Base(object):
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
 
     def save_code(self, path):
-        """a usecase for including code in the save is when the source code is continously
-         changing and still you want to reload an old version."""
+        """a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
         module = __import__("inspect").getmodule(self)
         if hasattr(module, "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
-        Path(path).write_text(file.read_text())
-        return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
+        Path(path).write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
     def save(self, path=None, itself=True, r=False, include_code=False, add_suffix=True):
         """Pickles the object.
@@ -180,14 +166,12 @@ class Base(object):
             * __init__ method will be used again at reconstruction time_produced of the object before the attributes are monkey-patched.
             * It is very arduous to design __init__ method that is convenient (uses plethora of
               default arguments) and works at the same time_produced with no input at reconstruction time_produced.
-
         :param include_code: `save_code` will be called.
         :param r: recursive flag.
             * If attributes are not data, but rather objects, then, this flag should be set to True.
             * The recusive flag is particularly relevant when `itself` is False and __dict__ is composed of objects.
             * In pickling the object (itself=True), the recursive flag is the default.
         :param add_suffix: if True, the suffixes `.pkl` and `.py` will be added to the file name.
-
         * Tip: whether pickling the class or its data alone, always implement __getstate__ appropriately to
         avoid security risk involved in pickling objects that reference sensitive information like tokens and
         passwords.
@@ -237,13 +221,11 @@ class Base(object):
         a flag (e.g. from_saved) to init method to require the special behaviour indicated above when it is raised,
          e.g. do NOT create some expensive attribute is this flag is raised because it will be obtained later.
         """
-        # ============================= step 1: unpickle the data
         assert ".dat." in str(path), f"Are you sure the path {path} is pointing to pickeld state of {cls}?"
-        data = dill.loads(Path(path).read_bytes())
+        data = dill.loads(Path(path).read_bytes())  # ============================= step 1: unpickle the data
         inst = cls(*args, **kwargs)  # ============================= step 2: initialize the class
         inst.__setstate__(dict(data))  # ===========step 3: update / populate instance attributes with data.
-        # ============================= step 4: check for saved attributes.
-        if r:  # add further attributes to `inst`, if any.
+        if r:  # ============================= step 4: check for saved attributes.
             contents = [item.stem for item in Path(path).parent.glob("*.zip")]
             for key, _ in data.items():  # val is probably None (if init was written properly)
                 if key in contents:  # if key is not an attribute of the object, skip it.
@@ -252,8 +234,7 @@ class Base(object):
 
     @staticmethod
     def from_code_and_state(code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
-        sys.path.insert(0, str(Path(code_path).parent))
-        return getattr(__import__("importlib").import_module(Path(code_path).stem), class_name).from_state(data_path, *args, r=r, **kwargs)
+        sys.path.insert(0, str(Path(code_path).parent)); return getattr(__import__("importlib").import_module(Path(code_path).stem), class_name).from_state(data_path, *args, r=r, **kwargs)
 
     @staticmethod
     def from_zipped_code_state(path, *args, class_name=None, r=False, scope=None, **kwargs):
@@ -262,15 +243,13 @@ class Base(object):
         saved and instead use code passed through `scope` which is a dictionary, e.g. globals(), in which
         the class of interest can be found [className -> module].
         """
-        fname = Path(path).name.split(".zip")[1]
-        temp_path = Path.home().joinpath(f"tmp_results/unzipped/{fname}_{randstr()}")
+        temp_path = Path.home().joinpath(f"tmp_results/unzipped/{Path(path).name.split('.zip')[1]}_{randstr()}")
         with __import__("ZipFile").ZipFile(str(path), 'r') as zipObj: zipObj.extractall(temp_path)
         code_path = list(temp_path.glob("source_code*"))[0]
         data_path = list(temp_path.glob("class_data*"))[0]
         if ".dat." in str(data_path):  # loading the state and initializing the class
             class_name = class_name or str(data_path).split(".")[1]
-            if scope is None: return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **kwargs)
-            return scope[class_name].from_saved()  # use fresh scope passed.
+            return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **kwargs) if scope is None else scope[class_name].from_saved()
         if scope:  # file points to pickled object:
             print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!")
             scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
@@ -291,8 +270,7 @@ class Base(object):
         get a handle of the latest object to reference it in a subsequent method."""
         # be wary of unintended behaciour if a string had `self` in it **by coincidence.**
         _ = self
-        if type(string_) is not str: return string_
-        if expected == 'func': return eval("lambda x: " + string_)
+        if type(string_) is not str or expected == 'func' : return string_ if type(string) is not str else eval("lambda x: " + string_)
         elif expected == 'self': return eval(string_) if "self" in string_ else string_
 
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
@@ -360,7 +338,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
             return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator]) if other is None else List([func(x, y) for x, y in iterator])
 
-    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * nl, sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
+    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self): return self.list
     def to_numpy(self): return self.np
@@ -374,50 +352,25 @@ class List(Base, list):  # Inheriting from Base gives save method.
             if obj_included or names: df.loc[i] = ([obj] if names is None else [names[i]]) + list(self.list[i].__dict__.values())
             else: df.loc[i] = list(self.list[i].__dict__.values())
         return df
-    # if match == "string" or None:
-    #     for idx, item in enumerate(self.list):
-    #         if patt in str(item):
-    #             return item
-    # elif match == "fnmatch":
-    #     import fnmatch
-    #     for idx, item in enumerate(self.list):
-    #         if fnmatch.fnmatch(str(item), patt):
-    #             return item
-    # else:  # "regex"
-    #     # escaped = re.escape(string_)
-    #     compiled = re.compile(patt)
-    #     for idx, item in enumerate(self.list):
-    #         if compiled.search(str(item)) is not None:
-    #             return item
 
 
 class Struct(Base, dict):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
     def __init__(self, dictionary=None, **kwargs):
-        """:param dictionary: a dict, a Struct, None or an object with __dict__ attribute."""
         super(Struct, self).__init__()
-        if type(dictionary) is Struct: dictionary = dictionary.dict
-        if dictionary is None: final_dict = kwargs  # only kwargs were passed
-        elif not kwargs:  # only dictionary was passed
-            if type(dictionary) is dict: final_dict = dictionary
-            elif dictionary.__class__.__name__ == "mappingproxy": final_dict = dict(dictionary)
-            else: final_dict = dictionary.__dict__
-        else:  # both were passed
-            final_dict = dictionary if type(dictionary) is dict else dictionary.__dict__
-            final_dict.update(kwargs)
-        self.__dict__ = final_dict
+        if dictionary is None or type(dictionary) is dict: final_dict = dict() if dictionary is None else dictionary
+        else: final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)
+        final_dict.update(kwargs); self.__dict__ = final_dict
 
     @staticmethod
     def recursive_struct(mydict): struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     @staticmethod
     def recursive_dict(struct): [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path=None): return Save.json(obj=self.__dict__, path=path)
+    from_keys_values = classmethod(lambda cls, k, v: cls(dict(zip(k, v))))
+    from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
-    def from_keys_values(cls, keys, values): return cls(dict(zip(keys, values)))
-    @classmethod
-    def from_keys_values_pairs(cls, my_list): return cls({k: v for k, v in my_list})
-    @classmethod
-    def from_names(cls, names, default_=None): return cls.from_keys_values(names, values=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
+    def from_names(cls, names, default_=None): return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
     def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
@@ -425,22 +378,12 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     # =========================== print ===========================
     def print(self, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
         if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
-        if config:
-            if return_str: return Display.config(self.__dict__, newline=newline)
-            print(Display.config(self.__dict__, newline=newline)); return self
-        if yaml: print(__import__("yaml").dump(self.__dict__))
-        df = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-        if return_str: return repr(df)
-        else: print(df); return self
+        if yaml or config: res = (__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline))
+        else: res = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+        if return_str: return repr(res)
+        else: print(res); return self
 
-    def __str__(self, sep=",", newline="\n", breaklines=None):
-        mystr = str(self.__dict__)[1:-1].replace(":", " =").replace("'", "").replace(",", sep)
-        if breaklines:
-            res = np.array(mystr.split(sep))
-            res = List(np.array_split(res, int(np.ceil((len(res) / breaklines))))).apply(lambda x: sep.join(x))
-            mystr = __import__("functools").reduce(lambda a, b: a + newline + b, res) if len(res) > 1 else res[0]
-        return mystr
-
+    def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
     def __getattr__(self, item): return self.__dict__[item]  # this works better with the linter. KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
@@ -462,15 +405,15 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     def values(self, verbose=False) -> List: return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
     def items(self, verbose=False) -> List: return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items())
     def get_values(self, keys) -> List: return List([self[key] for key in keys])
-    def apply_to_keys(self, key_val_func, verbose=False): return Struct({key_val_func(key, val): val for key, val in self.items(verbose=verbose)})
-    def apply_to_values(self, key_val_func, verbose=False): [self.__setitem__(key, key_val_func(key, val)) for key, val in self.items(verbose=verbose)]; return self
-    def filter(self, key_val_func=None): return Struct({key: self[key] for key, val in self.items() if key_val_func(key, val)})
+    def apply_to_keys(self, kv_func, verbose=False): return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose)})
+    def apply_to_values(self, kv_func, verbose=False): [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose)]; return self
+    def filter(self, kv_func=None): return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
 
-    def delete(self, key=None, keys=None, criterion=None):
+    def delete(self, key=None, keys=None, kv_func=None):
         [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]
-        if criterion is not None: [self.__dict__.__delitem__(key) for key in self.keys().list if criterion(self[key])]
+        if kv_func is not None: [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)]
         return self
 
     @staticmethod

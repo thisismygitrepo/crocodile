@@ -143,10 +143,8 @@ class Experimental:
     def extract_arguments(func, modules=None, exclude_args=True, verbose=True, copy2clipboard=False, **kwargs):
         """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
         """
-        if type(func) is str:  # will not work because once a string is passed, this method won't be able
-            # to interpret it, at least not without the globals passed.
-            self = ".".join(func.split(".")[:-1])
-            _ = self
+        if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
+            self = ".".join(func.split(".")[:-1]); _ = self
             func = eval(func, modules)
         from crocodile.file_management import Struct
         import inspect
@@ -203,13 +201,7 @@ class Experimental:
 class Manipulator:
     @staticmethod
     def merge_adjacent_axes(array, ax1, ax2):
-        """Multiplies out two axes to generate reduced order array.
-        :param array:
-        :param ax1:
-        :param ax2:
-        :return:
-        changed in April 2021
-        """
+        """Multiplies out two axes to generate reduced order array."""
         shape = array.shape
         sz1, sz2 = shape[ax1], shape[ax2]
         new_shape = shape[:ax1] + (sz1 * sz2,)
@@ -219,28 +211,19 @@ class Manipulator:
 
     @staticmethod
     def merge_axes(array, ax1, ax2):
-        """Brings ax2 next to ax1 first, then combine the two axes into one.
-        :param array:
-        :param ax1:
-        :param ax2:
-        :return:
-        """
+        """Brings ax2 next to ax1 first, then combine the two axes into one."""
         array2 = np.moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
         return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
 
     @staticmethod
     def expand_axis(array, ax_idx, factor, curtail=False):
-        """opposite functionality of merge_axes.
-        While ``numpy.split`` requires the division number, this requies the split size.
-        """
+        """opposite functionality of merge_axes.  While ``numpy.split`` requires the division number, this requies the split size."""
         if curtail:  # if size at ax_idx doesn't divide evenly factor, it will be curtailed.
             size_at_idx = array.shape[ax_idx]
             extra = size_at_idx % factor
             array = array[Manipulator.indexer(axis=ax_idx, myslice=slice(0, -extra))]
         total_shape = list(array.shape)
-        size = total_shape.pop(ax_idx)
-        new_shape = (int(size / factor), factor)
-        for index, item in enumerate(new_shape): total_shape.insert(ax_idx + index, item)
+        for index, item in enumerate((int(total_shape.pop(ax_idx) / factor), factor)): total_shape.insert(ax_idx + index, item)
         return array.reshape(tuple(total_shape))  # should be same as return np.split(array, new_shape, ax_idx)
 
     @staticmethod
@@ -258,10 +241,7 @@ class Manipulator:
 
     @staticmethod
     def indexer(axis, myslice, rank=None):
-        """Allows subseting an array of arbitrary shape, given console index to be subsetted and the range.
-        Returns a tuple of slicers.
-        changed in April 2021 without testing.
-        """
+        """Allows subseting an array of arbitrary shape, given console index to be subsetted and the range. Returns a tuple of slicers."""
         if rank is None: rank = axis + 1
         indices = [slice(None, None, None)] * rank  # slice(None, None, None) is equivalent to `:` `everything`
         indices[axis] = myslice
@@ -377,7 +357,6 @@ class Terminal:
         producing a different window and humanly interact with it.
         https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
         https://www.youtube.com/watch?v=IynV6Y80vws
-
         https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html
         """
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
@@ -385,15 +364,11 @@ class Terminal:
             if self.machine == "win32": shell = ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
             else: shell = ""
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
-        extra = "-Command" if shell in {"powershell", "pwsh"} else ""
-        my_list = []
-        if self.machine == "win32": my_list += [new_window, terminal, shell, extra]  # by having a list,
-        # it is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
-        my_list += cmds
+        extra, my_list = ("-Command" if shell in {"powershell", "pwsh"} else ""), list(cmds)
+        if self.machine == "win32": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         my_list = [item for item in my_list if item != ""]
         print("Meta.Terminal.run_async: Subprocess command: ", my_list)
-        w = subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin
-        return w  # returns Popen object, not so useful for communcation with an opened terminal
+        return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
 
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True,
@@ -689,8 +664,7 @@ class Log(object):
     def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
         """Basic Python logger."""
         logger = Log.get_base_logger(logging, name, l_level)
-        fmt = logging.Formatter(fmt or Log.get_format(sep))
-        Log.add_handlers(logger, logging, file, f_level, file_path, fmt, stream, s_level)
+        Log.add_handlers(logger, logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
         return logger
 
     @staticmethod
