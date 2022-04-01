@@ -95,6 +95,14 @@ class Pomodoro:
         else: winsound.Beep(frequency, duration)
 
 
+def profile_memory(command):
+    psutil = install_n_import("psutil")
+    before = psutil.virtual_memory()
+    exec(command)
+    after = psutil.virtual_memory()
+    print(f"Memory used = {(after.used - before.used) / 1e6}")
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         pass

@@ -79,5 +79,25 @@ def browse(path, depth=2, width=20):
         return path
 
 
+def accelerate(func, ip):
+    """ Conditions for this to work:
+    * Must run under __main__ context
+    * func must be defined outside that context.
+    To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
+    but takes a long time_produced to be obtained like a request from server. For this, multithreading launches all threads
+    together, then process them in an interleaved fashion as they arrive, all will line-up for same processor,
+    if it happens that they arrived quickly.
+    To accelerate processing-bound process use multiprocessing, even better, use Numba.
+    Method1 use: multiprocessing / multithreading.
+    Method2: using joblib (still based on multiprocessing)
+    from joblib import Parallel, delayed
+    Fast method using Concurrent module
+    """
+    split = np.array_split(ip, os.cpu_count())
+    import concurrent.futures
+    with concurrent.futures.ProcessPoolExecutor() as executor: op = list(executor.map(func, split))
+    return np.concatenate(op, axis=0)
+
+
 if __name__ == '__main__':
     pass

@@ -156,19 +156,7 @@ class P(type(Path()), Path):
         elif verbose: print(f"Could NOT trash {self}")
         return self
 
-    def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True,
-             content=False):
-        """
-        :param folder: directory
-        :param name: fname of the file
-        :param path: full path, that includes directory and file fname.
-        :param rel2it:
-        :param overwrite:
-        :param parents:
-        :param content:
-        :param verbose:
-        :return:
-        """
+    def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False):
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
         name, folder = path.name, path.parent
         if parents: folder.create(parents=True, exist_ok=True)
@@ -197,20 +185,7 @@ class P(type(Path()), Path):
         if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
         return new_path if not orig else self
 
-    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}",
-             overwrite=False, orig=False):
-        """
-        :param orig:
-        :param overwrite:
-        :param name:
-        :param append:
-        :param folder: copy the file to this directory (filename remains the same).
-        :param path: full path of destination (including -potentially different file name).
-        :param content: copy the parent directory or its content (relevant only if copying a directory)
-        :param verbose:
-        :return: path to copied file or directory.
-        .. wanring:: Do not confuse this with ``copy`` module that creates clones of Python objects.
-        """  # tested %100
+    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100
         if folder is not None and path is None:
             if name is None: dest = P(folder).expanduser().resolve().create()
             else: dest, content = P(folder).expanduser().resolve() / name, True
@@ -230,14 +205,6 @@ class P(type(Path()), Path):
 
     # ======================================= File Editing / Reading ===================================
     def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
-        """
-        :param reader: function that reads this file format, if not passed it will be inferred from extension.
-        :param notfound: behaviour when file ``self`` to be read doesn't actually exist. Default: throw an error.
-                can be set to return `False` or any other value that will be returned if file not found.
-        :param verbose:
-        :param kwargs:
-        :return:
-        """
         if not self.exists():
             if notfound is FileNotFoundError: raise FileNotFoundError(f"`{self}` is no where to be found!")
             else: return notfound
@@ -289,6 +256,17 @@ class P(type(Path()), Path):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response.content if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
 
+    def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False):
+        """
+        :param res: result path, could exists or not.
+        :param inlieu: decides on whether the current object `self` is mutated to be the result `res` or the result is returned as a separate object.
+        """
+        if inlieu: self._str = str(res)
+        if inplace:
+            assert res.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
+            if operation == "rename": self.rename(res)
+        return self if orig else res
+
     # ================================ Path Object management ===========================================
     """ The default behaviour of methods that mutate the path object:
         Those methods do not perform an action on objects in disk. Instead, only manipulate strings in memory.
@@ -305,18 +283,6 @@ class P(type(Path()), Path):
     def with_trunk(self, name, inlieu=False, inplace=False): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), inlieu=inlieu, inplace=inplace, operation="rename")  # Complementary to `with_stem` and `with_suffix`
     def switch(self, key: str, val: str, inlieu=False, inplace=False): return self._return(P(str(self).replace(key, val)), inlieu=inlieu, inplace=inplace, operation="rename")  # Like string replce method, but `replace` is an already defined method."""
     def switch_by_index(self, idx: int, val: str, inplace=False, inlieu=False): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), inlieu=inlieu, inplace=inplace, operation="rename")
-
-    def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False):
-        """
-        :param res: result path, could exists or not.
-        :param inlieu: decides on whether the current object `self` is mutated to be the result `res` or the result is returned as a separate object.
-        """
-        if inlieu: self._str = str(res)
-        if inplace:
-            assert res.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
-            if operation == "rename": self.rename(res)
-        return self if orig else res
-
     # ============================= attributes of object ======================================
     trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
     len = property(lambda self: self.__len__())
@@ -372,9 +338,8 @@ class P(type(Path()), Path):
         return one, two
 
     def __getitem__(self, slici):  # tested.
-        if type(slici) is slice: return P(*self.parts[slici])
-        elif type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
-        else: return P(self.parts[slici])  # it is an integer
+        if type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
+        else: return P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici])  # it is an integer
 
     def __setitem__(self, key, value):  # key: typing.Union[str, int, slice] # value: typing.Union[str, Path]
         fullparts, new = list(self.parts), list(P(value).parts)

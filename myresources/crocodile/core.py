@@ -263,14 +263,8 @@ class Base(object):
         if return_objects: attrs = [getattr(self, x) for x in attrs]
         return List(attrs)
 
-    def evalstr(self, string_, expected='self'):
-        """This method allows other methods to parse strings that refer to the object themselves via `self`.
-        This is a next level walrus operator where you can always refer to the object on the fly visa `self`
-        string. It comes particularly handy during chaining in one-liners. There is no need to break chaining to
-        get a handle of the latest object to reference it in a subsequent method."""
-        # be wary of unintended behaciour if a string had `self` in it **by coincidence.**
-        _ = self
-        if type(string_) is not str or expected == 'func' : return string_ if type(string) is not str else eval("lambda x: " + string_)
+    def evalstr(self, string_, expected='self', other=False):
+        if type(string_) is not str or expected == 'func' : return string_ if type(string) is not str else eval(("lambda x, y: " if other else "lambda x:") + string_)
         elif expected == 'self': return eval(string_) if "self" in string_ else string_
 
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
@@ -282,10 +276,8 @@ class Base(object):
 
 class List(Base, list):  # Inheriting from Base gives save method.
     """Use this class to keep items of the same type."""
-    # =============================== Constructor Methods ====================
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
-    @classmethod
-    def from_copies(cls, obj, count): return cls([copy.deepcopy(obj) for _ in range(count)])
+    from_copies = classmethod(lambda cls, obj, count: cls([copy.deepcopy(obj) for _ in range(count)]))
     @classmethod
     def from_replicating(cls, func, *args, replicas=None, **kwargs): return cls([func() for _ in range(replicas)]) if not args and not kwargs else cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
@@ -305,12 +297,6 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __getattr__(self, name): return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
     def __call__(self, *args, **kwargs): return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
-
-    def __getitem__(self, key):
-        if type(key) is list or type(key) is np.ndarray: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
-        elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
-        return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
-
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None): return self[np.random.choice(len(self), size, replace=replace, p=p)]
     def index_items(self, idx): return List([item[idx] for item in self.list])
@@ -328,6 +314,17 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def exec(self, func: str): _ = self; return exec(func)  # enables reference to self
     def modify(self, func: str, other=None): [exec(func) for idx, x in enumerate(self.list)] if other is None else [exec(func) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value=None, values=None): [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
+    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
+    def to_series(self): return __import__("pandas").Series(self.list)
+    def to_list(self): return self.list
+    def to_numpy(self): return self.np
+    np = property(lambda self: np.array(self.list))
+    def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
+
+    def __getitem__(self, key):
+        if type(key) is list or type(key) is np.ndarray: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
+        elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
+        return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
     def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs))
@@ -337,13 +334,6 @@ class List(Base, list):  # Inheriting from Base gives save method.
             from joblib import Parallel, delayed
             return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator]) if other is None else List([func(x, y) for x, y in iterator])
-
-    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
-    def to_series(self): return __import__("pandas").Series(self.list)
-    def to_list(self): return self.list
-    def to_numpy(self): return self.np
-    np = property(lambda self: np.array(self.list))
-    def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
 
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
@@ -357,10 +347,9 @@ class List(Base, list):  # Inheriting from Base gives save method.
 class Struct(Base, dict):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
     def __init__(self, dictionary=None, **kwargs):
-        super(Struct, self).__init__()
         if dictionary is None or type(dictionary) is dict: final_dict = dict() if dictionary is None else dictionary
         else: final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)
-        final_dict.update(kwargs); self.__dict__ = final_dict
+        final_dict.update(kwargs); super(Struct, self).__init__(); self.__dict__ = final_dict
 
     @staticmethod
     def recursive_struct(mydict): struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
@@ -374,15 +363,6 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, expected='self'))
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, expected="self"), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
-
-    # =========================== print ===========================
-    def print(self, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
-        if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
-        if yaml or config: res = (__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline))
-        else: res = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-        if return_str: return repr(res)
-        else: print(res); return self
-
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
     def __getattr__(self, item): return self.__dict__[item]  # this works better with the linter. KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
@@ -415,6 +395,13 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
         [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]
         if kv_func is not None: [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)]
         return self
+
+    def print(self, yaml=False, dtype=True, return_str=False, limit=50, config=False, newline=True):
+        if bool(self) is False: print(f"Empty Struct."); return None  # break out of the function.
+        if yaml or config: res = (__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline))
+        else: res = __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+        if return_str: return repr(res)
+        else: print(res); return self
 
     @staticmethod
     def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):

@@ -17,274 +17,160 @@ class Null:
     def __bool__(self): return False
 
 
-class Experimental:
-    """Debugging and Meta programming tools"""
-    @staticmethod
-    def profile_memory(command):
-        psutil = install_n_import("psutil")
-        before = psutil.virtual_memory()
-        exec(command)
-        after = psutil.virtual_memory()
-        print(f"Memory used = {(after.used - before.used) / 1e6}")
+class Log(object):
+    """This class is needed once a project grows beyond simple work. Simple print statements from
+    dozens of objects will not be useful as the programmer will not easily recognize who
+     is printing this message, in addition to many other concerns.
 
-    @staticmethod
-    def try_this(func, return_=None, raise_=None, run=None, handle=None):
-        try: return func()
-        except BaseException as e:  # or Exception
-            if raise_ is not None: raise raise_
-            if handle is not None: return handle(e)
-            return run() if run is not None else return_
+     Advantages of using instances of this class: You do not need to worry about object pickling process by modifing
+     the __getstate__ method of the class that will own the logger. This is the case because loggers lose access
+     to the file logger when unpickled, so it is better to instantiate them again.
+     Logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
+     Additionally, this class keeps track of log files used, append to them if they still exist.
 
-    @staticmethod
-    def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
-    @staticmethod
-    def run_globally(func, scope, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
-    @staticmethod
-    def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
+     Implementation detail: the design favours composition over inheritence. To counter the inconvenience
+      of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
+    def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
+                 name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
+                 s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
+                 verbose=False, log_colors=None):
+        self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
+        self.dialect = dialect  # specific to this class
+        self.verbose = verbose  # specific to coloredlogs dialect
+        self.log_colors = log_colors  # specific kwarg to colorlog dialect
+        self.owners = []  # list of objects using this object to log. It won't be pickled anyway, no circularity prob
+        self._install()  # update specs after intallation.
+        self.specs["path"] = self.logger.name
+        if file: self.specs["file_path"] = self.logger.handlers[0].baseFilename  # first handler is a file handler
 
+    def __getattr__(self, item): return getattr(self.logger, item)  # makes it twice as slower as direct access 300 ns vs 600 ns
+    def debug(self, msg): return self.logger.debug(msg)  # to speed up the process and avoid falling back to __getattr__
+    def info(self, msg): return self.logger.info(msg)
+    def warn(self, msg): return self.logger.warn(msg)
+    def error(self, msg): return self.logger.error(msg)
+    def critical(self, msg): return self.logger.critical(msg)
+    file = property(lambda self: P(self.specs["file_path"]) if self.specs["file_path"] else None)
     @staticmethod
-    def generate_readme(path, obj=None, meta=None, save_source_code=True):
-        """Generates a readme file to contextualize any binary files.
-        :param path: directory or file path. If directory is passed, README.md will be the filename.
-        :param obj: Python module, class, method or function used to generate the result data.
-         (dot not pass the data itself or an instance of any class)
-        :param meta:
-        :param save_source_code:
-        """
-        import inspect
-        readmepath, separator, text = P(path) / f"README.md" if P(path).is_dir() else P(path), "\n" + "-----" + "\n\n", "# Meta\n"
-        if meta is not None: text = text + meta
-        text += separator
-        if obj is not None:
-            lines = inspect.getsource(obj)
-            text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
-            text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
-        readmepath.write_text(text)
-        print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
-        if save_source_code:
-            P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
-            print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+    def get_basic_format(): return logging.BASIC_FORMAT
+    def close(self): raise NotImplementedError
 
-    @staticmethod
-    def load_from_source_code(directory, obj=None, delete=False):
-        """Does the following:
+    def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
+        if which in {"logger", "all"}: self.logger.setLevel(level)
+        if which in {"stream", "all"}: self.get_shandler().setLevel(level)
+        if which in {"file", "all"}: self.get_fhandler().setLevel(level)
 
-        * scope directory passed for ``source_code`` module.
-        * Loads the directory to the memroy.
-        * Returns either the package or a piece of it as indicated by ``obj``
-        """
-        tmpdir = P.tmp() / timestamp(name="tmp_sourcecode")
-        P(directory).find("source_code*", r=True).unzip(tmpdir)
-        sys.path.insert(0, str(tmpdir))
-        sourcefile = __import__(tmpdir.find("*").stem)
-        tmpdir.delete(sure=delete, verbose=False)
-        return getattr(sourcefile, obj) if obj is not None else sourcefile
+    def get_shandler(self, first=True):
+        shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler))
+        return shandlers[0] if first else shandlers
 
-    @staticmethod
-    def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
-        """Captures the local variables inside a function.
-        :param func:
-        :param scope: `globals()` executed in the main scope. This provides the function with scope defined in main.
-        :param args: dict of what you would like to pass to the function as arguments.
-        :param self: relevant only if the function is a method of a class. self refers to the path of the instance
-        :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
-        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
-        exec(code, scope, res := dict())  # run the function within the scope `res`
-        if update_scope: scope.update(res)
-        return res
+    def get_fhandler(self, first=True):
+        fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler))
+        return fhandlers[0] if first else fhandlers
+
+    def _install(self):  # populates self.logger attribute according to specs and dielect.
+        if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
+        elif self.dialect == "colorlog": self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
+        elif self.dialect == "logging": self.logger = Log.get_logger(**self.specs)
+        elif self.dialect == "coloredlogs": self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
+        else: self.logger = Log.get_colorlog(**self.specs)
+
+    def __setstate__(self, state):
+        self.__dict__ = state   # this way of creating relative path makes transferrable across machines.
+        if self.specs["file_path"] is not None: self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
+        self._install()
+
+    def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
+        state = self.__dict__.copy()
+        state["specs"] = state["specs"].copy()
+        del state["logger"]
+        if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
+        return state
+
+    def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
+    @staticmethod  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
+    def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
 
     @staticmethod
-    def extract_code(func, code: str = None, include_args=True, modules=None,
-                     verbose=True, copy2clipboard=False, **kwargs):
-        """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
-        This is useful to debug functions and class methods alike.
-        Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
-        TODO: how to handle decorated functions.
-        """
-        if type(func) is str:
-            assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
-            tmp = func
-            first_parenth = func.find("(")
-            # last_parenth = -1
-            func = eval(tmp[:first_parenth])
-            # args_kwargs = tmp[first_parenth + 1: last_parenth]
-            # what is self? only for methods:
-            # tmp2 = tmp[:first_parenth]
-            # idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
-            self = ".".join(func.split(".")[:-1])
-            _ = self
-            func = eval(func, modules)
-        # TODO: add support for lambda functions.  ==> use dill for powerfull inspection
-        import inspect
-        import textwrap
-        codelines = textwrap.dedent(inspect.getsource(func))
-        if codelines.startswith("@staticmethod\n"): codelines = codelines[14:]
-        assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
-        # remove def func_name() line from the list
-        idx = codelines.find("):\n")
-        codelines = codelines[idx + 3:]
-        # remove any indentation (4 for funcs and 8 for classes methods, etc)
-        codelines = textwrap.dedent(codelines)
-        lines = codelines.split("\n")  # remove return statements
-        codelines = []
-        for aline in lines:
-            if not textwrap.dedent(aline).startswith("return "): codelines.append(aline + "\n")  # keep as is, normal statement
-            else: codelines.append(aline.replace("return ", "return_ = ") + "\n")  # a return statement
-        code_string = ''.join(codelines)  # convert list to string.
-        args_kwargs = ""
-        if include_args:  args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
-        if code is not None: args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
-        if include_args or code: code_string = args_kwargs + code_string
-        if copy2clipboard: install_n_import("clipboard").copy(code_string)
-        if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
-        return code_string  # ready to be run with exec()
+    def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
+        # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
+        level_styles = {'spam': {'color': 'green', 'faint': True},
+                        'debug': {'color': 'white'},
+                        'verbose': {'color': 'blue'},
+                        'info': {'color': "green"},
+                        'notice': {'color': 'magenta'},
+                        'warning': {'color': 'yellow'},
+                        'success': {'color': 'green', 'bold': True},
+                        'error': {'color': 'red', "faint": True, "underline": True},
+                        'critical': {'color': 'red', 'bold': True, "inverse": False}}
+        field_styles = {'asctime': {'color': 'green'},
+                        'hostname': {'color': 'magenta'},
+                        'levelname': {'color': 'black', 'bold': True},
+                        'path': {'color': 'blue'},
+                        'programname': {'color': 'cyan'},
+                        'username': {'color': 'yellow'}}
+        coloredlogs = install_n_import("coloredlogs")
+        if verbose:  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
+            verboselogs = install_n_import("verboselogs")
+            logger = verboselogs.VerboseLogger(name=name); logger.setLevel(l_level)
+        else:
+            logger = Log.get_base_logger(logging, name=name, l_level=l_level)
+            Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
+        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
+        return logger
 
     @staticmethod
-    def extract_arguments(func, modules=None, exclude_args=True, verbose=True, copy2clipboard=False, **kwargs):
-        """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
-        """
-        if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
-            self = ".".join(func.split(".")[:-1]); _ = self
-            func = eval(func, modules)
-        from crocodile.file_management import Struct
-        import inspect
-        ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
-        ak = Struct.from_keys_values(ak.name, ak.default)
-        ak = ak.update(kwargs)
-        res = """"""
-        for key, val in ak.items():
-            if key != "args" and key != "kwargs":
-                flag = False
-                if val is inspect._empty:  # not passed argument.
-                    if exclude_args: flag = True
-                    else:
-                        val = None
-                        print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
-                if not flag: res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
-        ak = inspect.getfullargspec(func)
-        if ak.varargs: res += f"{ak.varargs} = (,)\n"
-        if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
-        if copy2clipboard: install_n_import("clipboard").copy(res)
-        if verbose: print("Finished. Paste code now.")
-        return res
+    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
+        log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
+        colorlog = install_n_import("colorlog")
+        logger = Log.get_base_logger(colorlog, name, l_level)
+        fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
+        Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
+        return logger
 
     @staticmethod
-    def edit_source(module, *edits):
-        sourcelines = P(module.__file__).read_text().split("\n")
-        for edit_idx, edit in enumerate(edits):
-            line_idx = 0
-            for line_idx, line in enumerate(sourcelines):
-                if f"here{edit_idx}" in line:
-                    new_line = line.replace(edit[0], edit[1])
-                    print(f"Old Line: {line}\nNew Line: {new_line}")
-                    if new_line == line: raise KeyError(f"Text Not found.")
-                    sourcelines[line_idx] = new_line
-                    break
-            else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
-        newsource = "\n".join(sourcelines)
-        P(module.__file__).write_text(newsource)
-        import importlib
-        importlib.reload(module)
-        return module
+    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
+        """Basic Python logger."""
+        logger = Log.get_base_logger(logging, name, l_level)
+        Log.add_handlers(logger, logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
+        return logger
 
     @staticmethod
-    def run_cell(pointer, module=sys.modules[__name__]):
-        sourcecells = P(module.__file__).read_text().split("#%%")
-        for cell in sourcecells:
-            if pointer in cell.split('\n')[0]: break  # bingo
-        else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
-        print(cell)
-        install_n_import("clipboard").copy(cell)
-        return cell
-
-
-class Manipulator:
-    @staticmethod
-    def merge_adjacent_axes(array, ax1, ax2):
-        """Multiplies out two axes to generate reduced order array."""
-        shape = array.shape
-        sz1, sz2 = shape[ax1], shape[ax2]
-        new_shape = shape[:ax1] + (sz1 * sz2,)
-        if ax2 == -1 or ax2 == len(shape): pass
-        else: new_shape = new_shape + shape[ax2 + 1:]
-        return array.reshape(new_shape)
+    def get_base_logger(module, name, l_level):
+        if name is None: print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
+        else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
+        logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
+        return logger
 
     @staticmethod
-    def merge_axes(array, ax1, ax2):
-        """Brings ax2 next to ax1 first, then combine the two axes into one."""
-        array2 = np.moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
-        return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
+    def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
+        if file or file_path:  Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)  # create file handler for the logger.
+        if stream: Log.add_streamhandler(logger, s_level, fmt, module=module)  # ==> create stream handler for the logger.
 
     @staticmethod
-    def expand_axis(array, ax_idx, factor, curtail=False):
-        """opposite functionality of merge_axes.  While ``numpy.split`` requires the division number, this requies the split size."""
-        if curtail:  # if size at ax_idx doesn't divide evenly factor, it will be curtailed.
-            size_at_idx = array.shape[ax_idx]
-            extra = size_at_idx % factor
-            array = array[Manipulator.indexer(axis=ax_idx, myslice=slice(0, -extra))]
-        total_shape = list(array.shape)
-        for index, item in enumerate((int(total_shape.pop(ax_idx) / factor), factor)): total_shape.insert(ax_idx + index, item)
-        return array.reshape(tuple(total_shape))  # should be same as return np.split(array, new_shape, ax_idx)
+    def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
+        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler)
+        print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
 
     @staticmethod
-    def slicer(array, a_slice: slice, axis=0):
-        """Extends Numpy slicing by allowing rotation if index went beyond size."""
-        lower_, upper_ = a_slice.start, a_slice.stop
-        n = array.shape[axis]
-        lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
-        roll = lower_
-        lower_, upper_ = lower_ - roll, upper_ - roll
-        array_ = np.roll(array, -roll, axis=axis)
-        upper_ = upper_ % n
-        new_slice = slice(lower_, upper_, a_slice.step)
-        return array_[Manipulator.indexer(axis=axis, myslice=new_slice, rank=array.ndim)]
+    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
+        if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
+        fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
+        fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
+        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
 
     @staticmethod
-    def indexer(axis, myslice, rank=None):
-        """Allows subseting an array of arbitrary shape, given console index to be subsetted and the range. Returns a tuple of slicers."""
-        if rank is None: rank = axis + 1
-        indices = [slice(None, None, None)] * rank  # slice(None, None, None) is equivalent to `:` `everything`
-        indices[axis] = myslice
-        # noinspection PyTypeChecker
-        indices.append(Ellipsis)  # never hurts to add this in the end.
-        return tuple(indices)
+    def test_logger(logger):
+        logger.debug("this is a debugging message"); logger.info("this is an informational message"); logger.warning("this is a warning message")
+        logger.error("this is an error message"); logger.critical("this is a critical message"); [logger.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
 
+    @staticmethod
+    def test_all():
+        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger); print("=" * 100)
 
-def batcher(func_type='function'):
-    if func_type == 'method':
-        def batch(func):
-            # from functools import wraps
-            # @wraps(func)
-            def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):
-                output = []
-                for counter, item in enumerate(x):
-                    mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()} if per_instance_kwargs is not None else {}
-                    output.append(func(self, item, *args, **mykwargs, **kwargs))
-                return np.array(output)
-            return wrapper
-        return batch
-    elif func_type == 'class': raise NotImplementedError
-    elif func_type == 'function':
-        class Batch(object):
-            def __init__(self, func): self.func = func
-            def __call__(self, x, **kwargs): return np.array([self.func(item, **kwargs) for item in x])
-        return Batch
-
-
-def batcherv2(func_type='function', order=1):
-    if func_type == 'method':
-        def batch(func):
-            # from functools import wraps
-            # @wraps(func)
-            def wrapper(self, *args, **kwargs): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
-            return wrapper
-        return batch
-    elif func_type == 'class': raise NotImplementedError
-    elif func_type == 'function':
-        class Batch(object):
-            def __int__(self, func): self.func = func
-            def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
-        return Batch
+    @staticmethod
+    def manual_degug(path):
+        sys.stdout = open(path, 'w'); sys.stdout.close()  # all print statements will write to this file.
+        print(f"Finished ... have a look @ \n {path}")
 
 
 class Terminal:
@@ -517,6 +403,16 @@ class SSH(object):
     def local(): return f"{os.getlogin()}@{platform.node()}"
     def open_console(self, new_window=True):Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
     def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {os.environ[name]}; export {name}")
+    def copy_to_here(self, source, target=None): pass
+    def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
+    @staticmethod
+    def run_locally(command): print(f"Executing Locally @ {platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
+
+    def run(self, cmd, verbose=True):
+        res = self.ssh.exec_command(cmd)
+        res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
+        if verbose: res.print()
+        return res
 
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
@@ -537,193 +433,6 @@ class SSH(object):
             resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
             source.delete(sure=True)
             return resp
-
-    def copy_to_here(self, source, target=None): pass
-    def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
-    @staticmethod
-    def run_locally(command): print(f"Executing Locally @ {platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
-
-    def run(self, cmd, verbose=True):
-        res = self.ssh.exec_command(cmd)
-        res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
-        if verbose: res.print()
-        return res
-
-
-class Log(object):
-    """This class is needed once a project grows beyond simple work. Simple print statements from
-    dozens of objects will not be useful as the programmer will not easily recognize who
-     is printing this message, in addition to many other concerns.
-
-     Advantages of using instances of this class: You do not need to worry about object pickling process by modifing
-     the __getstate__ method of the class that will own the logger. This is the case because loggers lose access
-     to the file logger when unpickled, so it is better to instantiate them again.
-     Logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
-     Additionally, this class keeps track of log files used, append to them if they still exist.
-
-     Implementation detail: the design favours composition over inheritence. To counter the inconvenience
-      of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
-    def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
-                 name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
-                 s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
-                 verbose=False, log_colors=None):
-        self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
-        self.dialect = dialect  # specific to this class
-        self.verbose = verbose  # specific to coloredlogs dialect
-        self.log_colors = log_colors  # specific kwarg to colorlog dialect
-        self.owners = []  # list of objects using this object to log. It won't be pickled anyway, no circularity prob
-        self._install()  # update specs after intallation.
-        self.specs["path"] = self.logger.name
-        if file: self.specs["file_path"] = self.logger.handlers[0].baseFilename  # first handler is a file handler
-
-    def __getattr__(self, item): return getattr(self.logger, item)  # makes it twice as slower as direct access 300 ns vs 600 ns
-    def debug(self, msg): return self.logger.debug(msg)  # to speed up the process and avoid falling back to __getattr__
-    def info(self, msg): return self.logger.info(msg)
-    def warn(self, msg): return self.logger.warn(msg)
-    def error(self, msg): return self.logger.error(msg)
-    def critical(self, msg): return self.logger.critical(msg)
-    file = property(lambda self: P(self.specs["file_path"]) if self.specs["file_path"] else None)
-    @staticmethod
-    def get_basic_format(): return logging.BASIC_FORMAT
-    def close(self): raise NotImplementedError
-
-    def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
-        if which in {"logger", "all"}: self.logger.setLevel(level)
-        if which in {"stream", "all"}: self.get_shandler().setLevel(level)
-        if which in {"file", "all"}: self.get_fhandler().setLevel(level)
-
-    def get_shandler(self, first=True):
-        shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler))
-        return shandlers[0] if first else shandlers
-
-    def get_fhandler(self, first=True):
-        fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler))
-        return fhandlers[0] if first else fhandlers
-
-    def _install(self):  # populates self.logger attribute according to specs and dielect.
-        if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
-        elif self.dialect == "colorlog": self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
-        elif self.dialect == "logging": self.logger = Log.get_logger(**self.specs)
-        elif self.dialect == "coloredlogs": self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
-        else: self.logger = Log.get_colorlog(**self.specs)
-
-    def __setstate__(self, state):
-        self.__dict__ = state   # this way of creating relative path makes transferrable across machines.
-        if self.specs["file_path"] is not None: self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
-        self._install()
-
-    def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
-        state = self.__dict__.copy()
-        state["specs"] = state["specs"].copy()
-        del state["logger"]
-        if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
-        return state
-
-    def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
-    @staticmethod  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
-    def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
-
-    @staticmethod
-    def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
-        # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
-        level_styles = {'spam': {'color': 'green', 'faint': True},
-                        'debug': {'color': 'white'},
-                        'verbose': {'color': 'blue'},
-                        'info': {'color': "green"},
-                        'notice': {'color': 'magenta'},
-                        'warning': {'color': 'yellow'},
-                        'success': {'color': 'green', 'bold': True},
-                        'error': {'color': 'red', "faint": True, "underline": True},
-                        'critical': {'color': 'red', 'bold': True, "inverse": False}}
-        field_styles = {'asctime': {'color': 'green'},
-                        'hostname': {'color': 'magenta'},
-                        'levelname': {'color': 'black', 'bold': True},
-                        'path': {'color': 'blue'},
-                        'programname': {'color': 'cyan'},
-                        'username': {'color': 'yellow'}}
-        coloredlogs = install_n_import("coloredlogs")
-        if verbose:  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
-            verboselogs = install_n_import("verboselogs")
-            logger = verboselogs.VerboseLogger(name=name); logger.setLevel(l_level)
-        else:
-            logger = Log.get_base_logger(logging, name=name, l_level=l_level)
-            Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
-        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
-        return logger
-
-    @staticmethod
-    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
-        log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
-        colorlog = install_n_import("colorlog")
-        logger = Log.get_base_logger(colorlog, name, l_level)
-        fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
-        Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
-        return logger
-
-    @staticmethod
-    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
-        """Basic Python logger."""
-        logger = Log.get_base_logger(logging, name, l_level)
-        Log.add_handlers(logger, logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
-        return logger
-
-    @staticmethod
-    def get_base_logger(module, name, l_level):
-        if name is None: print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
-        else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
-        logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
-        return logger
-
-    @staticmethod
-    def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
-        if file or file_path:  Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)  # create file handler for the logger.
-        if stream: Log.add_streamhandler(logger, s_level, fmt, module=module)  # ==> create stream handler for the logger.
-
-    @staticmethod
-    def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
-        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler)
-        print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
-
-    @staticmethod
-    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
-        if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
-        fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
-        fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
-        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
-
-    @staticmethod
-    def test_logger(logger):
-        logger.debug("this is a debugging message"); logger.info("this is an informational message"); logger.warning("this is a warning message")
-        logger.error("this is an error message"); logger.critical("this is a critical message"); [logger.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
-
-    @staticmethod
-    def test_all():
-        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger); print("=" * 100)
-
-    @staticmethod
-    def manual_degug(path):
-        sys.stdout = open(path, 'w'); sys.stdout.close()  # all print statements will write to this file.
-        print(f"Finished ... have a look @ \n {path}")
-
-
-def accelerate(func, ip):
-    """ Conditions for this to work:
-    * Must run under __main__ context
-    * func must be defined outside that context.
-    To accelerate IO-bound process, use multithreading. An example of that is somthing very cheap to process,
-    but takes a long time_produced to be obtained like a request from server. For this, multithreading launches all threads
-    together, then process them in an interleaved fashion as they arrive, all will line-up for same processor,
-    if it happens that they arrived quickly.
-    To accelerate processing-bound process use multiprocessing, even better, use Numba.
-    Method1 use: multiprocessing / multithreading.
-    Method2: using joblib (still based on multiprocessing)
-    from joblib import Parallel, delayed
-    Fast method using Concurrent module
-    """
-    split = np.array_split(ip, os.cpu_count())
-    import concurrent.futures
-    with concurrent.futures.ProcessPoolExecutor() as executor: op = list(executor.map(func, split))
-    return np.concatenate(op, axis=0)
 
 
 class Scheduler:
@@ -800,6 +509,267 @@ class Scheduler:
         # import signal
         # def keyboard_interrupt_handler(signum, frame): print(signum, frame); raise KeyboardInterrupt
         # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+
+
+class Experimental:
+    """Debugging and Meta programming tools"""
+    @staticmethod
+    def try_this(func, return_=None, raise_=None, run=None, handle=None):
+        try: return func()
+        except BaseException as e:  # or Exception
+            if raise_ is not None: raise raise_
+            if handle is not None: return handle(e)
+            return run() if run is not None else return_
+
+    @staticmethod
+    def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
+    @staticmethod
+    def run_globally(func, scope, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
+    @staticmethod
+    def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
+
+    @staticmethod
+    def generate_readme(path, obj=None, meta=None, save_source_code=True):
+        """Generates a readme file to contextualize any binary files.
+        :param path: directory or file path. If directory is passed, README.md will be the filename.
+        :param obj: Python module, class, method or function used to generate the result data.
+         (dot not pass the data itself or an instance of any class)
+        :param meta:
+        :param save_source_code:
+        """
+        import inspect
+        readmepath, separator, text = P(path) / f"README.md" if P(path).is_dir() else P(path), "\n" + "-----" + "\n\n", "# Meta\n"
+        if meta is not None: text = text + meta
+        text += separator
+        if obj is not None:
+            lines = inspect.getsource(obj)
+            text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
+            text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
+        readmepath.write_text(text)
+        print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
+        if save_source_code:
+            P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
+            print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+
+    @staticmethod
+    def load_from_source_code(directory, obj=None, delete=False):
+        """Does the following:
+        * scope directory passed for ``source_code`` module.
+        * Loads the directory to the memroy.
+        * Returns either the package or a piece of it as indicated by ``obj``
+        """
+        tmpdir = P.tmp() / timestamp(name="tmp_sourcecode")
+        P(directory).find("source_code*", r=True).unzip(tmpdir)
+        sys.path.insert(0, str(tmpdir))
+        sourcefile = __import__(tmpdir.find("*").stem)
+        tmpdir.delete(sure=delete, verbose=False)
+        return getattr(sourcefile, obj) if obj is not None else sourcefile
+
+    @staticmethod
+    def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
+        """Captures the local variables inside a function.
+        :param func:
+        :param scope: `globals()` executed in the main scope. This provides the function with scope defined in main.
+        :param args: dict of what you would like to pass to the function as arguments.
+        :param self: relevant only if the function is a method of a class. self refers to the path of the instance
+        :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
+        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
+        exec(code, scope, res := dict())  # run the function within the scope `res`
+        if update_scope: scope.update(res)
+        return res
+
+    @staticmethod
+    def extract_code(func, code: str = None, include_args=True, modules=None,
+                     verbose=True, copy2clipboard=False, **kwargs):
+        """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
+        This is useful to debug functions and class methods alike.
+        Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
+        TODO: how to handle decorated functions.
+        """
+        if type(func) is str:
+            assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
+            tmp = func
+            first_parenth = func.find("(")
+            # last_parenth = -1
+            func = eval(tmp[:first_parenth])
+            # args_kwargs = tmp[first_parenth + 1: last_parenth]
+            # what is self? only for methods:
+            # tmp2 = tmp[:first_parenth]
+            # idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
+            self = ".".join(func.split(".")[:-1])
+            _ = self
+            func = eval(func, modules)
+        # TODO: add support for lambda functions.  ==> use dill for powerfull inspection
+        import inspect
+        import textwrap
+        codelines = textwrap.dedent(inspect.getsource(func))
+        if codelines.startswith("@staticmethod\n"): codelines = codelines[14:]
+        assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
+        # remove def func_name() line from the list
+        idx = codelines.find("):\n")
+        codelines = codelines[idx + 3:]
+        # remove any indentation (4 for funcs and 8 for classes methods, etc)
+        codelines = textwrap.dedent(codelines)
+        lines = codelines.split("\n")  # remove return statements
+        codelines = []
+        for aline in lines:
+            if not textwrap.dedent(aline).startswith("return "): codelines.append(aline + "\n")  # keep as is, normal statement
+            else: codelines.append(aline.replace("return ", "return_ = ") + "\n")  # a return statement
+        code_string = ''.join(codelines)  # convert list to string.
+        args_kwargs = ""
+        if include_args:  args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
+        if code is not None: args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
+        if include_args or code: code_string = args_kwargs + code_string
+        if copy2clipboard: install_n_import("clipboard").copy(code_string)
+        if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
+        return code_string  # ready to be run with exec()
+
+    @staticmethod
+    def extract_arguments(func, modules=None, exclude_args=True, verbose=True, copy2clipboard=False, **kwargs):
+        """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
+        """
+        if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
+            self = ".".join(func.split(".")[:-1]); _ = self
+            func = eval(func, modules)
+        from crocodile.file_management import Struct
+        import inspect
+        ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
+        ak = Struct.from_keys_values(ak.name, ak.default)
+        ak = ak.update(kwargs)
+        res = """"""
+        for key, val in ak.items():
+            if key != "args" and key != "kwargs":
+                flag = False
+                if val is inspect._empty:  # not passed argument.
+                    if exclude_args: flag = True
+                    else:
+                        val = None
+                        print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
+                if not flag: res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
+        ak = inspect.getfullargspec(func)
+        if ak.varargs: res += f"{ak.varargs} = (,)\n"
+        if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
+        if copy2clipboard: install_n_import("clipboard").copy(res)
+        if verbose: print("Finished. Paste code now.")
+        return res
+
+    @staticmethod
+    def edit_source(module, *edits):
+        sourcelines = P(module.__file__).read_text().split("\n")
+        for edit_idx, edit in enumerate(edits):
+            line_idx = 0
+            for line_idx, line in enumerate(sourcelines):
+                if f"here{edit_idx}" in line:
+                    new_line = line.replace(edit[0], edit[1])
+                    print(f"Old Line: {line}\nNew Line: {new_line}")
+                    if new_line == line: raise KeyError(f"Text Not found.")
+                    sourcelines[line_idx] = new_line
+                    break
+            else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
+        newsource = "\n".join(sourcelines)
+        P(module.__file__).write_text(newsource)
+        import importlib
+        importlib.reload(module)
+        return module
+
+    @staticmethod
+    def run_cell(pointer, module=sys.modules[__name__]):
+        sourcecells = P(module.__file__).read_text().split("#%%")
+        for cell in sourcecells:
+            if pointer in cell.split('\n')[0]: break  # bingo
+        else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
+        print(cell)
+        install_n_import("clipboard").copy(cell)
+        return cell
+
+
+class Manipulator:
+    @staticmethod
+    def merge_adjacent_axes(array, ax1, ax2):
+        """Multiplies out two axes to generate reduced order array."""
+        shape = array.shape
+        sz1, sz2 = shape[ax1], shape[ax2]
+        new_shape = shape[:ax1] + (sz1 * sz2,)
+        if ax2 == -1 or ax2 == len(shape): pass
+        else: new_shape = new_shape + shape[ax2 + 1:]
+        return array.reshape(new_shape)
+
+    @staticmethod
+    def merge_axes(array, ax1, ax2):
+        """Brings ax2 next to ax1 first, then combine the two axes into one."""
+        array2 = np.moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
+        return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
+
+    @staticmethod
+    def expand_axis(array, ax_idx, factor, curtail=False):
+        """opposite functionality of merge_axes.  While ``numpy.split`` requires the division number, this requies the split size."""
+        if curtail:  # if size at ax_idx doesn't divide evenly factor, it will be curtailed.
+            size_at_idx = array.shape[ax_idx]
+            extra = size_at_idx % factor
+            array = array[Manipulator.indexer(axis=ax_idx, myslice=slice(0, -extra))]
+        total_shape = list(array.shape)
+        for index, item in enumerate((int(total_shape.pop(ax_idx) / factor), factor)): total_shape.insert(ax_idx + index, item)
+        return array.reshape(tuple(total_shape))  # should be same as return np.split(array, new_shape, ax_idx)
+
+    @staticmethod
+    def slicer(array, a_slice: slice, axis=0):
+        """Extends Numpy slicing by allowing rotation if index went beyond size."""
+        lower_, upper_ = a_slice.start, a_slice.stop
+        n = array.shape[axis]
+        lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
+        roll = lower_
+        lower_, upper_ = lower_ - roll, upper_ - roll
+        array_ = np.roll(array, -roll, axis=axis)
+        upper_ = upper_ % n
+        new_slice = slice(lower_, upper_, a_slice.step)
+        return array_[Manipulator.indexer(axis=axis, myslice=new_slice, rank=array.ndim)]
+
+    @staticmethod
+    def indexer(axis, myslice, rank=None):
+        """Allows subseting an array of arbitrary shape, given console index to be subsetted and the range. Returns a tuple of slicers."""
+        if rank is None: rank = axis + 1
+        indices = [slice(None, None, None)] * rank  # slice(None, None, None) is equivalent to `:` `everything`
+        indices[axis] = myslice
+        # noinspection PyTypeChecker
+        indices.append(Ellipsis)  # never hurts to add this in the end.
+        return tuple(indices)
+
+
+def batcher(func_type='function'):
+    if func_type == 'method':
+        def batch(func):
+            # from functools import wraps
+            # @wraps(func)
+            def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):
+                output = []
+                for counter, item in enumerate(x):
+                    mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()} if per_instance_kwargs is not None else {}
+                    output.append(func(self, item, *args, **mykwargs, **kwargs))
+                return np.array(output)
+            return wrapper
+        return batch
+    elif func_type == 'class': raise NotImplementedError
+    elif func_type == 'function':
+        class Batch(object):
+            def __init__(self, func): self.func = func
+            def __call__(self, x, **kwargs): return np.array([self.func(item, **kwargs) for item in x])
+        return Batch
+
+
+def batcherv2(func_type='function', order=1):
+    if func_type == 'method':
+        def batch(func):
+            # from functools import wraps
+            # @wraps(func)
+            def wrapper(self, *args, **kwargs): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+            return wrapper
+        return batch
+    elif func_type == 'class': raise NotImplementedError
+    elif func_type == 'function':
+        class Batch(object):
+            def __int__(self, func): self.func = func
+            def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+        return Batch
 
 
 if __name__ == '__main__':
