@@ -10,26 +10,14 @@ def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__
 
 def pwd2key(password: str, salt=None, iterations=None) -> bytes:
     """Derive a secret key from a given password and salt"""
-    import base64
     if salt is None:
-        m = __import__("hashlib").sha256()  # converts anything to fixed length 32 bytes
-        m.update(password.encode("utf-8"))
-        return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
-    """Adding salt and iterations to the password. The salt and iteration numbers will be stored explicitly
-    with the final encrypted message, i.e. known publicly. The benefit is that they makes trying very hard.
-    The machinery below that produces the final key is very expensive (as large as iteration)"""
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None)
-    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
+        m = __import__("hashlib").sha256(); m.update(password.encode("utf-8"))
+        return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
+    from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
 
 
 def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int = None) -> bytes:
-    """Encryption Tips:
-    * Be careful of key being stored unintendedly in console or terminal history, e.g. don't use IPython.
-    * It behoves you to try decrypting it to err on the side of safety.
-    * Don't forget to delete OR store key file safely.
-    """
     salt = None  # silence the linter.
     # step 1: get the key:
     if pwd is not None:  # generate it from password
@@ -108,19 +96,11 @@ class Read(object):
     def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
     py = staticmethod(lambda path: Struct(__import__("runpy").run_path(path)))
     pickles = staticmethod(lambda bytes_obj: dill.loads(bytes_obj))
-
     @staticmethod
-    def pickle(path, **kwargs):
-        obj = dill.loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+    def pickle(path, **kwargs): obj = dill.loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 
 
 class P(type(Path()), Path):
-    """Path Class: Designed with one goal in mind: any operation on paths MUST NOT take more than one line of code.
-    It offers:
-    * methods act on the underlying object in the disk drive: move, move_up, copy, encrypt, zip and delete.
-    * methods act on the path object: parent, joinpath, switch, prepend, append
-    * attributes of path: stem, trunk, size, date etc.
-    """
     # ==================================== File management =========================================
     """ The default behaviour of methods acting on underlying disk object is to perform the action
         and return a new path referring to the mutated object in disk drive. However, there is a flag `orig` that makes
@@ -173,8 +153,7 @@ class P(type(Path()), Path):
         new_path = self.parent / name
         if overwrite and new_path.exists(): new_path.delete(sure=True)
         self.rename(new_path)
-        if verbose: print(f"RENAMED {repr(self)} ==> {repr(new_path)}")
-        return new_path if not orig else self
+        return self._return(new_path, inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"RENAMED {repr(self)} ==> {repr(new_path)}")
 
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100
         if folder is not None and path is None:
@@ -245,28 +224,22 @@ class P(type(Path()), Path):
 
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):  # fails at html.
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return response.content if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
+        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
 
-    def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False):
-        """
-        :param res: result path, could exists or not.
-        :param inlieu: decides on whether the current object `self` is mutated to be the result `res` or the result is returned as a separate object.
-        """
+    def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False, verbose=False, msg=""):
         if inlieu: self._str = str(res)
         if inplace:
             assert res.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename": self.rename(res)
+            if operation == "delete": self.delete(sure=True, verbose=verbose)
+        if verbose: print(msg)
         return self if orig else res
 
     # ================================ Path Object management ===========================================
-    """ The default behaviour of methods that mutate the path object:
-        Those methods do not perform an action on objects in disk. Instead, only manipulate strings in memory.
-        The new object returned by these methods can be a new one (Default) or mutation of `self`, which is
-        achieved by using `inliue` flag. A different name for this flag is chosen to distinguish it from `inpalce`
-        used by the aforementioned category of methods. Furthermore, this gives extra controllability for user
-        to dictate the exact behaviour wanted.
-        `Inplace` flag might still be offered in some of those methods and is relevant only if path exists
-        The default for this flag is False in those methods.
+    """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
+        `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
+        `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
+        `orig`: whether the method returns the original path object or a new one.
     """
     def prepend(self, prefix, suffix=None, inlieu=False, inplace=False): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(self.suffixes))), inlieu=inlieu, inplace=inplace, operation="rename")
     def append(self, name='', suffix=None, inplace=False, inlieu=False): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(self.suffixes))), inlieu=inlieu, inplace=inplace, operation="rename")
@@ -364,15 +337,14 @@ class P(type(Path()), Path):
 
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
-        sizes = List(['b', 'kb', 'mb', 'gb'])
-        factor = dict(zip(sizes + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
+        sizes = List(['b', 'kb', 'mb', 'gb']); factor = dict(zip(sizes + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         return round(total_size / factor, 1)
 
     def time(self, which="m", **kwargs):
-        """* ``m`` time_produced of modifying file ``content``, i.e. the time_produced it was created.
-            * ``c`` time_produced of changing file status (its inode is changed like permissions, path etc, but not content)
-            * ``a`` last time_produced the file was accessed."""
+        """* ``m`` time of modifying file ``content``, i.e. the time_produced it was created.
+            * ``c`` time of changing file status (its inode is changed like permissions, path etc, but not content)
+            * ``a`` last time the file was accessed."""
         return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)
 
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
@@ -388,12 +360,11 @@ class P(type(Path()), Path):
     def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
     def read_text(self, encoding=None, lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
+    def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
 
     def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
-        if file is not None:
-            assert folder is None, "You can only pass source or source_dir, not both."
-            result = P(file).expanduser().absolute()
+        if file is not None: assert folder is None, "You can only pass source or source_dir, not both."; result = P(file).expanduser().absolute()
         else: result = P(folder or P.cwd()).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
 
@@ -406,17 +377,11 @@ class P(type(Path()), Path):
         if __import__("platform").system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
             Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); time.sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
-        if verbose: print(f"LINKED {repr(self)}")
-        return P(target) if not orig else self
-    
+        return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)}")
+
     def resolve(self, strict=False):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
-
-    def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...):
-        if parents: self.parent.create(parents=parents)
-        super(P, self).touch(mode=mode, exist_ok=exist_ok)
-        return self
 
     # ======================================== Folder management =======================================
     def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
@@ -444,9 +409,7 @@ class P(type(Path()), Path):
         if compressed:
             comp_files = List(raw).filter(lambda x: '.zip' in str(x))
             for comp_file in comp_files: raw += P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=compressed, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
-
-        def run_filter(item_): return all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters])
-        processed = List([P(item) for item in raw if run_filter(P(item))])
+        processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
 
     def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
@@ -521,9 +484,7 @@ class P(type(Path()), Path):
         else:
             root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
             path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
-        if verbose: print(f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-        if inplace: slf.delete(sure=True, verbose=verbose)
-        return path if not orig else self
+        return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
 
     def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, **kwargs):
         """
@@ -543,9 +504,7 @@ class P(type(Path()), Path):
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).joinpath(zipfile.stem).expanduser().resolve()
         result = Compression.unzip(zipfile, folder if not content else folder.parent, fname, **kwargs)
-        if verbose: print(f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
-        if inplace: slf.delete(sure=True, verbose=verbose)
-        return result if not orig else self
+        return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
 
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
     def untar(self, path, verbose=True): _ = self, path, verbose; return P()
@@ -553,13 +512,12 @@ class P(type(Path()), Path):
     def ungz(self, path, verbose=True): _ = self, path, verbose; return P()
     def tar_gz(self): pass
 
-    def untar_ungz(self, folder=None, inplace=False, verbose=True):
+    def untar_ungz(self, folder=None, inplace=False, verbose=True, orig=False):
         folder = folder or P(self.parent) / P(self.stem)
         intrem = self.ungz(path=folder, verbose=verbose)
         result = intrem.untar(path=folder, verbose=verbose)
         intrem.delete(sure=True, verbose=verbose)
-        if inplace: self.delete(sure=True, verbose=verbose)
-        return result
+        return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(result)}")
 
     def compress(self, path=None, base_dir=None, fmt="zip", inplace=False, **kwargs):
         fmts = ["zip", "tar", "gzip"]
@@ -633,10 +591,9 @@ class Compression(object):
         If arcname = filename without any path, then, it will be in the root of the archive.
         """
         import zipfile
-        jungle_zip = zipfile.ZipFile(str(op_path), 'w')
-        if password is not None: jungle_zip.setpassword(pwd=password)
-        jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
-        jungle_zip.close()
+        with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
+            jungle_zip.setpassword(pwd=password) if password is not None else None
+            jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
         return op_path
 
     @staticmethod
@@ -680,20 +637,8 @@ class MemoryDB:
 
 
 class Fridge:
-    """This class helps to accelrate access to latest data coming from a rather expensive function,
-    Thus, if multiple methods from superior classses requested this within 0.1 seconds,
-    there will be no problem of API being a bottleneck reducing running time_produced to few seconds
-    The class has two flavours, memory-based and disk-based variants."""
+    """This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
     def __init__(self, source_func, expire="1m", time_produced=None, logger=None, path=None, save=Save.pickle, read=Read.read):
-        """
-        :param source_func: function that returns data
-        :param expire: time_produced after which the data is considered expired.
-        :param time_produced: creation time. If not provided, it will be taken from the source_func.
-        :param logger: logger to use.
-        :param path: path to save the data.
-        :param save: save method.
-        :param read: read method.
-        """
         self.cache = None  # fridge content
         self.time_produced = time_produced or datetime.now()  # init time_produced
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.

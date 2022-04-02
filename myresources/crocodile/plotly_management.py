@@ -56,9 +56,7 @@ class App:
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod
-    def get_app(name=""):
-        return dash.Dash(name=name+tb.randstr(),
-                         external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
+    def get_app(name=""): return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
 
     @staticmethod
     def run_async(func):
@@ -70,17 +68,12 @@ class App:
             module = tb.P(func.__code__.co_filename)
             tb.sys.path.insert(0, module.parent)  # potentially dangerous as it leads to perplexing behaviour.
             cmd = f"import {module.stem} as m; m.{func.__name__}()"
-        resp = tm.run_async("python", "-c", cmd)
-        # import crocodile.run
-        return resp
+        return tm.run_async("python", "-c", cmd)
 
     @staticmethod
     def run_async_decorator(func):
         """Decorate functions with this to make them run_command asynchornously."""
-
-        def get_async_version():
-            return App.run_async(func)
-
+        def get_async_version(): return App.run_async(func)
         return get_async_version
 
 

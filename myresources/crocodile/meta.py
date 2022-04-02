@@ -18,22 +18,9 @@ class Null:
 
 
 class Log(object):
-    """This class is needed once a project grows beyond simple work. Simple print statements from
-    dozens of objects will not be useful as the programmer will not easily recognize who
-     is printing this message, in addition to many other concerns.
-
-     Advantages of using instances of this class: You do not need to worry about object pickling process by modifing
-     the __getstate__ method of the class that will own the logger. This is the case because loggers lose access
-     to the file logger when unpickled, so it is better to instantiate them again.
-     Logger can be pickled, but its handlers are lost, so what's the point? no perfect reconstruction.
-     Additionally, this class keeps track of log files used, append to them if they still exist.
-
-     Implementation detail: the design favours composition over inheritence. To counter the inconvenience
-      of having extra typing to reach the logger, a property `logger` was added to Base class to refer to it."""
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
                  name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
-                 s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG,
-                 verbose=False, log_colors=None):
+                 s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
         self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
         self.dialect = dialect  # specific to this class
         self.verbose = verbose  # specific to coloredlogs dialect
