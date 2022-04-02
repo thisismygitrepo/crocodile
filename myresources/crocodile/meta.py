@@ -18,8 +18,7 @@ class Null:
 
 
 class Log(object):
-    def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0],
-                 name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
+    def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0], name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
         self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
         self.dialect = dialect  # specific to this class
@@ -40,19 +39,9 @@ class Log(object):
     @staticmethod
     def get_basic_format(): return logging.BASIC_FORMAT
     def close(self): raise NotImplementedError
-
-    def set_level(self, level, which=["logger", "stream", "file", "all"][0]):
-        if which in {"logger", "all"}: self.logger.setLevel(level)
-        if which in {"stream", "all"}: self.get_shandler().setLevel(level)
-        if which in {"file", "all"}: self.get_fhandler().setLevel(level)
-
-    def get_shandler(self, first=True):
-        shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler))
-        return shandlers[0] if first else shandlers
-
-    def get_fhandler(self, first=True):
-        fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler))
-        return fhandlers[0] if first else fhandlers
+    def get_shandler(self, first=True): shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler)); return shandlers[0] if first else shandlers
+    def get_fhandler(self, first=True): fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler)); return fhandlers[0] if first else fhandlers
+    def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.logger.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
 
     def _install(self):  # populates self.logger attribute according to specs and dielect.
         if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
@@ -67,9 +56,7 @@ class Log(object):
         self._install()
 
     def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
-        state = self.__dict__.copy()
-        state["specs"] = state["specs"].copy()
-        del state["logger"]
+        state = self.__dict__.copy(); state["specs"] = state["specs"].copy(); del state["logger"]
         if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
 
@@ -97,8 +84,7 @@ class Log(object):
                         'username': {'color': 'yellow'}}
         coloredlogs = install_n_import("coloredlogs")
         if verbose:  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
-            verboselogs = install_n_import("verboselogs")
-            logger = verboselogs.VerboseLogger(name=name); logger.setLevel(l_level)
+            logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)
         else:
             logger = Log.get_base_logger(logging, name=name, l_level=l_level)
             Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
@@ -108,8 +94,7 @@ class Log(object):
     @staticmethod
     def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
         log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
-        colorlog = install_n_import("colorlog")
-        logger = Log.get_base_logger(colorlog, name, l_level)
+        colorlog = install_n_import("colorlog"); logger = Log.get_base_logger(colorlog, name, l_level)
         fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
         return logger
@@ -155,9 +140,7 @@ class Log(object):
         for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger); print("=" * 100)
 
     @staticmethod
-    def manual_degug(path):
-        sys.stdout = open(path, 'w'); sys.stdout.close()  # all print statements will write to this file.
-        print(f"Finished ... have a look @ \n {path}")
+    def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
 
 
 class Terminal:
@@ -181,8 +164,7 @@ class Terminal:
 
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
-        * adding `start` to the begining of the command results in launching a new console that will not
-        inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
+        * adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
         * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
         * `suprocess.call` is an archaic command for pre-Python-3.5.
@@ -315,22 +297,15 @@ path.delete(sure=True, verbose=False)
         """
         if os.name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
         _ = install_n_import("win32api", name="pypiwin32")
-        import win32con
-        win32event = install_n_import("win32event")
-        win32process = install_n_import("win32process")
+        win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
         win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
-        shell_execute_ex = win32com.shell.shell.ShellExecuteEx
-        win32com = __import__("win32com", fromlist=["shell.shellcon"])
-        shellcon = win32com.shell.shellcon
         if cmd_line is None: cmd_line = [sys.executable] + sys.argv
         elif type(cmd_line) not in (tuple, list): raise ValueError("cmdLine is not a sequence.")
-        cmd = '"%s"' % (cmd_line[0],)
-        # TODO: isn't there a function or something we can call to massage command line params?
+        cmd = '"%s"' % (cmd_line[0],)   # TODO: isn't there a function or something we can call to massage command line params?
         params = " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
-        # ShellExecute() doesn't seem to allow us to fetch the PID or handle of the process, so we can't get anything useful from it. Therefore the more complex ShellExecuteEx() must be used.
-        # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
-        proce_info = shell_execute_ex(nShow=win32con.SW_SHOWNORMAL, fMask=shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas',  # causes UAC elevation prompt.
-                                      lpFile=cmd, lpParameters=params)
+        # ShellExecute() doesn't seem to allow us to fetch the PID or handle of the process, so we can't get anything useful from it. Therefore the more complex ShellExecuteEx() must be used. # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
+        proce_info = win32com.shell.shell.ShellExecuteEx(nShow=__import__("win32con").SW_SHOWNORMAL, fMask=__import__("win32com", fromlist=["shell.shellcon"]).shell.shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas',  # causes UAC elevation prompt.
+                                                         lpFile=cmd, lpParameters=params)
         if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); rc = win32process.GetExitCodeProcess(proc_handle)
         else: rc = None; return rc
 
@@ -374,16 +349,12 @@ class SSH(object):
     def run_locally(command): print(f"Executing Locally @ {platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
 
     def run(self, cmd, verbose=True):
-        res = self.ssh.exec_command(cmd)
-        res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
-        if verbose: res.print()
-        return res
+        res = self.ssh.exec_command(cmd); res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
+        res.print() if verbose else None; return res
 
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
-        if zip_n_encrypt:
-            print(f"ZIPPING & ENCRYPTING".center(80, "="))
-            source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
+        if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
         if target is None:
             target = P(source).collapseuser()
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."

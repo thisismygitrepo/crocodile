@@ -85,7 +85,7 @@ class Base(object):
     def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(copy.deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
-    def evalstr(self, string_, func=True, other=False): return string_ if type(string) is not str else eval(("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "" + string_ + (self if False else ''))
+    def evalstr(self, string_, func=True, other=False): return string_ if type(string) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
 
     def save_code(self, path):  # a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
         module = __import__("inspect").getmodule(self)
@@ -141,7 +141,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def sample(self, size=1, replace=False, p=None): return self[np.random.choice(len(self), size, replace=replace, p=p)]
     def index_items(self, idx): return List([item[idx] for item in self.list])
     def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
-    def filter(self, func): return List([item for item in self.list if self.evalstr(func)(item)])
+    def filter(self, func): return List([item for item in self.list if self.evalstr(func, func=True)(item)])
     # ======================= Modify Methods ===============================
     def reduce(self, func): return __import__("functools").reduce(func, self.list)
     def append(self, item): self.list.append(item); return self
