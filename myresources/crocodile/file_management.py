@@ -19,17 +19,10 @@ def pwd2key(password: str, salt=None, iterations=None) -> bytes:
 
 def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int = None) -> bytes:
     salt = None  # silence the linter.
-    # step 1: get the key:
     if pwd is not None:  # generate it from password
-        assert key is None, f"You can either pass key or pwd, or none of them, but not both."
-        assert type(pwd) is str
-        if salted:   # strengthen the password by adding random characters to it. The characters will be
-            # explicitly mentioned in final encryption and used at decryption. They help to make problem more expensive
-            # to brute force, hence reducing hances of finding a password even though it has few characters.
-            import secrets
-            if iteration is None: iteration = secrets.randbelow(1_000_000)
-            salt = secrets.token_bytes(16)
-        else: salt = iteration = None
+        assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
+        if salted: import secrets; salt, iteration = secrets.token_bytes(16), iteration or secrets.randbelow(1_000_000)
+        else: salt, iteration = None, None
         key = pwd2key(pwd, salt, iteration)
     elif key is None:  # generate a new key: discouraged, always make your keys/pwd before invoking the func.
         key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key()  # uses random bytes, more secure but no string representation
