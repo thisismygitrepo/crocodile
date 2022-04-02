@@ -282,8 +282,7 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
         """Python brachnes off to a new window and run the function passed. context can be either a pickled session or the current file __file__"""
-        # step 1: pickle the function # step 2: create a script that unpickles it. # step 3: run the script that runs the function.
-        file = P.tmpfile(tstamp=False, suffix=".pkl")
+        file = P.tmpfile(tstamp=False, suffix=".pkl")  # step 1: pickle the function # step 2: create a script that unpickles it. # step 3: run the script that runs the function.
         Save.pickle(obj=obj, path=file, verbose=False)
         script = f"""
 path = tb.P(r'{file}')
@@ -306,21 +305,11 @@ path.delete(sure=True, verbose=False)
 
     @staticmethod
     def is_user_admin():
-        """@return: True if the current user is an 'Admin' whatever that
-        means (root on Unix), otherwise False.
-        Warning: The inner function fails unless you have Windows XP SP2 or
-        higher. The failure causes a traceback to be printed and this
-        function to return False.
-        adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
-        """
+        """@return: True if the current user is an 'Admin' whatever that means (root on Unix), otherwise False. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if os.name == 'nt':
-            import ctypes  # WARNING: requires Windows XP SP2 or higher!
+            import ctypes
             try: return ctypes.windll.shell32.IsUserAnAdmin()
-            except:
-                import traceback
-                traceback.print_exc()
-                print("Admin check failed, assuming not an admin.")
-                return False
+            except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return os.getuid() == 0  # Check for root on Posix
 
     @staticmethod
@@ -331,15 +320,10 @@ path.delete(sure=True, verbose=False)
 
     @staticmethod
     def run_as_admin(cmd_line=None, wait=True):
-        """Attempt to relaunch the current script as an admin using the same
-        command line parameters.  Pass cmdLine in to override and set a new
+        """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new
         command.  It must be a list of [command, arg1, arg2...] format.
-        Set wait to False to avoid waiting for the sub-process to finish. You
-        will not be able to fetch the exit code of the process if wait is
-        False.
-        Returns the sub-process return code, unless wait is False in which
-        case it returns None.
-        @WARNING: this function only works on Windows.
+        Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
+        Returns the sub-process return code, unless wait is False in which case it returns None.
         adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
         """
         if os.name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
@@ -352,22 +336,16 @@ path.delete(sure=True, verbose=False)
         win32com = __import__("win32com", fromlist=["shell.shellcon"])
         shellcon = win32com.shell.shellcon
         if cmd_line is None: cmd_line = [sys.executable] + sys.argv
-        elif type(cmd_line) not in (tuple, list):
-            raise ValueError("cmdLine is not a sequence.")
+        elif type(cmd_line) not in (tuple, list): raise ValueError("cmdLine is not a sequence.")
         cmd = '"%s"' % (cmd_line[0],)
-        # XXX TODO: isn't there a function or something we can call to massage command line params?
+        # TODO: isn't there a function or something we can call to massage command line params?
         params = " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
         # ShellExecute() doesn't seem to allow us to fetch the PID or handle of the process, so we can't get anything useful from it. Therefore the more complex ShellExecuteEx() must be used.
         # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
-        proce_info = shell_execute_ex(nShow=win32con.SW_SHOWNORMAL, fMask=shellcon.SEE_MASK_NOCLOSEPROCESS,
-                                      lpVerb='runas',  # causes UAC elevation prompt.
+        proce_info = shell_execute_ex(nShow=win32con.SW_SHOWNORMAL, fMask=shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas',  # causes UAC elevation prompt.
                                       lpFile=cmd, lpParameters=params)
-        if wait:
-            proc_handle = proce_info['hProcess']
-            _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE)
-            rc = win32process.GetExitCodeProcess(proc_handle)
-        else: rc = None
-        return rc
+        if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); rc = win32process.GetExitCodeProcess(proc_handle)
+        else: rc = None; return rc
 
 
 class SSH(object):
@@ -533,7 +511,7 @@ class Experimental:
         """Generates a readme file to contextualize any binary files.
         :param path: directory or file path. If directory is passed, README.md will be the filename.
         :param obj: Python module, class, method or function used to generate the result data.
-         (dot not pass the data itself or an instance of any class)
+         (dot not pass the data data_only or an instance of any class)
         :param meta:
         :param save_source_code:
         """

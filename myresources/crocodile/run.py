@@ -8,7 +8,7 @@ Choices made by default:
 * -m is the default (run as module)
 
 If the file is to be loaded as a module (-m), then it will be `imported` into a script, rather than being
-executed by itself, in which case the file itself will be __main__.
+executed by data_only, in which case the file data_only will be __main__.
 The advantage of running it as a module is having reference to the file from which classes came.
 This is vital for pickling.
 
@@ -54,7 +54,7 @@ def build_parser():
     # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file path (-f)")
     # ==================================================================================
 
-    if args.main is True and args.file != "":  # run the file itself, don't import it.
+    if args.main is True and args.file != "":  # run the file data_only, don't import it.
         tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal, new_window=not args.here)
     else:  # run as a module (i.e. import it)
 
