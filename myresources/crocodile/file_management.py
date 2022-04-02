@@ -73,18 +73,15 @@ class Read(object):
     @staticmethod
     def read(path, **kwargs):
         suffix = Path(path).suffix[1:]
-        # if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']:
-        #     # plt.gcf().canvas.get_supported_filetypes().keys():
-        #     return plt.imread(path, **kwargs)
-        try: reader = getattr(Read, suffix)
-        except AttributeError: raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
-        return reader(str(path), **kwargs)
+        try: return getattr(Read, suffix)(str(path), **kwargs)
+        except AttributeError:
+            if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib.pyplot").imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
+            raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
 
     @staticmethod
     def npy(path, **kwargs):
         data = np.load(str(path), allow_pickle=True, **kwargs)
-        if data.dtype == np.object: data = data.item()
-        return Struct(data) if type(data) is dict else data
+        if data.dtype == np.object: data = data.item(); return Struct(data) if type(data) is dict else data
 
     @staticmethod
     def mat(path, remove_meta=False, **kwargs):
@@ -95,10 +92,8 @@ class Read(object):
     @staticmethod
     def json(path, r=False, **kwargs):
         """Returns a Structure"""
-        try:
-            with open(str(path), "r") as file: mydict = __import__("json").load(file, **kwargs)
-        except Exception:  # file has C-style comments.
-            with open(str(path), "r") as file: mydict = install_n_import("pyjson5").load(file, **kwargs)
+        try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
+        except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
         return Struct.recursive_struct(mydict) if r else Struct(mydict)
 
     @staticmethod
@@ -116,8 +111,7 @@ class Read(object):
 
     @staticmethod
     def pickle(path, **kwargs):
-        with open(path, 'rb') as file: obj = dill.load(file, **kwargs)
-        return Struct(obj) if type(obj) is dict else obj
+        obj = dill.loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 
 
 class P(type(Path()), Path):
@@ -150,11 +144,8 @@ class P(type(Path()), Path):
         return self
 
     def send2trash(self, verbose=True):
-        if self.exists():
-            install_n_import("send2trash").send2trash(self.resolve().str)  # do not expand user symlinks.
-            if verbose: print(f"TRASHED {repr(self)}")
-        elif verbose: print(f"Could NOT trash {self}")
-        return self
+        if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
+        elif verbose: print(f"Could NOT trash {self}"); return self
 
     def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False):
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)

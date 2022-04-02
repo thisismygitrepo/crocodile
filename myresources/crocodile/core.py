@@ -45,7 +45,7 @@ def save_decorator(ext=""):  # pply default paths, add extension to path, print 
         def wrapper(obj, path=None, verbose=True, add_suffix=True, **kwargs):
             if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
             elif add_suffix and not str(path).endswith(ext): path = Path(str(path) + ext); print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}") if verbose else None
-            else: path = Path(path)
+            else: path = Path(path).expanduser().resolve()
             path.parent.mkdir(exist_ok=True, parents=True)
             func(path=path, obj=obj, **kwargs); print(f"SAVED {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
             return path
@@ -60,13 +60,12 @@ class Save:
     @staticmethod
     @save_decorator(".npy")
     def npy(obj, path, **kwargs): np.save(path, obj, **kwargs)
-    pickles = staticmethod(lambda obj: dill.dumps(obj))
     @staticmethod
     @save_decorator(".mat")
     def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
     @staticmethod
     @save_decorator(".json")
-    def json(obj, path=None, **kwargs): Path(path).write_bytes(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
+    def json(obj, path=None, **kwargs): Path(path).write_text(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj, path, **kwargs): Path(path).write_bytes(__import__("yaml").dumps(obj, **kwargs))
@@ -76,6 +75,7 @@ class Save:
     @staticmethod
     @save_decorator(".pkl")
     def pickle(obj=None, path=None, r=False, **kwargs): Path(path).write_bytes(dill.dumps(obj, recurse=r, **kwargs))
+    pickles = staticmethod(lambda obj: dill.dumps(obj))
 
 
 class Base(object):
@@ -94,9 +94,9 @@ class Base(object):
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True):  # pickles the object
-        path = str(path or Path.home().joinpath(f"tmp_results/tmp_files/{randstr()}"))
+        path = str(path or Path.home().joinpath(f"tmp_results/tmp_files/{randstr()}")); path = path.replace(".pkl", "")
         if add_suffix: path += ("" if self.__class__.__name__ in path else ("." + self.__class__.__name__))  # Fruthermore, .zip or .pkl will be added later depending on `save_code` value, warning will be raised.
-        path = Path(path).expanduser().resolve()
+        path = Path(path)
         result_path = Save.pickle(obj=self, path=path, verbose=False, add_suffix=add_suffix)
         print(f"Object ({Display.f(repr(self), 50)}) saved @ `{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`") if verbose else None; return result_path
 

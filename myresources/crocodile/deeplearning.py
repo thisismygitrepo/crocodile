@@ -51,8 +51,7 @@ class HyperParam(tb.Struct):
 
     def save(self, path=None, data_only=True, r=False, include_code=False, add_suffix=True):
         self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(data=str(self))
-        if self.save_type in {"whole", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), data_only=True, add_suffix=False)
-        if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath) / "hparams.HyperParam.dat.pkl", data_only=False, add_suffix=False)
+        if self.save_type in {"whole", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False)
 
     @classmethod
     def from_saved(cls, path, *args, r=False, scope=None, **kwargs):  return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl")
@@ -167,10 +166,7 @@ class DataReader(tb.Base):
 
     def save(self, path=None, *args, **kwargs):
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath)
-        if self.hp.save_type in {"whole", "both"}:
-            super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", data_only=True, add_suffix=False)
-        if self.hp.save_type in {"data", "both"}:
-            super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", data_only=False, add_suffix=False)
+        if self.hp.save_type in {"whole", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False)
 
     @classmethod
     def from_saved(cls, path, *args, **kwargs):
