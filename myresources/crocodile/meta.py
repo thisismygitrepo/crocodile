@@ -578,9 +578,7 @@ class Experimental:
                 flag = False
                 if val is inspect._empty:  # not passed argument.
                     if exclude_args: flag = True
-                    else:
-                        val = None
-                        print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
+                    else: val = None; print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
                 if not flag: res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
         ak = inspect.getfullargspec(func)
         if ak.varargs: res += f"{ak.varargs} = (,)\n"

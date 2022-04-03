@@ -266,11 +266,8 @@ class P(type(Path()), Path):
         """Splits a path at a given string or index
         :param at: string telling where to split.
         :param index: integer telling at which index to split.
-        :param sep: can be either [-1, 0, 1]. Determines where the separator is going to live with:
-               left portion, none or right portion.
-        :param mode: "lenient" mode makes `split` method behaves like split method of string. This can produce
-            unwanted behaviour due to e.g. patial matches. 'strict' mode is the default which only splits
-             at exact match.
+        :param sep: can be either [-1, 0, 1]. Determines where the separator is going to live with: left portion, none or right portion.
+        :param mode: "lenient" mode makes `split` method behaves like split method of string. This can produce unwanted behaviour due to e.g. patial matches. 'strict' mode is the default which only splits at exact match.
         :return: two paths
         """
         # ====================================   Splitting
@@ -298,7 +295,7 @@ class P(type(Path()), Path):
         if type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
         else: return P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici])  # it is an integer
 
-    def __setitem__(self, key, value):  # key: typing.Union[str, int, slice] # value: typing.Union[str, Path]
+    def __setitem__(self, key: str or int or slice, value: str or Path):
         fullparts, new = list(self.parts), list(P(value).parts)
         if type(key) is str:
             idx = fullparts.index(key)
@@ -445,14 +442,10 @@ class P(type(Path()), Path):
 
     def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
-    @staticmethod
-    def pwd(): return P.cwd()
-    @staticmethod
-    def tempdir(): return P(__import__("tempfile").mktemp())
-    @staticmethod
-    def temp(): return P(__import__("tempfile").gettempdir())
-    @staticmethod
-    def tmpdir(prefix=""): return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
+    pwd = staticmethod(lambda: P.cwd())
+    tempdir = staticmethod(lambda: P(__import__("tempfile").mktemp()))
+    temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))
+    tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
     def chdir(self): os.chdir(str(self.expanduser())); return self
     def listdir(self): return List(os.listdir(self.expanduser().resolve())).apply(P)
     @staticmethod
@@ -522,29 +515,21 @@ class P(type(Path()), Path):
 
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):
         """see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
-        slf = self.expanduser().resolve()
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
-        path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         if use_7z:
             import crocodile.environment as env
-            path = path + '.7z'
+            path = path + '.7z' if not path.suffix == '.7z' else path
             if env.system == "Windows":
-                program = env.ProgramFiles.joinpath("7-Zip/7z.exe")
-                if not program.exists(): env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell")
+                program = env.ProgramFiles.joinpath("7-Zip/7z.exe"); env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not program.exists() else None
                 env.tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
             else: raise NotImplementedError("7z not implemented for Linux")
-            return path
-        path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
-        if verbose: print(f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
-        if inplace: slf.delete(sure=True, verbose=verbose)
-        return path if not orig else self
+        else: path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
+        return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
 
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", inplace=False, orig=False):
-        slf = self.expanduser().resolve()
-        path = self._resolve_path(folder, name, path, slf.switch(append, "").name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
-        if verbose: print(f"DECRYPTED: {repr(slf)} ==> {repr(path)}.")
-        if inplace: slf.delete(sure=True, verbose=verbose)
-        return path if not orig else self
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.switch(append, "").name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
+        return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.")
 
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.zip(inplace=inplace, verbose=verbose).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
     def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
@@ -555,16 +540,12 @@ class P(type(Path()), Path):
         :param rel2it: `folder` or `path` are relative to `self` as opposed to cwd."""
         if path is not None:
             assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."
-            if rel2it: path = self.joinpath(path).resolve()
-            path = P(path).expanduser().resolve()
+            path = P(self.joinpath(path).resolve() if rel2it else path).expanduser().resolve()
             assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
             folder, name = path.parent, path.name; _ = name, folder
         else:
-            if name is None: name = default_name
-            else: name = str(name)  # good for edge cases of path with single part.
-            if folder is None: folder = self.parent  # means same directory, just different name
-            if rel2it: folder = self.joinpath(folder).resolve()
-            path = P(folder).expanduser().resolve() / name
+            name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
+            path = P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
         return path
 
 

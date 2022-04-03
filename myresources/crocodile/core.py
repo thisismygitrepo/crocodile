@@ -132,8 +132,6 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __iter__(self): return iter(self.list)
     len = property(lambda self: self.list.__len__())
     # ================= call methods =====================================
-    def method(self, name, *args, **kwargs): return List(getattr(i, name)(*args, **kwargs) for i in self.list)
-    def attr(self, name): return List(getattr(i, name) for i in self.list)
     def __getattr__(self, name): return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
     def __call__(self, *args, **kwargs): return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
