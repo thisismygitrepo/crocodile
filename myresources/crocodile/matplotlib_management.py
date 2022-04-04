@@ -884,12 +884,8 @@ class ImShow(FigureManager):
         self.auto_brightness = auto_brightness
         if ax is None:
             self.figpolicy = figpolicy
-            self.fig = self.get_fig(figname=figname,
-                                    figsize=(14, 9) if figsize is None else figsize, facecolor='white')
-            if figsize is None:
-                plt.get_current_fig_manager().full_screen_toggle()
-                # .window.showMaximized()  # state('zoom')
-                # plt.get_current_fig_manager().window.setGeometry(800,70,1000,900)
+            self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white')
+            if figsize is None: plt.get_current_fig_manager().full_screen_toggle()  # .window.showMaximized()  # state('zoom')  # plt.get_current_fig_manager().window.setGeometry(800,70,1000,900)
             if gridspec is not None:
                 gs = self.fig.add_gridspec(gridspec[0])
                 self.ax = []
@@ -964,9 +960,7 @@ class Artist(FigureManager):
         self.line = self.cursor = self.check_b = None
         if ax is None:  # create a figure
             with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize)
-        else:  # use the passed axis
-            self.ax = ax
-            self.fig = ax[0].figure
+        else: self.ax = ax; self.fig = ax[0].figure  # use the passed axis
 
         if len(args):  # if there's something to plot in the init
             if not ax: self.create_new_axes = True  # no ax sent but we need to plot, we need an ax, plot will soon call get_axes. # just for the first time_produced in this init method.
@@ -994,8 +988,7 @@ class Artist(FigureManager):
         self.fig.subplots_adjust(left=0.3)
         self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
         rax = self.fig.add_axes(self.visibility_ax)
-        labels = [str(line.get_label()) for line in self.ax.lines]
-        visibility = [line.get_visible() for line in self.ax.lines]
+        labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
         self.check_b = CheckButtons(rax, labels, visibility)
 
         def func(label):
