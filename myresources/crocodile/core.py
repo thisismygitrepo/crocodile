@@ -155,11 +155,11 @@ class List(Base, list):  # Inheriting from Base gives save method.
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
-    def apply(self, func, *args, other=None, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
+    def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.evalstr(func, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
-        return List([func(x, *args, **kwargs) for x in iterator]) if other is None else List([func(x, y) for x, y in iterator])
+        return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])
 
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))

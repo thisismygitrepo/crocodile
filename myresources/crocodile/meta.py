@@ -221,32 +221,25 @@ class Terminal:
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
         extra, my_list = ("-Command" if shell in {"powershell", "pwsh"} else ""), list(cmds)
         if self.machine == "win32": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
-        my_list = [item for item in my_list if item != ""]
-        print("Meta.Terminal.run_async: Subprocess command: ", my_list)
+        print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
 
     @staticmethod
-    def run_script(script, wdir=None, interactive=True, ipython=True,
-                   shell=None, delete=False, terminal="", new_window=True, header=True):
-        """This method is a wrapper on top of `run_async" except that the command passed will launch python
-        terminal that will run script passed by user.
-        * Regular Python is much lighter than IPython. Consider using it while not debugging.
-        """  # TODO: add option whether to add prepend to the script or not.
+    def run_script(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
+        """This method is a wrapper on top of `run_async" except that the command passed will launch python terminal that will run script passed by user. """
         header_script = f"""
 # ======================== Code prepended by Terminal.run_script =========================
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir or P.cwd()}')
 # ======================== End of header, start of script passed: ========================
-"""     # this header is necessary so import statements in the script passed are identified relevant to wdir.
+""" # this header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
         script = f"""print(r'''{script}''')""" + "\n" + script
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
-        Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)
-        # python will use the same dir as the one from console this method is called.
-        # file.delete(sure=delete, verbose=False)
-        _ = delete  # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
+        Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
+        file.delete(sure=delete, verbose=False)  # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
 
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
@@ -398,8 +391,7 @@ class Scheduler:
         while datetime.now() < until and self.count < self.cycles:
             # 1- Opening Message ==============================================================
             time1 = datetime.now()  # time_produced before calcs started.  # use  fstring format {x:<10}
-            msg = f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}."
-            self.logger.info(msg + f" UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
+            self.logger.info(f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
             # 2- Perform logic ======================================================
             try: self.routine()
             except Exception as ex: self.handle_exceptions(ex)
@@ -411,8 +403,7 @@ class Scheduler:
             self.count += 1
             time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time_produced.
             time_left = time_left if time_left > 0 else 1
-            self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. "
-                             f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
+            self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
             # 5- Sleep ===============================================================
             try: __import__("time").sleep(time_left)  # consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.handle_exceptions(ex)
@@ -606,8 +597,7 @@ class Experimental:
 
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):
-        sourcecells = P(module.__file__).read_text().split("#%%")
-        for cell in sourcecells:
+        for cell in P(module.__file__).read_text().split("#%%"):
             if pointer in cell.split('\n')[0]: break  # bingo
         else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
         print(cell)

@@ -131,10 +131,8 @@ class P(type(Path()), Path):
             return path  # contents live within this directory.
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
             path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
-            slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict.
-            # now we can delete any potential conflict before eventually taking its path
-            path.delete(sure=True, verbose=False)  # It is important to delete after moving
-            # because `self` could be within the file you want to delete.
+            slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict. # now we can delete any potential conflict before eventually taking its path
+            path.delete(sure=True, verbose=False)  # It is important to delete after moving. # because `self` could be within the file you want to delete.
             path_.rename(path)
         else: slf.rename(path)
         if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
@@ -182,7 +180,7 @@ class P(type(Path()), Path):
         filename = self.expanduser().resolve().str
         if __import__("sys").platform == "win32":
             if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
-            else: tmp = rf'powershell {opener} \'{self}\'' # __import__("os)s.tartfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            else: tmp = rf'powershell {opener} \'{self}\'' # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
         elif __import__("sys").platform == 'linux': subprocess.call(["xdg-open", filename])  # works for files and folders alike
         else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
@@ -210,8 +208,7 @@ class P(type(Path()), Path):
         for idx, line in enumerate(lines):
             if txt in line:
                 bingo = True
-                if newline is True: lines[idx] = alt if type(alt) is str else alt(line)
-                else: lines[idx] = line.replace(txt, alt if type(alt) is str else alt(line))
+                lines[idx] = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line))
         if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
         return self.write_text("\n".join(lines), encoding=encoding)
 
