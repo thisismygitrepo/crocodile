@@ -7,6 +7,7 @@ import os
 system = platform.system()
 OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # path separator, not to be confused with P.sep
+env = tb.Struct(dict(os.environ)).clean_view
 
 P = tb.P
 L = tb.List

@@ -13,25 +13,17 @@ from crocodile import file_management as _fm
 
 
 # CORE =====================================
-Base, timestamp, randstr, validate_name = core.Base, core.timestamp, core.randstr, core.validate_name
-Struct, Display, str2timedelta, Save, List = core.Struct, core.Display, core.str2timedelta, core.Save, core.List
-install_n_import = core.install_n_import
-
+str2timedelta, timestamp, randstr, validate_name, install_n_import = core.str2timedelta, core.timestamp, core.randstr, core.validate_name, core.install_n_import
+Base, Struct, Display, Save, List = core.Base, core.Struct, core.Display, core.Save, core.List
 # File Management ==========================
-P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
-Fridge, MemoryDB = _fm.Fridge, _fm.MemoryDB
+P, Read, Compression, Fridge, MemoryDB = _fm.P, _fm.Read, _fm.Compression, _fm.Fridge, _fm.MemoryDB
 encrypt, decrypt = _fm.encrypt, _fm.decrypt
-
 # META ====================================
-Experimental, Terminal, Manipulator = meta.Experimental, meta.Terminal, meta.Manipulator
-Log, Null = meta.Log, meta.Null
-Scheduler, SSH = meta.Scheduler, meta.SSH
-
+Experimental, Terminal, Log, Null, Scheduler, SSH = meta.Experimental, meta.Terminal, meta.Log, meta.Null, meta.Scheduler, meta.SSH
 
 L = List
 tmp = P.tmp
 E = Experimental
-M = Manipulator
 D = Display
 # _ = P, Read, Compression
 # _ = Experimental
