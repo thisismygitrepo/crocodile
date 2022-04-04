@@ -15,7 +15,7 @@ import dash_daq as daq
 
 from types import SimpleNamespace
 import webbrowser
-
+import sys
 
 pio.renderers.default = "browser"
 tm = tb.Terminal()
@@ -62,7 +62,9 @@ class App:
     def run_async(func):
         if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
             cn = func.__qualname__.split(".")[0]  # class name is obtained.
-            cmd = f"import {func.__module__} as m; inst=m.{cn}(); inst.{func.__name__}()"
+            module = func.__module__
+            module = tb.P(sys.modules['__main__'].__file__).rel2cwd().stem if module == "__main__" else module
+            cmd = f"import {module} as m; inst=m.{cn}(); inst.{func.__name__}()"
         else:  # it is a standalone function.
             # module = func.__module__  # fails if the function comes from main as it returns __main__.
             module = tb.P(func.__code__.co_filename)

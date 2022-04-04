@@ -232,14 +232,13 @@ class Terminal:
 import crocodile.toolbox as tb
 tb.sys.path.insert(0, r'{wdir or P.cwd()}')
 # ======================== End of header, start of script passed: ========================
-""" # this header is necessary so import statements in the script passed are identified relevant to wdir.
+"""  # this header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
-        script = f"""print(r'''{script}''')""" + "\n" + script
-        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(script)
+        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
-        file.delete(sure=delete, verbose=False)  # command = f'ipython {"-i" if interactive else ""} -c "{script}"'
+        file.delete(sure=delete, verbose=False)
 
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
