@@ -10,10 +10,10 @@ In implementation, the focus is on ease of use, not efficiency.
 
 from crocodile.toolbox import *
 from crocodile import __version__
+import random
 
-croc = P(__file__).parent.joinpath("art").search().sample()[0].read_text()
 print(f"Crocodile Shell {__version__}")
 # link to tutorial or github
 print(f"Made with ❤️")
-print(croc)
+print(random.choice(P(__file__).parent.joinpath("art").search()).read_text())
 
