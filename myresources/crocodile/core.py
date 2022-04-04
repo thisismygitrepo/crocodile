@@ -2,38 +2,30 @@
 """
 """
 
-import os
-import sys
 from pathlib import Path
-import string
-import random
-import numpy as np  # Numerical
-import dill  # Meta
-import copy
-from datetime import datetime
-import datetime as dt  # useful for deltatime and timezones.
 
 
 # ============================== Accessories ============================================
 
-def validate_name(astring, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
-def timestamp(fmt=None, name=None): return (name + '_' + datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
+
+def validate_name(astring: str, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
+def timestamp(fmt=None, name=None): return (name + '_' + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 
 
 def str2timedelta(past):
     """Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[past[-1]], eval(past[:-1])
-    key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return dt.timedelta(**{key: val})
+    key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 
 
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False):
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
-    return ''.join(random.choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
+    import string; return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
 
 def install_n_import(package, name=None):
     try: return __import__(package)
-    except ImportError: __import__("subprocess").check_call([sys.executable, "-m", "pip", "install", name or package])
+    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package])
     return __import__(package)
 
 
@@ -59,7 +51,7 @@ class Save:
     def csv(obj, path=None): obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
     @staticmethod
     @save_decorator(".npy")
-    def npy(obj, path, **kwargs): np.save(path, obj, **kwargs)
+    def npy(obj, path, **kwargs): import numpy as np; np.save(path, obj, **kwargs)
     @staticmethod
     @save_decorator(".mat")
     def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
@@ -74,8 +66,8 @@ class Save:
     def vanilla_pickle(obj, path, **kwargs): Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
     @staticmethod
     @save_decorator(".pkl")
-    def pickle(obj=None, path=None, r=False, **kwargs): Path(path).write_bytes(dill.dumps(obj, recurse=r, **kwargs))
-    pickles = staticmethod(lambda obj: dill.dumps(obj))
+    def pickle(obj=None, path=None, r=False, **kwargs): Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))
+    pickles = staticmethod(lambda obj: __import__("dill").dumps(obj))
 
 
 class Base(object):
@@ -83,9 +75,9 @@ class Base(object):
     def __getstate__(self): return self.__dict__.copy()
     def __setstate__(self, state): self.__dict__.update(state)
     def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
-    def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(copy.deepcopy(self.__dict__)); return obj
+    def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
-    def evalstr(self, string_, func=True, other=False): return string_ if type(string) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
+    def evalstr(self, string_, func=True, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
 
     def save_code(self, path):  # a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
         module = __import__("inspect").getmodule(self)
@@ -110,19 +102,18 @@ class Base(object):
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
-        if sys.platform == "win32": os.startfile(str(filename.absolute()))  # works for files and folders alike
-        return filename
+        __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
 class List(Base, list):  # Inheriting from Base gives save method.
     """Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
-    from_copies = classmethod(lambda cls, obj, count: cls([copy.deepcopy(obj) for _ in range(count)]))
+    from_copies = classmethod(lambda cls, obj, count: cls([__import__("copy").deepcopy(obj) for _ in range(count)]))
     @classmethod
     def from_replicating(cls, func, *args, replicas=None, **kwargs): return cls([func() for _ in range(replicas)]) if not args and not kwargs else cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
     def __repr__(self): return f"List object with {len(self.list)} elements. First item of those is: \n" + f"{repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
-    def __deepcopy__(self): return List([copy.deepcopy(i) for i in self.list])
+    def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
     def __copy__(self): return List(self.list.copy())
@@ -136,12 +127,12 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __call__(self, *args, **kwargs): return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
     def __setitem__(self, key, value): self.list[key] = value
-    def sample(self, size=1, replace=False, p=None): return self[np.random.choice(len(self), size, replace=replace, p=p)]
+    def sample(self, size=1, replace=False, p=None): return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
     def index_items(self, idx): return List([item[idx] for item in self.list])
     def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
     def filter(self, func): return List([item for item in self.list if self.evalstr(func, func=True)(item)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func): return __import__("functools").reduce(func, self.list)
+    def reduce(self, func): return __import__("functools").reduce(self.evalstr(func, func=True, other=True), self.list)
     def append(self, item): self.list.append(item); return self
     def __add__(self, other): return List(self.list + list(other))  # implement coersion
     def __radd__(self, other): return List(self.list + list(other))
@@ -155,12 +146,12 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self): return self.list
-    def to_numpy(self): return self.np
-    np = property(lambda self: np.array(self.list))
+    def to_numpy(self): import numpy as np; return np.array(self.list)
+    np = property(lambda self: self.to_numpy())
     def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
 
-    def __getitem__(self, key):
-        if type(key) is list or type(key) is np.ndarray: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
+    def __getitem__(self, key: str or list or slice):
+        if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
 
@@ -226,7 +217,7 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
-    def _pandas_repr(self, limit): return __import__("pandas").DataFrame(np.array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+    def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
     def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
 
     @staticmethod
@@ -235,7 +226,7 @@ class Struct(Base, dict):  # inheriting from dict gives `get` method, should giv
             keys = dicts[0].keys()
             for i in dicts[1:]: assert i.keys() == keys
         # else if lenient, take the union
-        if clone: total_dict = copy.deepcopy(dicts[0])  # take first dict in the tuple
+        if clone: total_dict = __import__("copy").deepcopy(dicts[0])  # take first dict in the tuple
         else: total_dict = dicts[0]  # take first dict in the tuple
         if collect_items:
             for key, val in total_dict.item(): total_dict[key] = [val]
@@ -270,8 +261,8 @@ class Display:
 
     @staticmethod
     def get_repr(data, limit=50, justify=False):
-        if type(data) is np.ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
-        elif type(data) in {list, str}: string_ = data if type(data) is str else f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+        if type(data) in {list, str}: string_ = data if type(data) is str else f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+        elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
         else: string_ = repr(data)
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 

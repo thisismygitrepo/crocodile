@@ -1,10 +1,10 @@
 
+
+from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
+from crocodile.file_management import P, datetime
 import logging
 import subprocess
-import time
-import platform
-from crocodile.core import np, os, sys, timestamp, randstr, str2timedelta, datetime, Save, dill, install_n_import, List, Struct
-from crocodile.file_management import P
+import sys
 
 
 class Null:
@@ -173,7 +173,7 @@ class Terminal:
         """
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
-        self.machine = sys.platform  # 'win32', 'linux' OR: import platform; platform.system(): Windows, Linux, Darwin
+        self.machine = sys.platform  # 'win32', 'linux' OR: import platform; self.platform.system(): Windows, Linux, Darwin
 
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
@@ -187,7 +187,7 @@ class Terminal:
         Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for:
         res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
-        * Unlike `os.system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
+        * Unlike `__import__('os').system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run.
             Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
         * `text=True` converts the bytes objects returned in stdout to text by default.
@@ -264,7 +264,7 @@ obj{'()' if execute else ''}
     @staticmethod
     def replicate_session(cmd=""):
         file = P.tmpfile(suffix=".pkl")
-        dill.dump_session(file, main=sys.modules[__name__])
+        __import__("dill").dump_session(file, main=sys.modules[__name__])
         script = f"""
 path = tb.P(r'{file}')
 tb.dill.load_session(str(path)); 
@@ -275,11 +275,11 @@ path.delete(sure=True, verbose=False)
     @staticmethod
     def is_user_admin():
         """@return: True if the current user is an 'Admin' whatever that means (root on Unix), otherwise False. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
-        if os.name == 'nt':
+        if __import__('os').name == 'nt':
             import ctypes
             try: return ctypes.windll.shell32.IsUserAnAdmin()
             except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
-        else: return os.getuid() == 0  # Check for root on Posix
+        else: return __import__('os').getuid() == 0  # Check for root on Posix
 
     @staticmethod
     def run_code_as_admin(params):
@@ -295,7 +295,7 @@ path.delete(sure=True, verbose=False)
         Returns the sub-process return code, unless wait is False in which case it returns None.
         adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
         """
-        if os.name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
+        if __import__('os').name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
         _ = install_n_import("win32api", name="pypiwin32")
         win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
         win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
@@ -322,7 +322,8 @@ class SSH(object):
         self.sftp = self.ssh.open_sftp()
         self.target_machine = "Windows" if self.run("$env:OS", verbose=False).output["stdout"] == "Windows_NT" else "Linux"
         # it must uses a python independent way to figure out the machine type to avoid circualrity below:
-        if platform.system() == "Windows": self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
+        self.platform = __import__("platform")
+        if self.platform.system() == "Windows": self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
         else: self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
         if self.target_machine == "Windows": self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
         else: self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
@@ -331,22 +332,19 @@ class SSH(object):
         """In SSH commands you need this: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}' """
         return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""
 
-    @staticmethod
-    def copy_sshkeys_to_remote(fqdn):
+    def copy_sshkeys_to_remote(self, fqdn):
         """Windows Openssh alternative to ssh-copy-id"""
-        assert platform.system() == "Windows"
+        assert self.platform.system() == "Windows"
         return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
 
-    def __repr__(self): return f"{self.local()} [{platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
+    def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
     def remote(self): return f"{self.username}@{self.hostname}"
-    @staticmethod
-    def local(): return f"{os.getlogin()}@{platform.node()}"
-    def open_console(self, new_window=True):Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
-    def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {os.environ[name]}; export {name}")
+    def local(self): return f"{__import__('os').getlogin()}@{self.platform.node()}"
+    def open_console(self, new_window=True): Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
+    def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def copy_to_here(self, source, target=None): pass
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
-    @staticmethod
-    def run_locally(command): print(f"Executing Locally @ {platform.node()}:\n{command}"); return Terminal.Response(os.system(command))
+    def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
 
     def run(self, cmd, verbose=True):
         res = self.ssh.exec_command(cmd); res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
@@ -416,7 +414,7 @@ class Scheduler:
             self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. "
                              f"Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
             # 5- Sleep ===============================================================
-            try: time.sleep(time_left)  # consider replacing by Asyncio.sleep
+            try: __import__("time").sleep(time_left)  # consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.handle_exceptions(ex)
         else:  # while loop finished due to condition satisfaction (rather than breaking)
             if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
@@ -631,7 +629,7 @@ class Manipulator:
     @staticmethod
     def merge_axes(array, ax1, ax2):
         """Brings ax2 next to ax1 first, then combine the two axes into one."""
-        array2 = np.moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
+        array2 = __import__("numpy").moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
         return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
 
     @staticmethod
@@ -643,7 +641,7 @@ class Manipulator:
             array = array[Manipulator.indexer(axis=ax_idx, myslice=slice(0, -extra))]
         total_shape = list(array.shape)
         for index, item in enumerate((int(total_shape.pop(ax_idx) / factor), factor)): total_shape.insert(ax_idx + index, item)
-        return array.reshape(tuple(total_shape))  # should be same as return np.split(array, new_shape, ax_idx)
+        return array.reshape(tuple(total_shape))  # should be same as return __import__("numpy)s.plit(array, new_shape, ax_idx)
 
     @staticmethod
     def slicer(array, a_slice: slice, axis=0):
@@ -653,7 +651,7 @@ class Manipulator:
         lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
         roll = lower_
         lower_, upper_ = lower_ - roll, upper_ - roll
-        array_ = np.roll(array, -roll, axis=axis)
+        array_ = __import__("numpy").roll(array, -roll, axis=axis)
         upper_ = upper_ % n
         new_slice = slice(lower_, upper_, a_slice.step)
         return array_[Manipulator.indexer(axis=axis, myslice=new_slice, rank=array.ndim)]

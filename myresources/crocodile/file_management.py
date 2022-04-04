@@ -1,6 +1,6 @@
 
-import time
-from crocodile.core import Struct, np, os, sys, List, datetime, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, dill
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
+from datetime import datetime
 
 
 # =============================== Security ================================================
@@ -61,7 +61,7 @@ class Read(object):
 
     @staticmethod
     def npy(path, **kwargs):
-        data = np.load(str(path), allow_pickle=True, **kwargs)
+        import numpy as np; data = np.load(str(path), allow_pickle=True, **kwargs)
         if data.dtype == np.object: data = data.item(); return Struct(data) if type(data) is dict else data
 
     @staticmethod
@@ -88,9 +88,9 @@ class Read(object):
     @staticmethod
     def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
     py = staticmethod(lambda path: Struct(__import__("runpy").run_path(path)))
-    pickles = staticmethod(lambda bytes_obj: dill.loads(bytes_obj))
+    pickles = staticmethod(lambda bytes_obj: __import__("dill").loads(bytes_obj))
     @staticmethod
-    def pickle(path, **kwargs): obj = dill.loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+    def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 
 
 class P(type(Path()), Path):
@@ -180,11 +180,11 @@ class P(type(Path()), Path):
         import subprocess
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
         filename = self.expanduser().resolve().str
-        if sys.platform == "win32":
+        if __import__("sys").platform == "win32":
             if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
-            else: tmp = rf'powershell {opener} \'{self}\'' # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            else: tmp = rf'powershell {opener} \'{self}\'' # __import__("os)s.tartfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
-        elif sys.platform == 'linux': subprocess.call(["xdg-open", filename])  # works for files and folders alike
+        elif __import__("sys").platform == 'linux': subprocess.call(["xdg-open", filename])  # works for files and folders alike
         else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
         return self
 
@@ -292,7 +292,7 @@ class P(type(Path()), Path):
         return one, two
 
     def __getitem__(self, slici):  # tested.
-        if type(slici) is list or type(slici) is np.ndarray: return P(*[self[item] for item in slici])
+        if type(slici) is list: return P(*[self[item] for item in slici])
         else: return P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici])  # it is an integer
 
     def __setitem__(self, key: str or int or slice, value: str or Path):
@@ -327,7 +327,7 @@ class P(type(Path()), Path):
 
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
-        sizes = List(['b', 'kb', 'mb', 'gb']); factor = dict(zip(sizes + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
+        sizes = List(['b', 'kb', 'mb', 'gb']); import numpy as np; factor = dict(zip(sizes + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         return round(total_size / factor, 1)
 
@@ -365,7 +365,7 @@ class P(type(Path()), Path):
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         from crocodile.meta import Terminal
         if __import__("platform").system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
-            Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); time.sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
+            Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); __import__("time").sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
         return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)}")
 
@@ -446,8 +446,8 @@ class P(type(Path()), Path):
     tempdir = staticmethod(lambda: P(__import__("tempfile").mktemp()))
     temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))
     tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
-    def chdir(self): os.chdir(str(self.expanduser())); return self
-    def listdir(self): return List(os.listdir(self.expanduser().resolve())).apply(P)
+    def chdir(self): __import__("os").chdir(str(self.expanduser())); return self
+    def listdir(self): return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
     @staticmethod
     def tmpfile(name=None, suffix="", folder=None, tstamp=False): return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files")
 
@@ -590,7 +590,7 @@ class Compression(object):
 
     @staticmethod
     def tar(self, op_path):
-        with __import__("tarfile").open(op_path, "w:gz") as tar: tar.add(str(self), arcname=os.path.basename(str(self)))
+        with __import__("tarfile").open(op_path, "w:gz") as tar: tar.add(str(self), arcname=__import__("os").path.basename(str(self)))
         return op_path
 
     @staticmethod

@@ -8,30 +8,21 @@ This is `export file` while one can dictate what will be exposed with toolbox
 """
 
 from crocodile import core
-from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
-
+from crocodile import meta
 from crocodile import file_management as _fm
 
-from crocodile import meta
-from crocodile.meta import logging, subprocess, time
 
-from crocodile import matplotlib_management as _pm
-from crocodile.matplotlib_management import plt, enum, FigureManager
-
-import pandas as pd
-_ = pd
-
+# CORE =====================================
 Base, timestamp, randstr, validate_name = core.Base, core.timestamp, core.randstr, core.validate_name
 Struct, Display, str2timedelta, Save, List = core.Struct, core.Display, core.str2timedelta, core.Save, core.List
 install_n_import = core.install_n_import
 
+# File Management ==========================
 P, Read, Compression = _fm.P, _fm.Read, _fm.Compression
 Fridge, MemoryDB = _fm.Fridge, _fm.MemoryDB
 encrypt, decrypt = _fm.encrypt, _fm.decrypt
 
-Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImShow, _pm.SaveType
-VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
-
+# META ====================================
 Experimental, Terminal, Manipulator = meta.Experimental, meta.Terminal, meta.Manipulator
 Log, Null = meta.Log, meta.Null
 Scheduler, SSH = meta.Scheduler, meta.SSH
@@ -42,21 +33,34 @@ tmp = P.tmp
 E = Experimental
 M = Manipulator
 D = Display
+# _ = P, Read, Compression
+# _ = Experimental
 
 
 _ = Base, timestamp, Save, Terminal, List, Struct, Display
-_ = datetime, dt, os, sys, np, copy, random, dill
+# from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
+# _ = datetime, dt, os, sys, np, copy, random, dill
+# import logging, subprocess
 
-_ = P, Read, Compression, string, sys  # , Path
-_ = Experimental
-_ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
-_ = logging, subprocess, time
+
+_ = False
+if _:
+    from crocodile import matplotlib_management as _pm
+    from crocodile.matplotlib_management import plt, enum, FigureManager
+
+    Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImShow, _pm.SaveType
+    VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
+
+    _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
+
+    import pandas as pd
+    _ = pd
 
 
 def reload(verbose=True):
     import inspect
     import importlib
-    tb = sys.modules["crocodile.toolbox"]
+    tb = __import__("sys").modules["crocodile.toolbox"]
     for val in tb.__dict__.values():
         if inspect.ismodule(val):
             importlib.reload(val)
