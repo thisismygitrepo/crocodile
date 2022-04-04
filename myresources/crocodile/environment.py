@@ -18,8 +18,7 @@ DotFiles = P.home().joinpath("dotfiles")
 
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
-WindowsApps = AppData.joinpath \
-    (r"Microsoft\WindowsApps") if AppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
+WindowsApps = AppData.joinpath(r"Microsoft\WindowsApps") if AppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
 
 ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
 ProgramFiles = P(tmp) if (tmp := os.getenv("ProgramFiles")) else None  # C:\Program Files
@@ -102,8 +101,7 @@ class EnvVar:
     def set(key, val, temp=False, run=False):
         if system == "Windows":
             if temp is False:
-                res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters
-                # in case the variable included ";" separated paths, this limit can be exceeded.
+                res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters # in case the variable included ";" separated paths, this limit can be exceeded.
                 return res if not run else tm.run(res, shell="powershell")
             else:
                 raise NotImplementedError
@@ -143,13 +141,9 @@ class PathVar:
                 command = fr'$env:Path = "{path};" + $env:Path'
             elif kind == "replace":  # Replace the Path variable in the current window (use with caution!):
                 command = fr'$env:Path = "{path}"'
-            else:
-                raise KeyError
-            result = command
-            return result if run is False else tm.run(result, shell="powershell")
-
-        else:
-            result = f'export PATH="{path}:$PATH"'
+            else: raise KeyError
+            return command if run is False else tm.run(command, shell="powershell")
+        else: result = f'export PATH="{path}:$PATH"'
         return result if run is False else tm.run(result, shell="powershell")
 
     @staticmethod
@@ -160,9 +154,7 @@ class PathVar:
             command = fr'[Environment]::SetEnvironmentVariable("Path", $env:PATH + ";{path}", "{scope}")'
             result = backup + command
             return result if run is False else tm.run(result, shell="powershell")
-
-        else:
-            tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
+        else: tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
 
     @staticmethod
     def set_permanetly(path, scope=["User", "system"][0], run=False):
@@ -196,16 +188,15 @@ def get_shell_profiles(shell):
     # following this: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.2
     # https://devblogs.microsoft.com/scripting/understanding-the-six-powershell-profiles/
     # Dynmaically obtained:
-    profiles = tb.Struct(
+    return tb.Struct(
         CurrentUserCurrentHost=tm.run("$PROFILE.CurrentUserCurrentHost", shell=shell).as_path,
         CurrentUserAllHosts=tm.run("$PROFILE.CurrentUserAllHosts", shell=shell).as_path,
         AllUsersCurrentHost=tm.run("$PROFILE.AllUsersCurrentHost", shell=shell).as_path,
         AllUsersAllHosts=tm.run("$PROFILE.AllUsersAllHosts", shell=shell).as_path,
     )
-    return profiles
 
 
-def construct_path(path_list): return tb.L(tb.pd.unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
+def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
 
 
 if __name__ == '__main__':

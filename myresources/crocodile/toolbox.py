@@ -40,7 +40,7 @@ D = Display
 _ = Base, timestamp, Save, Terminal, List, Struct, Display
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
 # _ = datetime, dt, os, sys, np, copy, random, dill
-# import logging, subprocess
+import logging, subprocess, sys
 
 
 _ = False
