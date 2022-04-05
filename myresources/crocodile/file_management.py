@@ -155,12 +155,10 @@ class P(type(Path()), Path):
         else: raise NotImplementedError
         dest, slf = dest.expanduser().resolve().create(parent_only=True), self.expanduser().resolve()
         if overwrite and dest.exists(): dest.delete(sure=True)
-        if slf.is_file():
-            __import__("shutil").copy(str(slf), str(dest))
-            if verbose: print(f"COPIED {repr(slf)} ==> {repr(dest)}")
+        if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir():
             __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()))
-            if verbose: print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}")
+            print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest / slf.name if not orig else self
 
@@ -307,20 +305,14 @@ class P(type(Path()), Path):
         self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
 
     def __repr__(self):  # this is useful only for the console
-        rep = "P:"
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
             except Exception: target = "BROKEN LINK " + str(self)
             if target == self: target = str(target)  # avoid infinite recursions for broken links.
-            rep += " Symlink '" + str(self) + "' ==> " + repr(target)
-        elif self.is_absolute():
-            rep += " " + self._type() + " '" + self.clickable() + "'"
-            if self.exists():
-                rep += " | " + self.time(which="c").isoformat()[:-7].replace("T", "  ")
-                if self.is_file(): rep += f" | {self.size()} Mb"
-        elif "http" in str(self): rep += " URL " + self.as_url_str()
-        else: rep += " Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
-        return rep
+            return "P: Symlink '" + str(self) + "' ==> " + repr(target)
+        elif self.is_absolute(): return "P: " + self._type() + " '" + self.clickable() + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "")+ (f" | {self.size()} Mb" if self.is_file() else "")
+        elif "http" in str(self): return "P: URL " + self.as_url_str()
+        else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
 
     # %% ===================================== File Specs =============================================================
     def size(self, units='mb'):
@@ -402,14 +394,7 @@ class P(type(Path()), Path):
     def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
         """Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
         space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
-
-        def get_stats(apath):
-            if stats or desc:
-                sts = apath.stats(printit=False)
-                result = f" {sts.size} MB. {sts.content_mod_time}. "
-                if desc is not None: result += desc(apath)
-                return result
-            return ""
+        def get_stats(apath): return (f" {(sts := apath.stats(printit=False)).size} MB. {sts.content_mod_time}. " + desc(apath) if desc is not None else "") if stats or desc else ""
 
         def inner(apath: P, prefix: str = '', level_=-1):
             nonlocal files, directories

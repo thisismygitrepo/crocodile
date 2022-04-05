@@ -550,8 +550,9 @@ class Experimental:
 
     @staticmethod
     def edit_source(module, *edits):
+        sourcelines, line_idx = P(module.__file__).read_text().split("\n"), 0
         for edit_idx, edit in enumerate(edits):
-            for line_idx, line in enumerate(P(module.__file__).read_text().split("\n")):
+            for line_idx, line in enumerate(sourcelines):
                 if f"here{edit_idx}" in line:
                     new_line = line.replace(edit[0], edit[1])
                     print(f"Old Line: {line}\nNew Line: {new_line}")

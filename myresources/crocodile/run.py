@@ -1,6 +1,7 @@
 
 """
 To use this use this syntax: `python -m crocodile.run filepath [options]`
+Functionality offered her is made redundant by the fire library par for importing file as a module and running it which is not offered by fire.
 
 Choices made by default:
 * ipython over python
@@ -50,26 +51,16 @@ def build_parser():
     if args.main is True and args.file != "":  # run the file data_only, don't import it.
         tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal, new_window=not args.here)
     else:  # run as a module (i.e. import it)
-
         if args.file != "":  # non empty file path:
-
             path = tb.P(args.file)
             if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.
                 if path.is_absolute(): path = path.rel2cwd()
                 path = str((path - path.suffix)).replace(os.sep, ".")
             else:  # It must be that user passed a.b format
                 assert path.exists() is False, f"I could not determine whether this is a.b or a/b format."
-                #         script = f"""
-                # import importlib
-                # module = importlib.import_module('{path}')
-                # globals().update(module.__dict__)
-                # """
-
             script = fr"""
 from {path} import *
-
-"""
-            script += args.cmd + "\n"
+""" + args.cmd + "\n"
         else: script = args.cmd
         if args.func != "": script += f"tb.E.run_globally({args.func}, globals())"
         tb.Terminal().run_script(script=script, terminal=args.terminal, new_window=not args.here, interactive=not args.solitary, ipython=not args.python)
