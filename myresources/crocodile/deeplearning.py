@@ -54,7 +54,7 @@ class HyperParam(tb.Struct):
         self.update(**kwargs)
 
     def save(self, path=None, data_only=True, r=False, include_code=False, add_suffix=True):
-        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(data=str(self))
+        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(str(self))
         if self.save_type in {"whole", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False)
 
     @classmethod

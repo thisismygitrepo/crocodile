@@ -344,7 +344,7 @@ class P(type(Path()), Path):
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
-    def write_text(self, txt: str, **kwargs): super(P, self).write_text(txt, **kwargs); return self
+    def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
     def read_text(self, encoding=None, lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
