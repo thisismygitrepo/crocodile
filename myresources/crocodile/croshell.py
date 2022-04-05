@@ -18,5 +18,5 @@ from crocodile.matplotlib_management import *
 print(f"Crocodile Shell {__version__}")
 # link to tutorial or github
 print(f"Made with ❤️")
-print(np.random.choice(P(__file__).parent.joinpath("art").search()).read_text())
+print(P(__file__).parent.joinpath("art").search().sample(size=1)[0].read_text())
 

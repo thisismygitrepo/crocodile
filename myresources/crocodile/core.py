@@ -241,7 +241,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         return Struct(total_dict)
 
     def plot(self, artist=None):
-        if artist is None: fig, artist = __import__("matplotlib.pyplot").subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
+        if artist is None: fig, artist = __import__("matplotlib").pyplot.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
         for key, val in self: artist.plot(val, label=key)
         try: artist.fig.legend()
         except AttributeError: pass

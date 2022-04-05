@@ -238,12 +238,8 @@ class DataReader(tb.Base):
         """
         Assumes numpy inputs
         """
-        if gt is None:
-            labels = None
-            self.plotter = ImShow(pred, labels=labels, sup_titles=names, origin='lower', **kwargs)
-        else:
-            labels = ['Reconstruction', 'Ground Truth']
-            self.plotter = ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
+        if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
+        else: self.plotter = ImShow(pred, gt, labels=['Reconstruction', 'Ground Truth'], sup_titles=names, origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
         """Implement here how you would visualize a batch of input and ouput pair.
