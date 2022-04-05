@@ -448,7 +448,7 @@ class Experimental:
     @staticmethod
     def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
     @staticmethod
-    def run_globally(func, scope, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
+    def run_globally(func, scope=None, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
     @staticmethod
     def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 
@@ -456,20 +456,17 @@ class Experimental:
     def generate_readme(path, obj=None, meta=None, save_source_code=True):
         """Generates a readme file to contextualize any binary files.
         :param path: directory or file path. If directory is passed, README.md will be the filename.
-        :param obj: Python module, class, method or function used to generate the result data.
-         (dot not pass the data data_only or an instance of any class)
+        :param obj: Python module, class, method or function used to generate the result data. (dot not pass the data data_only or an instance of any class)
         :param meta:
         :param save_source_code:
         """
         import inspect
-        readmepath, separator, text = P(path) / f"README.md" if P(path).is_dir() else P(path), "\n" + "-----" + "\n\n", "# Meta\n"
-        if meta is not None: text = text + meta
-        text += separator
+        text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
         if obj is not None:
             lines = inspect.getsource(obj)
             text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
-        readmepath.write_text(text)
+        (readmepath := P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
         print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
         if save_source_code:
             P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
@@ -482,8 +479,7 @@ class Experimental:
         * Loads the directory to the memroy.
         * Returns either the package or a piece of it as indicated by ``obj``
         """
-        tmpdir = P.tmp() / timestamp(name="tmp_sourcecode")
-        P(directory).find("source_code*", r=True).unzip(tmpdir)
+        P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
         sys.path.insert(0, str(tmpdir))
         sourcefile = __import__(tmpdir.find("*").stem)
         tmpdir.delete(sure=delete, verbose=False)
@@ -509,53 +505,35 @@ class Experimental:
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
         TODO: how to handle decorated functions.
+        TODO : add support for lambda functions.  ==> use dill for powerfull inspection
         """
         if type(func) is str:
             assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
             tmp = func
-            first_parenth = func.find("(")
-            # last_parenth = -1
+            first_parenth = func.find("(")  # last_parenth = -1
             func = eval(tmp[:first_parenth])
-            self = ".".join(func.split(".")[:-1])
-            _ = self
+            self = ".".join(func.split(".")[:-1]); _ = self
             func = eval(func, modules)
-        # TODO: add support for lambda functions.  ==> use dill for powerfull inspection
-        import inspect
-        import textwrap
-        codelines = textwrap.dedent(inspect.getsource(func))
-        if codelines.startswith("@staticmethod\n"): codelines = codelines[14:]
+        import inspect, textwrap
+        codelines = tmp_[14:] if (tmp_ := textwrap.dedent(inspect.getsource(func))).startswith("@staticmethod\n") else tmp_
         assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
-        # remove def func_name() line from the list
-        idx = codelines.find("):\n")
-        codelines = codelines[idx + 3:]
-        # remove any indentation (4 for funcs and 8 for classes methods, etc)
-        codelines = textwrap.dedent(codelines)
-        lines = codelines.split("\n")  # remove return statements
-        codelines = []
-        for aline in lines:
-            if not textwrap.dedent(aline).startswith("return "): codelines.append(aline + "\n")  # keep as is, normal statement
-            else: codelines.append(aline.replace("return ", "return_ = ") + "\n")  # a return statement
-        code_string = ''.join(codelines)  # convert list to string.
-        args_kwargs = ""
-        if include_args:  args_kwargs = Experimental.extract_arguments(func, verbose=verbose, **kwargs)
-        if code is not None: args_kwargs = args_kwargs + "\n" + code + "\n"  # added later so it has more overwrite authority.
-        if include_args or code: code_string = args_kwargs + code_string
+        idx = codelines.find("):\n")  # remove def func_name() line from the list
+        lines = textwrap.dedent(codelines[idx + 3:]).split("\n")  # dedents will remove any indentation (4 for funcs and 8 for classes methods, etc)
+        code_string = ''.join([aline + "\n" if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") + "\n" for aline in lines])  # remove return statements if there else keep line as is.
+        code_string = (Experimental.extract_arguments(func, verbose=verbose, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + code_string  # added later so it has more overwrite authority.
         if copy2clipboard: install_n_import("clipboard").copy(code_string)
-        if verbose: print(f"code to be run extracted from {func.__name__} \n", code_string, "=" * 100)
+        if verbose: print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100)
         return code_string  # ready to be run with exec()
 
     @staticmethod
-    def extract_arguments(func, modules=None, exclude_args=True, verbose=True, copy2clipboard=False, **kwargs):
-        """Get code to define the args and kwargs defined in the main. Works for funcs and methods.
-        """
+    def extract_arguments(func, modules=None, exclude_args=True, copy2clipboard=False, **kwargs):
+        """Get code to define the args and kwargs defined in the main. Works for funcs and methods."""
         if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
             self = ".".join(func.split(".")[:-1]); _ = self
             func = eval(func, modules)
-        from crocodile.file_management import Struct
         import inspect
         ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
-        ak = Struct.from_keys_values(ak.name, ak.default)
-        ak = ak.update(kwargs)
+        ak = Struct.from_keys_values(ak.name, ak.default).update(kwargs)
         res = """"""
         for key, val in ak.items():
             if key != "args" and key != "kwargs":
@@ -563,20 +541,17 @@ class Experimental:
                 if val is inspect._empty:  # not passed argument.
                     if exclude_args: flag = True
                     else: val = None; print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
-                if not flag: res += f"{key} = " + (f"'{val}'" if type(val) is str else str(val)) + "\n"
+                if not flag: res += f"{key} = rf" + (f"'{val}'" if type(val) in {str, P} else str(val)) + "\n"
         ak = inspect.getfullargspec(func)
         if ak.varargs: res += f"{ak.varargs} = (,)\n"
         if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
         if copy2clipboard: install_n_import("clipboard").copy(res)
-        if verbose: print("Finished. Paste code now.")
         return res
 
     @staticmethod
     def edit_source(module, *edits):
-        sourcelines = P(module.__file__).read_text().split("\n")
         for edit_idx, edit in enumerate(edits):
-            line_idx = 0
-            for line_idx, line in enumerate(sourcelines):
+            for line_idx, line in enumerate(P(module.__file__).read_text().split("\n")):
                 if f"here{edit_idx}" in line:
                     new_line = line.replace(edit[0], edit[1])
                     print(f"Old Line: {line}\nNew Line: {new_line}")
@@ -584,11 +559,8 @@ class Experimental:
                     sourcelines[line_idx] = new_line
                     break
             else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
-        newsource = "\n".join(sourcelines)
-        P(module.__file__).write_text(newsource)
-        import importlib
-        importlib.reload(module)
-        return module
+        P(module.__file__).write_text("\n".join(sourcelines))
+        return __import__("importlib").reload(module)
 
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):

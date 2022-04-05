@@ -80,17 +80,12 @@ class HyperParam(tb.Struct):
             devices += handle.config.experimental.list_physical_devices('GPU')
             device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
 
-            if self.device_name is Device.auto:
-                chosen_device = Device.gpu0 if len(devices) > 1 else Device.cpu
-            else:
-                chosen_device = self.device_name
-
+            if self.device_name is Device.auto: chosen_device = Device.gpu0 if len(devices) > 1 else Device.cpu
+            else: chosen_device = self.device_name
             device_str = chosen_device.value if 1 > 0 else "haha"
             if device_str not in device_dict.keys():
-                for i in range(10):
-                    print(f"This machine has no such a device to be chosen! ({device_str})")
-                # Revert to cpu, keep going, instead of throwing an error.
-                device_str = "cpu"
+                print(f"This machine has no such a device to be chosen! ({device_str})\n" * 10)
+                device_str = "cpu"  # Revert to cpu, keep going, instead of throwing an error.
 
             try:
                 device = device_dict[device_str]
@@ -102,16 +97,14 @@ class HyperParam(tb.Struct):
 
         elif handle.__name__ == 'torch':
             device = self.device_name
-            if device is Device.auto:
-                return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
+            if device is Device.auto: return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
+            elif device is Device.cpu: return handle.device('cpu')
             elif device is Device.gpu0:
                 assert handle.cuda.device_count() > 0, f"GPU {device} not available"
                 return handle.device('cuda:0')
             elif device is Device.gpu1:
                 assert handle.cuda.device_count() > 1, f"GPU {device} not available"
                 return handle.device('cuda:1')
-            elif device is Device.cpu:
-                return handle.device('cpu')
             # How to run Torch model on 2 GPUs ?
         else: raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
 
@@ -137,14 +130,12 @@ class HyperParam(tb.Struct):
                 # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
                 # now, logical gpu is created only for visible device
                 # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-
         except AssertionError as e:
             print(e)
             print(f"Trying again with auto-device {Device.auto}")
             self.device_name = Device.auto
             self.config_device()
         except ValueError: print("Cannot set memory growth on non-GPU devices")
-
         except RuntimeError as e:
             print(e)
             print(f"Device already configured, skipping ... ")
@@ -201,20 +192,18 @@ class DataReader(tb.Base):
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
-    def sample_dataset(self, aslice=None, dataset="test"):
-        if aslice is None: aslice = slice(0, self.hp.batch_size)
-        keys = self.split.keys().filter(f"'_{dataset}' in x")
-        return tuple([self.split[key][aslice] for key in keys])
+    def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, dataset="test"):
+        keys = self.split.keys().filter(lambda x: f'_{dataset}' in x)
+        selection = indices or aslice
+        res1 = selection or np.random.choice(len(self.split[keys[0]]), size=self.hp.batch_size, replace=False)
+        res2 = selection or slice(0, self.hp.batch_size)
+        selection = res1 if use_default_slice is False and (indices or aslice) is None else (res1 if indices is not None else res2)
+        return tuple([tmp.iloc[selection] if type(tmp:=self.split[key]) is pd.DataFrame else tmp[selection] for key in keys])
 
     def get_random_input_output(self, ip_shape=None, op_shape=None):
-        if ip_shape is None:
-            ip_shape = self.specs.ip_shape
-        if op_shape is None:
-            op_shape = self.specs.op_shape
-        if hasattr(self.hp, "precision"):
-            dtype = self.hp.precision
-        else:
-            dtype = "float32"
+        if ip_shape is None: ip_shape = self.specs.ip_shape
+        if op_shape is None: op_shape = self.specs.op_shape
+        dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
         ip = np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype)
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
@@ -228,7 +217,7 @@ class DataReader(tb.Base):
         return args[0]  # acts like identity
 
     def standardize(self):
-        assert self.split is not None, "Load up the data first."
+        assert self.split is not None, "Load up the data first before you standardize it."
         from sklearn.preprocessing import StandardScaler
         self.scaler = StandardScaler()
         self.split.x_train = self.scaler.fit_transform(self.split.x_train)
