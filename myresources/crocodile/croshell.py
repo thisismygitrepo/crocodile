@@ -10,7 +10,6 @@ In implementation, the focus is on ease of use, not efficiency.
 
 from crocodile.toolbox import *
 from crocodile import __version__
-import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,5 +18,5 @@ from crocodile.matplotlib_management import *
 print(f"Crocodile Shell {__version__}")
 # link to tutorial or github
 print(f"Made with ❤️")
-print(random.choice(P(__file__).parent.joinpath("art").search()).read_text())
+print(np.random.choice(P(__file__).parent.joinpath("art").search()).read_text())
 

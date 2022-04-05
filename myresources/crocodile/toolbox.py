@@ -35,18 +35,18 @@ _ = Base, timestamp, Save, Terminal, List, Struct, Display
 import logging, subprocess, sys
 
 
-_ = False
-if _:
-    from crocodile import matplotlib_management as _pm
-    from crocodile.matplotlib_management import plt, enum, FigureManager
-
-    Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImShow, _pm.SaveType
-    VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
-
-    _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
-
-    import pandas as pd
-    _ = pd
+# _ = False
+# if _:
+#     from crocodile import matplotlib_management as _pm
+#     from crocodile.matplotlib_management import plt, enum, FigureManager
+#
+#     Artist, FigurePolicy, ImShow, SaveType = _pm.Artist, _pm.FigurePolicy, _pm.ImShow, _pm.SaveType
+#     VisibilityViewer, VisibilityViewerAuto = _pm.VisibilityViewer, _pm.VisibilityViewerAuto
+#
+#     _ = plt, enum, FigureManager, FigurePolicy, ImShow, SaveType, VisibilityViewer, VisibilityViewerAuto, Artist
+#
+#     import pandas as pd
+#     _ = pd
 
 
 def reload(verbose=True):

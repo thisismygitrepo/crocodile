@@ -1,9 +1,13 @@
 
 import crocodile.toolbox as tb
+from crocodile.matplotlib_management import ImShow, SaveType
 import numpy as np
+import pandas as pd
+
 from abc import ABC, abstractmethod
 import enum
 from tqdm import tqdm
+import copy
 
 
 # %% ========================== DeepLearning Accessories =================================
@@ -236,10 +240,10 @@ class DataReader(tb.Base):
         """
         if gt is None:
             labels = None
-            self.plotter = tb.ImShow(pred, labels=labels, sup_titles=names, origin='lower', **kwargs)
+            self.plotter = ImShow(pred, labels=labels, sup_titles=names, origin='lower', **kwargs)
         else:
             labels = ['Reconstruction', 'Ground Truth']
-            self.plotter = tb.ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
+            self.plotter = ImShow(pred, gt, labels=labels, sup_titles=names, origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
         """Implement here how you would visualize a batch of input and ouput pair.
@@ -265,7 +269,7 @@ class BaseModel(ABC):
         self.data = data  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = tb.List() if history is None else history  # should be populated in fit method, or loaded up.
-        self.plotter = tb.SaveType.NullAuto
+        self.plotter = SaveType.NullAuto
         self.kwargs = None
         self.tmp = None
 
@@ -293,13 +297,11 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
     def fit(self, viz=False, **kwargs):
-        default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train,
-                                     validation_data=(self.data.split.x_test, self.data.split.y_test),
-                                     batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1,
-                                     shuffle=self.hp.shuffle, callbacks=[])
+        default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train, validation_data=(self.data.split.x_test, self.data.split.y_test),
+                                     batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings.dict)
-        self.history.append(tb.Struct(tb.copy.deepcopy(hist.history)))
+        self.history.append(tb.Struct(copy.deepcopy(hist.history)))
         # it is paramount to copy, cause source can change.
         if viz: self.plot_loss()
         return self
@@ -410,7 +412,7 @@ class BaseModel(ABC):
                     a_metric.reset_states()
                 loss = a_metric(a_prediction[None], a_y_test[None])
                 loss_dict[name].append(np.array(loss).item())
-        return tb.pd.DataFrame(loss_dict)
+        return pd.DataFrame(loss_dict)
 
     def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
@@ -513,7 +515,7 @@ class BaseModel(ABC):
             print(f"Input shape = {ip.shape}")
             print(f"Output shape = {op.shape}")
             print("Stats on output data for random normal input:")
-            print(tb.pd.DataFrame(np.array(op).flatten()).describe())
+            print(pd.DataFrame(np.array(op).flatten()).describe())
             print("----------------------------------------", '\n\n')
 
 
@@ -541,7 +543,7 @@ class Ensemble(tb.Base):
             for i in tqdm(range(size)):
                 hp = self.hp_class()
                 hp.name = str(hp.name) + f'__model__{i}'
-                datacopy = tb.copy.copy(self.data)  # shallow copy
+                datacopy = copy.copy(self.data)  # shallow copy
                 datacopy.hp = hp
                 self.models.append(model_class(hp, datacopy))
         self.performance = None

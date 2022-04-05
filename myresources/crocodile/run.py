@@ -9,13 +9,13 @@ Choices made by default:
 
 If the file is to be loaded as a module (-m), then it will be `imported` into a script, rather than being
 executed by data_only, in which case the file data_only will be __main__.
-The advantage of running it as a module is having reference to the file from which classes came.
-This is vital for pickling.
+The advantage of running it as a module is having reference to the file from which classes came. This is vital for pickling.
 
 """
 
 import crocodile.toolbox as tb
 import argparse
+import os
 
 
 def build_parser():
@@ -24,28 +24,21 @@ def build_parser():
     # POSITIONAL ARGUMENT (UNNAMED)
     parser.add_argument(dest="file", help="Python file path.", default="this")
     # if dest is not specified, then, it has same path as keyword, e.g. "--dest"
-
     # parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
     parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
 
     # A FLAG:
     parser.add_argument("--main", help="Flag tells to run the file as main.", action="store_true")  # default is False
     # default is running as module, unless indicated by --main flag, which runs the script as main
-    parser.add_argument("--here", "-H",
-                        help="Flag for running in this window.", action="store_true")  # default is False
-    parser.add_argument("-s", "--solitary",
-                        help="Specify a non-interactive session.", action="store_true")  # default is False
-    parser.add_argument("-p", "--python",
-                        help="Use python over IPython.", action="store_true")  # default is False
-    parser.add_argument("-e", help="Explore the file (what are its contents).",
-                        action="store_true")  # default is False
+    parser.add_argument("--here", "-H", help="Flag for running in this window.", action="store_true")  # default is False
+    parser.add_argument("-s", "--solitary", help="Specify a non-interactive session.", action="store_true")  # default is False
+    parser.add_argument("-p", "--python", help="Use python over IPython.", action="store_true")  # default is False
+    parser.add_argument("-e", help="Explore the file (what are its contents).", action="store_true")  # default is False
 
     # OPTIONAL KEYWORD
     parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
-    parser.add_argument("--terminal", "-t", dest="terminal",
-                        help=f"Flag to specify which terminal to be used. Default CMD.", default="")  # can choose `wt`
-    parser.add_argument("--shell", "-S", dest="shell",
-                        help=f"Flag to specify which terminal to be used. Default CMD.", default="")
+    parser.add_argument("--terminal", "-t", dest="terminal",  help=f"Flag to specify which terminal to be used. Default CMD.", default="")  # can choose `wt`
+    parser.add_argument("--shell", "-S", dest="shell", help=f"Flag to specify which terminal to be used. Default CMD.", default="")
 
     args = parser.parse_args()
     print(f"Crocodile.run: args of the firing command: ")
@@ -62,9 +55,8 @@ def build_parser():
 
             path = tb.P(args.file)
             if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.
-                if path.is_absolute():
-                    path = path.rel2cwd()
-                path = str((path - path.suffix)).replace(tb.os.sep, ".")
+                if path.is_absolute(): path = path.rel2cwd()
+                path = str((path - path.suffix)).replace(os.sep, ".")
             else:  # It must be that user passed a.b format
                 assert path.exists() is False, f"I could not determine whether this is a.b or a/b format."
                 #         script = f"""
@@ -77,15 +69,10 @@ def build_parser():
 from {path} import *
 
 """
-            script += args.cmd
-            script += "\n"
-        else:
-            script = args.cmd
-
-        if args.func != "":
-            script += f"tb.E.run_globally({args.func}, globals())"
-        tb.Terminal().run_script(script=script, terminal=args.terminal, new_window=not args.here,
-                                 interactive=not args.solitary, ipython=not args.python)
+            script += args.cmd + "\n"
+        else: script = args.cmd
+        if args.func != "": script += f"tb.E.run_globally({args.func}, globals())"
+        tb.Terminal().run_script(script=script, terminal=args.terminal, new_window=not args.here, interactive=not args.solitary, ipython=not args.python)
 
 
 # tips: to launch python in the same terminal, simply don't use crocodile.run

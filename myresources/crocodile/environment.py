@@ -28,8 +28,7 @@ ProgramFilesX86 = P(tmp) if (tmp := os.getenv("ProgramFiles(x86)")) else None  #
 
 CommonProgramFiles = P(tmp) if (tmp := os.getenv("CommonProgramFiles")) else None  # C:\Program Files\Common Files
 CommonProgramW6432 = P(tmp) if (tmp := os.getenv("CommonProgramW6432")) else None  # C:\Program Files\Common Files
-CommonProgramFilesX86 = P(tmp) if \
-    (tmp := os.getenv("CommonProgramFiles(x86)")) else None  # C:\Program Files (x86)\Common Files
+CommonProgramFilesX86 = P(tmp) if (tmp := os.getenv("CommonProgramFiles(x86)")) else None  # C:\Program Files (x86)\Common Files
 
 Tmp = P(tmp) if (tmp := os.getenv("TMP")) else None  # C:\Users\usernrame\AppData\Local\Temp
 Temp = Tmp
@@ -57,8 +56,7 @@ OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe") if LocalA
 
 def get_address():
     netifaces = tb.install_n_import("netifaces")
-    subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0][
-        'netmask']
+    subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
     default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
 
     import uuid
@@ -72,8 +70,7 @@ def get_address():
 
     from requests import get
     public_ip = get('https://api.ipify.org').text
-    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4,
-                default_gateway=default_gateway, public_ip=public_ip)
+    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip=public_ip)
 
 
 # ============================== System Variables ==============================
@@ -136,12 +133,9 @@ class PathVar:
     def append_temporarily(path, kind="append", run=False):
         if system == "Windows":
             """Source: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.2"""
-            if kind == "append":  # Append to the Path variable in the current window:
-                command = fr'$env:Path += ";{path}"'
-            elif kind == "prefix":  # Prefix the Path variable in the current window:
-                command = fr'$env:Path = "{path};" + $env:Path'
-            elif kind == "replace":  # Replace the Path variable in the current window (use with caution!):
-                command = fr'$env:Path = "{path}"'
+            if kind == "append": command = fr'$env:Path += ";{path}"'  # Append to the Path variable in the current window:
+            elif kind == "prefix": command = fr'$env:Path = "{path};" + $env:Path'  # Prefix the Path variable in the current window:
+            elif kind == "replace": command = fr'$env:Path = "{path}"'  # Replace the Path variable in the current window (use with caution!):
             else: raise KeyError
             return command if run is False else tm.run(command, shell="powershell")
         else: result = f'export PATH="{path}:$PATH"'
@@ -178,8 +172,6 @@ class PathVar:
         if system == "Windows":
             result = fr'[System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'
             return result if run is False else tm.run(result, shell="powershell")
-        else:
-            raise NotImplementedError
 
 
 # ============================== Shells =========================================
@@ -198,6 +190,7 @@ def get_shell_profiles(shell):
 
 
 def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
+def get_defined_prorgams(string_="*.exe"): return Path.search(string_).reduce(lambda x, y: x+y).print()
 
 
 if __name__ == '__main__':

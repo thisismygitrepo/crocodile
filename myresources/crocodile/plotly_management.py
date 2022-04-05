@@ -62,8 +62,7 @@ class App:
     def run_async(func):
         if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
             cn = func.__qualname__.split(".")[0]  # class name is obtained.
-            module = func.__module__
-            module = tb.P(sys.modules['__main__'].__file__).rel2cwd().stem if module == "__main__" else module
+            module = tb.P(sys.modules['__main__'].__file__).rel2cwd().stem if (module := func.__module__) == "__main__" else module
             cmd = f"import {module} as m; inst=m.{cn}(); inst.{func.__name__}()"
         else:  # it is a standalone function.
             # module = func.__module__  # fails if the function comes from main as it returns __main__.

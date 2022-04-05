@@ -12,9 +12,9 @@ def validate_name(astring: str, replace='_'): return __import__("re").sub(r'^(?=
 def timestamp(fmt=None, name=None): return (name + '_' + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 
 
-def str2timedelta(past):
+def str2timedelta(shift):
     """Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
-    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[past[-1]], eval(past[:-1])
+    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 
 
@@ -170,7 +170,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
         return df
 
 
-class Struct(Base, dict):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
+class Struct(Base):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
     def __init__(self, dictionary=None, **kwargs):
         if dictionary is None or type(dictionary) is dict: final_dict = dict() if dictionary is None else dictionary

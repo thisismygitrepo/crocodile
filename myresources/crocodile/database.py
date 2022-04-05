@@ -38,11 +38,6 @@ class DBMS:
         self.sch_vws = None
         self.refresh()
 
-    def close(self):
-        self.con.close()
-        self.ses.close()
-        self.eng.dispose()
-
     def refresh(self, sch=None):
         # fails if multiple schemas are there and None is specified
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
@@ -59,11 +54,10 @@ class DBMS:
         return self
 
     @classmethod
-    def from_local_db(cls, path=None, echo=False):
-        return cls(engine=cls.make_sql_db(path, echo))
-
-    def __repr__(self):
-        return f"DataBase @ {self.eng}"
+    def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(path, echo))
+    def __repr__(self): return f"DataBase @ {self.eng}"
+    def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
+    def close(self): self.con.close(); self.ses.close(); self.eng.dispose()
 
     @staticmethod
     def make_sql_db(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
@@ -119,9 +113,6 @@ class DBMS:
         # df = pd.read_sql_table(table, con=self.eng, schema=schema or self.sch)
         return res
 
-    def get_columns(self, table, sch=None):
-        return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
-
     def insert_dicts(self, table, *mydicts):
         cmd = f"""INSERT INTO {table} VALUES """
         for mydict in mydicts:
@@ -142,7 +133,7 @@ class DBMS:
         print("SAMPLE:\n", df)
         if dtype:
             print("\n")
-            print("DETAILED COLUMNS:\n", tb.pd.DataFrame(self.insp.get_columns(table)))
+            print("DETAILED COLUMNS:\n", pd.DataFrame(self.insp.get_columns(table)))
             # print("DETAILED COLUMNS:\n", list(self.meta.tables[self._get_table_identifier(table, sch)].columns))
         print("\n" * 3)
 

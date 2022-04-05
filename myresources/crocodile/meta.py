@@ -516,10 +516,6 @@ class Experimental:
             first_parenth = func.find("(")
             # last_parenth = -1
             func = eval(tmp[:first_parenth])
-            # args_kwargs = tmp[first_parenth + 1: last_parenth]
-            # what is self? only for methods:
-            # tmp2 = tmp[:first_parenth]
-            # idx = -((tmp[-1:0:-1] + tmp[0]).find(".") + 1)
             self = ".".join(func.split(".")[:-1])
             _ = self
             func = eval(func, modules)
