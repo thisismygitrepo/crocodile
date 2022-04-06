@@ -3,7 +3,6 @@ import crocodile.toolbox as tb
 from crocodile.matplotlib_management import ImShow, SaveType
 import numpy as np
 import pandas as pd
-
 from abc import ABC, abstractmethod
 import enum
 from tqdm import tqdm
@@ -27,7 +26,7 @@ class HyperParam(tb.Struct):
     * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
     * Ease of saving settings of experiments! and also replicating it later.
     """
-    subpath = tb.P('metadata/hyper_params')  # location within model directory where this will be saved.
+    subpath = tb.P('metadata/hyper_param')  # location within model directory where this will be saved.
 
     def __init__(self, **kwargs):
         super().__init__(
@@ -50,16 +49,17 @@ class HyperParam(tb.Struct):
         )
         self._configured = False
         self.device_name = None
-        self.save_type = ["data", "whole", "both"][-1]
+        self.save_type = ["data", "obj", "both"][-1]
         self.update(**kwargs)
 
     def save(self, path=None, data_only=True, r=False, include_code=False, add_suffix=True):
         self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(str(self))
-        if self.save_type in {"whole", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False)
+        if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.dat.pkl"), add_suffix=False, data_only=True, desc="")
+        if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
 
     @classmethod
-    def from_saved(cls, path, *args, r=False, scope=None, **kwargs):  return super(HyperParam, cls).from_saved(path=tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl")
-    def __repr__(self): return tb.Struct(self.__dict__).print(config=True, return_str=True)
+    def from_saved_data(cls, path, *args, **kwargs): return super(HyperParam, cls).from_saved_data(tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
+    def __repr__(self): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
     @property
     def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
     @property
@@ -160,16 +160,12 @@ class DataReader(tb.Base):
         self.scaler = None
 
     def save(self, path=None, *args, **kwargs):
-        base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath)
-        if self.hp.save_type in {"whole", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False)
+        base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
+        if self.hp.save_type in {"data", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
+        if self.hp.save_type in {"obj", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False, data_only=False)
 
     @classmethod
-    def from_saved(cls, path, *args, **kwargs):
-        instance = cls(*args, **kwargs)
-        data = (tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl").readit()
-        instance.__setstate__(data)
-        return instance
-
+    def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
     def __getstate__(self): return dict(specs=self.specs, scaler=self.scaler)
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
@@ -413,36 +409,33 @@ class BaseModel(ABC):
 
     def save_class(self, weights_only=True, version='0', **kwargs):
         """Simply saves everything:
-
         1. Hparams
         2. Data specs
         3. Model architecture or weights depending on the following argument.
-
         :param version: Model version, up to the user.
         :param weights_only: self-explanatory
         :return:
-
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl')  # goes into the meta path.
+        tb.Save.pickle(obj=self.history, path=(hist_path:=self.hp.save_dir / 'metadata/history.pkl'), verbose=True, desc="Training History")  # goes into the meta path.
         # model save goes into data path.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
         # Saving wrapper_class and model architecture in the main path:
-        tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
-        print(f'Model class saved successfully!, check out: {self.hp.save_dir.as_uri()}')
+        # tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
+        print(f'SAVED: Model Class @ {self.hp.save_dir.as_uri()}')
 
     @classmethod
     def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None):
         path = tb.P(path)
 
-        if hparam_class is not None: hp_obj = hparam_class.from_saved(path)
+        if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
         else: hp_obj = (path / HyperParam.subpath + ".HyperParam.pkl").readit()
         if device_name: hp_obj.device_name = device_name
 
-        if data_class is not None: d_obj = data_class.from_saved(path, hp=hp_obj)
+        if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
         else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
         d_obj.hp = hp_obj
 
@@ -456,8 +449,8 @@ class BaseModel(ABC):
     @classmethod
     def from_class_model(cls, path):
         path = tb.P(path)
-        data_obj = DataReader.from_saved(path)
-        hp_obj = HyperParam.from_saved(path)
+        data_obj = DataReader.from_saved_data(path)
+        hp_obj = HyperParam.from_saved_data(path)
         model_obj = cls.load_model(path.search('*_save_*')[0])  # static method.
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class

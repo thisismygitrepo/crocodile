@@ -35,12 +35,11 @@ def install_n_import(package, name=None):
 
 def save_decorator(ext=""):  # pply default paths, add extension to path, print the saved file path
     def decorator(func):
-        def wrapper(obj, path=None, verbose=True, add_suffix=True, **kwargs):
+        def wrapper(obj, path=None, verbose=True, add_suffix=True, desc="", **kwargs):
             if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
             elif add_suffix and not str(path).endswith(ext): path = Path(str(path) + ext); print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}") if verbose else None
             else: path = Path(path).expanduser().resolve()
-            path.parent.mkdir(exist_ok=True, parents=True)
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
+            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__}: {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
             return path
         return wrapper
     return decorator
@@ -86,12 +85,15 @@ class Base(object):
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
-    def save(self, path=None, add_suffix=True, save_code=False, verbose=True):  # pickles the object
-        path = str(path or Path.home().joinpath(f"tmp_results/tmp_files/{randstr()}")); path = path.replace(".pkl", "")
-        if add_suffix: path += ("" if self.__class__.__name__ in path else ("." + self.__class__.__name__))  # Fruthermore, .zip or .pkl will be added later depending on `save_code` value, warning will be raised.
-        path = Path(path)
-        result_path = Save.pickle(obj=self, path=path, verbose=False, add_suffix=add_suffix)
-        print(f"Object ({Display.f(repr(self), 50)}) saved @ `{result_path.absolute().as_uri()}`, Directory: `{result_path.parent.absolute().as_uri()}`") if verbose else None; return result_path
+    def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):  # pickles the object
+        path = str(path or Path.home().joinpath(f"tmp_results/tmp_files/{randstr()}"))
+        if add_suffix: path = path.replace(".pkl", "").replace("." + self.__class__.__name__ , "").replace(".dat", ""); path += "." + self.__class__.__name__ + (".dat" if data_only else "") # Fruthermore, .zip or .pkl will be added later depending on `save_code` value, warning will be raised.
+        if data_only: obj = self.__getstate__(); obj = obj.copy()  # do not mess with original __dict__
+        else: obj = self
+        return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
+
+    @classmethod
+    def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
 
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
@@ -113,7 +115,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     @classmethod
     def from_replicating(cls, func, *args, replicas=None, **kwargs): return cls([func() for _ in range(replicas)]) if not args and not kwargs else cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
-    def __repr__(self): return f"List object with {len(self.list)} elements. First item of those is: \n" + f"{Display.get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
@@ -212,16 +214,16 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
     def keys(self, verbose=False) -> List: return List(list(self.dict.keys())) if not verbose else install_n_import("tqdm").tqdm(self.dict.keys())
     def values(self, verbose=False) -> List: return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
-    def items(self, verbose=False) -> List: return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items())
+    def items(self, verbose=False, desc="") -> List: return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items(), desc=desc)
     def get_values(self, keys) -> List: return List([self[key] for key in keys])
-    def apply_to_keys(self, kv_func, verbose=False): return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose)})
-    def apply_to_values(self, kv_func, verbose=False): [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose)]; return self
+    def apply_to_keys(self, kv_func, verbose=False, desc=""): return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
+    def apply_to_values(self, kv_func, verbose=False, desc=""): [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def filter(self, kv_func=None): return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self): return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-    def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
+    def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list'): return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
 
@@ -242,7 +244,7 @@ class Display:
     @staticmethod
     def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
     set_pandas_auto_width = staticmethod(lambda: __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-    config = staticmethod(lambda mydict, newline=True: "".join([f"{key} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
+    config = staticmethod(lambda mydict, newline=True, limit=15, justify=True: "".join([f"{key:>{limit if justify else 0}} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
     f = staticmethod(lambda str_, limit=50, direc="<": f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):{direc}{limit}}')
     @staticmethod
     def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.display.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
