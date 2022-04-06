@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 # ============================== Accessories ============================================
+import pandas as pd
 
 
 def validate_name(astring: str, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
@@ -112,7 +113,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     @classmethod
     def from_replicating(cls, func, *args, replicas=None, **kwargs): return cls([func() for _ in range(replicas)]) if not args and not kwargs else cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
-    def __repr__(self): return f"List object with {len(self.list)} elements. First item of those is: \n" + f"{repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List object with {len(self.list)} elements. First item of those is: \n" + f"{Display.get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
@@ -190,7 +191,9 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
-    def __getattr__(self, item): return self.__dict__[item]  # this works better with the linter. KeyError: raise AttributeError(f"Could not find the attribute `{item}` in this Struct object.")
+    def __getattr__(self, item):
+        try: return self.__dict__[item]
+        except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
@@ -219,33 +222,20 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
     def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
-
     @staticmethod
-    def concat_values(*dicts, method=None, lenient=True, collect_items=False, clone=True):
-        if not lenient:
-            keys = dicts[0].keys()
-            for i in dicts[1:]: assert i.keys() == keys
-        # else if lenient, take the union
-        if clone: total_dict = __import__("copy").deepcopy(dicts[0])  # take first dict in the tuple
-        else: total_dict = dicts[0]  # take first dict in the tuple
-        if collect_items:
-            for key, val in total_dict.item(): total_dict[key] = [val]
-            def method(tmp1, tmp2): return tmp1 + [tmp2]
-        if len(dicts) > 1:  # are there more dicts?
-            for adict in dicts[1:]:
-                for key in adict.keys():  # get everything from this dict
-                    try: total_dict[key] = (method or list.__add__)(total_dict[key], adict[key])  # may be the key exists in the total dict already.
-                    except KeyError:  # key does not exist in total dict
-                        if collect_items: total_dict[key] = [adict[key]]
-                        else: total_dict[key] = adict[key]
-        return Struct(total_dict)
+    def concat_values(*dicts, orient='list'): return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
 
-    def plot(self, artist=None):
-        if artist is None: fig, artist = __import__("matplotlib").pyplot.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
-        for key, val in self: artist.plot(val, label=key)
-        try: artist.fig.legend()
-        except AttributeError: pass
-        return artist
+    def plot(self, artist=None, use_plt=True):
+        if not use_plt:
+            from crocodile.plotly_management import px
+            fig = px.line(self.__dict__); fig.show(); return fig
+        else:
+            plt = __import__("matplotlib").pyplot
+            if artist is None: fig, artist = plt.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
+            for key, val in self.items(): artist.plot(val, label=key)
+            try: artist.legend()
+            except AttributeError: pass
+            return artist
 
 
 class Display:
@@ -263,6 +253,7 @@ class Display:
     def get_repr(data, limit=50, justify=False):
         if type(data) in {list, str}: string_ = data if type(data) is str else f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
         elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
+        elif type(data) is __import__("pandas").DataFrame: string_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}."
         else: string_ = repr(data)
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 

@@ -476,9 +476,8 @@ class BaseModel(ABC):
         import tensorflow as tf
         tf.keras.utils.plot_model(self.model, to_file=self.hp.save_dir / 'model_plot.png',
                                   show_shapes=True, show_layer_names=True, show_dtype=True,
-                                  expand_nested=True,
-                                  dpi=150, **kwargs)
-        print('Successfully plotted the model, check out \n', (self.hp.save_dir / 'model_plot.png').as_uri())
+                                  expand_nested=True, dpi=150, **kwargs)
+        print(f"Successfully plotted the model @ {(self.hp.save_dir / 'model_plot.png').as_uri()}")
 
     def build(self, ip_shape=None, verbose=True):
         """ Building has two main uses.
