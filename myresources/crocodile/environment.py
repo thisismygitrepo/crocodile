@@ -19,7 +19,7 @@ DotFiles = P.home().joinpath("dotfiles")
 
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
-WindowsApps = AppData.joinpath(r"Microsoft\WindowsApps") if AppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
+WindowsApps = LocalAppData.joinpath(r"Microsoft\WindowsApps") if AppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
 
 ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
 ProgramFiles = P(tmp) if (tmp := os.getenv("ProgramFiles")) else None  # C:\Program Files
@@ -40,9 +40,9 @@ HostName = os.getenv("COMPUTERNAME")  # e.g. "MY-SURFACE"
 LogonServer = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
 UserDomain = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
 UserDomainRoaming = P(tmp) if (tmp := os.getenv("USERDOMAIN_ROAMINGPROFILE")) else None  # e.g. SURFACE
-UserName = os.getenv("USERNAME")  # e.g: alex
-UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\eng_a
-HomePath = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\eng_a
+UserName = os.getenv("USERNAME")  # e.g: username
+UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\username
+HomePath = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
 Public = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
 
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
@@ -82,7 +82,6 @@ class ShellVar(object):
         if system == "Windows":
             res = f"set {key} {val}"
             return res if not run else tm.run(res, shell=shell)
-
         elif system == "Linux":
             res = f"{key} = {val}"
             return res if not run else tm.run(res, shell="bash")
