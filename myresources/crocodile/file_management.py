@@ -178,7 +178,7 @@ class P(type(Path()), Path):
         filename = self.expanduser().resolve().str
         if __import__("sys").platform == "win32":
             if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
-            else: tmp = rf'powershell {opener} \'{self}\'' # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            else: tmp = rf'powershell {opener} \'{self}\''  # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
         elif __import__("sys").platform == 'linux': subprocess.call(["xdg-open", filename])  # works for files and folders alike
         else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
@@ -310,7 +310,7 @@ class P(type(Path()), Path):
             except Exception: target = "BROKEN LINK " + str(self)
             if target == self: target = str(target)  # avoid infinite recursions for broken links.
             return "P: Symlink '" + str(self) + "' ==> " + repr(target)
-        elif self.is_absolute(): return "P: " + self._type() + " '" + self.clickable() + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "")+ (f" | {self.size()} Mb" if self.is_file() else "")
+        elif self.is_absolute(): return "P: " + self._type() + " '" + self.clickable() + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
         elif "http" in str(self): return "P: URL " + self.as_url_str()
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
 

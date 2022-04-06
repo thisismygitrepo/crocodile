@@ -102,13 +102,12 @@ class Log(object):
     @staticmethod
     def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
         """Basic Python logger."""
-        logger = Log.get_base_logger(logging, name, l_level)
-        Log.add_handlers(logger, logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
+        Log.add_handlers(logger := Log.get_base_logger(logging, name, l_level), logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
         return logger
 
     @staticmethod
     def get_base_logger(module, name, l_level):
-        if name is None: print(f"Logger path not passed. It is preferable to pass a path indicates the owner.")
+        if name is None: print(f"Logger name not passed. It is preferable to pass a name indicating the owner.")
         else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
         logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
         return logger
@@ -185,11 +184,9 @@ class Terminal:
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
         won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
         Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
-        * This method is short for:
-        res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
+        * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
         * Unlike `__import__('os').system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
-        * `shell=True` loads up the profile of the shell called so more specific commands can be run.
-            Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
+        * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
         * `text=True` converts the bytes objects returned in stdout to text by default.
         :param shell:
         :param ip:
@@ -200,9 +197,7 @@ class Terminal:
         if self.elevated is False or self.is_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         """ The advantage of addig `powershell -Command` is to give access to wider range of options. Other wise, command prompt shell doesn't recognize commands like `ls`.
-        `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned.
-        # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`
-        """
+        `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned. # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`"""
         return self.Response.from_completed_process(resp)
 
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
@@ -215,9 +210,7 @@ class Terminal:
         https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html
         """
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
-        if shell is None:
-            if self.machine == "win32": shell = ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
-            else: shell = ""
+        if shell is None: shell = "" if self.machine == "win32" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
         extra, my_list = ("-Command" if shell in {"powershell", "pwsh"} else ""), list(cmds)
         if self.machine == "win32": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
@@ -362,22 +355,16 @@ class SSH(object):
 
 
 class Scheduler:
-    def __init__(self, routine=lambda: None, occasional=lambda: None,
-                 exception=None, wind_down=None,
-                 other: int = 10, wait: str = "2m", runs=float("inf"), logger=None):
-        """
-        :param wait: repeat the cycle every this many minutes.
-        """
-        self.routine = routine  # main routine to be repeated every `wait` time_produced.
-        self.occasional = occasional  # routine to be repeated every `other` time_produced.
-        self.exception_handler = exception if exception is not None else lambda ex: None
-        self.wind_down = wind_down
-        # routine to be run when an error occurs, e.g. save object.
+    def __init__(self, routine=lambda: None, wait: str = "2m", occasional=lambda: None, other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
+        self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = wait  # wait period between routine cycles.
+        self.occasional = occasional  # routine to be repeated every `other` time period
         self.other = other  # number of routine cycles before `occasional` get executed once.
         self.cycles = runs  # how many times to run the routine. defaults to infinite.
+        self.exception_handler = exception if exception is not None else lambda ex: None
+        self.wind_down = wind_down  # routine to be run when an error occurs, e.g. save object.
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
-        self._start_time = None  # begining of a session (local time_produced)
+        self._start_time = None  # begining of a session (local time)
         self.history, self.count, self.total_count = [], 0, 0
 
     def run(self, until="2050-01-01", cycles=None):
@@ -385,9 +372,7 @@ class Scheduler:
         self.count = 0
         self._start_time = datetime.now()
         wait_time = str2timedelta(self.wait).total_seconds()
-        import pandas as pd  # TODO remove this dependency
-        until = pd.to_datetime(until)  # (local time_produced)
-        while datetime.now() < until and self.count < self.cycles:
+        while datetime.now() < datetime.fromisoformat(until) and self.count < self.cycles:
             # 1- Opening Message ==============================================================
             time1 = datetime.now()  # time_produced before calcs started.  # use  fstring format {x:<10}
             self.logger.info(f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
@@ -463,11 +448,10 @@ class Experimental:
         import inspect
         text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
         if obj is not None:
-            lines = inspect.getsource(obj)
-            text += f"# Code to generate the result\n" + "```python\n" + lines + "\n```" + separator
+            text += f"# Code to generate the result\n" + "```python\n" + inspect.getsource(obj) + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
         (readmepath := P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
-        print(f"Successfully generated README.md file. Checkout:\n", readmepath.absolute().as_uri())
+        print(f"README.md file generated @ {readmepath.absolute().as_uri()}")
         if save_source_code:
             P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
             print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
@@ -480,8 +464,7 @@ class Experimental:
         * Returns either the package or a piece of it as indicated by ``obj``
         """
         P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
-        sys.path.insert(0, str(tmpdir))
-        sourcefile = __import__(tmpdir.find("*").stem)
+        sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem)
         tmpdir.delete(sure=delete, verbose=False)
         return getattr(sourcefile, obj) if obj is not None else sourcefile
 
@@ -496,7 +479,7 @@ class Experimental:
         code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
         exec(code, scope, res := dict())  # run the function within the scope `res`
         if update_scope: scope.update(res)
-        return res
+        return Struct(res)
 
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None,
