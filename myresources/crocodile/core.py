@@ -77,6 +77,8 @@ class Base(object):
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
     def evalstr(self, string_, func=True, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
+    @classmethod
+    def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
 
     def save_code(self, path):  # a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
         module = __import__("inspect").getmodule(self)
@@ -90,9 +92,6 @@ class Base(object):
         if data_only: obj = self.__getstate__(); obj = obj.copy()  # do not mess with original __dict__
         else: obj = self
         return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
-
-    @classmethod
-    def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
 
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))

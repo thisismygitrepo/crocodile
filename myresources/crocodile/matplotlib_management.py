@@ -125,7 +125,7 @@ class FigureManager:
     def get_fig(self, figname='', suffix=None, **kwargs): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
     def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
     @staticmethod
-    def set_ax_to_real_life_size(ax, inch_per_unit=1 / 25.4): FigureManager.set_ax_size(ax, (limit_x := ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (limit_y := ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
+    def set_ax_to_real_life_size(ax, inch_per_unit=1 / 25.4): FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
     def close(self): plt.close(self.fig)
 
     def show_help(self, event):
@@ -178,15 +178,12 @@ class FigureManager:
             else:
                 while len(ax.texts) > 0: [text.remove() for text in ax.texts]
 
-
     def process_key(self, event):
         self.event = event  # useful for debugging.
         for key in self.help_menu.keys():
-            if event.key in key:
-                self.help_menu[key]['func'](event)
-                break
+            if event.key in key: self.help_menu[key]['func'](event); break
         self.update_info_text(self.message)
-        if event.key != 'q': (fig := event.canvas.figure).canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
+        if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
 
     @staticmethod
     def get_nrows_ncols(num_plots, nrows=None, ncols=None):
@@ -215,7 +212,7 @@ class FigureManager:
         self.boundaries_flag = not self.boundaries_flag
         axis = event.inaxes
         if event.key == 'a':
-            if axis: # event.inaxes.axis(['off', 'on'][self.boundaries_flag])
+            if axis:  # event.inaxes.axis(['off', 'on'][self.boundaries_flag])
                 self.toggle_ticks(axis)
                 self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
         else: [self.toggle_ticks(ax) for ax in self.ax]
@@ -248,7 +245,7 @@ class FigureManager:
 
     @staticmethod
     def set_ax_size(ax, w, h, units='inches'):
-        l, r, t, b = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom
+        l, r, t, b, _ = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom, units
         ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
 
     @staticmethod
@@ -292,7 +289,8 @@ class SaveType:
     class GenericSave:
         """ You can either pass the figures to be tracked at init time, pass them dynamically at add time, or, add method will capture every figure and axis"""
         stream = ['clear', 'accumulate', 'update'][0]
-        def __init__(self, save_dir=None, save_name=None, watch_figs: list or None=None, max_calls=2000, delay=100, **kwargs):
+
+        def __init__(self, save_dir=None, save_name=None, watch_figs: list or None = None, max_calls=2000, delay=100, **kwargs):
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
             self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_image_save")
             self.kwargs, self.counter, self.delay, self.max = kwargs, 0, delay, max_calls,
@@ -300,7 +298,7 @@ class SaveType:
         def add(self, fignames=None, names=None, **kwargs):
             print(f"Saver added frame number {self.counter}", end='\r')
             self.counter += 1; plt.pause(self.delay * 0.001); print('Turning off IO') if self.counter > self.max else None; plt.ioff()
-            self.watch_figs = [plt.figure(figname) for figname in fignames]  if fignames else ([plt.figure(k) for k in plt.get_figlabels()] if self.watch_figs is None else self.watch_figs)  # path sent explicitly, # None exist ==> add all else # they exist already.
+            self.watch_figs = [plt.figure(figname) for figname in fignames] if fignames else ([plt.figure(k) for k in plt.get_figlabels()] if self.watch_figs is None else self.watch_figs)  # path sent explicitly, # None exist ==> add all else # they exist already.
             if names is None: names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]  # individual save path, useful for PNG.
             for afig, aname in zip(self.watch_figs, names): self._save(afig, aname, **kwargs)
 
@@ -322,7 +320,7 @@ class SaveType:
     class PNG(GenericSave):
         def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
         def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
-        def finish(self):  print(f"PNGs Saved @", P(self.fname).absolute().as_uri()); return self.fname
+        def finish(self): print(f"PNGs Saved @", P(self.fname).absolute().as_uri()); return self.fname
 
     class GIF(GenericSave):
         """Requirements: same axis must persist (If you clear the axis, nothing will be saved), only new objects are drawn inside it. This is not harsh as no one wants to add multiple axes on top of each other.
@@ -533,7 +531,7 @@ class VisibilityViewer(FigureManager):
         print(f"VViewer added plot number {self.index}", end='\r')
         if hide_artist_axes: self.hide_artist_axes()
 
-    def animate(self): # remove current axes and set self.index as visible.
+    def animate(self):  # remove current axes and set self.index as visible.
         [ax.set_visible(False) for ax in self.axes_repo[self.current]]; [text.set_visible(False) for text in self.texts_repo[self.current]]
         [ax.set_visible(True) for ax in self.axes_repo[self.index]]; [text.set_visible(True) for text in self.texts_repo[self.index]]
         self.current = self.index
@@ -586,8 +584,7 @@ class VisibilityViewerAuto(VisibilityViewer):
             self.saver.add()
             if self.pause: break
             else: self.index = i
-        if self.index == self.index_max - 1 and not self.pause:  # arrived at last image and not in manual mode
-            self.fname = self.saver.finish()
+        if self.index == self.index_max - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
 
     @staticmethod
     def test(): return VisibilityViewerAuto(data=np.random.randn(1, 10, 10, 3))
@@ -628,7 +625,7 @@ class ImShow(FigureManager):
         # bnext.on_clicked(callback.next)
         # bprev = Button(axprev, 'Previous')
         # bprev.on_clicked(callback.prev)
-        sub_labels = [[a_label for _ in np.arange(self.index_max)] for a_label in labels] if labels is not None else [[str(i) for i in np.arange(self.index_max)] for _ in range(self.num_plots)]
+        sub_labels = [[a_label for _ in np.arange(self.index_max)] for a_label in labels] if labels is not None else ([[str(i) for i in np.arange(self.index_max)] for _ in range(self.num_plots)] if sub_labels is None else sub_labels)
         self.image_list, self.sub_labels, self.titles = images_list, sub_labels, sup_titles if sup_titles is not None else [str(i) for i in np.arange(self.index_max)]
         self.pause, self.kwargs, self.delay, self.auto_brightness = pause, kwargs, delay, auto_brightness
         self.fname = self.event = None
@@ -732,11 +729,7 @@ class Artist(FigureManager):
         rax = self.fig.add_axes(self.visibility_ax)
         labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
         self.check_b = CheckButtons(rax, labels, visibility)
-
-        def func(label):
-            index = labels.index(label)
-            self.ax.lines[index].set_visible(not self.ax.lines[index].get_visible())
-            self.fig.canvas.draw()
+        def func(label): self.ax.lines[index := labels.index(label)].set_visible(not self.ax.lines[index].get_visible()); self.fig.canvas.draw()
         self.check_b.on_clicked(func)
 
     @staticmethod
