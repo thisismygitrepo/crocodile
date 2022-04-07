@@ -418,7 +418,7 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        tb.Save.pickle(obj=self.history, path=(hist_path:=self.hp.save_dir / 'metadata/history.pkl'), verbose=True, desc="Training History")  # goes into the meta path.
+        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         # model save goes into data path.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
         if weights_only: self.save_weights(save_dir)

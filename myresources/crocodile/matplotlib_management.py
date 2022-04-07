@@ -315,12 +315,12 @@ class SaveType:
             self.fname = self.save_dir.joinpath(self.save_name + '.pdf'); self.pp = PdfPages(self.fname)
 
         def _save(self, a_fig, a_name, bbox_inches='tight', pad_inches=0.3, **kwargs): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
-        def finish(self, open_result=True): print(f"Saving results ..."); self.pp.close(); print(f"PDF Saved @", P(self.fname).absolute().as_uri()); self.fname() if open_result else None; return self
+        def finish(self, open_result=True): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); self.fname() if open_result else None; return self
 
     class PNG(GenericSave):
         def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
         def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
-        def finish(self): print(f"PNGs Saved @", P(self.fname).absolute().as_uri()); return self.fname
+        def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self.fname
 
     class GIF(GenericSave):
         """Requirements: same axis must persist (If you clear the axis, nothing will be saved), only new objects are drawn inside it. This is not harsh as no one wants to add multiple axes on top of each other.
@@ -357,7 +357,7 @@ class SaveType:
                     ani = animation.ArtistAnimation(a_fig, ims, interval=self.interval, blit=True, repeat_delay=1000)
                     self.fname = os.path.join(self.save_dir, f'{a_fig.get_label()}_{self.save_name}.gif')
                     ani.save(self.fname, writer=MovieWriter(fps=4))  # if you don't specify the writer, it goes to ffmpeg by default then try others if that is not available, resulting in behaviours that is not consistent across machines.
-                    print(f"GIF Saved @", P(self.fname).absolute().as_uri())
+                    print(f"SAVED GIF @", P(self.fname).absolute().as_uri())
                 else: print(f"Nothing to be saved by GIF writer."); return self.fname
 
     class GIFFileBased(GenericSave):
@@ -374,7 +374,7 @@ class SaveType:
             self.writer.setup(fig=self.watch_figs[0], outfile=self.fname, dpi=dpi)
 
         def _save(self, afig, aname, **kwargs): self.writer.grab_frame(**kwargs)
-        def finish(self): print('Saving results ...'); self.writer.finish(); print(f"Saved @", P(self.fname).absolute().as_uri()); return self.fname
+        def finish(self): print('Saving results ...'); self.writer.finish(); print(f"SAVED GIF @", P(self.fname).absolute().as_uri()); return self.fname
 
     class GIFPipeBased(GIFFileBased):
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
@@ -466,7 +466,7 @@ class SaveType:
                     self.plotter.animate(datum)
                     self.saver.grab_frame()
                     plt.pause(self.delay * 0.001)
-            print(f"Results saved successfully @ {self.fname}")
+            print(f"SAVED GIF successfully @ {self.fname}")
 
     class GIFPipeBasedAuto(GIFFileBasedAuto):
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
