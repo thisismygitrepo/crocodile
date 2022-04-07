@@ -174,7 +174,7 @@ class FigureManager:
                 message = f"Auto-brightness flag is set to {self.auto_brightness}"
                 if self.auto_brightness:  # this change is only for the current image.
                     im = self.ax.images[0]
-                    im.norm.autoscale(im.get_array()) # changes to all ims take place in animate as in ImShow and Nifti methods animate.
+                    im.norm.autoscale(im.get_array())  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
             vmin, vmax = ax.images[0].get_clim()
             if event.key in '-_': message = 'increase vmin'; vmin += 1
             elif event.key in '[{': message = 'decrease vmin'; vmin -= 1
@@ -928,7 +928,7 @@ class ImShow(FigureManager):
         if self.index == self.index_max - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
 
     @staticmethod
-    def cm(im, nrows=3, ncols=7, **kwargs): # Useful for looking at one image in multiple cmaps
+    def cm(im, nrows=3, ncols=7, **kwargs):  # Useful for looking at one image in multiple cmaps
         _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs)
         return [plt.get_cmap(style)(im) for style in plt.colormaps()]
 
@@ -969,9 +969,7 @@ class Artist(FigureManager):
             if not create_new_axes:  # are we going to ever create new axes?
                 self.create_new_axes = True  # if not then let's create one now.
                 self.get_axes()
-        self.create_new_axes = create_new_axes
-        self.visibility_ax = [0.01, 0.05, 0.2, 0.15]
-        self.txt = []
+        self.create_new_axes, self.visibility_ax, self.txt = create_new_axes, [0.01, 0.05, 0.2, 0.15], []
 
     def accessorize(self, *args, legends=None, title=None, **kwargs):
         self.line = self.ax[0].plot(*args, **kwargs)

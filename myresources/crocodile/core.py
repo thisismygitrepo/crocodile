@@ -6,7 +6,6 @@ from pathlib import Path
 
 
 # ============================== Accessories ============================================
-import pandas as pd
 
 
 def validate_name(astring: str, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
@@ -33,9 +32,9 @@ def install_n_import(package, name=None):
 # ====================================== Classes ====================================
 
 
-def save_decorator(ext=""):  # pply default paths, add extension to path, print the saved file path
+def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
     def decorator(func):
-        def wrapper(obj, path=None, verbose=True, add_suffix=True, desc="", **kwargs):
+        def wrapper(obj, path: str = None, verbose=True, add_suffix=True, desc="", **kwargs):
             if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
             elif add_suffix and not str(path).endswith(ext): path = Path(str(path) + ext); print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}") if verbose else None
             else: path = Path(path).expanduser().resolve()
@@ -87,7 +86,7 @@ class Base(object):
 
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):  # pickles the object
         path = str(path or Path.home().joinpath(f"tmp_results/tmp_files/{randstr()}"))
-        if add_suffix: path = path.replace(".pkl", "").replace("." + self.__class__.__name__ , "").replace(".dat", ""); path += "." + self.__class__.__name__ + (".dat" if data_only else "") # Fruthermore, .zip or .pkl will be added later depending on `save_code` value, warning will be raised.
+        if add_suffix: path = path.replace(".pkl", "").replace("." + self.__class__.__name__, "").replace(".dat", ""); path += "." + self.__class__.__name__ + (".dat" if data_only else "")  # Fruthermore, .zip or .pkl will be added later depending on `save_code` value, warning will be raised.
         if data_only: obj = self.__getstate__(); obj = obj.copy()  # do not mess with original __dict__
         else: obj = self
         return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
@@ -193,9 +192,10 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
+
     def __getattr__(self, item):
         try: return self.__dict__[item]
-        except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
+        except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
@@ -225,7 +225,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
     def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
-    def concat_values(*dicts, orient='list'): return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
+    def concat_values(*dicts, orient='list'): return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
 
     def plot(self, artist=None, use_plt=True):
         if not use_plt:
