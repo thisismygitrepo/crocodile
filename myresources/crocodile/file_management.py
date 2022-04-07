@@ -252,10 +252,7 @@ class P(type(Path()), Path):
     def __sub__(self, other): res = P(str(self).replace(str(other), "")); return res[1:] if str(res[0]) in {"\\", "/"} else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
-
-    def collapseuser(self, strict=True, inlieu=False):
-        if strict: assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)} OR one path is relative and the other is absolute.")
-        return self if "~" in self else self._return("~" / (self - P.home()), inlieu)
+    def collapseuser(self, strict=True, inlieu=False): assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self - P.home()), inlieu)
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -265,12 +262,10 @@ class P(type(Path()), Path):
         :param mode: "lenient" mode makes `split` method behaves like split method of string. This can produce unwanted behaviour due to e.g. patial matches. 'strict' mode is the default which only splits at exact match.
         :return: two paths
         """
-        # ====================================   Splitting
-        if index is None and (at is not None):  # at is provided
+        if index is None and (at is not None):  # at is provided  # ====================================   Splitting
             if mode == "lenient":
                 items = str(self).split(sep=str(at))
-                one, two = items[0], items[1]
-                one, two = one[:-1] if one.endswith("/") else one, two[1:] if two.startswith("/") else two
+                one, two = items[0], items[1]; one, two = one[:-1] if one.endswith("/") else one, two[1:] if two.startswith("/") else two
             else:  # "strict"
                 index = self.parts.index(str(at))  # raises an error if exact match is not found.
                 one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
@@ -279,8 +274,7 @@ class P(type(Path()), Path):
             one, two = self[:index], P(*self.parts[index + 1:])
             at = self[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
-        # ================================  appending `at` to one of the portions
-        if sep == 0: pass  # neither of the portions get the sperator appended to it.
+        if sep == 0: pass  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
         elif sep == 1: two = at / two   # append it to right portion
         elif sep == -1: one = one / at  # append it to left portion.
         else: raise ValueError(f"`sep` should take a value from the set [-1, 0, 1] but got {sep}")
@@ -420,9 +414,8 @@ class P(type(Path()), Path):
         if compressed is False and self.is_file(): return self
         results = self.search(*args, r=r, compressed=compressed, **kwargs)
         if len(results) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
-
-    def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
+    def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     pwd = staticmethod(lambda: P.cwd())
     tempdir = staticmethod(lambda: P(__import__("tempfile").mktemp()))
     temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))

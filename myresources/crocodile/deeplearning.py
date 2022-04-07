@@ -316,6 +316,8 @@ class BaseModel(ABC):
 
     def postprocess(self, *args, **kwargs): return self.data.postprocess(*args, **kwargs)
     def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
+    def predict(self, x, **kwargs): return self.postprocess(self.infer(x), **kwargs)
+    def viz(self, *args, **kwargs): self.data.viz(*args, **kwargs)
 
     def infer(self, x):
         """
@@ -326,19 +328,14 @@ class BaseModel(ABC):
         """
         return self.model.predict(x)  # Keras automatically handles special layers.
 
-    def predict(self, x, **kwargs): return self.postprocess(self.infer(x), **kwargs)
-
     def deduce(self, obj, viz=True, **kwargs):
         """Assumes that contents of the object are in the form of a batch."""
         preprocessed = self.preprocess(obj, **kwargs)
         prediction = self.infer(preprocessed)
         postprocessed = self.postprocess(prediction, **kwargs)
         result = tb.Struct(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
-        if viz:
-            self.viz(postprocessed, **kwargs)
+        if viz: self.viz(postprocessed, **kwargs)
         return result
-
-    def viz(self, *args, **kwargs): self.data.viz(*args, **kwargs)
 
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
@@ -456,9 +453,7 @@ class BaseModel(ABC):
         return wrapper_class
 
     def summary(self): return self.model.summary()
-
-    def config(self):
-        for layer in self.model.layers: print(layer.get_config(), "\n==============================")
+    def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
 
     def plot_model(self, **kwargs):
         """
@@ -485,14 +480,13 @@ class BaseModel(ABC):
         :return:
         """
         ip, _ = self.data.get_random_input_output(ip_shape=ip_shape)
-        op = self.model(ip)
-        self.tmp = op
+        self.tmp = self.model(ip)  # op
         if verbose:
             print("============  Build Test ==============")
             print(f"Input shape = {ip.shape}")
-            print(f"Output shape = {op.shape}")
+            print(f"Output shape = {self.tmp.shape}")
             print("Stats on output data for random normal input:")
-            print(pd.DataFrame(np.array(op).flatten()).describe())
+            print(pd.DataFrame(np.array(self.tmp).flatten()).describe())
             print("----------------------------------------", '\n\n')
 
 
@@ -550,9 +544,7 @@ class Ensemble(tb.Base):
                 self.performance.save_pickle(self.hp_class.save_dir / "performance.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
-    def clear_memory(self):
-        # t.cuda.empty_cache()
-        pass
+    def clear_memory(self): pass  # t.cuda.empty_cache()
 
 
 class Losses:
@@ -637,9 +629,7 @@ class HPTuning:
                 accuracy = self.run(param_dict)
                 self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
 
-    def optimize(self):
-        self.gen_writer()
-        self.loop()
+    def optimize(self): self.gen_writer(); self.loop()
 
 
 class KerasOptimizer:

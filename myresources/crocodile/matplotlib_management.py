@@ -188,13 +188,10 @@ class FigureManager:
     @staticmethod
     def get_nrows_ncols(num_plots, nrows=None, ncols=None):
         if not nrows and not ncols:
-            nrows = int(np.floor(np.sqrt(num_plots)))
-            ncols = int(np.ceil(np.sqrt(num_plots)))
-            while nrows * ncols < num_plots:
-                ncols += 1
+            nrows, ncols = int(np.floor(np.sqrt(num_plots))), int(np.ceil(np.sqrt(num_plots)))
+            while nrows * ncols < num_plots: ncols += 1
         elif not ncols and nrows: ncols = int(np.ceil(num_plots / nrows))
         elif not nrows and ncols: nrows = int(np.ceil(num_plots / ncols))
-        else: pass
         return nrows, ncols
 
     def show_cursor(self, event):
@@ -421,7 +418,6 @@ class SaveType:
 
             def gen_function():
                 for i in zip(*self.data): yield i
-
             self.gen = gen_function
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs)
             plt.pause(self.delay * 0.001)  # give time_produced for figures to show up before updating them
@@ -430,7 +426,7 @@ class SaveType:
             fname = f"{os.path.join(self.save_dir, self.save_name)}.{extension}"
             self.fname = fname
             self.ani.save(filename=fname, writer=writer)
-            print(f"Saved @", P(self.fname).absolute().as_uri())
+            print(f"SAVED GIF @ ", P(self.fname).absolute().as_uri())
 
     class PDFAuto(GenericAuto):
         def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = SaveType.PDF(**kwargs); self.animate()
@@ -550,23 +546,20 @@ class VisibilityViewerAuto(VisibilityViewer):
         :param artist: an instance of a class that subclasses `Artist`
         :param memorize: if set to True, then axes are hidden and shown again, otherwise, plots constructed freshly every time_produced they're shown (axes are cleaned instead of hidden)
         """
-        self.kwargs = kwargs
-        self.memorize = memorize
         self.max_index_memorized = 0
+        self.fname = None
         self.data = np.array(list(zip(*data))) if transpose else data
         self.legends = [f"Curve {i}" for i in range(len(self.data))] if legends is None else legends
         self.titles = titles if titles is not None else np.arange(len(self.data))
-        self.lables = x_labels
         if artist is None: artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends, create_new_axes=True, **kwargs)
         else:
             artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
             if memorize: assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new axes from the artist with every plot"
         self.artist = artist
         super().__init__(artist=self.artist, hide_artist_axes=False)
-        self.index_max = len(self.data)
-        self.pause = pause
         self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay)
-        self.fname = None
+        self.index_max, self.pause, self.kwargs, self.memorize, self.lables = len(self.data), pause, kwargs, memorize, x_labels
+    test = staticmethod(lambda: VisibilityViewerAuto(data=np.random.randn(1, 10, 10, 3)))
 
     def animate(self):
         for i in range(self.index, self.index_max):
@@ -585,9 +578,6 @@ class VisibilityViewerAuto(VisibilityViewer):
             if self.pause: break
             else: self.index = i
         if self.index == self.index_max - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
-
-    @staticmethod
-    def test(): return VisibilityViewerAuto(data=np.random.randn(1, 10, 10, 3))
 
 
 class ImShow(FigureManager):
@@ -619,12 +609,8 @@ class ImShow(FigureManager):
         self.num_plots = len(images_list)   # Number of images in each plot
         self.index_max = min([len(images_list[i]) for i in range(self.num_plots)])
         nrows, ncols = self.get_nrows_ncols(self.num_plots, nrows, ncols)
-        # axprev = plt.axes([0.7, 0.05, 0.1, 0.075])
-        # axnext = plt.axes([0.81, 0.05, 0.1, 0.075])
-        # bnext = Button(axnext, 'Next')
-        # bnext.on_clicked(callback.next)
-        # bprev = Button(axprev, 'Previous')
-        # bprev.on_clicked(callback.prev)
+        # bnext = Button(plt.axes([0.81, 0.05, 0.1, 0.075]), 'Next').on_clicked(callback.next)
+        # bprev = Button(plt.axes([0.7, 0.05, 0.1, 0.075]), 'Previous').on_clicked(callback.prev)
         sub_labels = [[a_label for _ in np.arange(self.index_max)] for a_label in labels] if labels is not None else ([[str(i) for i in np.arange(self.index_max)] for _ in range(self.num_plots)] if sub_labels is None else sub_labels)
         self.image_list, self.sub_labels, self.titles = images_list, sub_labels, sup_titles if sup_titles is not None else [str(i) for i in np.arange(self.index_max)]
         self.pause, self.kwargs, self.delay, self.auto_brightness = pause, kwargs, delay, auto_brightness
@@ -676,20 +662,13 @@ class ImShow(FigureManager):
         return [plt.get_cmap(style)(im) for style in plt.colormaps()]
 
     def annotate(self, event, axis=None, data=None): [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
-    @classmethod
-    def from_saved_images_path_lists(cls, *image_list, **kwargs): return cls(*[[plt.imread(an_image) for an_image in alist] for alist in image_list], sub_labels=[[P(an_image).name for an_image in alist] for alist in image_list], **kwargs)
-    @classmethod
-    def from_directories(cls, *directories, extension='png', **kwargs): return cls.from_saved_images_path_lists(*[P(a_dir).search(f"*.{extension}", win_order=True) for a_dir in directories], **kwargs)
-    @classmethod
-    def from_saved(cls, *things, **kwargs): return cls.from_saved_images_path_lists(*things, **kwargs) if isinstance(things[0], list) else cls.from_directories(*things, **kwargs)
-    @staticmethod
-    def imagesc(): pass  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-    @staticmethod
-    def test(): return ImShow(*np.random.randn(12, 10, 80, 120))
-    @classmethod
-    def complex(cls, data, pause=True, **kwargs): return cls(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs)
-    @staticmethod
-    def resize(path, m, n): plt.imsave(path, install_n_import("skimage").transform.resize(plt.imread(path), (m, n), anti_aliasing=True))
+    from_saved_images_path_lists = staticmethod(lambda *image_list, **kwargs: ImShow(*[[plt.imread(an_image) for an_image in alist] for alist in image_list], sub_labels=[[P(an_image).name for an_image in alist] for alist in image_list], **kwargs))
+    from_directories = staticmethod(lambda *directories, extension='png', **kwargs: ImShow.from_saved_images_path_lists(*[P(a_dir).search(f"*.{extension}", win_order=True) for a_dir in directories], **kwargs))
+    from_saved = staticmethod(lambda *things, **kwargs: ImShow.from_saved_images_path_lists(*things, **kwargs) if isinstance(things[0], list) else ImShow.from_directories(*things, **kwargs))
+    from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
+    imagesc = staticmethod(lambda: None)  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
+    test = staticmethod(lambda: ImShow(*np.random.randn(12, 10, 80, 120)))
+    resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import("skimage").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
 
 
 class Artist(FigureManager):
@@ -729,7 +708,7 @@ class Artist(FigureManager):
         rax = self.fig.add_axes(self.visibility_ax)
         labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
         self.check_b = CheckButtons(rax, labels, visibility)
-        def func(label): self.ax.lines[index := labels.index(label)].set_visible(not self.ax.lines[index].get_visible()); self.fig.canvas.draw()
+        def func(label): index = labels.index(label); self.ax.lines[index].set_visible(not self.ax.lines[index].get_visible()); self.fig.canvas.draw()
         self.check_b.on_clicked(func)
 
     @staticmethod
