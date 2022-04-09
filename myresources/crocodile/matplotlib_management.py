@@ -18,10 +18,7 @@ class FigurePolicy(enum.Enum):
 
 
 class FigureManager:
-    """
-    Handles figures of matplotlib.
-    """
-
+    """Handles figures of matplotlib."""
     def __init__(self, info_loc=None, figpolicy=FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
@@ -35,8 +32,7 @@ class FigureManager:
         self.auto_brightness = False
         self.info_loc = [0.8, 0.01] if info_loc is None else info_loc
         self.pix_vals = False
-        self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes. \\ "
-                                                 "toggles auto-brightness ", 'func': self.adjust_brightness},
+        self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
                           "/": {'help': 'Show/Hide info text', 'func': self.text_info},
                           "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
                           "tyTY": {'help': 'Change color map', 'func': self.change_cmap},
@@ -44,18 +40,14 @@ class FigureManager:
                           "v": {'help': 'Show/Hide pixel values (Toggle)', 'func': self.show_pix_val},
                           'P': {'help': 'Pause/Proceed (Toggle)', 'func': self.pause_func},
                           'r': {'help': 'Replay', 'func': self.replay},
-                          '1': {'help': 'Previous Image', 'func': self.previous},
-                          '2': {'help': 'Next Image', 'func': self.next},
+                          '1': {'help': 'Previous Image', 'func': self.previous}, '2': {'help': 'Next Image', 'func': self.next},
                           'S': {'help': 'Save Object', 'func': self.save},
                           'c': {'help': 'Show/Hide cursor', 'func': self.show_cursor},
                           'aA': {'help': 'Show/Hide ticks and their labels', 'func': self.show_ticks},
                           'alt+a': {'help': 'Show/Hide annotations', 'func': self.toggle_annotate}}
-        # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before.
-        # Otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
-        self.message = ''
-        self.message_obj = self.cursor = None
-        self.annot_flag = False  # one flag for all axes?
-        self.boundaries_flag = True
+        # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before, otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
+        self.message, self.message_obj, self.cursor = '', None, None
+        self.boundaries_flag, self.annot_flag = True, False  # one flag for all axes?
 
     @staticmethod
     def grid(ax, factor=5, x_or_y='both', color='gray', alpha1=0.5, alpha2=0.25):
@@ -68,46 +60,31 @@ class FigureManager:
         :param alpha2: transparancy for y axis grid.
         :return:
         """
-        if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]
-
-        # Turning on major grid for both axes.
-        ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1)
-        ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
+        if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]  # Turning on major grid for both axes.
+        ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
         if x_or_y in {'both', 'x'}:
             xt = ax.get_xticks()  # major ticks
-            steps = (xt[1] - xt[0]) / factor
-            ax.xaxis.set_minor_locator(plt.MultipleLocator(steps))
+            ax.xaxis.set_minor_locator(plt.MultipleLocator((xt[1] - xt[0]) / factor))  # steps
             ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
         if x_or_y in {'both', 'y'}:
             yt = ax.get_yticks()  # major ticks
-            steps = (yt[1] - yt[0]) / factor
-            ax.yaxis.set_minor_locator(plt.MultipleLocator(steps))
+            ax.yaxis.set_minor_locator(plt.MultipleLocator((yt[1] - yt[0]) / factor))  # steps
             ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
 
     def toggle_annotate(self, event):
         self.annot_flag = not self.annot_flag
-        if event.inaxes and event.inaxes.images:
-            event.inaxes.images[0].set_picker(True)
-            self.message = f"Annotation flag is toggled to {self.annot_flag}"
-        if not self.annot_flag: pass  # if it is off   # hide all annotations
+        if event.inaxes and event.inaxes.images: event.inaxes.images[0].set_picker(True); self.message = f"Annotation flag is toggled to {self.annot_flag}"
 
     def annotate(self, event, axis=None, data=None):
-        self.event = event
-        e = event.mouseevent
-        ax = e.inaxes if axis is None else axis
-        if ax:
-            if not hasattr(ax, 'annot_obj'):  # first time_produced
-                ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30),
-                                           textcoords="offset points",
-                                           arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
-                                           va="bottom", ha="left", fontsize=10,
-                                           bbox=dict(boxstyle="round", fc="w"), )
-            else: ax.annot_obj.set_visible(self.annot_flag)
-            x, y = int(np.round(e.xdata)), int(np.round(e.ydata))
-            z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
-            ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}')
-            ax.annot_obj.xy = (x, y)
-            self.fig.canvas.draw_idle()
+        self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
+        if not ax: return None
+        if not hasattr(ax, 'annot_obj'):  # first time_produced
+            ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
+                                       va="bottom", ha="left", fontsize=10, bbox=dict(boxstyle="round", fc="w"), )
+        else: ax.annot_obj.set_visible(self.annot_flag)
+        x, y = int(np.round(e.xdata)), int(np.round(e.ydata))
+        z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
+        ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}'); ax.annot_obj.xy = (x, y); self.fig.canvas.draw_idle()
 
     def save(self, event): _ = event; Save.pickle(P.tmpfile(name="figure_manager"), obj=self)
     def replay(self, event): _ = event; self.pause = False; self.index = 0; self.message = 'Replaying'; self.animate()
@@ -119,13 +96,11 @@ class FigureManager:
     def text_info(self, event): _ = event; self.message = ''
     def update_info_text(self, message): self.message_obj.remove() if self.message_obj else None; self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
     def change_facecolor(self, event): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
-    @staticmethod
-    def toggle_ticks(an_ax, state=None): [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
+    toggle_ticks = staticmethod(lambda an_ax, state=None: [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()])
     def clear_axes(self): [ax.cla() for ax in self.ax]
     def get_fig(self, figname='', suffix=None, **kwargs): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
     def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
-    @staticmethod
-    def set_ax_to_real_life_size(ax, inch_per_unit=1 / 25.4): FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
+    set_ax_to_real_life_size = staticmethod(lambda ax, inch_per_unit=1 / 25.4: FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit))
     def close(self): plt.close(self.fig)
 
     def show_help(self, event):
@@ -658,8 +633,7 @@ class ImShow(FigureManager):
 
     @staticmethod
     def cm(im, nrows=3, ncols=7, **kwargs):  # Useful for looking at one image in multiple cmaps
-        _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs)
-        return [plt.get_cmap(style)(im) for style in plt.colormaps()]
+        _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
 
     def annotate(self, event, axis=None, data=None): [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
     from_saved_images_path_lists = staticmethod(lambda *image_list, **kwargs: ImShow(*[[plt.imread(an_image) for an_image in alist] for alist in image_list], sub_labels=[[P(an_image).name for an_image in alist] for alist in image_list], **kwargs))
@@ -672,13 +646,9 @@ class ImShow(FigureManager):
 
 
 class Artist(FigureManager):
-    def __init__(self, *args, ax=None, figname='Graph', title='', label='curve', style='seaborn',
-                 create_new_axes=False, figpolicy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
+    def __init__(self, *args, ax=None, figname='Graph', title='', label='curve', style='seaborn', create_new_axes=False, figpolicy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
         super().__init__(figpolicy=figpolicy)
-        self.style = style
-        self.title = title
-        self.args = args
-        self.line = self.cursor = self.check_b = None
+        self.style, self.title, self.args = style, title, args; self.line = self.cursor = self.check_b = None
         if ax is None:  # create a figure
             with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize)
         else: self.ax = ax; self.fig = ax[0].figure  # use the passed axis
@@ -691,20 +661,14 @@ class Artist(FigureManager):
                 self.get_axes()
         self.create_new_axes, self.visibility_ax, self.txt = create_new_axes, [0.01, 0.05, 0.2, 0.15], []
 
-    def accessorize(self, *args, legends=None, title=None, **kwargs):
-        self.line = self.ax[0].plot(*args, **kwargs)
-        if legends is not None: self.ax[0].legend(legends)
-        if title is not None: self.ax[0].set_title(title)
-        self.ax[0].grid('on')
-
+    def accessorize(self, *args, legends=None, title=None, **kwargs): self.line = self.ax[0].plot(*args, **kwargs); self.ax[0].legend(legends) if legends is not None else None; self.ax[0].set_title(title) if title is not None else None; self.ax[0].grid('on')
     def plot(self, *args, **kwargs): self.get_axes(); self.accessorize(*args, **kwargs)
     def get_axes(self): self.ax = np.array([self.fig.subplots()]) if self.create_new_axes else self.ax
     def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
 
     def visibility(self):
         from matplotlib.widgets import CheckButtons
-        self.fig.subplots_adjust(left=0.3)
-        self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
+        self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
         rax = self.fig.add_axes(self.visibility_ax)
         labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
         self.check_b = CheckButtons(rax, labels, visibility)

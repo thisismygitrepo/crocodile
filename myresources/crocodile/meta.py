@@ -153,7 +153,7 @@ class Terminal:
         returncode = property(lambda self: self.output["returncode"])
         as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}" + "".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "=" * 50, "\n\n"); return self
+        def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}\n" + "".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 50, "\n\n"); return self
 
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
@@ -330,18 +330,13 @@ class SSH(object):
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
-        if target is None:
-            assert (target := P(source).collapseuser()).is_relative_to("~"), f"If target is not specified, source must be relative to home."
-            target = target.as_posix()
+        if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
         remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
         print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="))
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
-        if zip_n_encrypt:
-            print(f"UNZIPPING & DECRYPTING".center(80, "="))
-            resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
-            source.delete(sure=True); return resp
+        if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)"""); source.delete(sure=True); return resp
 
 
 class Scheduler:

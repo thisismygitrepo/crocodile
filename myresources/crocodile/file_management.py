@@ -228,11 +228,10 @@ class P(type(Path()), Path):
     def __setstate__(self, state): self._str = str(state)
     def __add__(self, other): return self.parent.joinpath(self.stem + str(other))
     def __radd__(self, other): return self.parent.joinpath(str(other) + self.stem)  # other + P and `other` doesn't know how to make this addition.
-    def __rtruediv__(self, other): super(P, self).__rtruediv__(other)
     def __sub__(self, other): res = P(str(self).replace(str(other), "")); return res[1:] if str(res[0]) in {"\\", "/"} else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
-    def collapseuser(self, strict=True, inlieu=False): assert str(P.home()) in str(self), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self - P.home()), inlieu)
+    def collapseuser(self, strict=True): assert str(P.home()) in str(self.expanduser()), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self - P.home()))
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
