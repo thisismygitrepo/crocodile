@@ -340,7 +340,7 @@ class SSH(object):
 
 
 class Scheduler:
-    def __init__(self, routine=lambda: None, wait: str = "2m", occasional=lambda: None, other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
+    def __init__(self, routine=[lambda: None], wait: str = "2m", occasional=[lambda: None], other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
         self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = wait  # wait period between routine cycles.
         self.occasional = occasional  # routine to be repeated every `other` time period
@@ -350,7 +350,7 @@ class Scheduler:
         self.wind_down = wind_down  # routine to be run when an error occurs, e.g. save object.
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
         self._start_time = None  # begining of a session (local time)
-        self.history, self.count, self.total_count = [], 0, 0
+        self.history, self.count, self.total_count = List([]), 0, 0
 
     def run(self, until="2050-01-01", cycles=None):
         self.cycles = cycles or self.cycles
@@ -362,11 +362,11 @@ class Scheduler:
             time1 = datetime.now()  # time_produced before calcs started.  # use  fstring format {x:<10}
             self.logger.info(f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
             # 2- Perform logic ======================================================
-            try: self.routine()
+            try: [routine() for routine in self.routine]
             except Exception as ex: self.handle_exceptions(ex)
             # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
-                try: self.occasional()
+                try: [occasional() for occaionsal in self.occasional]
                 except Exception as ex: self.handle_exceptions(ex)
             # 4- Conclude Message ============================================================
             self.count += 1
@@ -382,15 +382,14 @@ class Scheduler:
             self.record_session_end(reason=stop_reason)
 
     def record_session_end(self, reason="Unknown"):
-        """It is vital to record operation time_produced to retrospectively inspect market status at session time_produced."""
         self.total_count += self.count
-        self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count])
+        self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count]).save()
         self.logger.critical(f"\nScheduler has finished running a session. \n"
                              f"start  time_produced: {str(self._start_time)}\n"
                              f"finish time_produced: {str(end_time)} .\n"
                              f"time_produced    ran: {str(time_run)} | wait time_produced {self.wait}  \n"
                              f"cycles  ran: {self.count}  |  Lifetime cycles: {self.total_count} \n"
-                             f"termination: {reason} \n" + "-" * 100)
+                             f"termination: {reason} \n" + "-" * 100)        
 
     def handle_exceptions(self, ex):
         """One can implement a handler that raises an error, which terminates the program, or handle
