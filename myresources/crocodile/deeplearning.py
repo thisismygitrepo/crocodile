@@ -3,7 +3,7 @@ import crocodile.toolbox as tb
 from crocodile.matplotlib_management import ImShow, SaveType
 import numpy as np
 import pandas as pd
-from abc import ABC, abstractmethod
+from abc import ABC
 import enum
 from tqdm import tqdm
 import copy
@@ -63,7 +63,7 @@ class HyperParam(tb.Struct):
     @property
     def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
     @property
-    def save_dir(self): return tb.P(self.root) / self.name
+    def save_dir(self): return (tb.P(self.root) / self.name).create()
 
     @property
     def device(self):
@@ -86,7 +86,6 @@ class HyperParam(tb.Struct):
             if device_str not in device_dict.keys():
                 print(f"This machine has no such a device to be chosen! ({device_str})\n" * 10)
                 device_str = "cpu"  # Revert to cpu, keep going, instead of throwing an error.
-
             try:
                 device = device_dict[device_str]
                 return device
@@ -227,8 +226,7 @@ class DataReader(tb.Base):
         else: self.plotter = ImShow(pred, gt, labels=['Reconstruction', 'Ground Truth'], sup_titles=names, origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
-        """Implement here how you would visualize a batch of input and ouput pair.
-        Assume Numpy arguments rather than tensors."""
+        """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
         _ = self, args, kwargs
         return None
 
@@ -242,8 +240,10 @@ class BaseModel(ABC):
     * :func:`BaseModel.predict` expects a processed input, uese infer and does postprocessing.
     * :func:`BaseModel.predict_from_s` reads, preprocess, then uses predict method.
     * :func:`BseModel.evaluate` Expects processed input and internally calls infer and postprocess methods.
+
+    Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
-    @abstractmethod
+    # @abstractmethod
     def __init__(self, hp=None, data=None, model=None, compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
         self.model = model  # should be populated upon instantiation.
@@ -287,10 +287,6 @@ class BaseModel(ABC):
         if viz: self.plot_loss()
         return self
 
-    def plot_loss(self):
-        total_hist = tb.Struct.concat_values(*self.history)
-        total_hist.plot()
-
     def switch_to_sgd(self, epochs=10):
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         if self.hp.pkg.__name__ == 'tensorflow': new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
@@ -318,6 +314,14 @@ class BaseModel(ABC):
     def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
     def predict(self, x, **kwargs): return self.postprocess(self.infer(x), **kwargs)
     def viz(self, *args, **kwargs): self.data.viz(*args, **kwargs)
+    def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
+    def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
+    @staticmethod
+    def load_model(directory): __import__("tensorflow").keras.models.load_model(directory)  # path to directory. file saved_model.pb is read auto.
+    def load_weights(self, directory): self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
+    def summary(self): return self.model.summary()
+    def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
+    def plot_loss(self): return tb.Struct.concat_values(*self.history).plot()
 
     def infer(self, x):
         """
@@ -339,24 +343,11 @@ class BaseModel(ABC):
 
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
-        x_test = x_test if x_test is not None else self.data.split.x_test
-        y_test = y_test if y_test is not None else self.data.split.y_test
-        this = self.data.split.names_test if hasattr(self.data.split, "names_test") else range(len(x_test))
-        names_test = names_test if names_test is not None else this
-        if idx is None:
-            def get_rand(x, y):
-                idx_ = np.random.choice(len(x) - sample)
-                return x[idx_:idx_ + sample], y[idx_:idx_ + sample], \
-                    names_test[idx_: idx_ + sample], np.arange(idx_, idx_ + sample)
-            assert self.data is not None, 'Data attribute is not defined'
-            x_test, y_test, names_test, idx = get_rand(x_test, y_test)  # already processed S's
-        else:
-            if type(idx) is int:
-                assert idx < len(x_test), f"Index passed {idx} exceeds length of x_test {len(x_test)}"
-                x_test, y_test, names_test = x_test[idx: idx + 1], y_test[idx: idx + 1], names_test[idx: idx + 1]
-            else: x_test, y_test, names_test = x_test[idx], y_test[idx], names_test[idx]
+        x_test, y_test = x_test if x_test is not None else self.data.split.x_test, y_test if y_test is not None else self.data.split.y_test
+        names_test = names_test if names_test is not None else (self.data.split.names_test if hasattr(self.data.split, "names_test") else range(len(x_test)))
+        idx = np.random.choice(len(x_test) - 1, size=sample, replace=False) if idx is None else (slice(idx, idx + 1, 1) if isinstance(idx, int) else idx)
+        x_test, y_test, names_test = x_test[idx], y_test[idx], names_test[idx]
         # ==========================================================================
-
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
         if loss_dict is not None: loss_dict['names'] = names_test
@@ -380,29 +371,13 @@ class BaseModel(ABC):
             else: name = "unknown"
             # try:  # EAFP principle.
             #     path = a_metric.path  # works for subclasses Metrics
-            # except AttributeError:
-            #
-            #     path = a_metric.__name__  # works for functions.
+            # except AttributeError: path = a_metric.__name__  # works for functions.
             loss_dict[name] = []
-
             for a_prediction, a_y_test in zip(prediction, groun_truth):
-                if hasattr(a_metric, "reset_states"):
-                    a_metric.reset_states()
+                if hasattr(a_metric, "reset_states"): a_metric.reset_states()
                 loss = a_metric(a_prediction[None], a_y_test[None])
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
-
-    def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
-    def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
-
-    @staticmethod
-    def load_model(directory):
-        import tensorflow as tf
-        return tf.keras.models.load_model(directory)  # path to path. file saved_model.pb is read auto.
-
-    def load_weights(self, directory):
-        name = directory.glob('*.data*').__next__().__str__().split('.data')[0]
-        self.model.load_weights(name)  # requires path to file path.
 
     def save_class(self, weights_only=True, version='0', **kwargs):
         """Simply saves everything:
@@ -427,19 +402,15 @@ class BaseModel(ABC):
     @classmethod
     def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None):
         path = tb.P(path)
-
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
         else: hp_obj = (path / HyperParam.subpath + ".HyperParam.pkl").readit()
         if device_name: hp_obj.device_name = device_name
-
         if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
         else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
         d_obj.hp = hp_obj
-
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
         model_obj.history = (path / "metadata/history.pkl").readit(notfound=tb.L())
-
         print(f"Class {model_obj.__class__} Loaded Successfully.")
         return model_obj
 
@@ -452,26 +423,14 @@ class BaseModel(ABC):
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
-    def summary(self): return self.model.summary()
-    def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-
-    def plot_model(self, **kwargs):
-        """
-        .. note:: Functionally or Sequentually built models are much more powerful than Subclassed models.
-            They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
-            Alternative visualization is via tf2onnx then Netron.
-        """
+    def plot_model(self, **kwargs):  # alternative viz via tf2onnx then Netron.
         import tensorflow as tf
-        tf.keras.utils.plot_model(self.model, to_file=self.hp.save_dir / 'model_plot.png',
-                                  show_shapes=True, show_layer_names=True, show_dtype=True,
-                                  expand_nested=True, dpi=150, **kwargs)
+        tf.keras.utils.plot_model(self.model, to_file=self.hp.save_dir / 'model_plot.png', show_shapes=True, show_layer_names=True, show_dtype=True, expand_nested=True, dpi=150, **kwargs)
         print(f"Successfully plotted the model @ {(self.hp.save_dir / 'model_plot.png').as_uri()}")
 
     def build(self, ip_shape=None, verbose=True):
         """ Building has two main uses.
-
-        * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually
-          happen as the first batch goes in. This is a must before showing the summary of the model.
+        * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
 
@@ -535,8 +494,7 @@ class Ensemble(tb.Base):
         self.performance = tb.L()
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
-            if shuffle_train_test:
-                self.data.split_my_data_now(seed=np.random.randint(0, 1000))  # shuffle data (shared among models)
+            if shuffle_train_test: self.data.split_my_data_now(seed=np.random.randint(0, 1000))  # shuffle data (shared among models)
             self.models[i].fit(**kwargs)
             self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
             if save:

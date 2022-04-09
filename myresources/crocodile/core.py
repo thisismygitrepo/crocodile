@@ -34,11 +34,12 @@ def install_n_import(package, name=None):
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
     def decorator(func):
-        def wrapper(obj, path: str = None, verbose=True, add_suffix=True, desc="", **kwargs):
-            if path is None: path = Path.home().joinpath("tmp_results").joinpath(randstr() + ext); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
-            elif add_suffix and not str(path).endswith(ext): path = Path(str(path) + ext); print(f"tb.core: Warning: suffix {ext} is added to path passed {path.as_uri()}") if verbose else None
-            else: path = Path(path).expanduser().resolve()
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
+        def wrapper(obj, path: str = None, verbose=True, add_suffix=True, desc="", class_name="", **kwargs):
+            if path is None: path = Path.home().joinpath("tmp_results/tmp_files").joinpath(randstr()); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
+            if add_suffix:
+                [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
+                path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext
+            func(path=(path:=Path(path).expanduser().resolve()), obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
             return path
         return wrapper
     return decorator
@@ -87,11 +88,9 @@ class Base(object):
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):  # pickles the object
-        path = str(path or Path.home().joinpath(f"tmp_results/tmp_files/{randstr()}"))
-        if add_suffix: path = path.replace(".pkl", "").replace("." + self.__class__.__name__, "").replace(".dat", ""); path += "." + self.__class__.__name__ + (".dat" if data_only else "")  # Fruthermore, .zip or .pkl will be added later depending on `save_code` value, warning will be raised.
         if data_only: obj = self.__getstate__(); obj = obj.copy()  # do not mess with original __dict__
         else: obj = self
-        return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
+        return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else "") , desc=desc or (f"Data of {self.__class__}" if data_only else desc))
 
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
@@ -222,7 +221,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-    def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if bool(self) is False else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit)); print(res) if not return_str else None; return res if return_str else self
+    def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list'): return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
 
@@ -252,9 +251,10 @@ class Display:
 
     @staticmethod
     def get_repr(data, limit=50, justify=False):
-        if type(data) in {list, str}: string_ = data if type(data) is str else f"length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+        if type(data) in {list, str}: string_ = data if type(data) is str else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
         elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
         elif type(data) is __import__("pandas").DataFrame: string_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}."
+        elif type(data) is __import__("pandas").Series: string_ = f"Pandas Series: Length = {len(data)}, Keys = {Display.get_repr(data.keys().to_list())}."
         else: string_ = repr(data)
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
 

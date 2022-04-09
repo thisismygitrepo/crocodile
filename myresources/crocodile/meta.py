@@ -15,6 +15,7 @@ class Null:
     def __call__(self, *args, **kwargs): return self
     def __len__(self): return 0
     def __bool__(self): return False
+    def __contains__(self, item): _ = item; return False
 
 
 class Log(object):
@@ -228,7 +229,7 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
-        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
+        file = (file := P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts")).write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         file.delete(sure=delete, verbose=False)

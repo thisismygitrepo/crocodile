@@ -4,7 +4,7 @@ A collection of classes extending the functionality of Python's builtins.
 author: Alex Al-Saffar
 email: programmer@usa.com
 
-This is `export file` while one can dictate what will be exposed with toolbox
+This is `export file` where one can dictate what will be exposed with toolbox
 """
 
 from crocodile import core
@@ -16,8 +16,7 @@ from crocodile import file_management as _fm
 str2timedelta, timestamp, randstr, validate_name, install_n_import = core.str2timedelta, core.timestamp, core.randstr, core.validate_name, core.install_n_import
 Base, Struct, Display, Save, List = core.Base, core.Struct, core.Display, core.Save, core.List
 # File Management ==========================
-P, Read, Compression, Fridge, MemoryDB = _fm.P, _fm.Read, _fm.Compression, _fm.Fridge, _fm.MemoryDB
-encrypt, decrypt = _fm.encrypt, _fm.decrypt
+P, Read, Compression, Fridge, MemoryDB, encrypt, decrypt = _fm.P, _fm.Read, _fm.Compression, _fm.Fridge, _fm.MemoryDB, _fm.encrypt, _fm.decrypt
 # META ====================================
 Experimental, Terminal, Log, Null, Scheduler, SSH = meta.Experimental, meta.Terminal, meta.Log, meta.Null, meta.Scheduler, meta.SSH
 
@@ -25,15 +24,12 @@ L = List
 tmp = P.tmp
 E = Experimental
 D = Display
-# _ = P, Read, Compression
-# _ = Experimental
 
 
-_ = Base, timestamp, Save, Terminal, List, Struct, Display
+_ = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
-# _ = datetime, dt, os, sys, np, copy, random, dill
-import logging, subprocess, sys
-
+logging, subprocess, sys = meta.logging, meta.subprocess, meta.sys
+datetime = _fm.datetime
 
 # _ = False
 # if _:
