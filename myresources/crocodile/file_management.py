@@ -72,7 +72,6 @@ class Read(object):
 
     @staticmethod
     def json(path, r=False, **kwargs):
-        """Returns a Structure"""
         try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
         except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
         return Struct.recursive_struct(mydict) if r else Struct(mydict)
@@ -95,14 +94,11 @@ class Read(object):
 
 class P(type(Path()), Path):
     # ==================================== File management =========================================
-    """ The default behaviour of methods acting on underlying disk object is to perform the action
-        and return a new path referring to the mutated object in disk drive. However, there is a flag `orig` that makes
-        the function return orignal path object `self` as opposed to the new one pointing to new object.
-        Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace`
-        it defaults to False and in essence, it deletes the original underlying object. This can be seen in `zip` and `encrypt`
-        but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
-        Furthermore, those methods are accompanied with print statement explaining what happened to the object.
-    """
+    """ The default behaviour of methods acting on underlying disk object is to perform the action and return a new path referring to the mutated object in disk drive.
+    However, there is a flag `orig` that makes the function return orignal path object `self` as opposed to the new one pointing to new object.
+    Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace` it defaults to False and in essence, it deletes the original underlying object.
+    This can be seen in `zip` and `encrypt` but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
+    Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
     def delete(self, sure=False, verbose=True):
         slf = self  # slf = self.expanduser().resolve() don't resolve symlinks.
         if sure:
@@ -138,14 +134,6 @@ class P(type(Path()), Path):
         if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
         return path
 
-    def retitle(self, name, overwrite=False, verbose=True, orig=False):
-        """Unlike the builtin `rename`, this doesn't require or change full path, only file name."""
-        assert type(name) is str, "New new should be a string representing file name alone."
-        new_path = self.parent / name
-        if overwrite and new_path.exists(): new_path.delete(sure=True)
-        self.rename(new_path)
-        return self._return(new_path, inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"RENAMED {repr(self)} ==> {repr(new_path)}")
-
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100
         if folder is not None and path is None:
             if name is None: dest = P(folder).expanduser().resolve().create()
@@ -155,6 +143,7 @@ class P(type(Path()), Path):
         else: raise NotImplementedError
         dest, slf = dest.expanduser().resolve().create(parent_only=True), self.expanduser().resolve()
         if overwrite and dest.exists(): dest.delete(sure=True)
+        if not overwrite and dest.exists: raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir():
             __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()))
@@ -167,8 +156,7 @@ class P(type(Path()), Path):
         if not self.exists():
             if notfound is FileNotFoundError: raise FileNotFoundError(f"`{self}` is no where to be found!")
             else: return notfound
-        filename = self
-        if '.zip' in str(self): filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose)
+        filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose) if '.zip' in str(self) else self
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
 
@@ -189,24 +177,10 @@ class P(type(Path()), Path):
     def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, read=Read.read): return Fridge(source_func=source_func, path=self, expire=expire, save=save, read=read)
 
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
-        """
-        :param notfound_append: if file not found, append the text to it.
-        :param encoding:
-        :param txt: text to be searched for in the file. The line in which it is found will be up for change.
-        :param alt: alternative text that will replace `txt`. Either a string or a function returning a string
-        :param newline: completely remove the line in which `txt` was found and replace it with `alt`.
-        :return:
-        * This method is suitable for config files and simple scripts that has one-liners in it,
-        * File is created if it doesn't exist.
-        * Text is simply appended if not found in the text file.
-        """
         if not self.exists(): self.create(parent_only=True).write_text(txt)
-        lines = self.read_text(encoding=encoding).split("\n")
-        bingo = False
+        lines, bingo = self.read_text(encoding=encoding).split("\n"), False
         for idx, line in enumerate(lines):
-            if txt in line:
-                bingo = True
-                lines[idx] = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line))
+            if txt in line: lines[idx], bingo = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line)), True
         if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
         return self.write_text("\n".join(lines), encoding=encoding)
 
@@ -214,14 +188,19 @@ class P(type(Path()), Path):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
 
-    def _return(self, res, inlieu: bool, inplace=False, operation=None, orig=False, verbose=False, msg=""):
+    def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg=""):
         if inlieu: self._str = str(res)
         if inplace:
-            assert res.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
-            if operation == "rename": self.rename(res)
+            assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
+            if operation == "rename":
+                msg = f"RENAMED {repr(self)} ==> {repr(res)}"
+                if overwrite and res.exists(): res.delete(sure=True)
+                if not overwrite and res.exists():
+                    if strict: raise FileExistsError(f"File {res} already exists.")
+                    else: print(f"SIKIPPED `{msg}` because FileExistsError") if verbose else None; return self if orig else res
+                self.rename(res)
             if operation == "delete": self.delete(sure=True, verbose=verbose)
-        if verbose: print(msg)
-        return self if orig else res
+        print(msg) if verbose else None; return self if orig else res
 
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
@@ -229,12 +208,13 @@ class P(type(Path()), Path):
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
         `orig`: whether the method returns the original path object or a new one.
     """
-    def prepend(self, prefix, suffix=None, inlieu=False, inplace=False): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(self.suffixes))), inlieu=inlieu, inplace=inplace, operation="rename")
-    def append(self, name='', suffix=None, inplace=False, inlieu=False): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(self.suffixes))), inlieu=inlieu, inplace=inplace, operation="rename")
-    def append_time_stamp(self, fmt=None, inlieu=False, inplace=False): return self._return(self.append(name="_" + timestamp(fmt=fmt)), inlieu=inlieu, inplace=inplace, operation="rename")
-    def with_trunk(self, name, inlieu=False, inplace=False): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), inlieu=inlieu, inplace=inplace, operation="rename")  # Complementary to `with_stem` and `with_suffix`
-    def switch(self, key: str, val: str, inlieu=False, inplace=False): return self._return(P(str(self).replace(key, val)), inlieu=inlieu, inplace=inplace, operation="rename")  # Like string replce method, but `replace` is an already defined method."""
-    def switch_by_index(self, idx: int, val: str, inplace=False, inlieu=False): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), inlieu=inlieu, inplace=inplace, operation="rename")
+    def prepend(self, prefix, suffix=None, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(self.suffixes))), operation="rename", **kwargs)
+    def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(self.suffixes))), operation="rename", **kwargs)
+    def append_time_stamp(self, fmt=None, **kwargs): return self._return(self.append(name="_" + timestamp(fmt=fmt)), operation="rename", **kwargs)
+    def with_trunk(self, name, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", **kwargs)  # Complementary to `with_stem` and `with_suffix`
+    def with_name(self, name, verbose=True, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
+    def switch(self, key: str, val: str, **kwargs): return self._return(P(str(self).replace(key, val)), operation="rename", **kwargs)  # Like string replce method, but `replace` is an already defined method."""
+    def switch_by_index(self, idx: int, val: str, **kwargs): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", **kwargs)
     # ============================= attributes of object ======================================
     trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
     len = property(lambda self: self.__len__())
@@ -592,15 +572,14 @@ class Fridge:
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.save, self.read, self.logger, self.expire = save, read, logger, expire
+    def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
+    age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
+    def reset(self): self.time_produced = datetime.now()
 
     def __getstate__(self):
         state = self.__dict__.copy()
         if self.path is not None: state["path"] = self.path.rel2home()  # With this implementation, instances can be pickled and loaded up in different machine and still works.
         return state
-
-    def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
-    age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
-    def reset(self): self.time_produced = datetime.now()
 
     def __call__(self, fresh=False):
         if self.path is None:  # Memory Fridge

@@ -16,6 +16,7 @@ class Null:
     def __len__(self): return 0
     def __bool__(self): return False
     def __contains__(self, item): _ = item; return False
+    def __iter__(self): return iter([self])
 
 
 class Log(object):
@@ -64,6 +65,9 @@ class Log(object):
     def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
     @staticmethod  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
     def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
+    test_all = staticmethod(lambda: [Log.test_logger(logger) if not print("=" * 100) else None for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]])
+    @staticmethod
+    def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
 
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
@@ -135,22 +139,11 @@ class Log(object):
         logger.debug("this is a debugging message"); logger.info("this is an informational message"); logger.warning("this is a warning message")
         logger.error("this is an error message"); logger.critical("this is a critical message"); [logger.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
 
-    @staticmethod
-    def test_all():
-        for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]: Log.test_logger(logger); print("=" * 100)
-
-    @staticmethod
-    def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
-
 
 class Terminal:
     class Response:
         @staticmethod
-        def from_completed_process(cp: subprocess.CompletedProcess):
-            resp = Terminal.Response(cmd=cp.args)
-            resp.output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode))
-            return resp
-
+        def from_completed_process(cp: subprocess.CompletedProcess): (resp := Terminal.Response(cmd=cp.args)).output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)); return resp
         def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None): self.std, self.output, self.input = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd  # input command
         def __call__(self, *args, **kwargs): return self.op.rstrip() if type(self.op) is str else None
         op = property(lambda self: self.output["stdout"])
@@ -229,7 +222,7 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
 """  # this header is necessary so import statements in the script passed are identified relevant to wdir.
         script = header_script + script if header else script
         if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
-        file = (file := P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts")).write_text(f"""print(r'''{script}''')""" + "\n" + script)
+        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         file.delete(sure=delete, verbose=False)
@@ -239,24 +232,22 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
         """Python brachnes off to a new window and run the function passed. context can be either a pickled session or the current file __file__"""
         file = P.tmpfile(tstamp=False, suffix=".pkl")  # step 1: pickle the function # step 2: create a script that unpickles it. # step 3: run the script that runs the function.
         Save.pickle(obj=obj, path=file, verbose=False)
-        script = f"""
+        Terminal.run_script(f"""
 path = tb.P(r'{file}')
 obj = path.readit()
 path.delete(sure=True, verbose=False)
 obj{'()' if execute else ''}
-{cmd}"""
-        Terminal.run_script(script)
+{cmd}""")
 
     @staticmethod
     def replicate_session(cmd=""):
         file = P.tmpfile(suffix=".pkl")
         __import__("dill").dump_session(file, main=sys.modules[__name__])
-        script = f"""
+        Terminal().run_script(script=f"""
 path = tb.P(r'{file}')
 tb.dill.load_session(str(path)); 
 path.delete(sure=True, verbose=False)
-{cmd}"""
-        Terminal().run_script(script=script)
+{cmd}""")
 
     @staticmethod
     def is_user_admin():
@@ -333,15 +324,14 @@ class SSH(object):
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
 
     def run(self, cmd, verbose=True):
-        res = self.ssh.exec_command(cmd); res = Terminal.Response(stdin=res[0], stdout=res[1], stderr=res[2], cmd=cmd)
+        res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
         res.print() if verbose else None; return res
 
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
         if target is None:
-            target = P(source).collapseuser()
-            assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+            assert (target := P(source).collapseuser()).is_relative_to("~"), f"If target is not specified, source must be relative to home."
             target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
@@ -351,8 +341,7 @@ class SSH(object):
         if zip_n_encrypt:
             print(f"UNZIPPING & DECRYPTING".center(80, "="))
             resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)""")
-            source.delete(sure=True)
-            return resp
+            source.delete(sure=True); return resp
 
 
 class Scheduler:
@@ -400,9 +389,7 @@ class Scheduler:
     def record_session_end(self, reason="Unknown"):
         """It is vital to record operation time_produced to retrospectively inspect market status at session time_produced."""
         self.total_count += self.count
-        end_time = datetime.now()  # end of a session.
-        time_run = end_time - self._start_time
-        self.history.append([self._start_time, end_time, time_run, self.count])
+        self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count])
         self.logger.critical(f"\nScheduler has finished running a session. \n"
                              f"start  time_produced: {str(self._start_time)}\n"
                              f"finish time_produced: {str(end_time)} .\n"
