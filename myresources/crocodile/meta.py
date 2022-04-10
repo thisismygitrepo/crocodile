@@ -30,7 +30,6 @@ class Log(object):
         self._install()  # update specs after intallation.
         self.specs["path"] = self.logger.name
         if file: self.specs["file_path"] = self.logger.handlers[0].baseFilename  # first handler is a file handler
-
     def __getattr__(self, item): return getattr(self.logger, item)  # makes it twice as slower as direct access 300 ns vs 600 ns
     def debug(self, msg): return self.logger.debug(msg)  # to speed up the process and avoid falling back to __getattr__
     def info(self, msg): return self.logger.info(msg)
@@ -44,31 +43,26 @@ class Log(object):
     def get_shandler(self, first=True): shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler)); return shandlers[0] if first else shandlers
     def get_fhandler(self, first=True): fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler)); return fhandlers[0] if first else fhandlers
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.logger.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
-
     def _install(self):  # populates self.logger attribute according to specs and dielect.
         if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
         elif self.dialect == "colorlog": self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
         elif self.dialect == "logging": self.logger = Log.get_logger(**self.specs)
         elif self.dialect == "coloredlogs": self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
         else: self.logger = Log.get_colorlog(**self.specs)
-
     def __setstate__(self, state):
         self.__dict__ = state   # this way of creating relative path makes transferrable across machines.
         if self.specs["file_path"] is not None: self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
         self._install()
-
     def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy(); state["specs"] = state["specs"].copy(); del state["logger"]
         if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
-
     def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
     @staticmethod  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
     def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
     test_all = staticmethod(lambda: [Log.test_logger(logger) if not print("=" * 100) else None for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]])
     @staticmethod
     def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
-
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
@@ -95,7 +89,6 @@ class Log(object):
             Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
         coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
         return logger
-
     @staticmethod
     def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
         log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
@@ -103,37 +96,31 @@ class Log(object):
         fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
         return logger
-
     @staticmethod
     def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
         """Basic Python logger."""
         Log.add_handlers(logger := Log.get_base_logger(logging, name, l_level), logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
         return logger
-
     @staticmethod
     def get_base_logger(module, name, l_level):
         if name is None: print(f"Logger name not passed. It is preferable to pass a name indicating the owner.")
         else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
         logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
         return logger
-
     @staticmethod
     def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
         if file or file_path:  Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)  # create file handler for the logger.
         if stream: Log.add_streamhandler(logger, s_level, fmt, module=module)  # ==> create stream handler for the logger.
-
     @staticmethod
     def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
         shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler)
         print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
-
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
         if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
         print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
-
     @staticmethod
     def test_logger(logger):
         logger.debug("this is a debugging message"); logger.info("this is an informational message"); logger.warning("this is a warning message")
@@ -154,7 +141,6 @@ class Terminal:
         as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
         def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}\n" + "".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 50, "\n\n"); return self
-
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
         * adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
@@ -167,13 +153,11 @@ class Terminal:
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
         self.machine = sys.platform  # 'win32', 'linux' OR: import platform; self.platform.system(): Windows, Linux, Darwin
-
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
     @staticmethod
     def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
-
     def run(self, *cmds, shell=None, check=False, ip=None):
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
         won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
@@ -193,7 +177,6 @@ class Terminal:
         """ The advantage of addig `powershell -Command` is to give access to wider range of options. Other wise, command prompt shell doesn't recognize commands like `ls`.
         `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned. # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`"""
         return self.Response.from_completed_process(resp)
-
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
         """Opens a new terminal, and let it run asynchronously.
         Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
@@ -210,7 +193,6 @@ class Terminal:
         if self.machine == "win32": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
-
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
         """This method is a wrapper on top of `run_async" except that the command passed will launch python terminal that will run script passed by user. """
@@ -226,7 +208,6 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
-
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
         Save.pickle(obj=obj, path=(file := P.tmpfile(tstamp=False, suffix=".pkl")), verbose=False)
@@ -252,13 +233,11 @@ path.delete(sure=True, verbose=False)
             try: return ctypes.windll.shell32.IsUserAnAdmin()
             except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
-
     @staticmethod
     def run_code_as_admin(params):
         _ = install_n_import("win32api", name="pypiwin32")
         win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
         win32com.shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=params)
-
     @staticmethod
     def run_as_admin(cmd_line=None, wait=True):
         """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new command.  It must be a list of [command, arg1, arg2...] format.
@@ -293,7 +272,6 @@ class SSH(object):
         self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.remote_machine == "Windows" else rf"""source ~/venvs/ve/bin/activate"""
         self.platform = __import__("platform")
         self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.platform.system() == "Windows" else rf"""source ~/venvs/ve/bin/activate"""  # works for both cmd and pwsh
-
     def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
     def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.remote_machine}] "
     def remote(self): return f"{self.username}@{self.hostname}"
@@ -305,7 +283,6 @@ class SSH(object):
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_sshkeys_to_remote(self, fqdn): assert self.platform.system() == "Windows"; return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')  # Windows Openssh alternative to ssh-copy-id
-
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
@@ -329,7 +306,6 @@ class Scheduler:
         self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
         self._start_time = None  # begining of a session (local time)
         self.history, self.count, self.total_count = List([]), 0, 0
-
     def run(self, until="2050-01-01", cycles=None):
         self.cycles = cycles or self.cycles
         self.count = 0
@@ -358,7 +334,6 @@ class Scheduler:
             if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
             else: stop_reason = f"Reached due stop time_produced ({until})"
             self.record_session_end(reason=stop_reason)
-
     def record_session_end(self, reason="Unknown"):
         self.total_count += self.count
         self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count]).save()
@@ -367,8 +342,7 @@ class Scheduler:
                              f"finish time_produced: {str(end_time)} .\n"
                              f"time_produced    ran: {str(time_run)} | wait time_produced {self.wait}  \n"
                              f"cycles  ran: {self.count}  |  Lifetime cycles: {self.total_count} \n"
-                             f"termination: {reason} \n" + "-" * 100)        
-
+                             f"termination: {reason} \n" + "-" * 100)
     def handle_exceptions(self, ex):
         """One can implement a handler that raises an error, which terminates the program, or handle
         it in some fashion, in which case the cycles continue."""
@@ -389,14 +363,12 @@ class Experimental:
             if raise_ is not None: raise raise_
             if handle is not None: return handle(e)
             return run() if run is not None else return_
-
     @staticmethod
     def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
     @staticmethod
     def run_globally(func, scope=None, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
     @staticmethod
     def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
-
     @staticmethod
     def generate_readme(path, obj=None, meta=None, save_source_code=True):
         """Generates a readme file to contextualize any binary files.
@@ -414,7 +386,6 @@ class Experimental:
         if save_source_code:
             P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
             print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
-
     @staticmethod
     def load_from_source_code(directory, obj=None, delete=False):
         """Does the following:
@@ -426,7 +397,6 @@ class Experimental:
         sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem)
         tmpdir.delete(sure=delete, verbose=False)
         return getattr(sourcefile, obj) if obj is not None else sourcefile
-
     @staticmethod
     def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
         """Captures the local variables inside a function.
@@ -439,7 +409,6 @@ class Experimental:
         exec(code, scope, res := dict())  # run the function within the scope `res`
         if update_scope: scope.update(res)
         return Struct(res)
-
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None, verbose=True, copy2clipboard=False, **kwargs):
         """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
@@ -464,13 +433,11 @@ class Experimental:
         if copy2clipboard: install_n_import("clipboard").copy(code_string)
         if verbose: print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100)
         return code_string  # ready to be run with exec()
-
     @staticmethod
     def extract_arguments(func, modules=None, exclude_args=True, copy2clipboard=False, **kwargs):
         """Get code to define the args and kwargs defined in the main. Works for funcs and methods."""
         if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
-            self = ".".join(func.split(".")[:-1]); _ = self
-            func = eval(func, modules)
+            self, func = ".".join(func.split(".")[:-1]), eval(func, modules); _ = self
         ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default).update(kwargs)
         res = """"""
@@ -486,7 +453,6 @@ class Experimental:
         if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
         if copy2clipboard: install_n_import("clipboard").copy(res)
         return res
-
     @staticmethod
     def edit_source(module, *edits):
         sourcelines, line_idx = P(module.__file__).read_text().split("\n"), 0
@@ -501,7 +467,6 @@ class Experimental:
             else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
         P(module.__file__).write_text("\n".join(sourcelines))
         return __import__("importlib").reload(module)
-
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):
         for cell in P(module.__file__).read_text().split("#%%"):

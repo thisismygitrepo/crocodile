@@ -1,10 +1,7 @@
 
 """
 """
-
 from pathlib import Path
-
-
 # ============================== Accessories ============================================
 
 
@@ -78,34 +75,25 @@ class Base(object):
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
     def evalstr(self, string_, func=True, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
+    def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""): return Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else ""), desc=desc or (f"Data of {self.__class__}" if data_only else desc))
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
-
     def save_code(self, path):  # a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
         if hasattr(module := __import__("inspect").getmodule(self), "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
-
-    def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):  # pickles the object
-        if data_only: obj = self.__getstate__(); obj = obj.copy()  # do not mess with original __dict__
-        else: obj = self
-        return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else ""), desc=desc or (f"Data of {self.__class__}" if data_only else desc))
-
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
-        attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
-        if remove_base_attrs: [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)]
+        attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self))); [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)] if remove_base_attrs else None
         if not fields: attrs = list(filter(lambda x: __import__("inspect").ismethod(getattr(self, x)), attrs))  # logic (questionable): anything that is not a method is a field
         if not methods: attrs = list(filter(lambda x: not __import__("inspect").ismethod(getattr(self, x)), attrs))
         if return_objects: attrs = [getattr(self, x) for x in attrs]; return List(attrs)
-
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
         __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
-class List(Base):  # Inheriting from Base gives save method.
-    """Use this class to keep items of the same type."""
+class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     from_copies = classmethod(lambda cls, obj, count: cls([__import__("copy").deepcopy(obj) for _ in range(count)]))
     @classmethod
@@ -148,18 +136,15 @@ class List(Base):  # Inheriting from Base gives save method.
     def to_numpy(self): import numpy as np; return np.array(self.list)
     np = property(lambda self: self.to_numpy())
     def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
-
     def __getitem__(self, key: str or list or slice):
         if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
-
     def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.evalstr(func, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])
-
     def to_dataframe(self, names=None, minimal=False, obj_included=True):
         df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
         if minimal: return df
@@ -175,7 +160,6 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         if dictionary is None or type(dictionary) is dict: final_dict = dict() if dictionary is None else dictionary
         else: final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)
         final_dict.update(kwargs); super(Struct, self).__init__(); self.__dict__ = final_dict
-
     @staticmethod
     def recursive_struct(mydict): struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     @staticmethod
@@ -189,7 +173,6 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
-
     def __getattr__(self, item):
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
@@ -223,16 +206,14 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list'): return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
-
     def plot(self, artist=None, use_plt=True):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
-        else:
-            plt = __import__("matplotlib").pyplot
-            if artist is None: fig, artist = plt.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
-            for key, val in self.items(): artist.plot(val, label=key)
-            try: artist.legend()
-            except AttributeError: pass
-            return artist
+        plt = __import__("matplotlib").pyplot
+        if artist is None: fig, artist = plt.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
+        for key, val in self.items(): artist.plot(val, label=key)
+        try: artist.legend()
+        except AttributeError: pass
+        return artist
 
 
 class Display:
@@ -245,7 +226,6 @@ class Display:
     def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.display.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
     @staticmethod
     def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
-
     @staticmethod
     def get_repr(data, limit=50, justify=False):
         if type(data) in {list, str}: string_ = data if type(data) is str else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
@@ -254,7 +234,6 @@ class Display:
         elif type(data) is __import__("pandas").Series: string_ = f"Pandas Series: Length = {len(data)}, Keys = {Display.get_repr(data.keys().to_list())}."
         else: string_ = repr(data)
         return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
-
     @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):
         counter = 0
