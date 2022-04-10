@@ -340,10 +340,10 @@ class SSH(object):
 
 
 class Scheduler:
-    def __init__(self, routine=[lambda: None], wait: str = "2m", occasional=[lambda: None], other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
-        self.routine = routine  # main routine to be repeated every `wait` time period
+    def __init__(self, routine=None, wait: str = "2m", occasional=None, other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
+        self.routine = [lambda: None] if routine is None else routine  # main routine to be repeated every `wait` time period
         self.wait = wait  # wait period between routine cycles.
-        self.occasional = occasional  # routine to be repeated every `other` time period
+        self.occasional = [lambda: None] if occasional is None else occasional  # routine to be repeated every `other` time period
         self.other = other  # number of routine cycles before `occasional` get executed once.
         self.cycles = runs  # how many times to run the routine. defaults to infinite.
         self.exception_handler = exception if exception is not None else lambda ex: None
@@ -366,7 +366,7 @@ class Scheduler:
             except Exception as ex: self.handle_exceptions(ex)
             # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
-                try: [occasional() for occaionsal in self.occasional]
+                try: [occasional() for occasional in self.occasional]
                 except Exception as ex: self.handle_exceptions(ex)
             # 4- Conclude Message ============================================================
             self.count += 1

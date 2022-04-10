@@ -105,7 +105,7 @@ class Base(object):
         __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
-class List(Base, list):  # Inheriting from Base gives save method.
+class List(Base):  # Inheriting from Base gives save method.
     """Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     from_copies = classmethod(lambda cls, obj, count: cls([__import__("copy").deepcopy(obj) for _ in range(count)]))
@@ -129,7 +129,7 @@ class List(Base, list):  # Inheriting from Base gives save method.
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None): return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
     def index_items(self, idx): return List([item[idx] for item in self.list])
-    def find_index(self, func) -> list: return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
+    def find_index(self, func): return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
     def filter(self, func): return List([item for item in self.list if self.evalstr(func, func=True)(item)])
     # ======================= Modify Methods ===============================
     def reduce(self, func): return __import__("functools").reduce(self.evalstr(func, func=True, other=True), self.list)

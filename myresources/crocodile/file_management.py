@@ -3,16 +3,14 @@ from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2
 from datetime import datetime
 
 
-# =============================== Security ================================================
+# %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
 
 
 def pwd2key(password: str, salt=None, iterations=None) -> bytes:
     """Derive a secret key from a given password and salt"""
-    if salt is None:
-        m = __import__("hashlib").sha256(); m.update(password.encode("utf-8"))
-        return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
+    if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
 
@@ -48,7 +46,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 
 
-# =================================== File ============================================
+# %% =================================== File ============================================
 
 class Read(object):
     @staticmethod
@@ -93,7 +91,7 @@ class Read(object):
 
 
 class P(type(Path()), Path):
-    # ==================================== File management =========================================
+    # ============= Path management ==================
     """ The default behaviour of methods acting on underlying disk object is to perform the action and return a new path referring to the mutated object in disk drive.
     However, there is a flag `orig` that makes the function return orignal path object `self` as opposed to the new one pointing to new object.
     Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace` it defaults to False and in essence, it deletes the original underlying object.
@@ -117,14 +115,12 @@ class P(type(Path()), Path):
         elif verbose: print(f"Could NOT trash {self}"); return self
 
     def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False):
-        path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
-        name, folder = path.name, path.parent
+        path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it); name, folder = path.name, path.parent
         if parents: folder.create(parents=True, exist_ok=True)
         slf = self.expanduser().resolve()
         if content:
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
-            self.search("*").apply(lambda x: x.move(path=path, content=False))
-            return path  # contents live within this directory.
+            self.search("*").apply(lambda x: x.move(path=path, content=False)); return path  # contents live within this directory.
         if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
             path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
             slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict. # now we can delete any potential conflict before eventually taking its path
@@ -161,15 +157,13 @@ class P(type(Path()), Path):
         except IOError: raise IOError
 
     def start(self, opener=None):
-        import subprocess
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
-        filename = self.expanduser().resolve().str
         if __import__("sys").platform == "win32":
-            if opener is None: tmp = f"powershell start '{filename}'"  # double quotes fail with cmd.
+            if opener is None: tmp = f"powershell start '{self.expanduser().resolve().str}'"  # double quotes fail with cmd.
             else: tmp = rf'powershell {opener} \'{self}\''  # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
-            subprocess.Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
-        elif __import__("sys").platform == 'linux': subprocess.call(["xdg-open", filename])  # works for files and folders alike
-        else:  subprocess.call(["open", filename])  # works for files and folders alike  # mac
+            __import__("subprocess").Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
+        elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str])  # works for files and folders alike
+        else:  __import__("subprocess").call(["open", self.expanduser().resolve().str])  # works for files and folders alike  # mac
         return self
 
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
@@ -232,6 +226,14 @@ class P(type(Path()), Path):
     def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
     def collapseuser(self, strict=True): assert str(P.home()) in str(self.expanduser()), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self - P.home()))
+    def __getitem__(self, slici): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
+
+    def __setitem__(self, key: str or int or slice, value: str or Path):
+        fullparts, new = list(self.parts), list(P(value).parts)
+        if type(key) is str: idx = fullparts.index(key); fullparts.remove(key); fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
+        elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
+        elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
+        self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
 
     def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
         """Splits a path at a given string or index
@@ -259,24 +261,6 @@ class P(type(Path()), Path):
         else: raise ValueError(f"`sep` should take a value from the set [-1, 0, 1] but got {sep}")
         return one, two
 
-    def __getitem__(self, slici):  # tested.
-        if type(slici) is list: return P(*[self[item] for item in slici])
-        else: return P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici])  # it is an integer
-
-    def __setitem__(self, key: str or int or slice, value: str or Path):
-        fullparts, new = list(self.parts), list(P(value).parts)
-        if type(key) is str:
-            idx = fullparts.index(key)
-            fullparts.remove(key)
-            fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
-        elif type(key) is int or type(key) is slice:
-            if type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]  # replace this entry
-            elif type(key) is slice:
-                if key.stop is None: key = slice(key.start, len(fullparts), key.step)
-                if key.start is None: key = slice(0, key.stop, key.step)
-                fullparts = fullparts[:key.start] + new + fullparts[key.stop:]
-        self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
-
     def __repr__(self):  # this is useful only for the console
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
@@ -286,11 +270,10 @@ class P(type(Path()), Path):
         elif "http" in str(self): return "P: URL " + self.as_url_str()
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
 
-    # %% ===================================== File Specs =============================================================
+    # ===================================== File Specs =============================================================
     def size(self, units='mb'):
-        sizes = List(['b', 'kb', 'mb', 'gb']); import numpy as np; factor = dict(zip(sizes + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units]
-        total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
-        return round(total_size / factor, 1)
+        total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()]); import numpy as np
+        return round(total_size / dict(zip((sizes := List(['b', 'kb', 'mb', 'gb'])) + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units], 1)
 
     def time(self, which="m", **kwargs):
         """* ``m`` time of modifying file ``content``, i.e. the time_produced it was created.
@@ -320,13 +303,10 @@ class P(type(Path()), Path):
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
 
     def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
-        target = P(target).expanduser().resolve()
-        assert target.exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
-        self.parent.create()
+        self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
-        from crocodile.meta import Terminal
-        if __import__("platform").system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
-            Terminal.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); __import__("time").sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
+        if __import__("platform").system() == "Windows" and not (tm := __import__("crocodile.meta").Terminal).is_user_admin():  # you cannot create symlink without priviliages.
+            tm.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); __import__("time").sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
         return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)}")
 
@@ -363,60 +343,41 @@ class P(type(Path()), Path):
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
 
-    def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
-        """Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
+    def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):  # Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
         space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
         def get_stats(apath): return (f" {(sts := apath.stats(printit=False)).size} MB. {sts.content_mod_time}. " + desc(apath) if desc is not None else "") if stats or desc else ""
 
         def inner(apath: P, prefix: str = '', level_=-1):
             nonlocal files, directories
             if not level_: return  # 0, stop iterating
-            content = apath.search("*", files=not limit_to_directories)
-            pointers = [tee] * (len(content) - 1) + [last]
+            pointers = [tee] * (len(content := apath.search("*", files=not limit_to_directories)) - 1) + [last]
             for pointer, path in zip(pointers, content):
                 if path.is_dir():
                     yield prefix + pointer + path.name + get_stats(path)
-                    directories += 1
-                    extension = branch if pointer == tee else space
+                    directories, extension = directories + 1, branch if pointer == tee else space
                     yield from inner(path, prefix=prefix + extension, level_=level_ - 1)
-                elif not limit_to_directories:
-                    yield prefix + pointer + path.name + get_stats(path)
-                    files += 1
-        print(dir_path.name)
-        iterator = inner(dir_path, level_=level)
-        for line in __import__("itertools").islice(iterator, length_limit): print(line)
-        if next(iterator, None): print(f'... length_limit, {length_limit}, reached, counted:')
-        print(f'\n{directories} directories' + (f', {files} files' if files else ''))
+                elif not limit_to_directories: yield prefix + pointer + path.name + get_stats(path); files += 1
+        print(dir_path.name); iterator = inner(dir_path, level_=level)
+        [print(line) for line in __import__("itertools").islice(iterator, length_limit)]; print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None; print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
     def find(self, *args, r=True, compressed=True, **kwargs):
         """short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
         if compressed is False and self.is_file(): return self
-        results = self.search(*args, r=r, compressed=compressed, **kwargs)
-        if len(results) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
+        if len(results := self.search(*args, r=r, compressed=compressed, **kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
     def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
+    def chdir(self): __import__("os").chdir(str(self.expanduser())); return self
+    def listdir(self): return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
     pwd = staticmethod(lambda: P.cwd())
     tempdir = staticmethod(lambda: P(__import__("tempfile").mktemp()))
     temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))
     tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
-    def chdir(self): __import__("os").chdir(str(self.expanduser())); return self
-    def listdir(self): return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
-    @staticmethod
-    def tmpfile(name=None, suffix="", folder=None, tstamp=False): return P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files")
+    tmpfile = staticmethod(lambda name=None, suffix="", folder=None, tstamp=False: P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files"))
+    tmp = staticmethod(lambda folder=None, file=None, root="~/tmp_results": P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parent_only=True if file else False))
 
-    @staticmethod
-    def tmp(folder=None, file=None, root="~/tmp_results", verbose=False):
-        root = P(root).expanduser().create()
-        if folder is not None: root = (root / folder).create()
-        if file is not None: root = root / file
-        if verbose: print(f"TMPDIR {repr(root)}. Parent: {repr(root.parent)}")
-        return root
-
-    # ====================================== Compression ===========================================
+    # ====================================== Compression & Encryption ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True, orig=False, **kwargs):
-        """"""
-        path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
-        slf = self.expanduser().resolve()
+        path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         arcname = P(arcname or slf.name)
         if arcname.name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
         if slf.is_file(): Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, **kwargs)
@@ -459,30 +420,25 @@ class P(type(Path()), Path):
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(result)}")
 
     def compress(self, path=None, base_dir=None, fmt="zip", inplace=False, **kwargs):
-        fmts = ["zip", "tar", "gzip"]
-        assert fmt in fmts, f"Unsupported format {fmt}. The supported formats are {fmts}"
+        assert fmt in (fmts := ["zip", "tar", "gzip"]), f"Unsupported format {fmt}. The supported formats are {fmts}"
         _ = self, path, base_dir, kwargs, inplace
         pass
 
     def decompress(self): pass
 
-    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):
-        """see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):  #see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
-        if use_7z:
-            import crocodile.environment as env
-            path = path + '.7z' if not path.suffix == '.7z' else path
-            if env.system == "Windows":
-                program = env.ProgramFiles.joinpath("7-Zip/7z.exe"); env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not program.exists() else None
-                env.tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
-            else: raise NotImplementedError("7z not implemented for Linux")
+        if use_7z and (env := __import__("crocodile.environment")).system == "Windows":
+            env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
+            path = path + '.7z' if not path.suffix == '.7z' else path; env.tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
+        elif use_7z: raise NotImplementedError("7z not implemented for Linux")
         else: path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
 
-    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", inplace=False, orig=False):
+    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", **kwargs):
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.switch(append, "").name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
-        return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.")
+        return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
 
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.zip(inplace=inplace, verbose=verbose).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
     def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
@@ -571,20 +527,14 @@ class Fridge:
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.save, self.read, self.logger, self.expire = save, read, logger, expire
-    def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
     def reset(self): self.time_produced = datetime.now()
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        if self.path is not None: state["path"] = self.path.rel2home()  # With this implementation, instances can be pickled and loaded up in different machine and still works.
-        return state
+    def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
+    def __getstate__(self): state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
 
     def __call__(self, fresh=False):
         if self.path is None:  # Memory Fridge
-            if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
-                self.cache, self.time_produced = self.source_func(), datetime.now()
-                if self.logger: self.logger.debug(f"Updating / Saving data from {self.source_func}")
+            if self.cache is None or fresh is True or self.age > str2timedelta(self.expire): self.cache, self.time_produced = self.source_func(), datetime.now(); self.logger.debug(f"Updating / Saving data from {self.source_func}") if self.logger else None
             elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
         elif fresh or not self.path.exists() or self.age > str2timedelta(self.expire):  # disk fridge
             if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
