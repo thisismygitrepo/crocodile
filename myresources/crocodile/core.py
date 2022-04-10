@@ -18,9 +18,9 @@ def str2timedelta(shift):
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 
 
-def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False):
+def randstr(length=15, lower=True, upper=True, digits=True, punctuation=False, safe=False):
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
-    import string; return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
+    string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
 
 def install_n_import(package, name=None):
@@ -82,15 +82,14 @@ class Base(object):
     def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
 
     def save_code(self, path):  # a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
-        module = __import__("inspect").getmodule(self)
-        if hasattr(module, "__file__"): file = Path(module.__file__)
+        if hasattr(module := __import__("inspect").getmodule(self), "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
 
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):  # pickles the object
         if data_only: obj = self.__getstate__(); obj = obj.copy()  # do not mess with original __dict__
         else: obj = self
-        return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else "") , desc=desc or (f"Data of {self.__class__}" if data_only else desc))
+        return Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else ""), desc=desc or (f"Data of {self.__class__}" if data_only else desc))
 
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
         attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self)))
@@ -226,9 +225,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def concat_values(*dicts, orient='list'): return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
 
     def plot(self, artist=None, use_plt=True):
-        if not use_plt:
-            from crocodile.plotly_management import px
-            fig = px.line(self.__dict__); fig.show(); return fig
+        if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         else:
             plt = __import__("matplotlib").pyplot
             if artist is None: fig, artist = plt.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement

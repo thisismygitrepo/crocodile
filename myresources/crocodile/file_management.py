@@ -58,11 +58,6 @@ class Read(object):
             raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
 
     @staticmethod
-    def npy(path, **kwargs):
-        import numpy as np; data = np.load(str(path), allow_pickle=True, **kwargs)
-        if data.dtype == np.object: data = data.item(); return Struct(data) if type(data) is dict else data
-
-    @staticmethod
     def mat(path, remove_meta=False, **kwargs):
         res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs))
         if remove_meta: List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
@@ -80,6 +75,8 @@ class Read(object):
         with open(str(path), "r") as file: mydict = yaml.load(file, Loader=yaml.FullLoader)
         return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 
+    @staticmethod
+    def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
     @staticmethod
     def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
     @staticmethod
@@ -152,7 +149,7 @@ class P(type(Path()), Path):
         if not self.exists():
             if notfound is FileNotFoundError: raise FileNotFoundError(f"`{self}` is no where to be found!")
             else: return notfound
-        filename = self.unzip(folder=self.tmp(folder="unzipped"), verbose=verbose) if '.zip' in str(self) else self
+        filename = self.unzip(folder=self.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(self) else self
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
 
@@ -178,21 +175,20 @@ class P(type(Path()), Path):
         if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
         return self.write_text("\n".join(lines), encoding=encoding)
 
-    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):  # fails at html.
+    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
+        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(parent_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
 
     def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg=""):
         if inlieu: self._str = str(res)
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename":
-                msg = f"RENAMED {repr(self)} ==> {repr(res)}"
                 if overwrite and res.exists(): res.delete(sure=True)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
-                    else: print(f"SIKIPPED `{msg}` because FileExistsError") if verbose else None; return self if orig else res
-                self.rename(res)
+                    else: print(f"SKIPPED RENAMING {repr(self)} ==> {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
+                self.rename(res); msg = f"RENAMED {repr(self)} ==> {repr(res)}"
             if operation == "delete": self.delete(sure=True, verbose=verbose)
         print(msg) if verbose else None; return self if orig else res
 
@@ -426,7 +422,7 @@ class P(type(Path()), Path):
 
     def decompress(self): pass
 
-    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):  #see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         if use_7z and (env := __import__("crocodile.environment")).system == "Windows":

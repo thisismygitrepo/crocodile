@@ -225,13 +225,11 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
-        file.delete(sure=delete, verbose=False)
+        # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
 
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
-        """Python brachnes off to a new window and run the function passed. context can be either a pickled session or the current file __file__"""
-        file = P.tmpfile(tstamp=False, suffix=".pkl")  # step 1: pickle the function # step 2: create a script that unpickles it. # step 3: run the script that runs the function.
-        Save.pickle(obj=obj, path=file, verbose=False)
+        Save.pickle(obj=obj, path=(file := P.tmpfile(tstamp=False, suffix=".pkl")), verbose=False)
         Terminal.run_script(f"""
 path = tb.P(r'{file}')
 obj = path.readit()
@@ -240,10 +238,7 @@ obj{'()' if execute else ''}
 {cmd}""")
 
     @staticmethod
-    def replicate_session(cmd=""):
-        file = P.tmpfile(suffix=".pkl")
-        __import__("dill").dump_session(file, main=sys.modules[__name__])
-        Terminal().run_script(script=f"""
+    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_script(script=f"""
 path = tb.P(r'{file}')
 tb.dill.load_session(str(path)); 
 path.delete(sure=True, verbose=False)
@@ -266,8 +261,7 @@ path.delete(sure=True, verbose=False)
 
     @staticmethod
     def run_as_admin(cmd_line=None, wait=True):
-        """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new
-        command.  It must be a list of [command, arg1, arg2...] format.
+        """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new command.  It must be a list of [command, arg1, arg2...] format.
         Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
         Returns the sub-process return code, unless wait is False in which case it returns None.
         adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
@@ -289,51 +283,35 @@ path.delete(sure=True, verbose=False)
 
 class SSH(object):
     def __init__(self, username, hostname, sshkey=None, pwd=None):
-        _ = False
-        if _: super().__init__()
+        _ = False; super().__init__() if _ else None
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
-        import paramiko
-        self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.hostname, self.username = hostname, username
+        self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
+        self.hostname, self.username = hostname, username
         self.sftp = self.ssh.open_sftp()
-        self.target_machine = "Windows" if self.run("$env:OS", verbose=False).output["stdout"] == "Windows_NT" else "Linux"
-        # it must uses a python independent way to figure out the machine type to avoid circualrity below:
+        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).output["stdout"] == "Windows_NT" else "Linux"
+        self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.remote_machine == "Windows" else rf"""source ~/venvs/ve/bin/activate"""
         self.platform = __import__("platform")
-        if self.platform.system() == "Windows": self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
-        else: self.local_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
-        if self.target_machine == "Windows": self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate"""  # works for both cmd and pwsh
-        else: self.remote_python_cmd = rf"""source ~/venvs/ve/bin/activate"""
+        self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.platform.system() == "Windows" else rf"""source ~/venvs/ve/bin/activate"""  # works for both cmd and pwsh
 
-    def get_key(self):
-        """In SSH commands you need this: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}' """
-        return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""
-
-    def copy_sshkeys_to_remote(self, fqdn):
-        """Windows Openssh alternative to ssh-copy-id"""
-        assert self.platform.system() == "Windows"
-        return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')
-
-    def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.target_machine}] "
+    def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
+    def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.remote_machine}] "
     def remote(self): return f"{self.username}@{self.hostname}"
     def local(self): return f"{__import__('os').getlogin()}@{self.platform.node()}"
     def open_console(self, new_window=True): Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
-    def copy_env_var(self, name): assert self.target_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
+    def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def copy_to_here(self, source, target=None): pass
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
-
-    def run(self, cmd, verbose=True):
-        res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
-        res.print() if verbose else None; return res
+    def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
+    def copy_sshkeys_to_remote(self, fqdn): assert self.platform.system() == "Windows"; return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')  # Windows Openssh alternative to ssh-copy-id
 
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
         if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
-        resp = self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())')
-        remotepath = P(resp.op or "").joinpath(P(target).name).as_posix()
+        remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
         print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="))
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)"""); source.delete(sure=True); return resp
@@ -427,15 +405,14 @@ class Experimental:
         :param meta:
         :param save_source_code:
         """
-        import inspect
         text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
         if obj is not None:
-            text += f"# Code to generate the result\n" + "```python\n" + inspect.getsource(obj) + "\n```" + separator
+            text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
         (readmepath := P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
         print(f"README.md file generated @ {readmepath.absolute().as_uri()}")
         if save_source_code:
-            P(inspect.getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
+            P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
             print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
 
     @staticmethod
@@ -464,13 +441,11 @@ class Experimental:
         return Struct(res)
 
     @staticmethod
-    def extract_code(func, code: str = None, include_args=True, modules=None,
-                     verbose=True, copy2clipboard=False, **kwargs):
+    def extract_code(func, code: str = None, include_args=True, modules=None, verbose=True, copy2clipboard=False, **kwargs):
         """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
-        TODO: how to handle decorated functions.
-        TODO : add support for lambda functions.  ==> use dill for powerfull inspection
+        TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection
         """
         if type(func) is str:
             assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
@@ -479,7 +454,7 @@ class Experimental:
             func = eval(tmp[:first_parenth])
             self = ".".join(func.split(".")[:-1]); _ = self
             func = eval(func, modules)
-        import inspect, textwrap
+        import inspect; import textwrap
         codelines = tmp_[14:] if (tmp_ := textwrap.dedent(inspect.getsource(func))).startswith("@staticmethod\n") else tmp_
         assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
         idx = codelines.find("):\n")  # remove def func_name() line from the list
@@ -496,8 +471,7 @@ class Experimental:
         if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
             self = ".".join(func.split(".")[:-1]); _ = self
             func = eval(func, modules)
-        import inspect
-        ak = Struct(dict(inspect.signature(func).parameters)).values()  # ignores self for methods.
+        ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods.
         ak = Struct.from_keys_values(ak.name, ak.default).update(kwargs)
         res = """"""
         for key, val in ak.items():
