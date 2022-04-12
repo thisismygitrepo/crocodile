@@ -62,21 +62,21 @@ class DBMS:
         return eng
 
     # ==================== QUERIES =====================================
-    def execute_as_you_go(self, *commands, res_func=lambda x: x.all()):
+    def execute_as_you_go(self, *commands, res_func=lambda x: x.all(), df=False):
         with self.eng.connect() as conn:
             for command in commands: result = conn.execute(text(command))
             conn.commit()  # if driver is sqlite3, the connection is autocommitting. # this commit is only needed in case of DBAPI driver.
-        return res_func(result)
+        return res_func(result) if not df else pd.DataFrame(res_func(result))
 
-    def execute_begin_once(self, command, res_func=lambda x: x.all()):
+    def execute_begin_once(self, command, res_func=lambda x: x.all(), df=False):
         with self.eng.begin() as conn:
             result = conn.execute(text(command)) # no need for commit regardless of driver
             result = res_func(result)
-        return result
+        return result if not df else pd.DataFrame(result)
 
-    def execute(self, command):
+    def execute(self, command, df=False):
         with self.eng.begin() as conn: result = conn.execute(text(command))
-        return result
+        return result if not df else pd.DataFrame(result)
 
     def _get_table_identifier(self, table, sch):
         if sch is None: sch = self.sch

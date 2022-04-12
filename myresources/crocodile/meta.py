@@ -140,7 +140,7 @@ class Terminal:
         returncode = property(lambda self: self.output["returncode"])
         as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}\n" + "".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 50, "\n\n"); return self
+        def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 50, "\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         """
         * adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
@@ -157,8 +157,7 @@ class Terminal:
     @staticmethod
     def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
     def run(self, *cmds, shell=None, check=False, ip=None):
-        """Blocking operation. Thus, if you start a shell via this method, it will run in the main and
-        won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
+        """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
         Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
         * Unlike `__import__('os').system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
@@ -176,13 +175,10 @@ class Terminal:
         `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned. # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`"""
         return self.Response.from_completed_process(resp)
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
-        """Opens a new terminal, and let it run asynchronously.
-        Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
-        commands in one go without interaction with an ongoing channel. Use this only for the purpose of
-        producing a different window and humanly interact with it.
+        """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
+        commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it.
         https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
-        https://www.youtube.com/watch?v=IynV6Y80vws
-        https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
+        https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None: shell = "" if self.machine == "win32" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
@@ -245,11 +241,8 @@ path.delete(sure=True, verbose=False)
         win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
         if cmd_line is None: cmd_line = [sys.executable] + sys.argv
         elif type(cmd_line) not in (tuple, list): raise ValueError("cmdLine is not a sequence.")
-        cmd = '"%s"' % (cmd_line[0],)   # TODO: isn't there a function or something we can call to massage command line params?
-        params = " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
-        # ShellExecute() doesn't seem to allow us to fetch the PID or handle of the process, so we can't get anything useful from it. Therefore the more complex ShellExecuteEx() must be used. # procHandle = win32api.ShellExecute(0, lpVerb, cmd, params, cmdDir, showCmd)
-        proce_info = win32com.shell.shell.ShellExecuteEx(nShow=__import__("win32con").SW_SHOWNORMAL, fMask=__import__("win32com", fromlist=["shell.shellcon"]).shell.shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas',  # causes UAC elevation prompt.
-                                                         lpFile=cmd, lpParameters=params)
+        cmd, params = '"%s"' % (cmd_line[0],), " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
+        proce_info = win32com.shell.shell.ShellExecuteEx(nShow=__import__("win32con").SW_SHOWNORMAL, fMask=__import__("win32com", fromlist=["shell.shellcon"]).shell.shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas', lpFile=cmd, lpParameters=params)  # causes UAC elevation prompt.
         if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); rc = win32process.GetExitCodeProcess(proc_handle)
         else: rc = None; return rc
 
@@ -260,38 +253,35 @@ class SSH(object):
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
-        self.hostname, self.username = hostname, username
-        self.sftp = self.ssh.open_sftp()
+        self.hostname, self.username, self.sftp, self.platform = hostname, username, self.ssh.open_sftp(), __import__("platform")
         self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).output["stdout"] == "Windows_NT" else "Linux"
         self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.remote_machine == "Windows" else rf"""source ~/venvs/ve/bin/activate"""
-        self.platform = __import__("platform")
         self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.platform.system() == "Windows" else rf"""source ~/venvs/ve/bin/activate"""  # works for both cmd and pwsh
     def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
-    def __repr__(self): return f"{self.local()} [{self.platform.system()}] SSH connection to {self.remote()} [{self.remote_machine}] "
-    def remote(self): return f"{self.username}@{self.hostname}"
-    def local(self): return f"{__import__('os').getlogin()}@{self.platform.node()}"
+    def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] SSH connection to {self.get_repr('remote')} [{self.remote_machine}] "
+    def get_repr(self, which="remote"): return f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}"
     def open_console(self, new_window=True): Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def copy_to_here(self, source, target=None): pass
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
-    def copy_sshkeys_to_remote(self, fqdn): assert self.platform.system() == "Windows"; return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {fqdn} "cat >> .ssh/authorized_keys"')  # Windows Openssh alternative to ssh-copy-id
+    def copy_sshkeys_to_remote(self): assert self.platform.system() == "Windows"; return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {self.username}@{self.hostname} "cat >> .ssh/authorized_keys"')  # Windows Openssh alternative to ssh-copy-id
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
         if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
-        print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="))
+        print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="), "\n" * 2)
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)"""); source.delete(sure=True); return resp
 
 
-class Scheduler:
+class Scheduler:  # 1- Time before Ops, and Opening Message  2- Perform logic  3- Optional logic every while  4- Conclude Message  # 5- Sleep
     def __init__(self, routine=None, wait: str = "2m", occasional=None, other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
         self.routine = [lambda: None] if routine is None else routine  # main routine to be repeated every `wait` time period
-        self.wait = wait  # wait period between routine cycles.
+        self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.occasional = [lambda: None] if occasional is None else occasional  # routine to be repeated every `other` time period
         self.other = other  # number of routine cycles before `occasional` get executed once.
         self.cycles = runs  # how many times to run the routine. defaults to infinite.
@@ -301,27 +291,16 @@ class Scheduler:
         self._start_time = None  # begining of a session (local time)
         self.history, self.count, self.total_count = List([]), 0, 0
     def run(self, until="2050-01-01", cycles=None):
-        self.cycles = cycles or self.cycles
-        self.count = 0
-        self._start_time = datetime.now()
-        wait_time = str2timedelta(self.wait).total_seconds()
+        self.cycles, self.count, self._start_time = cycles or self.cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.count < self.cycles:
-            # 1- Opening Message ==============================================================
-            time1 = datetime.now()  # time_produced before calcs started.  # use  fstring format {x:<10}
-            self.logger.info(f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time)}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
-            # 2- Perform logic ======================================================
+            time1 = datetime.now(); self.logger.info(f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time): <10}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
             try: [routine() for routine in self.routine]
             except Exception as ex: self.handle_exceptions(ex)
-            # 3- Optional logic every while =========================================
             if self.count % self.other == 0:
                 try: [occasional() for occasional in self.occasional]
                 except Exception as ex: self.handle_exceptions(ex)
-            # 4- Conclude Message ============================================================
-            self.count += 1
-            time_left = int(wait_time - (datetime.now() - time1).total_seconds())  # take away processing time_produced.
-            time_left = time_left if time_left > 0 else 1
-            self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
-            # 5- Sleep ===============================================================
+            time_left = time_left if (time_left := int(self.wait - (datetime.now() - time1).total_seconds())) > 0 else 1  # take away processing time_produced.
+            self.count += 1; self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
             try: __import__("time").sleep(time_left)  # consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.handle_exceptions(ex)
         else:  # while loop finished due to condition satisfaction (rather than breaking)
@@ -347,8 +326,7 @@ class Scheduler:
         # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 
-class Experimental:
-    """Debugging and Meta programming tools"""
+class Experimental:  # Debugging and Meta programming tools"""
     @staticmethod
     def try_this(func, return_=None, raise_=None, run=None, handle=None):
         try: return func()
@@ -375,42 +353,24 @@ class Experimental:
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
         (readmepath := P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
         print(f"README.md file generated @ {readmepath.absolute().as_uri()}")
-        if save_source_code:
-            P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"))
-            print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+        if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip")); print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
     @staticmethod
     def load_from_source_code(directory, obj=None, delete=False):
-        """Does the following:
-        * scope directory passed for ``source_code`` module.
-        * Loads the directory to the memroy.
-        * Returns either the package or a piece of it as indicated by ``obj``"""
         P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
-        sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem)
-        tmpdir.delete(sure=delete, verbose=False)
+        sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
         return getattr(sourcefile, obj) if obj is not None else sourcefile
     @staticmethod
     def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
-        """Captures the local variables inside a function.
-        :param func:
-        :param scope: `globals()` executed in the main scope. This provides the function with scope defined in main.
-        :param args: dict of what you would like to pass to the function as arguments.
-        :param self: relevant only if the function is a method of a class. self refers to the path of the instance
-        :param update_scope: binary flag refers to whether you want the result in a struct or update main."""
-        code = Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False)
-        exec(code, scope, res := dict())  # run the function within the scope `res`
-        if update_scope: scope.update(res)
-        return Struct(res)
+        exec(Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False), scope, res := dict()); scope.update(res) if update_scope else None; return Struct(res)
     @staticmethod
     def extract_code(func, code: str = None, include_args=True, modules=None, verbose=True, copy2clipboard=False, **kwargs):
         """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
-        This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
         TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
         if type(func) is str:
             assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
-            tmp = func
             first_parenth = func.find("(")  # last_parenth = -1
-            func = eval(tmp[:first_parenth])
+            func = eval(func[:first_parenth])
             self = ".".join(func.split(".")[:-1]); _ = self
             func = eval(func, modules)
         import inspect; import textwrap
@@ -462,9 +422,7 @@ class Experimental:
         for cell in P(module.__file__).read_text().split("#%%"):
             if pointer in cell.split('\n')[0]: break  # bingo
         else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
-        print(cell)
-        install_n_import("clipboard").copy(cell)
-        return cell
+        print(cell); install_n_import("clipboard").copy(cell); return cell
 
 
 if __name__ == '__main__':

@@ -95,10 +95,8 @@ class P(type(Path()), Path):
         if sure:
             if not slf.exists():
                 slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
-                if verbose: print(f"Could NOT DELETE nonexisting file {repr(slf)}. ")
-                return slf  # terminate the function.
-            if slf.is_file() or slf.is_symlink(): slf.unlink(missing_ok=True)
-            else: __import__("shutil").rmtree(slf, ignore_errors=True)
+                print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # terminate the function.
+            slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=True)
             if verbose: print(f"DELETED {repr(slf)}.")
         elif verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
         return self
@@ -131,9 +129,7 @@ class P(type(Path()), Path):
         if overwrite and dest.exists(): dest.delete(sure=True)
         if not overwrite and dest.exists: raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
-        elif slf.is_dir():
-            __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()))
-            print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
+        elif slf.is_dir(): __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()));  print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest / slf.name if not orig else self
     # ======================================= File Editing / Reading ===================================
@@ -184,8 +180,8 @@ class P(type(Path()), Path):
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
         `orig`: whether the method returns the original path object or a new one."""
-    def prepend(self, prefix, suffix=None, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(self.suffixes))), operation="rename", **kwargs)
-    def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(self.suffixes))), operation="rename", **kwargs)
+    def prepend(self, prefix, suffix=None, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
+    def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)
     def append_time_stamp(self, fmt=None, **kwargs): return self._return(self.append(name="_" + timestamp(fmt=fmt)), operation="rename", **kwargs)
     def with_trunk(self, name, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", **kwargs)  # Complementary to `with_stem` and `with_suffix`
     def with_name(self, name, verbose=True, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
@@ -396,22 +392,20 @@ class P(type(Path()), Path):
         else: path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", **kwargs):
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.switch(append, "").name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(append, "")).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.zip(inplace=inplace, verbose=verbose).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
     def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
     # ========================== Helpers =========================================
     def _resolve_path(self, folder, name, path, default_name, rel2it=False):  # From all arguments, figure out what is the final path.
-        """:param rel2it: `folder` or `path` are relative to `self` as opposed to cwd."""
+        """:param rel2it: `folder` or `path` are relative to `self` as opposed to cwd. This is used when resolving '../dir'"""
         if path is not None:
-            assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."
             path = P(self.joinpath(path).resolve() if rel2it else path).expanduser().resolve()
-            assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `path` kwarg. {path}"
-            folder, name = path.parent, path.name; _ = name, folder
+            assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."; assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `folder` kwarg. `{path}`"
+            return path
         else:
             name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
-            path = P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
-        return path
+            return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
 
 
 class Compression(object):  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
@@ -422,11 +416,9 @@ class Compression(object):  # Provides consistent behaviour across all methods. 
         return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
     @staticmethod
     def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
-        """
-        arcname determines the directory of the file being archived inside the archive. Defaults to same
+        """arcname determines the directory of the file being archived inside the archive. Defaults to same
         as original directory except for drive. When changed, it should still include the file path in its end.
-        If arcname = filename without any path, then, it will be in the root of the archive.
-        """
+        If arcname = filename without any path, then, it will be in the root of the archive."""
         import zipfile
         with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
             jungle_zip.setpassword(pwd=password) if password is not None else None
