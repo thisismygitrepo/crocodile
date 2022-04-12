@@ -291,7 +291,7 @@ class SaveType:
 
     class PNG(GenericSave):
         def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
-        def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
+        def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname).create(parents_only=True)), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
         def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self.fname
 
     class GIF(GenericSave):

@@ -52,8 +52,8 @@ class HyperParam(tb.Struct):
         self.save_type = ["data", "obj", "both"][-1]
         self.update(**kwargs)
 
-    def save(self, path=None, data_only=True, r=False, include_code=False, add_suffix=True):
-        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parent_only=True).write_text(str(self))
+    def save(self, **kwargs):
+        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
         if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.dat.pkl"), add_suffix=False, data_only=True, desc="")
         if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
 
@@ -395,7 +395,6 @@ class BaseModel(ABC):
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
-        # Saving wrapper_class and model architecture in the main path:
         # tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         print(f'SAVED: Model Class @ {self.hp.save_dir.as_uri()}')
 

@@ -127,7 +127,7 @@ class P(type(Path()), Path):
         elif path is not None and folder is None: dest, content = P(path), True  # this way, the destination will be filled with contents of `self`
         elif path is None and folder is None: dest = self.with_name(str(name)) if name is not None else self.append(append)
         else: raise NotImplementedError
-        dest, slf = dest.expanduser().resolve().create(parent_only=True), self.expanduser().resolve()
+        dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
         if overwrite and dest.exists(): dest.delete(sure=True)
         if not overwrite and dest.exists: raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
@@ -157,7 +157,7 @@ class P(type(Path()), Path):
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
     def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, read=Read.read): return Fridge(source_func=source_func, path=self, expire=expire, save=save, read=read)
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
-        if not self.exists(): self.create(parent_only=True).write_text(txt)
+        if not self.exists(): self.create(parents_only=True).write_text(txt)
         lines, bingo = self.read_text(encoding=encoding).split("\n"), False
         for idx, line in enumerate(lines):
             if txt in line: lines[idx], bingo = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line)), True
@@ -165,7 +165,8 @@ class P(type(Path()), Path):
         return self.write_text("\n".join(lines), encoding=encoding)
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(parent_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
+        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(
+            parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
     def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg=""):
         if inlieu: self._str = str(res)
         if inplace:
@@ -332,7 +333,7 @@ class P(type(Path()), Path):
         if compressed is False and self.is_file(): return self
         if len(results := self.search(*args, r=r, compressed=compressed, **kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
-    def create(self, parents=True, exist_ok=True, parent_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parent_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
+    def create(self, parents=True, exist_ok=True, parents_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     def chdir(self): __import__("os").chdir(str(self.expanduser())); return self
     def listdir(self): return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
     pwd = staticmethod(lambda: P.cwd())
@@ -340,7 +341,7 @@ class P(type(Path()), Path):
     temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))
     tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
     tmpfile = staticmethod(lambda name=None, suffix="", folder=None, tstamp=False: P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files"))
-    tmp = staticmethod(lambda folder=None, file=None, root="~/tmp_results": P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parent_only=True if file else False))
+    tmp = staticmethod(lambda folder=None, file=None, root="~/tmp_results": P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False))
     # ====================================== Compression & Encryption ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=True, orig=False, **kwargs):
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
