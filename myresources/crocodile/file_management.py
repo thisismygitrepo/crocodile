@@ -92,14 +92,11 @@ class P(type(Path()), Path):
     Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
     def delete(self, sure=False, verbose=True):
         slf = self  # slf = self.expanduser().resolve() don't resolve symlinks.
-        if sure:
-            if not slf.exists():
-                slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
-                print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # terminate the function.
-            slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=True)
-            if verbose: print(f"DELETED {repr(slf)}.")
-        elif verbose: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.")
-        return self
+        if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.") if verbose else None; return self
+        if not slf.exists():
+            slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
+            print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # terminate the function.
+        slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=True); print(f"DELETED {repr(slf)}.") if verbose else None; return self
     def send2trash(self, verbose=True):
         if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
@@ -116,18 +113,13 @@ class P(type(Path()), Path):
             path.delete(sure=True, verbose=False)  # It is important to delete after moving. # because `self` could be within the file you want to delete.
             path_.rename(path)
         else: slf.rename(path)
-        if verbose: print(f"MOVED {repr(self)} ==> {repr(path)}`")
-        return path
-    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100
-        if folder is not None and path is None:
-            if name is None: dest = P(folder).expanduser().resolve().create()
-            else: dest, content = P(folder).expanduser().resolve() / name, True
-        elif path is not None and folder is None: dest, content = P(path), True  # this way, the destination will be filled with contents of `self`
-        elif path is None and folder is None: dest = self.with_name(str(name)) if name is not None else self.append(append)
-        else: raise NotImplementedError
+        print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
+    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
+        content = True if path is not None or name is not None else content  # this way, the destination will be filled with contents of `self`
+        dest = self._resolve_path(folder=folder, name=name, path=path, default_name=str(name) if name is not None else self.append(append).name, rel2it=False)
         dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
-        if overwrite and dest.exists(): dest.delete(sure=True)
-        if not overwrite and dest.exists: raise FileExistsError(f"Destination already exists: {repr(dest)}")
+        dest.delete(sure=True) if overwrite and dest.exists() else None
+        if not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir(): __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()));  print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
@@ -198,8 +190,8 @@ class P(type(Path()), Path):
     def __deepcopy__(self): return P(str(self))
     def __getstate__(self): return str(self)
     def __setstate__(self, state): self._str = str(state)
-    def __add__(self, other): return self.parent.joinpath(self.stem + str(other))
-    def __radd__(self, other): return self.parent.joinpath(str(other) + self.stem)  # other + P and `other` doesn't know how to make this addition.
+    def __add__(self, other): return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
+    def __radd__(self, other): return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
     def __sub__(self, other): res = P(str(self).replace(str(other), "")); return res[1:] if str(res[0]) in {"\\", "/"} else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
@@ -227,8 +219,7 @@ class P(type(Path()), Path):
                 one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
             one, two = P(one), P(two)
         elif index is not None and (at is None):  # index is provided
-            one, two = self[:index], P(*self.parts[index + 1:])
-            at = self[index]  # this is needed below.
+            one, two = self[:index], P(*self.parts[index + 1:]); at = self[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
         if sep == 0: pass  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
         elif sep == 1: two = at / two   # append it to right portion
@@ -343,7 +334,7 @@ class P(type(Path()), Path):
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         arcname = P(arcname or slf.name)
         if arcname.name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
-        if slf.is_file(): Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, **kwargs)
+        if slf.is_file(): path = Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, **kwargs)
         else:
             root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
             path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
