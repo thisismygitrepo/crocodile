@@ -182,8 +182,7 @@ class P(type(Path()), Path):
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
-        `orig`: whether the method returns the original path object or a new one.
-    """
+        `orig`: whether the method returns the original path object or a new one."""
     def prepend(self, prefix, suffix=None, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(self.suffixes))), operation="rename", **kwargs)
     def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(self.suffixes))), operation="rename", **kwargs)
     def append_time_stamp(self, fmt=None, **kwargs): return self._return(self.append(name="_" + timestamp(fmt=fmt)), operation="rename", **kwargs)
@@ -221,8 +220,7 @@ class P(type(Path()), Path):
         :param index: integer telling at which index to split.
         :param sep: can be either [-1, 0, 1]. Determines where the separator is going to live with: left portion, none or right portion.
         :param mode: "lenient" mode makes `split` method behaves like split method of string. This can produce unwanted behaviour due to e.g. patial matches. 'strict' mode is the default which only splits at exact match.
-        :return: two paths
-        """
+        :return: two paths"""
         if index is None and (at is not None):  # at is provided  # ====================================   Splitting
             if mode == "lenient":
                 items = str(self).split(sep=str(at))
@@ -298,8 +296,7 @@ class P(type(Path()), Path):
         :param filters: list of filters
         :param not_in: list of strings that search results should not contain them (short for filter with simple lambda)
         :param exts: list of extensions to search for.
-        :param win_order: return search results in the order of files as they appear on a Windows machine.
-        """
+        :param win_order: return search results in the order of files as they appear on a Windows machine."""
         filters = filters or []
         if not_in is not None: filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
         if exts is not None: filters += [lambda x: any([ext in x.name for ext in exts])]
@@ -364,8 +361,7 @@ class P(type(Path()), Path):
         If set to False, a directory with same path as the zip file will be created and will contain the results.
         :param inplace: delete the original zip file after successful extraction.
         :param kwargs:
-        :return: path if content=False, else, path.parent. Default path = self.parent / self.stem
-        """
+        :return: path if content=False, else, path.parent. Default path = self.parent / self.stem"""
         slf = zipfile = self.expanduser().resolve()
         if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(slf): return slf

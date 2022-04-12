@@ -147,9 +147,7 @@ class Terminal:
         * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
         * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
         * `suprocess.call` is an archaic command for pre-Python-3.5.
-        * In both `Popen` and `run`, the (shell=True) argument, implies that shell-specific commands are loaded up,
-        e.g. `start` or `conda`.
-        """
+        * In both `Popen` and `run`, the (shell=True) argument, implies that shell-specific commands are loaded up, e.g. `start` or `conda`."""
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
         self.machine = sys.platform  # 'win32', 'linux' OR: import platform; self.platform.system(): Windows, Linux, Darwin
@@ -184,8 +182,7 @@ class Terminal:
         producing a different window and humanly interact with it.
         https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
         https://www.youtube.com/watch?v=IynV6Y80vws
-        https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html
-        """
+        https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None: shell = "" if self.machine == "win32" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
@@ -217,14 +214,12 @@ obj = path.readit()
 path.delete(sure=True, verbose=False)
 obj{'()' if execute else ''}
 {cmd}""")
-
     @staticmethod
     def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_script(script=f"""
 path = tb.P(r'{file}')
 tb.dill.load_session(str(path)); 
 path.delete(sure=True, verbose=False)
 {cmd}""")
-
     @staticmethod
     def is_user_admin():
         """@return: True if the current user is an 'Admin' whatever that means (root on Unix), otherwise False. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
@@ -243,8 +238,7 @@ path.delete(sure=True, verbose=False)
         """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new command.  It must be a list of [command, arg1, arg2...] format.
         Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
         Returns the sub-process return code, unless wait is False in which case it returns None.
-        adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows
-        """
+        adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
         _ = install_n_import("win32api", name="pypiwin32")
         win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
@@ -344,8 +338,7 @@ class Scheduler:
                              f"cycles  ran: {self.count}  |  Lifetime cycles: {self.total_count} \n"
                              f"termination: {reason} \n" + "-" * 100)
     def handle_exceptions(self, ex):
-        """One can implement a handler that raises an error, which terminates the program, or handle
-        it in some fashion, in which case the cycles continue."""
+        """One can implement a handler that raises an error, which terminates the program, or handle it in some fashion, in which case the cycles continue."""
         self.record_session_end(reason=ex)
         self.exception_handler(ex)
         raise ex
@@ -375,8 +368,7 @@ class Experimental:
         :param path: directory or file path. If directory is passed, README.md will be the filename.
         :param obj: Python module, class, method or function used to generate the result data. (dot not pass the data data_only or an instance of any class)
         :param meta:
-        :param save_source_code:
-        """
+        :param save_source_code:"""
         text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
         if obj is not None:
             text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
@@ -391,8 +383,7 @@ class Experimental:
         """Does the following:
         * scope directory passed for ``source_code`` module.
         * Loads the directory to the memroy.
-        * Returns either the package or a piece of it as indicated by ``obj``
-        """
+        * Returns either the package or a piece of it as indicated by ``obj``"""
         P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
         sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem)
         tmpdir.delete(sure=delete, verbose=False)
@@ -414,8 +405,7 @@ class Experimental:
         """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
         This is useful to debug functions and class methods alike.
         Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
-        TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection
-        """
+        TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
         if type(func) is str:
             assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
             tmp = func

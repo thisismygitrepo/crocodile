@@ -167,7 +167,7 @@ class DataReader(tb.Base):
     def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
     def __getstate__(self): return dict(specs=self.specs, scaler=self.scaler)
     def __setstate__(self, state): return self.__dict__.update(state)
-    def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
+    def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=False, return_str=True)
 
     def split_the_data(self, *args, strings=None, **kwargs):
         """
@@ -267,13 +267,13 @@ class BaseModel(ABC):
         if self.hp.pkg_name == 'tensorflow':
             if loss is None: loss = pkg.keras.losses.MeanSquaredError()
             if optimizer is None: optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
-            if metrics is None: metrics = tb.List()  # [pkg.keras.metrics.MeanSquaredError()]
+            if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
         elif self.hp.pkg_name == 'torch':
             if loss is None: loss = pkg.nn.MSELoss()
             if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
-            if metrics is None: metrics = tb.List()  # [tmp.MeanSquareError()]
+            if metrics is None: metrics = []  # [tmp.MeanSquareError()]
         # Create a new compiler object
-        self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=tb.L(metrics), **kwargs)
+        self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics, **kwargs)
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 

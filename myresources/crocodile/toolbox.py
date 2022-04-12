@@ -11,7 +11,6 @@ from crocodile import core
 from crocodile import meta
 from crocodile import file_management as _fm
 
-
 # CORE =====================================
 str2timedelta, timestamp, randstr, validate_name, install_n_import = core.str2timedelta, core.timestamp, core.randstr, core.validate_name, core.install_n_import
 Base, Struct, Display, Save, List = core.Base, core.Struct, core.Display, core.Save, core.List
