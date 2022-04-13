@@ -266,7 +266,6 @@ class SSH(object):
     def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
-    def copy_sshkeys_to_remote(self): assert self.platform.system() == "Windows"; return Terminal().run(fr'type $env:USERPROFILE\.ssh\id_rsa.pub | ssh {self.username}@{self.hostname} "cat >> .ssh/authorized_keys"')  # Windows Openssh alternative to ssh-copy-id
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         pwd = randstr(length=10, safe=True)
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
