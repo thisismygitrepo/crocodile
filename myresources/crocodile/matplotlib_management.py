@@ -560,15 +560,14 @@ class ImShow(FigureManager):
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
 
-    def __init__(self, *images_list: typing.Union[list, np.ndarray], sup_titles=None, sub_labels=None, labels=None,
+    def __init__(self, img_tensor, sup_titles=None, sub_labels=None,
                  save_type=SaveType.Null, save_name=None, save_dir=None, save_kwargs=None,
                  subplots_adjust=None, gridspec=None, tight=True, info_loc=None, nrows=None, ncols=None, ax=None,
                  figsize=None, figname='im_show', figpolicy=FigurePolicy.add_new, auto_brightness=True, delay=200, pause=False, **kwargs):
         """
-        :param images_list: arbitrary number of image lists separated by comma, say N.
-        :param sup_titles: Titles for frames. Must have a length equal to number of images in each list, say M.
-        :param sub_labels: Must have a length = M, and in each entry there should be N labels.
-        :param labels: if labels are sent via this keyword, they will be repeated for all freames.
+        :param images_list: size M x N x W x H x C  # M used spatially, N for animation.
+        :param sup_titles: Titles for frames (N)
+        :param sub_labels: M x N. If shape sent is M, then N will be created by repeating the same labels.
         :param save_type:
         :param save_dir:
         :param save_name:
@@ -581,12 +580,7 @@ class ImShow(FigureManager):
         Tip: Use np.arrray_split to get sublists and have multiple plots per frame. Useful for very long lists.
         """
         super(ImShow, self).__init__(info_loc=info_loc)
-        self.num_plots = len(images_list)   # Number of images in each plot
-        self.index_max = min([len(images_list[i]) for i in range(self.num_plots)])
-        nrows, ncols = self.get_nrows_ncols(self.num_plots, nrows, ncols)
-        # bnext = Button(plt.axes([0.81, 0.05, 0.1, 0.075]), 'Next').on_clicked(callback.next)
-        # bprev = Button(plt.axes([0.7, 0.05, 0.1, 0.075]), 'Previous').on_clicked(callback.prev)
-        sub_labels = [[a_label for _ in np.arange(self.index_max)] for a_label in labels] if labels is not None else ([[str(i) for i in np.arange(self.index_max)] for _ in range(self.num_plots)] if sub_labels is None else sub_labels)
+        nrows, ncols = self.get_nrows_ncols(img_tensor.shape[0], nrows, ncols)
         self.image_list, self.sub_labels, self.titles = images_list, sub_labels, sup_titles if sup_titles is not None else [str(i) for i in np.arange(self.index_max)]
         self.pause, self.kwargs, self.delay, self.auto_brightness = pause, kwargs, delay, auto_brightness
         self.fname = self.event = None
@@ -641,7 +635,7 @@ class ImShow(FigureManager):
     from_saved = staticmethod(lambda *things, **kwargs: ImShow.from_saved_images_path_lists(*things, **kwargs) if isinstance(things[0], list) else ImShow.from_directories(*things, **kwargs))
     from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
     imagesc = staticmethod(lambda: None)  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-    test = staticmethod(lambda: ImShow(*np.random.randn(12, 10, 80, 120)))
+    test = staticmethod(lambda: ImShow(*np.random.rand(12, 10, 80, 120, 3)))
     resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import("skimage").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
 
 
