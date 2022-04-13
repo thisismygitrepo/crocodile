@@ -22,9 +22,7 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         if salted: import secrets; salt, iteration = secrets.token_bytes(16), iteration or secrets.randbelow(1_000_000)
         else: salt, iteration = None, None
         key = pwd2key(pwd, salt, iteration)
-    elif key is None:  # generate a new key: discouraged, always make your keys/pwd before invoking the func.
-        key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key()  # uses random bytes, more secure but no string representation
-        print(f"KEY SAVED @ {repr(P.tmpdir().joinpath('key.bytes').write_bytes(key))}")  # without verbosity check:
+    elif key is None: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); print(f"KEY SAVED @ {repr(P.tmpdir().joinpath('key.bytes').write_bytes(key))}")  # discouraged, make your keys/pwd before invoking the func. use random bytes, more secure but no string representation
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
@@ -229,11 +227,7 @@ class P(type(Path()), Path):
     def size(self, units='mb'):
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()]); import numpy as np
         return round(total_size / dict(zip((sizes := List(['b', 'kb', 'mb', 'gb'])) + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units], 1)
-    def time(self, which="m", **kwargs):
-        """* ``m`` time of modifying file ``content``, i.e. the time_produced it was created.
-            * ``c`` time of changing file status (its inode is changed like permissions, path etc, but not content)
-            * ``a`` last time the file was accessed."""
-        return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)
+    def time(self, which=["m", "c", "a"][0], **kwargs): return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)  # m last mofidication of content, i.e. the time it was created. c last status change (its inode is changed, permissions, path, but not content) a: last access
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
@@ -265,17 +259,6 @@ class P(type(Path()), Path):
         except OSError: return self
     # ======================================== Folder management =======================================
     def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
-        """
-        :param pattern:  linux search pattern
-        :param r: recursive search flag
-        :param files: include files in search.
-        :param folders: include directories in search.
-        :param compressed: search inside compressed files.
-        :param dotfiles: flag to indicate whether the search should include those or not.
-        :param filters: list of filters
-        :param not_in: list of strings that search results should not contain them (short for filter with simple lambda)
-        :param exts: list of extensions to search for.
-        :param win_order: return search results in the order of files as they appear on a Windows machine."""
         filters = filters or []
         if not_in is not None: filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
         if exts is not None: filters += [lambda x: any([ext in x.name for ext in exts])]
@@ -305,8 +288,7 @@ class P(type(Path()), Path):
                 elif not limit_to_directories: yield prefix + pointer + path.name + get_stats(path); files += 1
         print(dir_path.name); iterator = inner(dir_path, level_=level)
         [print(line) for line in __import__("itertools").islice(iterator, length_limit)]; print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None; print(f'\n{directories} directories' + (f', {files} files' if files else ''))
-    def find(self, *args, r=True, compressed=True, **kwargs):
-        """short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
+    def find(self, *args, r=True, compressed=True, **kwargs):  # short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
         if compressed is False and self.is_file(): return self
         if len(results := self.search(*args, r=r, compressed=compressed, **kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
@@ -330,16 +312,6 @@ class P(type(Path()), Path):
             path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, **kwargs):
-        """
-        :param orig:
-        :param folder: directory where extracted files will live.
-        :param fname: a specific file path to be extracted from the archive.
-        :param verbose:
-        :param content: if set to True, all contents of the zip archive will be scattered in path dir.
-        If set to False, a directory with same path as the zip file will be created and will contain the results.
-        :param inplace: delete the original zip file after successful extraction.
-        :param kwargs:
-        :return: path if content=False, else, path.parent. Default path = self.parent / self.stem"""
         slf = zipfile = self.expanduser().resolve()
         if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
             if ".zip" not in str(slf): return slf
@@ -391,15 +363,13 @@ class P(type(Path()), Path):
 
 class Compression(object):  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
     @staticmethod
-    def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):
-        """shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
+    def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  #shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
         assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"} and P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
         return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
     @staticmethod
     def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
-        """arcname determines the directory of the file being archived inside the archive. Defaults to same
-        as original directory except for drive. When changed, it should still include the file path in its end.
-        If arcname = filename without any path, then, it will be in the root of the archive."""
+        """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
+        When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
         import zipfile
         with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
             jungle_zip.setpassword(pwd=password) if password is not None else None
@@ -432,8 +402,7 @@ class Compression(object):  # Provides consistent behaviour across all methods. 
         return P(op_path)
 
 
-class MemoryDB:
-    """This class holds the historical data. It acts like a database, except that is memory based."""
+class MemoryDB:  # This class holds the historical data. It acts like a database, except that is memory based."""
     def __init__(self, size=5): self.size, self.list = size, List()
     def __repr__(self): return f"MemoryDB. Size={self.size}. Current length = {self.len}"
     def __getitem__(self, item): return self.list[item]
@@ -441,8 +410,7 @@ class MemoryDB:
     def append(self, item): self.list.append(item); self.list = self.list[-self.size:] if self.len > self.size else self.list  # take latest frames and drop the older ones.
 
 
-class Fridge:
-    """This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
+class Fridge:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
     def __init__(self, source_func, expire="1m", time_produced=None, logger=None, path=None, save=Save.pickle, read=Read.read):
         self.cache = None  # fridge content
         self.time_produced = time_produced or datetime.now()  # init time_produced

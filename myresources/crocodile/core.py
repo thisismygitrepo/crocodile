@@ -1,11 +1,13 @@
 
 """
 """
+# from __future__ import annotations
 from pathlib import Path
+
 # ============================== Accessories ============================================
 
 
-def validate_name(astring: str, replace='_'): return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
+def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
 def timestamp(fmt=None, name=None): return (name + '_' + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 
 
@@ -15,7 +17,7 @@ def str2timedelta(shift):
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 
 
-def randstr(length=15, lower=True, upper=True, digits=True, punctuation=False, safe=False):
+def randstr(length=15, lower=True, upper=True, digits=True, punctuation=False, safe=False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
@@ -105,44 +107,44 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
-    def __copy__(self): return List(self.list.copy())
+    def __copy__(self) -> 'List': return List(self.list.copy())
     def __getstate__(self): return self.list
     def __setstate__(self, state): self.list = state
     def __len__(self): return len(self.list)
     def __iter__(self): return iter(self.list)
     len = property(lambda self: self.list.__len__())
     # ================= call methods =====================================
-    def __getattr__(self, name): return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args, **kwargs): return List(i(*args, **kwargs) for i in self.list)
+    def __getattr__(self, name) -> 'List': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
+    def __call__(self, *args, **kwargs) -> 'List': return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
     def __setitem__(self, key, value): self.list[key] = value
-    def sample(self, size=1, replace=False, p=None): return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def index_items(self, idx): return List([item[idx] for item in self.list])
-    def find_index(self, func): return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
+    def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
+    def index_items(self, idx) -> 'List': return List([item[idx] for item in self.list])
+    def find_index(self, func) -> 'List': return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
     def filter(self, func): return List([item for item in self.list if self.evalstr(func, func=True)(item)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func): return __import__("functools").reduce(self.evalstr(func, func=True, other=True), self.list)
-    def append(self, item): self.list.append(item); return self
-    def __add__(self, other): return List(self.list + list(other))  # implement coersion
-    def __radd__(self, other): return List(self.list + list(other))
-    def __iadd__(self, other): self.list = self.list + list(other); return self  # inplace add.
-    def sort(self, key=None, reverse=False): self.list.sort(key=key, reverse=reverse); return self
-    def sorted(self, *args, **kwargs): return List(sorted(self.list, *args, **kwargs))
+    def reduce(self, func) -> 'List': return __import__("functools").reduce(self.evalstr(func, func=True, other=True), self.list)
+    def append(self, item) -> 'List': self.list.append(item); return self
+    def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
+    def __radd__(self, other) -> 'List': return List(self.list + list(other))
+    def __iadd__(self, other) -> 'List': self.list = self.list + list(other); return self  # inplace add.
+    def sort(self, key=None, reverse=False) -> 'List': self.list.sort(key=key, reverse=reverse); return self
+    def sorted(self, *args, **kwargs) -> 'List': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
-    def exec(self, expr: str): _ = self; return exec(expr)
-    def modify(self, expr: str, other=None): [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
-    def remove(self, value=None, values=None): [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
+    def exec(self, expr: str) -> 'List': _ = self; return exec(expr)
+    def modify(self, expr: str, other=None) -> 'List': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
+    def remove(self, value=None, values=None) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
     def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
-    def to_list(self): return self.list
+    def to_list(self) -> list: return self.list
     def to_numpy(self): import numpy as np; return np.array(self.list)
     np = property(lambda self: self.to_numpy())
-    def to_struct(self, key_val=None): return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
-    def __getitem__(self, key: str or list or slice):
+    def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
+    def __getitem__(self, key: str or list or slice) -> 'List':
         if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
-    def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, depth=1, verbose=False, desc=None, **kwargs):
+    def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, depth=1, verbose=False, desc=None, **kwargs) -> 'List':
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.evalstr(func, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
@@ -163,19 +165,19 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         else: final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)
         final_dict.update(kwargs); super(Struct, self).__init__(); self.__dict__ = final_dict
     @staticmethod
-    def recursive_struct(mydict): struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
+    def recursive_struct(mydict) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     @staticmethod
-    def recursive_dict(struct): [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
+    def recursive_dict(struct) -> 'Struct': [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path=None): return Save.json(obj=self.__dict__, path=path)
     from_keys_values = classmethod(lambda cls, k, v: cls(dict(zip(k, v))))
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
-    def from_names(cls, names, default_=None): return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
-    def spawn_from_values(self, values): return self.from_keys_values(self.keys(), self.evalstr(values, func=False))
-    def spawn_from_keys(self, keys): return self.from_keys_values(self.evalstr(keys, func=False), self.values())
+    def from_names(cls, names, default_=None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
+    def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.evalstr(values, func=False))
+    def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.evalstr(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
-    def __getattr__(self, item):
+    def __getattr__(self, item) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
@@ -189,25 +191,25 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def __setstate__(self, state): self.__dict__ = state
     def __iter__(self): return iter(self.dict.items())
     def __delitem__(self, key): del self.__dict__[key]
-    def copy(self): return Struct(self.__dict__.copy())
+    def copy(self) -> 'Struct': return Struct(self.__dict__.copy())
     dict = property(lambda self: self.__dict__)   # allows getting dictionary version without accessing private memebers explicitly.
     @dict.setter
     def dict(self, adict): self.__dict__ = adict
     def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
-    def keys(self, verbose=False) -> List: return List(list(self.dict.keys())) if not verbose else install_n_import("tqdm").tqdm(self.dict.keys())
-    def values(self, verbose=False) -> List: return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
-    def items(self, verbose=False, desc="") -> List: return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items(), desc=desc)
-    def get_values(self, keys) -> List: return List([self[key] for key in keys])
-    def apply_to_keys(self, kv_func, verbose=False, desc=""): return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
-    def apply_to_values(self, kv_func, verbose=False, desc=""): [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
-    def filter(self, kv_func=None): return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
-    def inverse(self): return Struct({v: k for k, v in self.dict.items()})
-    def update(self, *args, **kwargs): self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
-    def delete(self, key=None, keys=None, kv_func=None): [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
+    def keys(self, verbose=False) -> 'List': return List(list(self.dict.keys())) if not verbose else install_n_import("tqdm").tqdm(self.dict.keys())
+    def values(self, verbose=False) -> 'List': return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
+    def items(self, verbose=False, desc="") -> 'List': return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items(), desc=desc)
+    def get_values(self, keys) -> 'List': return List([self[key] for key in keys])
+    def apply_to_keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
+    def apply_to_values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
+    def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
+    def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.dict.items()})
+    def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
+    def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
     def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
-    def concat_values(*dicts, orient='list'): return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
+    def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, artist=None, use_plt=True):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         plt = __import__("matplotlib").pyplot

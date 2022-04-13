@@ -37,8 +37,6 @@ class Log(object):
     def error(self, msg): return self.logger.error(msg)
     def critical(self, msg): return self.logger.critical(msg)
     file = property(lambda self: P(self.specs["file_path"]) if self.specs["file_path"] else None)
-    @staticmethod
-    def get_basic_format(): return logging.BASIC_FORMAT
     def close(self): raise NotImplementedError
     def get_shandler(self, first=True): shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler)); return shandlers[0] if first else shandlers
     def get_fhandler(self, first=True): fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler)); return fhandlers[0] if first else fhandlers
@@ -58,8 +56,8 @@ class Log(object):
         if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
         return state
     def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
-    @staticmethod  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
-    def get_format(sep): return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}"
+    get_basic_format = staticmethod(lambda: logging.BASIC_FORMAT)
+    get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
     test_all = staticmethod(lambda: [Log.test_logger(logger) if not print("=" * 100) else None for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]])
     @staticmethod
     def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
@@ -267,7 +265,8 @@ class SSH(object):
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
-        pwd = randstr(length=10, safe=True); if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
+        pwd = randstr(length=10, safe=True)
+        if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
         if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
@@ -297,23 +296,19 @@ class Scheduler:  # 1- Time before Ops, and Opening Message  2- Perform logic  3
             if self.count % self.other == 0:
                 try: [occasional() for occasional in self.occasional]
                 except Exception as ex: self.handle_exceptions(ex)
-            time_left = time_left if (time_left := int(self.wait - (datetime.now() - time1).total_seconds())) > 0 else 1  # take away processing time_produced.
+            time_left = time_left if (time_left := int(self.wait - (datetime.now() - time1).total_seconds())) > 0 else 1  # take away processing time.
             self.count += 1; self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
             try: __import__("time").sleep(time_left)  # consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.handle_exceptions(ex)
         else:  # while loop finished due to condition satisfaction (rather than breaking)
             if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
-            else: stop_reason = f"Reached due stop time_produced ({until})"
+            else: stop_reason = f"Reached due stop time ({until})"
             self.record_session_end(reason=stop_reason)
     def record_session_end(self, reason="Unknown"):
         self.total_count += self.count
-        self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count]).save()
-        self.logger.critical(f"\nScheduler has finished running a session. \n"
-                             f"start  time_produced: {str(self._start_time)}\n"
-                             f"finish time_produced: {str(end_time)} .\n"
-                             f"time_produced    ran: {str(time_run)} | wait time_produced {self.wait}  \n"
-                             f"cycles  ran: {self.count}  |  Lifetime cycles: {self.total_count} \n"
-                             f"termination: {reason} \n" + "-" * 100)
+        self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count])
+        summ = {f"start time": f"{str(self._start_time)}", f"finish time": f"{str(end_time)}.", f"time ran": f"{str(time_run)} | wait time {self.wait}", f"cycles ran": f"{self.count}  |  Lifetime cycles: {self.total_count}", f"termination": f"{reason}"}
+        self.logger.critical(f"\nScheduler has finished running a session. \n" + tb.Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100)
     def handle_exceptions(self, ex):
         """One can implement a handler that raises an error, which terminates the program, or handle it in some fashion, in which case the cycles continue."""
         self.record_session_end(reason=ex)
