@@ -293,7 +293,6 @@ class P(type(Path()), Path):
     def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):  # Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
         space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
         def get_stats(apath): return (f" {(sts := apath.stats(printit=False)).size} MB. {sts.content_mod_time}. " + desc(apath) if desc is not None else "") if stats or desc else ""
-
         def inner(apath: P, prefix: str = '', level_=-1):
             nonlocal files, directories
             if not level_: return  # 0, stop iterating

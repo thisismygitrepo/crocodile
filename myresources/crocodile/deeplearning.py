@@ -1,6 +1,6 @@
 
 import crocodile.toolbox as tb
-from crocodile.matplotlib_management import ImShow, SaveType
+from crocodile.matplotlib_management import ImShow, FigureSave
 import numpy as np
 import pandas as pd
 from abc import ABC
@@ -250,7 +250,7 @@ class BaseModel(ABC):
         self.data = data  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = tb.List() if history is None else history  # should be populated in fit method, or loaded up.
-        self.plotter = SaveType.NullAuto
+        self.plotter = FigureSave.NullAuto
         self.kwargs = None
         self.tmp = None
 
