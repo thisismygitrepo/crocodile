@@ -54,7 +54,7 @@ class Read(object):
         suffix = Path(path).suffix[1:]
         try: return getattr(Read, suffix)(str(path), **kwargs)
         except AttributeError:
-            if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib.pyplot").imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
+            if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
             raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
     @staticmethod
     def mat(path, remove_meta=False, **kwargs):
@@ -121,7 +121,7 @@ class P(type(Path()), Path):
         dest.delete(sure=True) if overwrite and dest.exists() else None
         if not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
-        elif slf.is_dir(): __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create()));  print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
+        elif slf.is_dir(): __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create())); print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest / slf.name if not orig else self
     # ======================================= File Editing / Reading ===================================
@@ -203,21 +203,12 @@ class P(type(Path()), Path):
         elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
         elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
         self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
-    def split(self, at: str = None, index: int = None, sep: int = 1, mode=["strict", "lenient"][0]):
-        """Splits a path at a given string or index
-        :param at: string telling where to split.
-        :param index: integer telling at which index to split.
-        :param sep: can be either [-1, 0, 1]. Determines where the separator is going to live with: left portion, none or right portion.
-        :param mode: "lenient" mode makes `split` method behaves like split method of string. This can produce unwanted behaviour due to e.g. patial matches. 'strict' mode is the default which only splits at exact match.
-        :return: two paths"""
+    def split(self, at: str = None, index: int = None, sep=[-1, 0, 1][-1], strict=True):
         if index is None and (at is not None):  # at is provided  # ====================================   Splitting
-            if mode == "lenient":
-                items = str(self).split(sep=str(at))
-                one, two = items[0], items[1]; one, two = one[:-1] if one.endswith("/") else one, two[1:] if two.startswith("/") else two
-            else:  # "strict"
-                index = self.parts.index(str(at))  # raises an error if exact match is not found.
-                one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
-            one, two = P(one), P(two)
+            if not strict:  # bevaes like split method of string
+                one, two = (items := str(self).split(sep=str(at)))[0], items[1]; one, two = P(one[:-1]) if one.endswith("/") else P(one), P(two[1:]) if two.startswith("/") else P(two)
+            else:  # "strict": # raises an error if exact match is not found.
+                index = self.parts.index(str(at)); one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
         elif index is not None and (at is None):  # index is provided
             one, two = self[:index], P(*self.parts[index + 1:]); at = self[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
