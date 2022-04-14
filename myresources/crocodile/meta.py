@@ -73,8 +73,8 @@ class Log(object):  #
         colorlog = install_n_import("colorlog"); logger = Log.get_base_logger(colorlog, name, l_level)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors), stream, s_level); return logger
     @staticmethod
-    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):  #Basic Python logger."""
-        logger = Log.get_base_logger(logging, name, l_level), logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)); Log.add_handlers(logger, stream, s_level); return logger
+    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):  # Basic Python logger."""
+        logger = Log.get_base_logger(logging, name, l_level); Log.add_handlers(logger, logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level); return logger
     @staticmethod
     def get_base_logger(module, name, l_level):
         if name is None: print(f"Logger name not passed. It is preferable to pass a name indicating the owner.")
@@ -262,7 +262,7 @@ class Scheduler:
     def record_session_end(self, reason="Unknown"):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, self.logger.file])
         summ = {f"start time": f"{str(self.sess_start_time)}", f"finish time": f"{str(end_time)}.", f"duration": f"{str(duration)} | wait time {self.wait}", f"cycles ran": f"{self.cycle}", f"termination reason": f"{reason}"}
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100)
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling, terminate, save checkpoint, or continue, etc.  # Use signal library.
         else: self.record_session_end(reason=ex); raise ex

@@ -237,7 +237,7 @@ class P(type(Path()), Path):
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
-    def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
+    def write_text(self, data: str, **kwargs) -> 'Path': super(P, self).write_text(data, **kwargs); return self
     def read_text(self, encoding=None, lines=False, printit=False): res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
@@ -362,7 +362,7 @@ class P(type(Path()), Path):
 
 class Compression(object):  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
     @staticmethod
-    def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  #shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
+    def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
         assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"} and P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
         return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
     @staticmethod
