@@ -76,7 +76,8 @@ class Base(object):
     def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
-    def evalstr(self, string_, func=True, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
+    def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
+    def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else ""), desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         if save_code: self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")); return self
@@ -117,10 +118,10 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
     def index_items(self, idx) -> 'List': return List([item[idx] for item in self.list])
-    def find_index(self, func) -> 'List': return List([idx for idx, x in enumerate(self.list) if self.evalstr(func)(x)])
-    def filter(self, func): return List([item for item in self.list if self.evalstr(func, func=True)(item)])
+    def find_index(self, func) -> 'List': return List([idx for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
+    def filter(self, func): return List([item for item in self.list if self.eval(func, func=True)(item)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func) -> 'List': return __import__("functools").reduce(self.evalstr(func, func=True, other=True), self.list)
+    def reduce(self, func) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list)
     def append(self, item) -> 'List': self.list.append(item); return self
     def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other) -> 'List': return List(self.list + list(other))
@@ -128,7 +129,6 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def sort(self, key=None, reverse=False) -> 'List': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args, **kwargs) -> 'List': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
-    def exec(self, expr: str) -> 'List': _ = self; return exec(expr)
     def modify(self, expr: str, other=None) -> 'List': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value=None, values=None) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
     def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
@@ -136,13 +136,13 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def to_list(self) -> list: return self.list
     def to_numpy(self): import numpy as np; return np.array(self.list)
     np = property(lambda self: self.to_numpy())
-    def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.evalstr(key_val) if key_val else lambda x: (str(x), x)))
+    def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
     def __getitem__(self, key: str or list or slice) -> 'List':
         if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
     def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, depth=1, verbose=False, desc=None, **kwargs) -> 'List':
-        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.evalstr(func, other=bool(other))
+        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])
@@ -170,8 +170,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
     def from_names(cls, names, default_=None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
-    def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.evalstr(values, func=False))
-    def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.evalstr(keys, func=False), self.values())
+    def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.eval(values, func=False))
+    def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.eval(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
     def __getattr__(self, item) -> 'Struct':

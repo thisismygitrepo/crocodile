@@ -8,8 +8,7 @@ def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
 
 
-def pwd2key(password: str, salt=None, iterations=None) -> bytes:
-    """Derive a secret key from a given password and salt"""
+def pwd2key(password: str, salt=None, iterations=None) -> bytes:  # Derive a secret key from a given password and salt"""
     if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
@@ -225,8 +224,8 @@ class P(type(Path()), Path):
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
     # ===================================== File Specs =============================================================
     def size(self, units='mb'):
-        total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()]); import numpy as np
-        return round(total_size / dict(zip((sizes := List(['b', 'kb', 'mb', 'gb'])) + sizes.apply(lambda x: x.swapcase()), np.tile(1024 ** np.arange(len(sizes)), 2)))[units], 1)
+        total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
+        return round(total_size / dict(zip(List(['b', 'kb', 'mb', 'gb']).eval("self+self.swapcase()"), 2 * [1024 ** item for item in range(4)]))[units], 1)
     def time(self, which=["m", "c", "a"][0], **kwargs): return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)  # m last mofidication of content, i.e. the time it was created. c last status change (its inode is changed, permissions, path, but not content) a: last access
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
