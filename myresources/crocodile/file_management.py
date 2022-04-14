@@ -163,7 +163,7 @@ class P(type(Path()), Path):
                     else: print(f"SKIPPED RENAMING {repr(self)} ==> {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res); msg = f"RENAMED {repr(self)} ==> {repr(res)}"
             if operation == "delete": self.delete(sure=True, verbose=verbose)
-        print(msg) if verbose else None; return self if orig else res
+        print(msg) if verbose and msg != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
@@ -173,7 +173,7 @@ class P(type(Path()), Path):
     def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)
     def append_time_stamp(self, fmt=None, **kwargs): return self._return(self.append(name="_" + timestamp(fmt=fmt)), operation="rename", **kwargs)
     def with_trunk(self, name, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", **kwargs)  # Complementary to `with_stem` and `with_suffix`
-    def with_name(self, name, verbose=True, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
+    def with_name(self, name, verbose=False, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
     def switch(self, key: str, val: str, **kwargs): return self._return(P(str(self).replace(key, val)), operation="rename", **kwargs)  # Like string replce method, but `replace` is an already defined method."""
     def switch_by_index(self, idx: int, val: str, **kwargs): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", **kwargs)
     # ============================= attributes of object ======================================

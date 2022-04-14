@@ -293,9 +293,10 @@ class Experimental:  # Debugging and Meta programming tools"""
         if obj is not None:
             text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
-        (readmepath := P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
-        print(f"README.md file generated @ {readmepath.absolute().as_uri()}")
-        if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip")); print("Source code saved @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+        readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
+        print(f"SAVED README.md @ {readmepath.absolute().as_uri()}")
+        if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False)
+        print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
     @staticmethod
     def load_from_source_code(directory, obj=None, delete=False):
         P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
