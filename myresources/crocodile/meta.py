@@ -8,8 +8,6 @@ import sys
 
 
 class Null:
-    def __init__(self): pass
-    def __repr__(self): return "Welcome to the labyrinth!"
     def __getattr__(self, item): _ = item; return self
     def __getitem__(self, item): _ = item; return self
     def __call__(self, *args, **kwargs): return self
@@ -49,12 +47,10 @@ class Log(object):  #
         else: self.logger = Log.get_colorlog(**self.specs)
     def __setstate__(self, state):
         self.__dict__ = state   # this way of creating relative path makes transferrable across machines.
-        if self.specs["file_path"] is not None: self.specs["file_path"] = P(self.specs["file_path"]).rel2home()
-        self._install()
+        self.specs["file_path"] = P(self.specs["file_path"]).rel2home() if self.specs["file_path"] is not None else None; self._install()
     def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
         state = self.__dict__.copy(); state["specs"] = state["specs"].copy(); del state["logger"]
-        if self.specs["file_path"] is not None: state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser()
-        return state
+        state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser() if self.specs["file_path"] is not None else None; return state
     def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
     get_basic_format = staticmethod(lambda: logging.BASIC_FORMAT)
     get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -281,7 +277,7 @@ class Scheduler:
         self.other_routine = lambda: None if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
         self.logger, self.exception_handler = logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
-        self.sess_start_time, self.history, self.cycle, self.max_cycles = None, List([]), 0, max_cycles
+        self.sess_start_time, self.records, self.cycle, self.max_cycles = None, List([]), 0, max_cycles
     def run(self, until="2050-01-01", max_cycles=None):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
@@ -296,9 +292,10 @@ class Scheduler:
             try: __import__("time").sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
         else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
+    def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "logfile"])
     def record_session_end(self, reason="Unknown"):
-        self.history.append([self.sess_start_time, end_time := datetime.now(), time_run := end_time-self.sess_start_time, self.cycle, self.logger.file])
-        summ = {f"start time": f"{str(self.sess_start_time)}", f"finish time": f"{str(end_time)}.", f"time ran": f"{str(time_run)} | wait time {self.wait}", f"cycles ran": f"{self.cycle}", f"termination reason": f"{reason}"}
+        self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, self.logger.file])
+        summ = {f"start time": f"{str(self.sess_start_time)}", f"finish time": f"{str(end_time)}.", f"duration": f"{str(duration)} | wait time {self.wait}", f"cycles ran": f"{self.cycle}", f"termination reason": f"{reason}"}
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100)
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling, terminate, save checkpoint, or continue, etc.  # Use signal library.

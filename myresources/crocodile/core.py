@@ -99,9 +99,6 @@ class Base(object):
 
 class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
-    from_copies = classmethod(lambda cls, obj, count: cls([__import__("copy").deepcopy(obj) for _ in range(count)]))
-    @classmethod
-    def from_replicating(cls, func, *args, replicas=None, **kwargs): return cls([func() for _ in range(replicas)]) if not args and not kwargs else cls(func(*params[:len(args)], **dict(zip(kwargs.keys(), params[len(args):]))) for params in zip(*(args + tuple(kwargs.values()))))
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
