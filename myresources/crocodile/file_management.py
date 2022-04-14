@@ -239,7 +239,7 @@ class P(type(Path()), Path):
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
     def write_text(self, data: str, **kwargs): super(P, self).write_text(data, **kwargs); return self
-    def read_text(self, encoding=None, lines=False): return super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines())
+    def read_text(self, encoding=None, lines=False, printit=False): res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
     def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):

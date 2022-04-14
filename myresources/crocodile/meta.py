@@ -19,7 +19,7 @@ class Null:
     def __iter__(self): return iter([self])
 
 
-class Log(object):
+class Log(object):  #
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0], name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
         self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
@@ -89,7 +89,7 @@ class Log(object):
         return logger
     @staticmethod
     def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
-        log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_white', }  # see here for format: https://pypi.org/project/colorlog/
+        log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', }  # see here for format: https://pypi.org/project/colorlog/
         colorlog = install_n_import("colorlog"); logger = Log.get_base_logger(colorlog, name, l_level)
         fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
         Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
@@ -104,7 +104,7 @@ class Log(object):
         if name is None: print(f"Logger name not passed. It is preferable to pass a name indicating the owner.")
         else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
         logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
-        return logger
+        return logger  # https://alexandra-zaharia.github.io/posts/make-your-own-custom-color-formatter-with-python-logging/
     @staticmethod
     def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
         if file or file_path:  Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)  # create file handler for the logger.
@@ -198,7 +198,7 @@ tb.sys.path.insert(0, r'{wdir or P.cwd()}')
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
-        # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
+        _ = delete  # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
     @staticmethod
     def replicate_in_new_session(obj, execute=False, cmd=""):
         Save.pickle(obj=obj, path=(file := P.tmpfile(tstamp=False, suffix=".pkl")), verbose=False)
@@ -275,48 +275,34 @@ class SSH(object):
         if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)"""); source.delete(sure=True); return resp
 
 
-class Scheduler:  # 1- Time before Ops, and Opening Message  2- Perform logic  3- Optional logic every while  4- Conclude Message  # 5- Sleep
-    def __init__(self, routine=None, wait: str = "2m", occasional=None, other: int = 10, runs=float("inf"), exception=None, wind_down=None, logger=None):
-        self.routine = [lambda: None] if routine is None else routine  # main routine to be repeated every `wait` time period
-        self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
-        self.occasional = [lambda: None] if occasional is None else occasional  # routine to be repeated every `other` time period
-        self.other = other  # number of routine cycles before `occasional` get executed once.
-        self.cycles = runs  # how many times to run the routine. defaults to infinite.
-        self.exception_handler = exception if exception is not None else lambda ex: None
-        self.wind_down = wind_down  # routine to be run when an error occurs, e.g. save object.
-        self.logger = logger or Log(name="SchedulerAutoLogger" + randstr())
-        self._start_time = None  # begining of a session (local time)
-        self.history, self.count, self.total_count = List([]), 0, 0
-    def run(self, until="2050-01-01", cycles=None):
-        self.cycles, self.count, self._start_time = cycles or self.cycles, 0, datetime.now()
-        while datetime.now() < datetime.fromisoformat(until) and self.count < self.cycles:
-            time1 = datetime.now(); self.logger.info(f"Starting Cycle  {self.count: 4d}. Total Run Time = {str(datetime.now() - self._start_time): <10}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
-            try: [routine() for routine in self.routine]
-            except Exception as ex: self.handle_exceptions(ex)
-            if self.count % self.other == 0:
-                try: [occasional() for occasional in self.occasional]
-                except Exception as ex: self.handle_exceptions(ex)
-            time_left = time_left if (time_left := int(self.wait - (datetime.now() - time1).total_seconds())) > 0 else 1  # take away processing time.
-            self.count += 1; self.logger.info(f"Finishing Cycle {self.count - 1: 4d}. Sleeping for {self.wait} ({time_left} seconds left)\n" + "-" * 50)
-            try: __import__("time").sleep(time_left)  # consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex: self.handle_exceptions(ex)
-        else:  # while loop finished due to condition satisfaction (rather than breaking)
-            if self.count >= self.cycles: stop_reason = f"Reached maximum number of cycles ({self.cycles})"
-            else: stop_reason = f"Reached due stop time ({until})"
-            self.record_session_end(reason=stop_reason)
+class Scheduler:
+    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger=None):
+        self.routine = lambda: None if routine is None else routine  # main routine to be repeated every `wait` time period
+        self.other_routine = lambda: None if other_routine is None else other_routine  # routine to be repeated every `other` time period
+        self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
+        self.logger, self.exception_handler = logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
+        self.sess_start_time, self.history, self.cycle, self.max_cycles = None, List([]), 0, max_cycles
+    def run(self, until="2050-01-01", max_cycles=None):
+        self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
+        while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
+            time1 = datetime.now(); self.logger.info(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
+            try: self.routine()  # 2- Perform logic
+            except Exception as ex: self._handle_exceptions(ex, during="routine")
+            if self.cycle % self.other_ratio == 0:  # 3- Optional logic every while
+                try: self.other_routine()
+                except Exception as ex: self._handle_exceptions(ex, during="occasional")
+            time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
+            self.cycle += 1; self.logger.info(f"Finishing Cycle {self.cycle - 1: <4}. Sleeping for {self.wait} seconds. ({time_left} seconds left)\n" + "-" * 50)
+            try: __import__("time").sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
+            except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
+        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
     def record_session_end(self, reason="Unknown"):
-        self.total_count += self.count
-        self.history.append([self._start_time, end_time := datetime.now(), time_run := end_time-self._start_time, self.count])
-        summ = {f"start time": f"{str(self._start_time)}", f"finish time": f"{str(end_time)}.", f"time ran": f"{str(time_run)} | wait time {self.wait}", f"cycles ran": f"{self.count}  |  Lifetime cycles: {self.total_count}", f"termination": f"{reason}"}
-        self.logger.critical(f"\nScheduler has finished running a session. \n" + tb.Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100)
-    def handle_exceptions(self, ex):
-        """One can implement a handler that raises an error, which terminates the program, or handle it in some fashion, in which case the cycles continue."""
-        self.record_session_end(reason=ex)
-        self.exception_handler(ex)
-        raise ex
-        # import signal
-        # def keyboard_interrupt_handler(signum, frame): print(signum, frame); raise KeyboardInterrupt
-        # signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+        self.history.append([self.sess_start_time, end_time := datetime.now(), time_run := end_time-self.sess_start_time, self.cycle, self.logger.file])
+        summ = {f"start time": f"{str(self.sess_start_time)}", f"finish time": f"{str(end_time)}.", f"time ran": f"{str(time_run)} | wait time {self.wait}", f"cycles ran": f"{self.cycle}", f"termination reason": f"{reason}"}
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100)
+    def _handle_exceptions(self, ex, during):
+        if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling, terminate, save checkpoint, or continue, etc.  # Use signal library.
+        else: self.record_session_end(reason=ex); raise ex
 
 
 class Experimental:  # Debugging and Meta programming tools"""
