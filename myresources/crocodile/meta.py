@@ -24,7 +24,6 @@ class Log(object):  #
         self.dialect = dialect  # specific to this class
         self.verbose = verbose  # specific to coloredlogs dialect
         self.log_colors = log_colors  # specific kwarg to colorlog dialect
-        self.owners = []  # list of objects using this object to log. It won't be pickled anyway, no circularity prob
         self._install()  # update specs after intallation.
         self.specs["path"] = self.logger.name
         if file: self.specs["file_path"] = self.logger.handlers[0].baseFilename  # first handler is a file handler
@@ -60,41 +59,22 @@ class Log(object):  #
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
         # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
-        level_styles = {'spam': {'color': 'green', 'faint': True},
-                        'debug': {'color': 'white'},
-                        'verbose': {'color': 'blue'},
-                        'info': {'color': "green"},
-                        'notice': {'color': 'magenta'},
-                        'warning': {'color': 'yellow'},
-                        'success': {'color': 'green', 'bold': True},
-                        'error': {'color': 'red', "faint": True, "underline": True},
-                        'critical': {'color': 'red', 'bold': True, "inverse": False}}
-        field_styles = {'asctime': {'color': 'green'},
-                        'hostname': {'color': 'magenta'},
-                        'levelname': {'color': 'black', 'bold': True},
-                        'path': {'color': 'blue'},
-                        'programname': {'color': 'cyan'},
-                        'username': {'color': 'yellow'}}
+        level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
+                        'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}
+        field_styles = {'asctime': {'color': 'green'}, 'hostname': {'color': 'magenta'}, 'levelname': {'color': 'black', 'bold': True}, 'path': {'color': 'blue'}, 'programname': {'color': 'cyan'}, 'username': {'color': 'yellow'}}
         coloredlogs = install_n_import("coloredlogs")
-        if verbose:  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
-            logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)
-        else:
-            logger = Log.get_base_logger(logging, name=name, l_level=l_level)
-            Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
+        if verbose: logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
+        else: logger = Log.get_base_logger(logging, name=name, l_level=l_level); Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
         coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
         return logger
     @staticmethod
     def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
         log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', }  # see here for format: https://pypi.org/project/colorlog/
         colorlog = install_n_import("colorlog"); logger = Log.get_base_logger(colorlog, name, l_level)
-        fmt = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors)
-        Log.add_handlers(logger, colorlog, file, f_level, file_path, fmt, stream, s_level)
-        return logger
+        Log.add_handlers(logger, colorlog, file, f_level, file_path, colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors), stream, s_level); return logger
     @staticmethod
-    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):
-        """Basic Python logger."""
-        Log.add_handlers(logger := Log.get_base_logger(logging, name, l_level), logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level)
-        return logger
+    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):  #Basic Python logger."""
+        logger = Log.get_base_logger(logging, name, l_level), logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)); Log.add_handlers(logger, stream, s_level); return logger
     @staticmethod
     def get_base_logger(module, name, l_level):
         if name is None: print(f"Logger name not passed. It is preferable to pass a name indicating the owner.")
@@ -107,13 +87,11 @@ class Log(object):  #
         if stream: Log.add_streamhandler(logger, s_level, fmt, module=module)  # ==> create stream handler for the logger.
     @staticmethod
     def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
-        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler)
-        print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
+        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
         if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
-        fhandler = logging.FileHandler(filename=str(file_path), mode=mode)
-        fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
+        fhandler = logging.FileHandler(filename=str(file_path), mode=mode); fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
         print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
     @staticmethod
     def test_logger(logger):
@@ -136,12 +114,6 @@ class Terminal:
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
         def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 50, "\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
-        """
-        * adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from (e.g. conda environment), unlike when console path is ignored.
-        * `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job.
-        * `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task.
-        * `suprocess.call` is an archaic command for pre-Python-3.5.
-        * In both `Popen` and `run`, the (shell=True) argument, implies that shell-specific commands are loaded up, e.g. `start` or `conda`."""
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
         self.machine = sys.platform  # 'win32', 'linux' OR: import platform; self.platform.system(): Windows, Linux, Darwin
@@ -151,17 +123,11 @@ class Terminal:
     @staticmethod
     def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
     def run(self, *cmds, shell=None, check=False, ip=None):
-        """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly.
-        Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
+        """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
-        * Unlike `__import__('os').system(cmd)`, `subprocess.run(cmd)` gives much more control over the output and input.
-        * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
-        * `text=True` converts the bytes objects returned in stdout to text by default.
-        :param shell:
-        :param ip:
-        :param check: throw an exception is the execution of the external command failed (non zero returncode)
-        """
-        my_list = list(cmds)
+        * Unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
+        * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched."""
+        my_list = list(cmds)  # `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job. `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task. `suprocess.call` is an archaic command for pre-Python-3.5.
         if self.machine == "win32" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
         if self.elevated is False or self.is_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
@@ -175,7 +141,7 @@ class Terminal:
         https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None: shell = "" if self.machine == "win32" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
-        new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.
+        new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.  adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from e.g. conda
         extra, my_list = ("-Command" if shell in {"powershell", "pwsh"} else ""), list(cmds)
         if self.machine == "win32": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
