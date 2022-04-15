@@ -173,7 +173,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.eval(values, func=False))
     def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.eval(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
-    def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)  # == self.print(config=True)
+    def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)
     def __getattr__(self, item) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
@@ -203,8 +203,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
-    def _pandas_repr(self, limit): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-    def print(self, dtype=True, return_str=False, limit=50, config=False, yaml=False, newline=True): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, newline=newline, limit=limit)) if yaml or config else self._pandas_repr(limit).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
+    def _pandas_repr(self, justify): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, justify=justify).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+    def print(self, dtype=True, return_str=False, justify=50, config=False, yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, justify=justify, **kwargs)) if yaml or config else self._pandas_repr(justify).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, artist=None, use_plt=True):
@@ -221,20 +221,20 @@ class Display:
     @staticmethod
     def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
     set_pandas_auto_width = staticmethod(lambda: __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-    config = staticmethod(lambda mydict, newline=True, limit=15, justify=True: "".join([f"{key:>{limit if justify else 0}} = {val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
-    f = staticmethod(lambda str_, limit=50, direc="<": f'{(str_[:limit - 4] + " ..." if len(str_) > limit else str_):{direc}{limit}}')
+    config = staticmethod(lambda mydict, newline=True, justify=15, quotes=False: "".join([f"{key:>{justify}} = {repr(val) if quotes else val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
+    f = staticmethod(lambda str_, justify=50, direc="<": f'{(str_[:justify - 4] + " ..." if len(str_) > justify else str_):{direc}{justify}}')
     @staticmethod
     def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.display.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
     @staticmethod
     def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
     @staticmethod
-    def get_repr(data, limit=50, justify=False):
+    def get_repr(data, justify=50):
         if type(data) in {list, str}: string_ = data if type(data) is str else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
         elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
         elif type(data) is __import__("pandas").DataFrame: string_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}."
         elif type(data) is __import__("pandas").Series: string_ = f"Pandas Series: Length = {len(data)}, Keys = {Display.get_repr(data.keys().to_list())}."
         else: string_ = repr(data)
-        return f'{(string_[:limit - 4] + "... " if len(string_) > limit else string_):>{limit if justify else 0}}'
+        return f'{(string_[:justify - 4] + "... " if len(string_) > justify else string_):>{justify}}'
     @staticmethod
     def print_string_list(mylist, char_per_row=125, sep=" "):
         counter = 0

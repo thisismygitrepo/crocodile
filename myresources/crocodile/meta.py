@@ -124,8 +124,7 @@ class Terminal:
     def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
     def run(self, *cmds, shell=None, check=False, ip=None):
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
-        * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True)
-        * Unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
+        * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched."""
         my_list = list(cmds)  # `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job. `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task. `suprocess.call` is an archaic command for pre-Python-3.5.
         if self.machine == "win32" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
@@ -137,8 +136,7 @@ class Terminal:
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it.
-        https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python
-        https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
+        https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None: shell = "" if self.machine == "win32" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.  adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from e.g. conda
@@ -149,36 +147,16 @@ class Terminal:
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
         """This method is a wrapper on top of `run_async" except that the command passed will launch python terminal that will run script passed by user. """
-        header_script = f"""
-# ======================== Code prepended by Terminal.run_script =========================
-import crocodile.toolbox as tb
-tb.sys.path.insert(0, r'{wdir or P.cwd()}')
-# ======================== End of header, start of script passed: ========================
-"""  # this header is necessary so import statements in the script passed are identified relevant to wdir.
-        script = header_script + script if header else script
-        if terminal in {"wt", "powershell", "pwsh"}: script += "\ntb.DisplayData.set_pandas_auto_width()\n"
-        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
-        print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
+        header_script = f"""\n# {'Code prepended by Terminal.run_script'.center(80, '=')}; import crocodile.toolbox as tb; tb.sys.path.insert(0, r'{wdir or P.cwd()}'); # {'End of header, start of script passed'.center(80, '=')}\n""".replace("; ", "\n")  # this header is necessary so import statements in the script passed are identified relevant to wdir.
+        script = (header_script + script if header else script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
+        file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script); print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         _ = delete  # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
+    replicate_in_new_session = staticmethod(lambda obj, cmd="": Terminal.run_script(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}'); obj = path.readit(); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n")))
     @staticmethod
-    def replicate_in_new_session(obj, execute=False, cmd=""):
-        Save.pickle(obj=obj, path=(file := P.tmpfile(tstamp=False, suffix=".pkl")), verbose=False)
-        Terminal.run_script(f"""
-path = tb.P(r'{file}')
-obj = path.readit()
-path.delete(sure=True, verbose=False)
-obj{'()' if execute else ''}
-{cmd}""")
+    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_script(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
     @staticmethod
-    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_script(script=f"""
-path = tb.P(r'{file}')
-tb.dill.load_session(str(path)); 
-path.delete(sure=True, verbose=False)
-{cmd}""")
-    @staticmethod
-    def is_user_admin():
-        """@return: True if the current user is an 'Admin' whatever that means (root on Unix), otherwise False. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
+    def is_user_admin():  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name == 'nt':
             import ctypes
             try: return ctypes.windll.shell32.IsUserAnAdmin()
@@ -193,8 +171,7 @@ path.delete(sure=True, verbose=False)
     def run_as_admin(cmd_line=None, wait=True):
         """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new command.  It must be a list of [command, arg1, arg2...] format.
         Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
-        Returns the sub-process return code, unless wait is False in which case it returns None.
-        adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
+        Returns the sub-process return code, unless wait is False in which case it returns None. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
         _ = install_n_import("win32api", name="pypiwin32")
         win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
@@ -248,21 +225,18 @@ class Scheduler:
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now(); self.logger.info(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
-            try: self.routine()  # 2- Perform logic
-            except Exception as ex: self._handle_exceptions(ex, during="routine")
-            if self.cycle % self.other_ratio == 0:  # 3- Optional logic every while
-                try: self.other_routine()
-                except Exception as ex: self._handle_exceptions(ex, during="occasional")
+            Experimental.try_this(self.routine, handle=self._handle_exceptions, during="routine")  # 2- Perform logic
+            if self.cycle % self.other_ratio == 0: Experimental.try_this(self.other_routine, handle=self._handle_exceptions, during="occasional")  # 3- Optional logic every while
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1; self.logger.info(f"Finishing Cycle {self.cycle - 1: <4}. Sleeping for {self.wait} seconds. ({time_left} seconds left)\n" + "-" * 50)
             try: __import__("time").sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
-        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
+        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
     def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "logfile"])
     def record_session_end(self, reason="Unknown"):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, self.logger.file])
-        summ = {f"start time": f"{str(self.sess_start_time)}", f"finish time": f"{str(end_time)}.", f"duration": f"{str(duration)} | wait time {self.wait}", f"cycles ran": f"{self.cycle}", f"termination reason": f"{reason}"}
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).print(config=True, return_str=True) + "\n" + "-" * 100); return self
+        summ = {f"start time": f"{str(self.sess_start_time)}", f"finish time": f"{str(end_time)}.", f"duration": f"{str(duration)} | wait time {self.wait} seconds", f"cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": f"{reason}"}
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).print(config=True, return_str=True, quotes=False) + "\n" + "-" * 100); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling, terminate, save checkpoint, or continue, etc.  # Use signal library.
         else: self.record_session_end(reason=ex); raise ex
@@ -270,11 +244,11 @@ class Scheduler:
 
 class Experimental:  # Debugging and Meta programming tools"""
     @staticmethod
-    def try_this(func, return_=None, raise_=None, run=None, handle=None):
+    def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
         try: return func()
-        except BaseException as e:  # or Exception
+        except BaseException as ex:  # or Exception
             if raise_ is not None: raise raise_
-            if handle is not None: return handle(e)
+            if handle is not None: return handle(ex, **kwargs)
             return run() if run is not None else return_
     @staticmethod
     def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
@@ -283,83 +257,35 @@ class Experimental:  # Debugging and Meta programming tools"""
     @staticmethod
     def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
     @staticmethod
-    def generate_readme(path, obj=None, meta=None, save_source_code=True):
-        """Generates a readme file to contextualize any binary files.
-        :param path: directory or file path. If directory is passed, README.md will be the filename.
-        :param obj: Python module, class, method or function used to generate the result data. (dot not pass the data data_only or an instance of any class)
-        :param meta:
-        :param save_source_code:"""
+    def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):
+        """Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
         text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
         if obj is not None:
             text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
             text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
-        readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text)
-        print(f"SAVED README.md @ {readmepath.absolute().as_uri()}")
-        if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False)
-        print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+        readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
+        if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
     @staticmethod
     def load_from_source_code(directory, obj=None, delete=False):
         P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
         sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
         return getattr(sourcefile, obj) if obj is not None else sourcefile
     @staticmethod
-    def capture_locals(func, scope, args=None, self: str = None, update_scope=False):
-        exec(Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False), scope, res := dict()); scope.update(res) if update_scope else None; return Struct(res)
+    def capture_locals(func, scope, args=None, self: str = None, update_scope=False): res = dict(); exec(Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
     @staticmethod
-    def extract_code(func, code: str = None, include_args=True, modules=None, verbose=True, copy2clipboard=False, **kwargs):
-        """Takes in a function path, reads it source code and returns a new version of it that can be run in the main.
-        Use: in the main: exec(extract_code(func)) or is used by `run_globally` but you need to pass globals()
-        TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
-        if type(func) is str:
-            assert modules is not None, f"If you pass a string, you must pass globals to contextualize it."
-            first_parenth = func.find("(")  # last_parenth = -1
-            func = eval(func[:first_parenth])
-            self = ".".join(func.split(".")[:-1]); _ = self
-            func = eval(func, modules)
-        import inspect; import textwrap
-        codelines = tmp_[14:] if (tmp_ := textwrap.dedent(inspect.getsource(func))).startswith("@staticmethod\n") else tmp_
-        assert codelines.startswith("def "), f"extract_code method is expects a function to start with `def `"
-        idx = codelines.find("):\n")  # remove def func_name() line from the list
-        lines = textwrap.dedent(codelines[idx + 3:]).split("\n")  # dedents will remove any indentation (4 for funcs and 8 for classes methods, etc)
+    def extract_code(func, code: str = None, include_args=True, verbose=True, copy2clipboard=False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
+        import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
+        raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
         code_string = ''.join([aline + "\n" if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") + "\n" for aline in lines])  # remove return statements if there else keep line as is.
-        code_string = (Experimental.extract_arguments(func, verbose=verbose, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + code_string  # added later so it has more overwrite authority.
-        if copy2clipboard: install_n_import("clipboard").copy(code_string)
-        if verbose: print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100)
+        code_string = (Experimental.extract_arguments(func, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + "\n# " + f"BODY OF {func.__name__}".center(80, "=") +"\n" + code_string  # added later so it has more overwrite authority.
+        install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100) if verbose else None
         return code_string  # ready to be run with exec()
     @staticmethod
-    def extract_arguments(func, modules=None, exclude_args=True, copy2clipboard=False, **kwargs):
-        """Get code to define the args and kwargs defined in the main. Works for funcs and methods."""
-        if type(func) is str:  # will not work because once a string is passed, this method won't be able # to interpret it, at least not without the globals passed.
-            self, func = ".".join(func.split(".")[:-1]), eval(func, modules); _ = self
-        ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods.
-        ak = Struct.from_keys_values(ak.name, ak.default).update(kwargs)
-        res = """"""
-        for key, val in ak.items():
-            if key != "args" and key != "kwargs":
-                flag = False
-                if val is inspect._empty:  # not passed argument.
-                    if exclude_args: flag = True
-                    else: val = None; print(f'Experimental Warning: arg {key} has no value. Now replaced with None.')
-                if not flag: res += f"{key} = rf" + (f"'{val}'" if type(val) in {str, P} else str(val)) + "\n"
-        ak = inspect.getfullargspec(func)
-        if ak.varargs: res += f"{ak.varargs} = (,)\n"
-        if ak.varkw: res += f"{ak.varkw} = " + "{}\n"
-        if copy2clipboard: install_n_import("clipboard").copy(res)
-        return res
-    @staticmethod
-    def edit_source(module, *edits):
-        sourcelines, line_idx = P(module.__file__).read_text().split("\n"), 0
-        for edit_idx, edit in enumerate(edits):
-            for line_idx, line in enumerate(sourcelines):
-                if f"here{edit_idx}" in line:
-                    new_line = line.replace(edit[0], edit[1])
-                    print(f"Old Line: {line}\nNew Line: {new_line}")
-                    if new_line == line: raise KeyError(f"Text Not found.")
-                    sourcelines[line_idx] = new_line
-                    break
-            else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
-        P(module.__file__).write_text("\n".join(sourcelines))
-        return __import__("importlib").reload(module)
+    def extract_arguments(func, copy2clipboard=False, **kwargs):
+        ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and kwargs.
+        res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
+        ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and kwargs = {}
+        install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
     @staticmethod
     def run_cell(pointer, module=sys.modules[__name__]):
         for cell in P(module.__file__).read_text().split("#%%"):

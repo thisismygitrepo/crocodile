@@ -191,7 +191,22 @@ class SaveDecorator(object):
 #         if scope: print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!"); scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
 #         return dill.loads(data_path.read_bytes())
 
-
+    #
+    # @staticmethod
+    # def edit_source(module, *edits):
+    #     sourcelines, line_idx = P(module.__file__).read_text().split("\n"), 0
+    #     for edit_idx, edit in enumerate(edits):
+    #         for line_idx, line in enumerate(sourcelines):
+    #             if f"here{edit_idx}" in line:
+    #                 new_line = line.replace(edit[0], edit[1])
+    #                 print(f"Old Line: {line}\nNew Line: {new_line}")
+    #                 if new_line == line: raise KeyError(f"Text Not found.")
+    #                 sourcelines[line_idx] = new_line
+    #                 break
+    #         else: raise KeyError(f"No marker found in the text. Place the following: 'here{line_idx}'")
+    #     P(module.__file__).write_text("\n".join(sourcelines))
+    #     return __import__("importlib").reload(module)
+    #
 """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are loaded up and it happens implicitly. It often fails at load time_produced and requires same packages to be reloaded first.
          Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to dependency. Dill however, stores all the required packages for any attribute object, but not the class data_only, or the classes that it inherits (at least at with this version)."""
 

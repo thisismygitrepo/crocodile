@@ -25,11 +25,12 @@ class DBMS:
         self.path = tb.P(self.eng.url.database)
         self.con = self.eng.connect()
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
+        self.insp = None
+        self.meta = MetaData()
+
         self.db = db
         self.sch = sch
         self.vws = vws
-        self.insp = None
-        self.meta = MetaData()
         self.schema = None
         # self.tables = None
         # self.views = None
@@ -45,6 +46,9 @@ class DBMS:
         self.sch_vws = tb.Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
         return self
 
+    def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).__dict__
+    def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_db(self.path)
+
     @classmethod
     def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(path, echo))
     def __repr__(self): return f"DataBase @ {self.eng}"
@@ -54,12 +58,10 @@ class DBMS:
     @staticmethod
     def make_sql_db(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
         """Establish lazy initialization with database"""
-        # core style, use in conjustction with Connect.
         if path == "memory": return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True)
         if path is None: path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db")
         print(f"Linking to database at {tb.P(path).as_uri()}")
-        eng = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True) # echo flag is just a short for the more formal way of logging sql commands.
-        return eng
+        return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True) # echo flag is just a short for the more formal way of logging sql commands.
 
     # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands, res_func=lambda x: x.all(), df=False):
