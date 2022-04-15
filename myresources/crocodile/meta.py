@@ -21,7 +21,7 @@ class Log(logging.Logger):  #
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0], name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
         if name is None: print(f"Logger name not passed. It is recommended to pass a name indicating the owner."); name = randstr()
-        file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers") if (file_path is None or (file is True and file_path is None)) else P(file_path).expanduser()
+        file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers") if (file_path is None and file is True) else (P(file_path).expanduser() if file_path is not None else None)
         super().__init__(name=name, level=l_level)  # logs everything, finer level of control is given to its handlers
         if dialect == "colorlog":
             module = install_n_import("colorlog")
@@ -41,8 +41,7 @@ class Log(logging.Logger):  #
         specs = self.__dict__['specs'].copy(); specs["file_path"] = specs["file_path"].rel2home() if specs["file_path"] is not None else None; return specs
     def __reduce__(self): return self.__class__, tuple(self.specs.values())
     def __repr__(self): return "".join([f"Logger {self.specs['name']} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
-    get_basic_format = staticmethod(lambda: logging.BASIC_FORMAT)
-    get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
+    get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
     @staticmethod
     def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
