@@ -130,7 +130,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def sorted(self, *args, **kwargs) -> 'List': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
     def modify(self, expr: str, other=None) -> 'List': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
-    def remove(self, value=None, values=None) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else []))]; return self
+    def remove(self, value=None, values=None, strict=True) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
     def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list: return self.list

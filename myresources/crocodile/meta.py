@@ -17,86 +17,52 @@ class Null:
     def __iter__(self): return iter([self])
 
 
-class Log(object):  #
+class Log(logging.Logger):  #
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0], name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
-        self.specs = dict(name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level)  # save speces that are essential to re-create the object at
-        self.dialect = dialect  # specific to this class
-        self.verbose = verbose  # specific to coloredlogs dialect
-        self.log_colors = log_colors  # specific kwarg to colorlog dialect
-        self._install()  # update specs after intallation.
-        self.specs["path"] = self.logger.name
-        if file: self.specs["file_path"] = self.logger.handlers[0].baseFilename  # first handler is a file handler
-    def __getattr__(self, item): return getattr(self.logger, item)  # makes it twice as slower as direct access 300 ns vs 600 ns
-    def debug(self, msg): return self.logger.debug(msg)  # to speed up the process and avoid falling back to __getattr__
-    def info(self, msg): return self.logger.info(msg)
-    def warn(self, msg): return self.logger.warn(msg)
-    def error(self, msg): return self.logger.error(msg)
-    def critical(self, msg): return self.logger.critical(msg)
+        if name is None: print(f"Logger name not passed. It is recommended to pass a name indicating the owner."); name = randstr()
+        file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers") if (file_path is None or (file is True and file_path is None)) else P(file_path).expanduser()
+        super().__init__(name=name, level=l_level)  # logs everything, finer level of control is given to its handlers
+        if dialect == "colorlog":
+            module = install_n_import("colorlog")
+            processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', })  # see here for format: https://pypi.org/project/colorlog/
+        else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
+        if file or file_path: Log.add_filehandler(self, file_path=file_path, fmt=processed_fmt, f_level=f_level)  # create file handler for the logger.
+        if stream: Log.add_streamhandler(self, s_level, fmt=processed_fmt, module=module)  # ==> create stream handler for the logger.
+        self.specs = dict(dialect=dialect, name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # save speces that are essential to re-create the object at
+        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
     file = property(lambda self: P(self.specs["file_path"]) if self.specs["file_path"] else None)
     def close(self): raise NotImplementedError
-    def get_shandler(self, first=True): shandlers = List(handler for handler in self.logger.handlers if "StreamHandler" in str(handler)); return shandlers[0] if first else shandlers
-    def get_fhandler(self, first=True): fhandlers = List(handler for handler in self.logger.handlers if "FileHandler" in str(handler)); return fhandlers[0] if first else fhandlers
-    def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.logger.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
-    def _install(self):  # populates self.logger attribute according to specs and dielect.
-        if self.specs["file"] is False and self.specs["stream"] is False: self.logger = Null()
-        elif self.dialect == "colorlog": self.logger = Log.get_colorlog(log_colors=self.log_colors, **self.specs)
-        elif self.dialect == "logging": self.logger = Log.get_logger(**self.specs)
-        elif self.dialect == "coloredlogs": self.logger = Log.get_coloredlogs(verbose=self.verbose, **self.specs)
-        else: self.logger = Log.get_colorlog(**self.specs)
-    def __setstate__(self, state):
-        self.__dict__ = state   # this way of creating relative path makes transferrable across machines.
-        self.specs["file_path"] = P(self.specs["file_path"]).rel2home() if self.specs["file_path"] is not None else None; self._install()
+    def get_shandler(self, first=True): shandlers = List(handler for handler in self.handlers if "StreamHandler" in str(handler)); return shandlers[0] if first else shandlers
+    def get_fhandler(self, first=True): fhandlers = List(handler for handler in self.handlers if "FileHandler" in str(handler)); return fhandlers[0] if first else fhandlers
+    def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
+    def __setstate__(self, state): self.__dict__ = state  # this way of creating relative path makes transferrable across machines.
     def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
-        state = self.__dict__.copy(); state["specs"] = state["specs"].copy(); del state["logger"]
-        state["specs"]["file_path"] = P(self.specs["file_path"]).expanduser() if self.specs["file_path"] is not None else None; return state
-    def __repr__(self): return "".join([f"{self.logger} with handlers: \n"] + [repr(h) + "\n" for h in self.logger.handlers])
+        specs = self.__dict__['specs'].copy(); specs["file_path"] = specs["file_path"].rel2home() if specs["file_path"] is not None else None; return specs
+    def __reduce__(self): return self.__class__, tuple(self.specs.values())
+    def __repr__(self): return "".join([f"Logger {self.specs['name']} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
     get_basic_format = staticmethod(lambda: logging.BASIC_FORMAT)
     get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
-    test_all = staticmethod(lambda: [Log.test_logger(logger) if not print("=" * 100) else None for logger in [Log.get_logger(), Log.get_colorlog(), Log.get_coloredlogs()]])
     @staticmethod
     def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
-        # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
-                        'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}
+                        'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}  # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         field_styles = {'asctime': {'color': 'green'}, 'hostname': {'color': 'magenta'}, 'levelname': {'color': 'black', 'bold': True}, 'path': {'color': 'blue'}, 'programname': {'color': 'cyan'}, 'username': {'color': 'yellow'}}
-        coloredlogs = install_n_import("coloredlogs")
         if verbose: logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
-        else: logger = Log.get_base_logger(logging, name=name, l_level=l_level); Log.add_handlers(logger, module=logging, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
-        coloredlogs.install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
-        return logger
-    @staticmethod
-    def get_colorlog(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, log_colors=None, ):
-        log_colors = log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', }  # see here for format: https://pypi.org/project/colorlog/
-        colorlog = install_n_import("colorlog"); logger = Log.get_base_logger(colorlog, name, l_level)
-        Log.add_handlers(logger, colorlog, file, f_level, file_path, colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors), stream, s_level); return logger
-    @staticmethod
-    def get_logger(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG):  # Basic Python logger."""
-        logger = Log.get_base_logger(logging, name, l_level); Log.add_handlers(logger, logging, file, f_level, file_path, logging.Formatter(fmt or Log.get_format(sep)), stream, s_level); return logger
-    @staticmethod
-    def get_base_logger(module, name, l_level):
-        if name is None: print(f"Logger name not passed. It is preferable to pass a name indicating the owner.")
-        else: print(f"Logger `{name}` from `{module.__name__}` is instantiated with level {l_level}.")
-        logger = module.getLogger(name=name or randstr()); logger.setLevel(level=l_level)  # logs everything, finer level of control is given to its handlers
-        return logger  # https://alexandra-zaharia.github.io/posts/make-your-own-custom-color-formatter-with-python-logging/
-    @staticmethod
-    def add_handlers(logger, module, file, f_level, file_path, fmt, stream, s_level):
-        if file or file_path:  Log.add_filehandler(logger, file_path=file_path, fmt=fmt, f_level=f_level)  # create file handler for the logger.
-        if stream: Log.add_streamhandler(logger, s_level, fmt, module=module)  # ==> create stream handler for the logger.
+        else: logger = Log(name=name, dialect="logging", l_level=l_level, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
+        install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
     @staticmethod
     def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
         shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
     @staticmethod
     def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
-        if file_path is None: file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers")
         fhandler = logging.FileHandler(filename=str(file_path), mode=mode); fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
         print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
-    @staticmethod
-    def test_logger(logger):
-        logger.debug("this is a debugging message"); logger.info("this is an informational message"); logger.warning("this is a warning message")
-        logger.error("this is an error message"); logger.critical("this is a critical message"); [logger.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
+    def test(self):
+        self.debug("this is a debugging message"); self.info("this is an informational message"); self.warning("this is a warning message")
+        self.error("this is an error message"); self.critical("this is a critical message"); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
 
 
 class Terminal:
@@ -180,8 +146,8 @@ class Terminal:
         elif type(cmd_line) not in (tuple, list): raise ValueError("cmdLine is not a sequence.")
         cmd, params = '"%s"' % (cmd_line[0],), " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
         proce_info = win32com.shell.shell.ShellExecuteEx(nShow=__import__("win32con").SW_SHOWNORMAL, fMask=__import__("win32com", fromlist=["shell.shellcon"]).shell.shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas', lpFile=cmd, lpParameters=params)  # causes UAC elevation prompt.
-        if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); rc = win32process.GetExitCodeProcess(proc_handle)
-        else: rc = None; return rc
+        if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); return win32process.GetExitCodeProcess(proc_handle)
+        else: return None
 
 
 class SSH(object):

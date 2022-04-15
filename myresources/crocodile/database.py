@@ -46,7 +46,7 @@ class DBMS:
         self.sch_vws = tb.Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
         return self
 
-    def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).__dict__
+    def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.rel2home()).__dict__
     def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_db(self.path)
 
     @classmethod
