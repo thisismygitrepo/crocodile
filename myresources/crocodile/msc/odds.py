@@ -1,9 +1,9 @@
 
-from crocodile.file_management import P, List, install_n_import
+from crocodile.file_management import P, install_n_import
+from crocodile.meta import Scheduler, Log
 import datetime
 import time
 import sys
-import os
 import numpy as np
 
 
@@ -46,52 +46,40 @@ class DictCycle(Cycle):
 
 
 def polygon_area(points):
-    """Return the area of the polygon whose vertices are given by the
-    sequence points.
+    """Return the area of the polygon whose vertices are given by the sequence points.
     """
     area = 0
     q = points[-1]
     for p in points:
         area += p[0] * q[1] - p[1] * q[0]
         q = p
-    # 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
     return abs(area / 2)
 
 
-class Pomodoro:
-    def __init__(self, work=25, break_=5):
-        self.work = work  # minutes
-        self.break_ = break_  # minutes
+def pomodoro(work=25, rest=5, repeats=4):
+    logger = Log(name="pomodoro", file=False, stream=True)
 
-    @staticmethod
-    def loop(minutes, label='work'):
+    def loop():
+        speak("Alright, time to start working...")
         start = datetime.datetime.now()
-        diff_sec = 0
-        while diff_sec < minutes * 60:
-            now = datetime.datetime.now()
-            diff = (datetime.datetime.now() - start)
-            diff_sec = diff.seconds
-            time.sleep(2)
-            print(f"{label} .... Time Left: {round(minutes - diff.seconds / 60)} minutes, "
-                  f" Time now: {now.hour} : {now.minute}", end='\r')
-        Pomodoro.beep(5)
+        while (diff := work - ((datetime.datetime.now() - start).seconds / 60)) > 0:
+            logger.debug(f"Keep working. Time Left: {round(diff)} minutes, Time now: {datetime.datetime.now()}"); time.sleep(60 * 1)
+        speak("Now, its time to take a break.")
+        start = datetime.datetime.now()
+        while (diff := rest - ((datetime.datetime.now() - start).seconds / 60)) > 0:
+            logger.critical(f"Keep Resting. Time Left: {round(diff)} minutes, Time now: {datetime.datetime.now().time()}"); time.sleep(60 * 1)
 
-    def run(self):
-        # Work
-        self.loop(minutes=self.work, label="Work")
-        # start the break
-        self.loop(minutes=self.break_, label="Break")
-        # repeat
-        self.run()
+    def speak(txt):
+        install_n_import("gtts").gTTS(txt, lang='en', tld='com.au').save(tmp := P.tmpfile(suffix=".mp3")); time.sleep(0.5)
+        pyglet = install_n_import("pyglet"); pyglet.resource.path = [tmp.parent.str]; pyglet.resource.reindex(); pyglet.resource.media(tmp.name).play()
 
-    @staticmethod
     def beep(duration=1, frequency=3000):
-        duration = 1000 * duration
         try: import winsound
         except ImportError:
-            import os # apt-get install beep
-            os.system('beep -f %s -l %s' % (frequency, duration))
-        else: winsound.Beep(frequency, duration)
+            __import__("os").system('beep -f %s -l %s' % (frequency, 1000 * duration))
+        else: winsound.Beep(frequency, 1000 * duration)
+
+    return Scheduler(routine=loop, max_cycles=repeats, logger=logger, wait="0.1m").run()
 
 
 def profile_memory(command):

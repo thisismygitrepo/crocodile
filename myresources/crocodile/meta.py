@@ -181,8 +181,8 @@ class SSH(object):
 
 class Scheduler:
     def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger=None):
-        self.routine = lambda: None if routine is None else routine  # main routine to be repeated every `wait` time period
-        self.other_routine = lambda: None if other_routine is None else other_routine  # routine to be repeated every `other` time period
+        self.routine = (lambda: None) if routine is None else routine  # main routine to be repeated every `wait` time period
+        self.other_routine = (lambda: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
         self.logger, self.exception_handler = logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles = None, List([]), 0, max_cycles
