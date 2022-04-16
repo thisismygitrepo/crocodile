@@ -1,3 +1,4 @@
+
 from setuptools import setup
 from myresources.crocodile import __version__
 
@@ -31,18 +32,13 @@ setup(
     install_requires=[
         # CORE:
         "numpy",
-        "scipy",  # heavy-weight.
+        # "scipy",  # heavy-weight.
         "pandas",
         "matplotlib",
 
         # Accessories
         # h5py
         "joblib",  # multitasking
-        "pip",
-        "setuptools",  # for packaging  # correct place is in .toml
-        "wheel",
-        "twine",  # for pushing package to pypi.org
-        "pytest",  # popular alternative to builtint unittest
         "ipython",  # interactive python
         "fire",  # for automatic CLI interface
         "tqdm",  # for progress bar
@@ -50,10 +46,15 @@ setup(
         "cryptography",  # for encoding
         "paramiko",  # for SSH
         "requests",  # interacting with web
-        "pyyaml",  # storing yaml files.
+        # "pyyaml",  # storing yaml files.
         "cycler",
 
-        "scikit-image",  # image processing. Heavy-weight.
+        # Developer Tools
+        "setuptools",  # for packaging  # correct place is in .toml
+        "wheel",
+        "twine",  # for pushing package to pypi.org
+        "pytest",  # popular alternative to builtint unittest
+        # "scikit-image",  # image processing. Heavy-weight.
 
         # torch
         # tensorflow

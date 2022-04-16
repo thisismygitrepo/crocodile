@@ -8,7 +8,10 @@ start time than mere basic arithmetic, but just enought to make it more useful f
 In implementation, the focus is on ease of use, not efficiency.
 """
 
-from crocodile.toolbox import *
+from crocodile.core import *
+from crocodile.file_management import *
+from crocodile.meta import *
+import crocodile.toolbox as tb
 from crocodile import __version__
 import numpy as np
 import pandas as pd
@@ -18,4 +21,3 @@ print(f"Crocodile Shell {__version__}")
 # link to tutorial or github
 print(f"Made with ❤️")
 print(P(__file__).parent.joinpath("art").search().sample(size=1)[0].read_text())
-

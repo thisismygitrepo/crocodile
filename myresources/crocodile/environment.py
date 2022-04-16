@@ -3,14 +3,14 @@ import crocodile.toolbox as tb
 import platform
 import os
 
+P = tb.P
+L = tb.List
 
 system = platform.system()
 OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # path separator, not to be confused with P.sep
 env = tb.Struct(dict(os.environ)).clean_view
-
-P = tb.P
-L = tb.List
+exe = P(platform.sys.executable)
 
 tm = tb.Terminal()
 

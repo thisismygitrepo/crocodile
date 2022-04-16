@@ -241,7 +241,7 @@ class P(type(Path()), Path):
     def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
         self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
-        if __import__("platform").system() == "Windows" and not (tm := __import__("crocodile.meta").Terminal).is_user_admin():  # you cannot create symlink without priviliages.
+        if __import__("platform").system() == "Windows" and not (tm := __import__("crocodile").meta.Terminal).is_user_admin():  # you cannot create symlink without priviliages.
             tm.run_code_as_admin(f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\""); __import__("time").sleep(0.5)  # give time_produced for asynch process to conclude before returning response.
         else: super(P, self.expanduser()).symlink_to(str(target))
         return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)}")

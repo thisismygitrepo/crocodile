@@ -211,7 +211,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         return artist
 
 
-def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('max_colwidth', colwidth); pd.set_option('max_columns', columns); pd.set_option('width', width); pd.set_option('max_rows', rows)
+def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
 def as_config(mydict, newline=True, justify=15, quotes=False): return "".join([f"{key:>{justify}} = {repr(val) if quotes else val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
 def f(str_, justify=50, direc="<"): return f"{(str_[:justify - 4] + ' ...' if len(str_) > justify else str_):{direc}{justify}}"
