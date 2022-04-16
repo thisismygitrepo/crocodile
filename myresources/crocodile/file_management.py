@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, SimpleNamespace
 from datetime import datetime
 
 
@@ -45,39 +45,31 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
 
 # %% =================================== File ============================================
 
-class Read(object):
-    @staticmethod
-    def read(path, **kwargs):
-        suffix = Path(path).suffix[1:]
-        try: return getattr(Read, suffix)(str(path), **kwargs)
-        except AttributeError:
-            if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-            raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
-    @staticmethod
-    def mat(path, remove_meta=False, **kwargs):
-        res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs))
-        if remove_meta: List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
-        return res
-    @staticmethod
-    def json(path, r=False, **kwargs):
-        try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
-        except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
-        return Struct.recursive_struct(mydict) if r else Struct(mydict)
-    @staticmethod
-    def yaml(path, r=False):
-        import yaml
-        with open(str(path), "r") as file: mydict = yaml.load(file, Loader=yaml.FullLoader)
-        return Struct(mydict) if not r else Struct.recursive_struct(mydict)
-    @staticmethod
-    def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
-    @staticmethod
-    def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
-    @staticmethod
-    def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
-    py = staticmethod(lambda path: Struct(__import__("runpy").run_path(path)))
-    pickles = staticmethod(lambda bytes_obj: __import__("dill").loads(bytes_obj))
-    @staticmethod
-    def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+def read(path, **kwargs):
+    suffix = Path(path).suffix[1:]
+    try: return getattr(Read, suffix)(str(path), **kwargs)
+    except AttributeError:
+        if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
+        raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
+def mat(path, remove_meta=False, **kwargs):
+    res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs))
+    if remove_meta: List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
+    return res
+def json(path, r=False, **kwargs):
+    try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
+    except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
+    return Struct.recursive_struct(mydict) if r else Struct(mydict)
+def yaml(path, r=False):
+    import yaml
+    with open(str(path), "r") as file: mydict = yaml.load(file, Loader=yaml.FullLoader)
+    return Struct(mydict) if not r else Struct.recursive_struct(mydict)
+def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
+def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
+def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
+def py(path): return Struct(__import__("runpy").run_path(path))
+def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)
+def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+Read = SimpleNamespace(read=read, mat=mat, json=json, yaml=yaml, npy=npy, csv=csv, pkl=pkl, py=py, pickle=pickle)
 
 
 class P(type(Path()), Path):
@@ -140,7 +132,7 @@ class P(type(Path()), Path):
         return self
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
-    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, read=Read.read): return Fridge(source_func=source_func, path=self, expire=expire, save=save, read=read)
+    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read): return Fridge(source_func=source_func, path=self, expire=expire, save=save, reader=reader)
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt)
         lines, bingo = self.read_text(encoding=encoding).split("\n"), False
@@ -360,45 +352,38 @@ class P(type(Path()), Path):
             return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
 
 
-class Compression(object):  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
-    @staticmethod
-    def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
-        assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"} and P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
-        return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
-    @staticmethod
-    def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
-        """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
-        When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
-        import zipfile
-        with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
-            jungle_zip.setpassword(pwd=password) if password is not None else None
-            jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
-        return op_path
-    @staticmethod
-    def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
-        with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
-            if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
-            else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); op_path = P(op_path) / fname
-        return P(op_path)
-    @staticmethod
-    def gz(file, op_file):
-        with open(file, 'rb') as f_in:
-            with __import__("gzip").open(op_file, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
-        return op_file
-    @staticmethod
-    def ungz(self, op_path=None):
-        with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
-        return P(op_path)
-    @staticmethod
-    def tar(self, op_path):
-        with __import__("tarfile").open(op_path, "w:gz") as tar: tar.add(str(self), arcname=__import__("os").path.basename(str(self)))
-        return op_path
-    @staticmethod
-    def untar(self, op_path, fname=None, mode='r', **kwargs):
-        with __import__("tarfile").open(str(self), mode) as file:
-            if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
-            else: file.extract(fname, **kwargs)
-        return P(op_path)
+def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
+    assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"} and P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
+    return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
+def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
+    """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
+    When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
+    import zipfile
+    with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
+        jungle_zip.setpassword(pwd=password) if password is not None else None
+        jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
+    return op_path
+def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
+    with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
+        if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
+        else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); op_path = P(op_path) / fname
+    return P(op_path)
+def gz(file, op_file):
+    with open(file, 'rb') as f_in:
+        with __import__("gzip").open(op_file, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
+    return op_file
+def ungz(self, op_path=None):
+    with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
+    return P(op_path)
+def tar(self, op_path):
+    with __import__("tarfile").open(op_path, "w:gz") as tar: tar.add(str(self), arcname=__import__("os").path.basename(str(self)))
+    return op_path
+def untar(self, op_path, fname=None, mode='r', **kwargs):
+    with __import__("tarfile").open(str(self), mode) as file:
+        if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
+        else: file.extract(fname, **kwargs)
+    return P(op_path)
+Compression = SimpleNamespace(compress_folder=compress_folder, zip_file=zip_file, unzip=unzip, gz=gz, ungz=ungz, targ=tar, untar=untar)  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
 
 
 class MemoryDB:  # This class holds the historical data. It acts like a database, except that is memory based."""
@@ -410,12 +395,12 @@ class MemoryDB:  # This class holds the historical data. It acts like a database
 
 
 class Fridge:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
-    def __init__(self, source_func, expire="1m", time_produced=None, logger=None, path=None, save=Save.pickle, read=Read.read):
+    def __init__(self, source_func, expire="1m", time_produced=None, logger=None, path=None, save=Save.pickle, reader=Read.read):
         self.cache = None  # fridge content
         self.time_produced = time_produced or datetime.now()  # init time_produced
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
-        self.save, self.read, self.logger, self.expire = save, read, logger, expire
+        self.save, self.reader, self.logger, self.expire = save, reader, logger, expire
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
     def reset(self): self.time_produced = datetime.now()
     def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
@@ -428,7 +413,7 @@ class Fridge:  # This class helps to accelrate access to latest data coming from
             if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
             self.cache = self.source_func()  # fresh order, never existed or exists but expired.
             self.save(obj=self.cache, path=self.path)
-        elif self.age < str2timedelta(self.expire) and self.cache is None: self.cache = self.read(self.path)  # this implementation favours reading over pulling fresh at instantiation.  # exists and not expired. else # use the one in memory self.cache
+        elif self.age < str2timedelta(self.expire) and self.cache is None: self.cache = self.reader(self.path)  # this implementation favours reading over pulling fresh at instantiation.  # exists and not expired. else # use the one in memory self.cache
         return self.cache
 
 

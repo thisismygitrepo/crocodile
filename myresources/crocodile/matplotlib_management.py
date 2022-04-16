@@ -6,7 +6,7 @@ from crocodile.file_management import P
 import os
 import pandas as pd
 import numpy as np
-from crocodile.msc.miscellaneous import Cycle
+from crocodile.msc.odds import Cycle
 from matplotlib import widgets
 
 

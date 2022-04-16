@@ -1,6 +1,6 @@
 
 
-from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
+from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct, SimpleNamespace
 from crocodile.file_management import P, datetime
 import logging
 import subprocess
@@ -13,7 +13,7 @@ class Null:
     def __call__(self, *args, **kwargs): return self
     def __len__(self): return 0
     def __bool__(self): return False
-    def __contains__(self, item): _ = item; return False
+    def __contains__(self, item): _ = self, item; return False
     def __iter__(self): return iter([self])
 
 
@@ -42,8 +42,7 @@ class Log(logging.Logger):  #
     def __reduce__(self): return self.__class__, tuple(self.specs.values())
     def __repr__(self): return "".join([f"Logger {self.specs['name']} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
     get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
-    @staticmethod
-    def manual_degug(path): sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+    def manual_degug(self, path): _=self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
@@ -207,56 +206,45 @@ class Scheduler:
         else: self.record_session_end(reason=ex); raise ex
 
 
-class Experimental:  # Debugging and Meta programming tools"""
-    @staticmethod
-    def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
-        try: return func()
-        except BaseException as ex:  # or Exception
-            if raise_ is not None: raise raise_
-            if handle is not None: return handle(ex, **kwargs)
-            return run() if run is not None else return_
-    @staticmethod
-    def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
-    @staticmethod
-    def run_globally(func, scope=None, args=None, self: str = None): return Experimental.capture_locals(func=func, scope=scope, args=args, self=self, update_scope=True)
-    @staticmethod
-    def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
-    @staticmethod
-    def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):
-        """Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-        text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
-        if obj is not None:
-            text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
-            text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
-        readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
-        if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
-    @staticmethod
-    def load_from_source_code(directory, obj=None, delete=False):
-        P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
-        sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
-        return getattr(sourcefile, obj) if obj is not None else sourcefile
-    @staticmethod
-    def capture_locals(func, scope, args=None, self: str = None, update_scope=False): res = dict(); exec(Experimental.extract_code(func, args=args, self=self, include_args=False, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
-    @staticmethod
-    def extract_code(func, code: str = None, include_args=True, verbose=True, copy2clipboard=False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
-        import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
-        raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
-        code_string = ''.join([aline + "\n" if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") + "\n" for aline in lines])  # remove return statements if there else keep line as is.
-        code_string = (Experimental.extract_arguments(func, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + "\n# " + f"BODY OF {func.__name__}".center(80, "=") +"\n" + code_string  # added later so it has more overwrite authority.
-        install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100) if verbose else None
-        return code_string  # ready to be run with exec()
-    @staticmethod
-    def extract_arguments(func, copy2clipboard=False, **kwargs):
-        ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and kwargs.
-        res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
-        ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and kwargs = {}
-        install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
-    @staticmethod
-    def run_cell(pointer, module=sys.modules[__name__]):
-        for cell in P(module.__file__).read_text().split("#%%"):
-            if pointer in cell.split('\n')[0]: break  # bingo
-        else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
-        print(cell); install_n_import("clipboard").copy(cell); return cell
+def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
+    try: return func()
+    except BaseException as ex:  # or Exception
+        if raise_ is not None: raise raise_
+        if handle is not None: return handle(ex, **kwargs)
+        return run() if run is not None else return_
+def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
+def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
+def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=False, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
+def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):
+    """Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
+    text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
+    if obj is not None:
+        text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
+        text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
+    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
+    if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+def load_from_source_code(directory, obj=None, delete=False):
+    P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
+    sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
+    return getattr(sourcefile, obj) if obj is not None else sourcefile
+def extract_code(func, code: str = None, include_args=True, verbose=True, copy2clipboard=False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
+    import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
+    raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
+    code_string = ''.join([aline + "\n" if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") + "\n" for aline in lines])  # remove return statements if there else keep line as is.
+    code_string = (extract_arguments(func, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + "\n# " + f"BODY OF {func.__name__}".center(80, "=") +"\n" + code_string  # added later so it has more overwrite authority.
+    install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100) if verbose else None
+    return code_string  # ready to be run with exec()
+def extract_arguments(func, copy2clipboard=False, **kwargs):
+    ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and kwargs.
+    res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
+    ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and kwargs = {}
+    install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
+def run_cell(pointer, module=sys.modules[__name__]):
+    for cell in P(module.__file__).read_text().split("#%%"):
+        if pointer in cell.split('\n')[0]: break  # bingo
+    else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
+    print(cell); install_n_import("clipboard").copy(cell); return cell
+Experimental = SimpleNamespace(try_this=try_this, show_globals=show_globals, monkey_patch=monkey_patch, capture_locals=capture_locals, generate_readme=generate_readme, load_from_source_code=load_from_source_code, extract_code=extract_code,extract_arguments=extract_arguments, run_cell=run_cell)  # Debugging and Meta programming tools"""
 
 
 if __name__ == '__main__':

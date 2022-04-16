@@ -3,6 +3,7 @@
 """
 # from __future__ import annotations
 from pathlib import Path
+from types import SimpleNamespace
 
 # ============================== Accessories ============================================
 
@@ -38,35 +39,28 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
             if add_suffix:
                 [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
                 path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext; path = Path(path).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {Display.f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
+            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {f(repr(obj), 50)}  @ `{path.absolute().as_uri()}` |  Directory: `{path.parent.absolute().as_uri()}`") if verbose else None
             return path
         return wrapper
     return decorator
 
 
-class Save:
-    @staticmethod
-    @save_decorator(".csv")
-    def csv(obj, path=None): obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
-    @staticmethod
-    @save_decorator(".npy")
-    def npy(obj, path, **kwargs): import numpy as np; np.save(path, obj, **kwargs)
-    @staticmethod
-    @save_decorator(".mat")
-    def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
-    @staticmethod
-    @save_decorator(".json")
-    def json(obj, path=None, **kwargs): Path(path).write_text(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
-    @staticmethod
-    @save_decorator(".yml")
-    def yaml(obj, path, **kwargs): Path(path).write_bytes(__import__("yaml").dumps(obj, **kwargs))
-    @staticmethod
-    @save_decorator(".pkl")
-    def vanilla_pickle(obj, path, **kwargs): Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
-    @staticmethod
-    @save_decorator(".pkl")
-    def pickle(obj=None, path=None, r=False, **kwargs): Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))
-    pickles = staticmethod(lambda obj: __import__("dill").dumps(obj))
+@save_decorator(".csv")
+def csv(obj, path=None): return obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
+@save_decorator(".npy")
+def npy(obj, path, **kwargs): return __import__('numpy').save(path, obj, **kwargs)
+@save_decorator(".mat")
+def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
+@save_decorator(".json")
+def json(obj, path=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
+@save_decorator(".yml")
+def yaml(obj, path, **kwargs): return Path(path).write_bytes(__import__("yaml").dumps(obj, **kwargs))
+@save_decorator(".pkl")
+def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
+@save_decorator(".pkl")
+def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))
+def pickles(obj): return __import__("dill").dumps(obj)
+Save = SimpleNamespace(csv=csv, npy=npy, mat=mat, json=json, yaml=yaml, vanilla_pickle=vanilla_pickle, pickle=pickle, pickles=pickles)
 
 
 class Base(object):
@@ -101,7 +95,7 @@ class Base(object):
 class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
-    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
@@ -173,7 +167,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.eval(values, func=False))
     def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.eval(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
-    def __str__(self, newline=True): return Display.config(self.__dict__, newline=newline)
+    def __str__(self, newline=True): return as_config(self.__dict__, newline=newline)
     def __getattr__(self, item) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
@@ -203,8 +197,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
-    def _pandas_repr(self, justify): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: Display.get_repr(x, justify=justify).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-    def print(self, dtype=True, return_str=False, justify=50, config=False, yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else Display.config(self.__dict__, justify=justify, **kwargs)) if yaml or config else self._pandas_repr(justify).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
+    def _pandas_repr(self, justify): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
+    def print(self, dtype=True, return_str=False, justify=50, config=False, yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else as_config(self.__dict__, justify=justify, **kwargs)) if yaml or config else self._pandas_repr(justify).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, artist=None, use_plt=True):
@@ -217,30 +211,25 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         return artist
 
 
-class Display:
-    @staticmethod
-    def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
-    set_pandas_auto_width = staticmethod(lambda: __import__("pandas").set_option('display.width', 0))  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-    config = staticmethod(lambda mydict, newline=True, justify=15, quotes=False: "".join([f"{key:>{justify}} = {repr(val) if quotes else val}" + ("\n" if newline else ", ") for key, val in mydict.items()]))
-    f = staticmethod(lambda str_, justify=50, direc="<": f'{(str_[:justify - 4] + " ..." if len(str_) > justify else str_):{direc}{justify}}')
-    @staticmethod
-    def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.display.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
-    @staticmethod
-    def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
-    @staticmethod
-    def get_repr(data, justify=15):
-        if type(data) in {list, str}: string_ = data if type(data) is str else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
-        elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
-        elif type(data) is __import__("pandas").DataFrame: string_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}."
-        elif type(data) is __import__("pandas").Series: string_ = f"Pandas Series: Length = {len(data)}, Keys = {Display.get_repr(data.keys().to_list())}."
-        else: string_ = repr(data)
-        return f'{(string_[:justify - 4] + "... " if len(string_) > justify else string_):>{justify}}'
-    @staticmethod
-    def print_string_list(mylist, char_per_row=125, sep=" "):
-        counter = 0
-        for item in mylist:
-            print(item, end=sep); counter += len(item)
-            if not counter <= char_per_row: counter = 0; print("\n")
+def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('max_colwidth', colwidth); pd.set_option('max_columns', columns); pd.set_option('width', width); pd.set_option('max_rows', rows)
+def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
+def as_config(mydict, newline=True, justify=15, quotes=False): return "".join([f"{key:>{justify}} = {repr(val) if quotes else val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
+def f(str_, justify=50, direc="<"): return f"{(str_[:justify - 4] + ' ...' if len(str_) > justify else str_):{direc}{justify}}"
+def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
+def get_repr(data, justify=15):
+    if type(data) in {list, str}: string_ = data if type(data) is str else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+    elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
+    elif type(data) is __import__("pandas").DataFrame: string_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}."
+    elif type(data) is __import__("pandas").Series: string_ = f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
+    else: string_ = repr(data)
+    return f'{(string_[:justify - 4] + "... " if len(string_) > justify else string_):>{justify}}'
+def print_string_list(mylist, char_per_row=125, sep=" "):
+    counter = 0
+    for item in mylist:
+        print(item, end=sep); counter += len(item)
+        if not counter <= char_per_row: counter = 0; print("\n")
+Display = SimpleNamespace(set_pandas_display=set_pandas_display, set_pandas_auto_width=set_pandas_auto_width, as_config=as_config, f=f, eng=eng, outline=outline, get_repr=get_repr, print_string_list=print_string_list)
 
 
 if __name__ == '__main__':
