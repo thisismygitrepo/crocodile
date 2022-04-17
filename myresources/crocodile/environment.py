@@ -2,6 +2,7 @@
 import crocodile.toolbox as tb
 import platform
 import os
+import sys
 
 P = tb.P
 L = tb.List
@@ -10,7 +11,7 @@ system = platform.system()
 OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # path separator, not to be confused with P.sep
 env = tb.Struct(dict(os.environ)).clean_view
-exe = P(platform.sys.executable)
+exe = P(sys.executable)
 
 tm = tb.Terminal()
 
@@ -58,16 +59,13 @@ def get_address():
     netifaces = tb.install_n_import("netifaces")
     subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
     default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
-
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join(("%012X" % mac)[i:i + 2] for i in range(0, 12, 2))
     # elif hex_format: return hex(mac)
     # else: return mac
-
     import socket
     local_ip_v4 = socket.gethostbyname(socket.gethostname())
-
     from requests import get
     public_ip = get('https://api.ipify.org').text
     return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip=public_ip)
@@ -189,7 +187,7 @@ def get_shell_profiles(shell):
 
 
 def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
-def get_defined_prorgams(string_="*.exe"): return Path.search(string_).reduce(lambda x, y: x+y).print()
+def get_defined_programs(string_="*.exe"): return Path.search(string_).reduce(lambda x, y: x+y).print()
 
 
 if __name__ == '__main__':

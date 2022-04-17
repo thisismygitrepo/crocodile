@@ -29,8 +29,7 @@ class HParams(dl.HyperParam):
 class DataReader(dl.DataReader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dataset = tb.Struct(x=np.random.normal(1000, 10),
-                                 y=np.random.normal(1000, 1))
+        self.dataset = tb.Struct(x=np.random.normal(1000, 10), y=np.random.normal(1000, 1))
         self.split_the_data(self.dataset.x, self.dataset.y)
 
 

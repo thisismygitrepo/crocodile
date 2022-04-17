@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from crocodile.msc.odds import Cycle
 from matplotlib import widgets
+import matplotlib.colors as mcolors
 
 
 class FigurePolicy(enum.Enum):
@@ -22,7 +23,6 @@ class FigureManager:
         self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
         self.cmaps = Cycle(plt.colormaps())
-        import matplotlib.colors as mcolors
         self.mcolors = list(mcolors.CSS4_COLORS.keys())
         self.facecolor = Cycle(list(mcolors.CSS4_COLORS.values()))
         self.colors = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
