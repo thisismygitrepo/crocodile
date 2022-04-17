@@ -1,7 +1,6 @@
 
 """
 """
-# from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -215,12 +214,9 @@ def get_repr(data, justify=15, limit=float('inf'), direc="<"):
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
     return f(str_, justify=justify, limit=limit, direc=direc)
-def print_string_list(mylist, char_per_row=125, sep=" "):
-    counter = 0
-    for item in mylist:
-        print(item, end=sep); counter += len(item)
-        if not counter <= char_per_row: counter = 0; print("\n")
-Display = SimpleNamespace(set_pandas_display=set_pandas_display, set_pandas_auto_width=set_pandas_auto_width, as_config=as_config, f=f, eng=eng, outline=outline, get_repr=get_repr, print_string_list=print_string_list)
+def print_string_list(mylist, char_per_row=125, sep=" ", style=str, _counter=0):
+    for item in mylist: print(style(item), end=sep); _counter += len(style(item)); print("\n") if _counter % char_per_row == 0 else None
+Display = SimpleNamespace(set_pandas_display=set_pandas_display, set_pandas_auto_width=set_pandas_auto_width, as_config=as_config, f=f, eng=eng, outline=outline, get_repr=get_repr, print_string_list=print_string_list)  # or D = type('D', (object, ), dict(set_pandas_display
 
 
 if __name__ == '__main__':

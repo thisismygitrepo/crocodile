@@ -62,7 +62,7 @@ def build_parser():
 from {path} import *
 """ + args.cmd + "\n"
         else: script = args.cmd
-        if args.func != "": script += f"tb.E.run_globally({args.func}, globals())"
+        if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
         tb.Terminal().run_script(script=script, terminal=args.terminal, new_window=not args.here, interactive=not args.solitary, ipython=not args.python)
 
 

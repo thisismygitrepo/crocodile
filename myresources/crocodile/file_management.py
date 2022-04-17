@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, SimpleNamespace
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, SimpleNamespace, D, Display
 from datetime import datetime
 
 
@@ -76,9 +76,7 @@ class P(type(Path()), Path):
     def delete(self, sure=False, verbose=True):
         slf = self  # slf = self.expanduser().resolve() don't resolve symlinks.
         if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.") if verbose else None; return self
-        if not slf.exists():
-            slf.unlink(missing_ok=True)  # broken symlinks exhibit funny existence behaviour, catch them here.
-            print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # terminate the function.
+        if not slf.exists(): slf.unlink(missing_ok=True); print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # broken symlinks exhibit funny existence behaviour, catch them here.
         slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=True); print(f"DELETED {repr(slf)}.") if verbose else None; return self
     def send2trash(self, verbose=True):
         if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
@@ -108,10 +106,10 @@ class P(type(Path()), Path):
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest / slf.name if not orig else self
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, notfound=FileNotFoundError, verbose=False, **kwargs):
+    def readit(self, reader=None, strict=True, verbose=False, **kwargs):
         if not self.exists():
-            if notfound is FileNotFoundError: raise FileNotFoundError(f"`{self}` is no where to be found!")
-            else: return notfound
+            if strict: raise FileNotFoundError(f"`{self}` is no where to be found!")
+            else: return None
         filename = self.unzip(folder=self.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(self) else self
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
@@ -136,8 +134,7 @@ class P(type(Path()), Path):
         return self.write_text("\n".join(lines), encoding=encoding)
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(
-            parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
+        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
     def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg=""):
         if inlieu: self._str = str(res)
         if inplace:
@@ -195,11 +192,10 @@ class P(type(Path()), Path):
         elif index is not None and (at is None):  # index is provided
             one, two = self[:index], P(*self.parts[index + 1:]); at = self[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
-        if sep == 0: pass  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
-        elif sep == 1: two = at / two   # append it to right portion
-        elif sep == -1: one = one / at  # append it to left portion.
+        if sep == 0: return one, two  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
+        elif sep == 1: return one, at / two   # append it to right portion
+        elif sep == -1: return one / at, two  # append it to left portion.
         else: raise ValueError(f"`sep` should take a value from the set [-1, 0, 1] but got {sep}")
-        return one, two
     def __repr__(self):  # this is useful only for the console
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
@@ -208,8 +204,7 @@ class P(type(Path()), Path):
         elif self.is_absolute(): return "P: " + self._type() + " '" + self.clickable() + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
         elif "http" in str(self): return "P: URL " + self.as_url_str()
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
-    # ===================================== File Specs =============================================================
-    def size(self, units='mb'):
+    def size(self, units='mb'):  # ===================================== File Specs ==========================================================================================
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         return round(total_size / dict(zip(List(['b', 'kb', 'mb', 'gb']).eval("self+self.swapcase()"), 2 * [1024 ** item for item in range(4)]))[units], 1)
     def time(self, which=["m", "c", "a"][0], **kwargs): return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)  # m last mofidication of content, i.e. the time it was created. c last status change (its inode is changed, permissions, path, but not content) a: last access
@@ -244,11 +239,8 @@ class P(type(Path()), Path):
         except OSError: return self
     # ======================================== Folder management =======================================
     def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
-        filters = filters or []
-        if not_in is not None: filters += [lambda x: all([str(notin) not in str(x) for notin in not_in])]
-        if exts is not None: filters += [lambda x: any([ext in x.name for ext in exts])]
-        slf = self.expanduser().resolve()
-        if compressed and slf.suffix == ".zip":
+        filters = (filters or []) + ([lambda x: all([str(notin) not in str(x) for notin in not_in])] if not_in is not None else []) + ([lambda x: any([ext in x.name for ext in exts])] if exts is not None else [])
+        if compressed and (slf := self.expanduser().resolve()).suffix == ".zip":
             with __import__("zipfile").ZipFile(str(slf)) as z: content = List(z.namelist())
             raw = content.filter(lambda x: __import__("fnmatch").fnmatch(x, pattern)).apply(lambda x: slf / x)
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
@@ -322,9 +314,8 @@ class P(type(Path()), Path):
         pass
     def decompress(self): pass
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
-        assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
-        if use_7z and (env := __import__("crocodile.environment")).system == "Windows":
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name); assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
+        if use_7z and (env := P.env()).system == "Windows":
             env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
             path = path + '.7z' if not path.suffix == '.7z' else path; env.tm.run(f"&'{program}' a '{path}' '{self}' -p{pwd}", shell="powershell")
         elif use_7z: raise NotImplementedError("7z not implemented for Linux")
@@ -335,7 +326,6 @@ class P(type(Path()), Path):
         return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.zip(inplace=inplace, verbose=verbose).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
     def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
-    # ========================== Helpers =========================================
     def _resolve_path(self, folder, name, path, default_name, rel2it=False):  # From all arguments, figure out what is the final path.
         """:param rel2it: `folder` or `path` are relative to `self` as opposed to cwd. This is used when resolving '../dir'"""
         if path is not None:
@@ -406,8 +396,7 @@ class Fridge:  # This class helps to accelrate access to latest data coming from
             elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
         elif fresh or not self.path.exists() or self.age > str2timedelta(self.expire):  # disk fridge
             if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")
-            self.cache = self.source_func()  # fresh order, never existed or exists but expired.
-            self.save(obj=self.cache, path=self.path)
+            self.cache = self.source_func(); self.save(obj=self.cache, path=self.path)  # fresh order, never existed or exists but expired.
         elif self.age < str2timedelta(self.expire) and self.cache is None: self.cache = self.reader(self.path)  # this implementation favours reading over pulling fresh at instantiation.  # exists and not expired. else # use the one in memory self.cache
         return self.cache
 

@@ -219,7 +219,7 @@ def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=Tr
     """Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
     text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
     if obj is not None:
-        text += f"# Code to generate the result\n" + "```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
+        text += f"# Code to generate the result\n```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
         text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
     readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
