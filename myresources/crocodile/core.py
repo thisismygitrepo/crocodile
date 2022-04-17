@@ -10,19 +10,13 @@ from types import SimpleNamespace
 
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
 def timestamp(fmt=None, name=None): return (name + '_' + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
-
-
 def str2timedelta(shift):
     """Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
-
-
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
-
-
 def install_n_import(package, name=None):
     try: return __import__(package)
     except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package])
@@ -67,10 +61,10 @@ class Base(object):
     def __init__(self, *args, **kwargs): pass
     def __getstate__(self): return self.__dict__.copy()
     def __setstate__(self, state): self.__dict__.update(state)
-    def print(self, typeinfo=False): Struct(self.__dict__).print(dtype=typeinfo)
+    def print(self, dtype=False, attrs=False, **kwargs): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
-    def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not string_.startswith("lambda") and func else "") + string_ + (self if False else ''))
+    def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
     def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else ""), desc=desc or (f"Data of {self.__class__}" if data_only else desc))
@@ -82,10 +76,9 @@ class Base(object):
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
     def get_attributes(self, remove_base_attrs=True, return_objects=False, fields=True, methods=True):
-        attrs = list(filter(lambda x: ('__' not in x) and not x.startswith("_"), dir(self))); [attrs.remove(x) for x in Base().get_attributes(remove_base_attrs=False)] if remove_base_attrs else None
-        if not fields: attrs = list(filter(lambda x: __import__("inspect").ismethod(getattr(self, x)), attrs))  # logic (questionable): anything that is not a method is a field
-        if not methods: attrs = list(filter(lambda x: not __import__("inspect").ismethod(getattr(self, x)), attrs))
-        if return_objects: attrs = [getattr(self, x) for x in attrs]; return List(attrs)
+        attrs = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=Base().get_attributes(remove_base_attrs=False)if remove_base_attrs else []); import inspect
+        attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
+        return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
@@ -95,7 +88,8 @@ class Base(object):
 class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
-    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0])}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=50)}" if len(self.list) > 0 else f"An Empty List []"
+    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
@@ -125,7 +119,6 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
     def modify(self, expr: str, other=None) -> 'List': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value=None, values=None, strict=True) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
-    def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list: return self.list
     def to_numpy(self): import numpy as np; return np.array(self.list)
@@ -172,7 +165,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
-    def __repr__(self): return "Struct: [" + "".join([str(key) + ", " for key in self.keys().to_list()]) + "]"
+    def __repr__(self): return "Struct: [" + ", ".join(self.keys()) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key, value): self.__dict__[key] = value
     def __bool__(self): return bool(self.__dict__)
@@ -198,7 +191,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, justify): return __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify).replace("\n", " "))]).T, columns=["key", "dtype", "details"])
-    def print(self, dtype=True, return_str=False, justify=50, config=False, yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if yaml else as_config(self.__dict__, justify=justify, **kwargs)) if yaml or config else self._pandas_repr(justify).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
+    def print(self, dtype=True, return_str=False, justify=50, config=False, as_yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else as_config(self.__dict__, justify=justify, **kwargs)) if yaml or config else self._pandas_repr(justify).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, artist=None, use_plt=True):
@@ -213,17 +206,15 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
 
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-def as_config(mydict, newline=True, justify=15, quotes=False): return "".join([f"{key:>{justify}} = {repr(val) if quotes else val}" + ("\n" if newline else ", ") for key, val in mydict.items()])
-def f(str_, justify=50, direc="<"): return f"{(str_[:justify - 4] + ' ...' if len(str_) > justify else str_):{direc}{justify}}"
+def as_config(mydict, newline=True, justify=15, quotes=False): return ("\n" if newline else ", ").join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+def f(str_, justify=50, limit=float('inf'), direc="<"): return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
-def get_repr(data, justify=15):
-    if type(data) in {list, str}: string_ = data if type(data) is str else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
-    elif type(data) is __import__("numpy").ndarray: string_ = f"shape = {data.shape}, dtype = {data.dtype}."
-    elif type(data) is __import__("pandas").DataFrame: string_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}."
-    elif type(data) is __import__("pandas").Series: string_ = f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
-    else: string_ = repr(data)
-    return f'{(string_[:justify - 4] + "... " if len(string_) > justify else string_):>{justify}}'
+def get_repr(data, justify=15, limit=float('inf'), direc="<"):
+    if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+    elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
+    else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
+    return f(str_, justify=justify, limit=limit, direc=direc)
 def print_string_list(mylist, char_per_row=125, sep=" "):
     counter = 0
     for item in mylist:
