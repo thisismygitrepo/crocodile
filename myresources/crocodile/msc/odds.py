@@ -3,8 +3,14 @@ from crocodile.file_management import P, install_n_import, datetime
 from crocodile.meta import Scheduler, Log
 import time
 
+def share(path):
+    response = install_n_import("requests").post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False,
+                                                 description="its a file, init?", ), files={'file': path.read_bytes()})
+    return response.json()['link'] if ['link'] in response.json() else response.json()
+
 
 def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
+def capture_photo(): cv2 = install_n_import("opencv-python"", cv2"); cam = cv2.VideoCapture(); cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3000); cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000); _, frame = cam.read(); cam.releaes(); return frame
 def count_number_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True, **kwargs): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
 def profile_memory(command): psutil = install_n_import("psutil"); before = psutil.virtual_memory(); exec(command); after = psutil.virtual_memory(); print(f"Memory used = {(after.used - before.used) / 1e6}")
 def pomodoro(work=25, rest=5, repeats=4):
@@ -24,7 +30,7 @@ def pomodoro(work=25, rest=5, repeats=4):
     return Scheduler(routine=loop, max_cycles=repeats, logger=logger, wait="0.1m").run()
 class Cycle:
     def __init__(self, iterable=None): self.list = iterable; self.index = -1
-    def next(self): self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index;return self.list[self.index]
+    def next(self): self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index; return self.list[self.index]
     def previous(self): self.index -= 1; self.index = len(self.list) - 1 if self.index < 0 else self.index; return self.list[self.index]
     def set(self, value): self.index = self.list.index(value)
     def get(self): return self.list[self.index]
@@ -34,6 +40,18 @@ class Cycle:
 class DictCycle(Cycle):
     def __init__(self, strct): super(DictCycle, self).__init__(iterable=strct.items()); self.keys = strct.keys()
     def set_key(self, key): self.index = list(self.keys).index(key)
+
+
+def capture_from_webcam():
+    import cv2
+    cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        cv2.imshow('frame', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':

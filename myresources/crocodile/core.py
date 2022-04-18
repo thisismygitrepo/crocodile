@@ -5,8 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 # ============================== Accessories ============================================
-
-
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
 def timestamp(fmt=None, name=None): return (name + '_' + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift):
@@ -20,9 +18,6 @@ def install_n_import(package, name=None):
     try: return __import__(package)
     except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package])
     return __import__(package)
-
-
-# ====================================== Classes ====================================
 
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
@@ -56,6 +51,7 @@ def pickles(obj): return __import__("dill").dumps(obj)
 Save = SimpleNamespace(csv=csv, npy=npy, mat=mat, json=json, yaml=yaml, vanilla_pickle=vanilla_pickle, pickle=pickle, pickles=pickles)
 
 
+# ====================================== Object Management ====================================
 class Base(object):
     def __init__(self, *args, **kwargs): pass
     def __getstate__(self): return self.__dict__.copy()

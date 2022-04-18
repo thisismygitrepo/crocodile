@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, SimpleNamespace, D, Display
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, SimpleNamespace
 from datetime import datetime
 
 
@@ -36,9 +36,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 
-
 # %% =================================== File ============================================
-
 def read(path, **kwargs):
     suffix = Path(path).suffix[1:]
     try: return getattr(Read, suffix)(str(path), **kwargs)
@@ -63,7 +61,7 @@ def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
 def py(path): return Struct(__import__("runpy").run_path(path))
 def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)
 def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
-Read = SimpleNamespace(read=read, mat=mat, json=json, yaml=yaml, npy=npy, csv=csv, pkl=pkl, py=py, pickle=pickle)
+Read = SimpleNamespace(read=read, mat=mat, json=json, yaml=yaml, npy=npy, csv=csv, pkl=pkl, py=py, pickle=pickle, txt=lambda path: P(path).read_text())
 
 
 class P(type(Path()), Path):
@@ -124,7 +122,7 @@ class P(type(Path()), Path):
         return self
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
-    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read): return Fridge(source_func=source_func, path=self, expire=expire, save=save, reader=reader)
+    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Fridge(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt)
         lines, bingo = self.read_text(encoding=encoding).split("\n"), False
@@ -220,7 +218,7 @@ class P(type(Path()), Path):
     # ========================== override =======================================
     def write_text(self, data: str, **kwargs) -> 'Path': super(P, self).write_text(data, **kwargs); return self
     def read_text(self, encoding=None, lines=False, printit=False): res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
-    def write_bytes(self, data: bytes): super(P, self).write_bytes(data); return self
+    def write_bytes(self, data: bytes): res = super(P, self).write_bytes(data); print(f"Could not save file on disk.") if res == 0 else None; return self
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
@@ -240,7 +238,7 @@ class P(type(Path()), Path):
     # ======================================== Folder management =======================================
     def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
         filters = (filters or []) + ([lambda x: all([str(notin) not in str(x) for notin in not_in])] if not_in is not None else []) + ([lambda x: any([ext in x.name for ext in exts])] if exts is not None else [])
-        if compressed and (slf := self.expanduser().resolve()).suffix == ".zip":
+        if (slf := self.expanduser().resolve()).suffix == ".zip" and compressed:
             with __import__("zipfile").ZipFile(str(slf)) as z: content = List(z.namelist())
             raw = content.filter(lambda x: __import__("fnmatch").fnmatch(x, pattern)).apply(lambda x: slf / x)
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
@@ -380,11 +378,11 @@ class MemoryDB:  # This class holds the historical data. It acts like a database
 
 
 class Fridge:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
-    def __init__(self, source_func, expire="1m", time_produced=None, logger=None, path=None, save=Save.pickle, reader=Read.read):
+    def __init__(self, source_func, expire="1m", logger=None, path=None, save=Save.pickle, reader=Read.read):
         self.cache = None  # fridge content
-        self.time_produced = time_produced or datetime.now()  # init time_produced
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
+        self.time_produced = None
         self.save, self.reader, self.logger, self.expire = save, reader, logger, expire
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
     def reset(self): self.time_produced = datetime.now()

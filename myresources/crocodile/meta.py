@@ -215,12 +215,10 @@ def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
 def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=False, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
-def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):
-    """Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
+def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
     text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
-    if obj is not None:
-        text += f"# Code to generate the result\n```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator
-        text += f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator
+    text += (f"# Code to generate the result\n```python\n" + (inspect := __import__("inspect")).getsource(obj) + "\n```" + separator) if obj is not None else ""
+    text += (f"# Source code file generated me was located here: \n'{inspect.getfile(obj)}'\n" + separator) if obj is not None else ""
     readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
 def load_from_source_code(directory, obj=None, delete=False):
