@@ -95,8 +95,8 @@ class P(type(Path()), Path):
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         content = True if path is not None or name is not None else content  # this way, the destination will be filled with contents of `self`
-        dest = self._resolve_path(folder=folder, name=name, path=path, default_name=str(name) if name is not None else self.append(append).name, rel2it=False)
-        dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
+        dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
+        dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve(); dest = self.append(append) if dest == self else dest
         dest.delete(sure=True) if overwrite and dest.exists() else None
         if not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
@@ -133,18 +133,18 @@ class P(type(Path()), Path):
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
-    def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg=""):
+    def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg="", __delayed_msg__=""):
         if inlieu: self._str = str(res)
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename":
-                if overwrite and res.exists(): res.delete(sure=True)
+                if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
                     else: print(f"SKIPPED RENAMING {repr(self)} ==> {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res); msg = f"RENAMED {repr(self)} ==> {repr(res)}"
-            if operation == "delete": self.delete(sure=True, verbose=verbose)
-        print(msg) if verbose and msg != "" else None; return self if orig else res
+            elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED {repr(self)}."
+        print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and  __delayed_msg__ != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
@@ -154,7 +154,7 @@ class P(type(Path()), Path):
     def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)
     def append_time_stamp(self, fmt=None, **kwargs): return self._return(self.append(name="_" + timestamp(fmt=fmt)), operation="rename", **kwargs)
     def with_trunk(self, name, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", **kwargs)  # Complementary to `with_stem` and `with_suffix`
-    def with_name(self, name, verbose=False, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
+    def with_name(self, name, verbose=True, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
     def switch(self, key: str, val: str, **kwargs): return self._return(P(str(self).replace(key, val)), operation="rename", **kwargs)  # Like string replce method, but `replace` is an already defined method."""
     def switch_by_index(self, idx: int, val: str, **kwargs): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", **kwargs)
     # ============================= attributes of object ======================================
@@ -320,7 +320,7 @@ class P(type(Path()), Path):
         else: path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", **kwargs):
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(append, "")).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(append, "") if "_encrypted" in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.zip(inplace=inplace, verbose=verbose).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
     def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self

@@ -168,14 +168,13 @@ class SSH(object):
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
-        pwd = randstr(length=10, safe=True)
-        if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=pwd)
+        if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True)))
         if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
         print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="), "\n" * 2)
         self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
-        if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{pwd}", inplace=True)"""); source.delete(sure=True); return resp
+        if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)"""); source.delete(sure=True); return resp
 
 
 class Scheduler:
@@ -229,7 +228,7 @@ def extract_code(func, code: str = None, include_args=True, verbose=True, copy2c
     import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
     raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
     code_string = ''.join([aline + "\n" if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") + "\n" for aline in lines])  # remove return statements if there else keep line as is.
-    code_string = (extract_arguments(func, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + "\n# " + f"BODY OF {func.__name__}".center(80, "=") +"\n" + code_string  # added later so it has more overwrite authority.
+    code_string = (extract_arguments(func, **kwargs) if include_args else '') + ("\n" + code + "\n" if code is not None else '') + "\n# " + f"BODY OF {func.__name__}".center(80, "=") + "\n" + code_string  # added later so it has more overwrite authority.
     install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(f"Code extracted from `{func}`: \n" + "=" * 100 + '\n' + code_string, "=" * 100) if verbose else None
     return code_string  # ready to be run with exec()
 def extract_arguments(func, copy2clipboard=False, **kwargs):
