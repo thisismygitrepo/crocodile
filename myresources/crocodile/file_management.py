@@ -81,8 +81,7 @@ class P(type(Path()), Path):
         elif verbose: print(f"Could NOT trash {self}"); return self
     def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False):
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it); name, folder = path.name, path.parent
-        if parents: folder.create(parents=True, exist_ok=True)
-        slf = self.expanduser().resolve()
+        folder.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False)); return path  # contents live within this directory.
@@ -94,15 +93,14 @@ class P(type(Path()), Path):
         else: slf.rename(path)
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
-        content = True if path is not None or name is not None else content  # this way, the destination will be filled with contents of `self`
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
         dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve(); dest = self.append(append) if dest == self else dest
-        dest.delete(sure=True) if overwrite and dest.exists() else None
-        if not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
+        dest.delete(sure=True) if not content and overwrite and dest.exists() else None
+        if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
-        elif slf.is_dir(): __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest) if content else str(P(dest).joinpath(slf.name).create())); print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
+        elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); print(f"COPIED {'Content of ' if False else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
-        return dest / slf.name if not orig else self
+        return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
     def readit(self, reader=None, strict=True, verbose=False, **kwargs):
         if not self.exists():

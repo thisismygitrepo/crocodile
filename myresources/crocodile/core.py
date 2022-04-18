@@ -83,7 +83,7 @@ class Base(object):
 class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
-    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=50)}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
     def print(self, nl=1, sep=False, style=repr): [print(f"{idx:2}- {style(item)}", '\n' * (nl-1), sep * 100 if sep else ' ') for idx, item in enumerate(self.list)]
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
