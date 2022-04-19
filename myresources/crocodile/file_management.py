@@ -75,22 +75,18 @@ class P(type(Path()), Path):
         slf = self  # slf = self.expanduser().resolve() don't resolve symlinks.
         if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.") if verbose else None; return self
         if not slf.exists(): slf.unlink(missing_ok=True); print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # broken symlinks exhibit funny existence behaviour, catch them here.
-        slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=True); print(f"DELETED {repr(slf)}.") if verbose else None; return self
+        slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=False); print(f"DELETED {repr(slf)}.") if verbose else None; return self
     def send2trash(self, verbose=True):
         if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
     def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False):
-        path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it); name, folder = path.name, path.parent
-        folder.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
+        path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
+        path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False)); return path  # contents live within this directory.
-        if overwrite:  # the following works safely even if you are moving a path up and parent has same path.
-            path_ = P(folder).absolute() / randstr()  # no conflict with existing files/dirs of same `self.path`
-            slf.rename(path_)  # no error are likely to occur as the random path won't cause conflict. # now we can delete any potential conflict before eventually taking its path
-            path.delete(sure=True, verbose=False)  # It is important to delete after moving. # because `self` could be within the file you want to delete.
-            path_.rename(path)
-        else: slf.rename(path)
+        if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr(), verbose=verbose); path.delete(sure=True, verbose=verbose); tmp_path.rename(path, verbose=verbose)  # works if moving a path up and parent has same name
+        else: slf.rename(path, verbose=verbose)
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
