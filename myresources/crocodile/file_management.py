@@ -101,7 +101,7 @@ class P(type(Path()), Path):
     def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs):
         if not self.exists():
             if strict: raise FileNotFoundError(f"`{self}` is no where to be found!")
-            else: return notfoud
+            else: return notfound
         filename = self.unzip(folder=self.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(self) else self
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
