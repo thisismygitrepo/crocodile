@@ -142,7 +142,7 @@ class P(type(Path()), Path):
                     else: print(f"SKIPPED RENAMING {repr(self)} ==> {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res); msg = f"RENAMED {repr(self)} ==> {repr(res)}"
             elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED {repr(self)}."
-        print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and  __delayed_msg__ != "" else None; return self if orig else res
+        print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
@@ -357,7 +357,7 @@ def ungz(self, op_path=None):
     with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
 def tar(self, op_path):
-    with __import__("tarfile").open(op_path, "w:gz") as tar: tar.add(str(self), arcname=__import__("os").path.basename(str(self)))
+    with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(self), arcname=__import__("os").path.basename(str(self)))
     return op_path
 def untar(self, op_path, fname=None, mode='r', **kwargs):
     with __import__("tarfile").open(str(self), mode) as file:
