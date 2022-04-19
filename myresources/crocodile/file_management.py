@@ -242,21 +242,7 @@ class P(type(Path()), Path):
             for comp_file in comp_files: raw += P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=compressed, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
-    def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):  # Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
-        space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
-        def get_stats(apath): return (f" {(sts := apath.stats(printit=False)).size} MB. {sts.content_mod_time}. " + desc(apath) if desc is not None else "") if stats or desc else ""
-        def inner(apath: P, prefix: str = '', level_=-1):
-            nonlocal files, directories
-            if not level_: return  # 0, stop iterating
-            pointers = [tee] * (len(content := apath.search("*", files=not limit_to_directories)) - 1) + [last]
-            for pointer, path in zip(pointers, content):
-                if path.is_dir():
-                    yield prefix + pointer + path.name + get_stats(path)
-                    directories, extension = directories + 1, branch if pointer == tee else space
-                    yield from inner(path, prefix=prefix + extension, level_=level_ - 1)
-                elif not limit_to_directories: yield prefix + pointer + path.name + get_stats(path); files += 1
-        print(dir_path.name); iterator = inner(dir_path, level_=level)
-        [print(line) for line in __import__("itertools").islice(iterator, length_limit)]; print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None; print(f'\n{directories} directories' + (f', {files} files' if files else ''))
+    def tree(self, *args, **kwargs): return __import__("crocodile").msc.odds.__dict__['tree'](self, *args, **kwargs)
     def find(self, *args, r=True, compressed=True, **kwargs):  # short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
         if compressed is False and self.is_file(): return self
         if len(results := self.search(*args, r=r, compressed=compressed, **kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
@@ -324,9 +310,8 @@ class P(type(Path()), Path):
             path = P(self.joinpath(path).resolve() if rel2it else path).expanduser().resolve()
             assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."; assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `folder` kwarg. `{path}`"
             return path
-        else:
-            name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
-            return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
+        name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
+        return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
 
 
 def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""

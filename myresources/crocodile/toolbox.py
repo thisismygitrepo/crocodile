@@ -21,10 +21,11 @@ P, Read, Compression, Fridge, MemoryDB, encrypt, decrypt = _fm.P, _fm.Read, _fm.
 Experimental, Terminal, Log, Null, Scheduler, SSH = meta.Experimental, meta.Terminal, meta.Log, meta.Null, meta.Scheduler, meta.SSH
 
 L = List
-tmp = P.tmp
-E = Experimental
+S = Struct
 D = Display
-
+T = Terminal
+E = Experimental
+tmp = P.tmp
 
 _ = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
@@ -61,15 +62,6 @@ def reload(verbose=True):
     # # current_module = sys.modules["crocodile.toolbox"]
     # # current_module.__dict__.update(mod)
     return tb
-
-
-def get_parser():
-    # TODO: has no purpose so far.
-    import argparse
-    parser = argparse.ArgumentParser(description="Crocodile toolbox parser")
-    parser.add_argument()
-    args = parser.parse_args()
-    return args
 
 
 if __name__ == '__main__':

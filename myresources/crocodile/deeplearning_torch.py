@@ -7,6 +7,7 @@ import torch as t
 # import matplotlib.pyplot as plt
 import numpy as np
 # import torch.nn
+import pandas as pd
 
 Flatten = t.nn.Flatten
 
@@ -34,10 +35,8 @@ class TorchDataReader(dl.DataReader):
 
     @staticmethod
     def to_numpy(x):
-        if type(x) is not np.ndarray:
-            return x.cpu().detach().numpy()
-        else:
-            return x
+        if type(x) is not np.ndarray: return x.cpu().detach().numpy()
+        else: return x
 
 
 class PTBaseModel(dl.BaseModel, dl.ABC):
@@ -58,8 +57,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
 
     def summary(self, detailed=False):
         print(' Summary '.center(50, '='))
-        if detailed:
-            self.check_childern_details(self.model)
+        if detailed: self.check_childern_details(self.model)
         else:
             print('Number of weights in the NN = ', sum(p.numel() for p in self.model.parameters()))
             print(''.center(57, '='))
@@ -68,14 +66,10 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         t.save()
 
     def load_weights(self, save_dir, map_location=None):
-        if map_location is None:  # auto location.
-            if t.cuda.is_available():
-                # load to where ever the model was saved from in the first place
-                self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__()))
-            else:  # we are restricted to CPU
-                self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location="cpu"))
-        else:
-            self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location=map_location))
+        if map_location is None:  # auto location.  # load to where ever the model was saved from in the first place
+            if t.cuda.is_available(): self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__()))
+            else: self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location="cpu"))
+        else: self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location=map_location))
         self.model.eval()
 
     def save_model(self, save_dir):
@@ -216,14 +210,12 @@ def check_shapes(module, ip):
         named_childern = list(module.named_modules())
     for idx, (a_name, a_layer) in enumerate(named_childern):
         if idx == 0:
-            with t.no_grad():
-                op = a_layer(ip)
+            with t.no_grad(): op = a_layer(ip)
         else:
-            with t.no_grad():
-                op = a_layer(op)
+            with t.no_grad(): op = a_layer(op)
         print(f'{idx + 1:2}- {a_name:20s}, {op.shape}')
     print("Stats on output data for random normal input:")
-    print(dl.tb.pd.DataFrame(TorchDataReader.to_numpy(op).flatten()).describe())
+    print(pd.DataFrame(TorchDataReader.to_numpy(op).flatten()).describe())
     return op
 
 

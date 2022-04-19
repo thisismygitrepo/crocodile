@@ -5,7 +5,7 @@ import os
 import sys
 
 P = tb.P
-L = tb.List
+L = tb.L
 
 system = platform.system()
 OS = os.getenv("OS")  # Windows_NT

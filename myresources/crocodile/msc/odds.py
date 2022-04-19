@@ -54,5 +54,23 @@ def capture_from_webcam():
     cv2.destroyAllWindows()
 
 
+def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
+    # Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
+    space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
+    def get_stats(apath): return (f" {(sts := apath.stats(printit=False)).size} MB. {sts.content_mod_time}. " + desc(apath) if desc is not None else "") if stats or desc else ""
+    def inner(apath: P, prefix: str = '', level_=-1):
+        nonlocal files, directories
+        if not level_: return  # 0, stop iterating
+        pointers = [tee] * (len(content := apath.search("*", files=not limit_to_directories)) - 1) + [last]
+        for pointer, path in zip(pointers, content):
+            if path.is_dir():
+                yield prefix + pointer + path.name + get_stats(path)
+                directories, extension = directories + 1, branch if pointer == tee else space
+                yield from inner(path, prefix=prefix + extension, level_=level_ - 1)
+            elif not limit_to_directories: yield prefix + pointer + path.name + get_stats(path); files += 1
+    print(dir_path.name); iterator = inner(dir_path, level_=level)
+    [print(line) for line in __import__("itertools").islice(iterator, length_limit)]; print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None; print(f'\n{directories} directories' + (f', {files} files' if files else ''))
+
+
 if __name__ == '__main__':
     pass
