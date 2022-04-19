@@ -398,7 +398,7 @@ class BaseModel(ABC):
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
 
     @classmethod
-    def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None):
+    def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None, verbose=True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
         else: hp_obj = (path / HyperParam.subpath + ".HyperParam.pkl").readit()
@@ -409,7 +409,7 @@ class BaseModel(ABC):
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
         model_obj.history = (path / "metadata/history.pkl").readit(notfound=tb.L())
-        print(f"Class {model_obj.__class__} Loaded Successfully.")
+        print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
         return model_obj
 
     @classmethod
@@ -431,7 +431,6 @@ class BaseModel(ABC):
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
-
         :param ip_shape:
         :param verbose:
         :return:
@@ -439,12 +438,12 @@ class BaseModel(ABC):
         ip, _ = self.data.get_random_input_output(ip_shape=ip_shape)
         self.tmp = self.model(ip)  # op
         if verbose:
-            print("============  Build Test ==============")
+            print("Build Test".center(50, '-'))
             print(f"Input shape = {ip.shape}")
             print(f"Output shape = {self.tmp.shape}")
             print("Stats on output data for random normal input:")
             print(pd.DataFrame(np.array(self.tmp).flatten()).describe())
-            print("----------------------------------------", '\n\n')
+            print("-" * 100 + '\n' * 2)
 
 
 class Ensemble(tb.Base):

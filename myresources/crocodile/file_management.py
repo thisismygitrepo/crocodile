@@ -102,10 +102,10 @@ class P(type(Path()), Path):
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, strict=True, verbose=False, **kwargs):
+    def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs):
         if not self.exists():
             if strict: raise FileNotFoundError(f"`{self}` is no where to be found!")
-            else: return None
+            else: return notfoud
         filename = self.unzip(folder=self.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(self) else self
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
