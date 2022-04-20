@@ -42,7 +42,7 @@ def read(path, **kwargs):
     try: return getattr(Read, suffix)(str(path), **kwargs)
     except AttributeError:
         if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-        raise AttributeError(f"Unknown file type. failed to recognize the suffix {suffix}")
+        raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`")
 def mat(path, remove_meta=False, **kwargs):
     res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs))
     if remove_meta: List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))

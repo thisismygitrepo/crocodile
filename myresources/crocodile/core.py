@@ -100,9 +100,8 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     # ======================== Access Methods ==========================================
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def index_items(self, idx) -> 'List': return List([item[idx] for item in self.list])
-    def find_index(self, func) -> 'List': return List([idx for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
-    def filter(self, func): return List([item for item in self.list if self.eval(func, func=True)(item)])
+    def split(self, every=1, idx=None) -> 'List': return List([(self[idx:idx+every] if idx+every<len(self) else self[idx:len(self)]) for idx in range(0, len(self), every)])
+    def filter(self, func, which=lambda idx, x: x) -> 'List': return List([which(idx, x) for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list)
     def append(self, item) -> 'List': self.list.append(item); return self
@@ -160,7 +159,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
-    def __repr__(self): return "Struct: [" + ", ".join(self.keys()) + "]"
+    def __repr__(self, limit=150): return "Struct: [" + Display.get_repr(self.keys(), limit=limit, justfy=0) + "]"
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key, value): self.__dict__[key] = value
     def __bool__(self): return bool(self.__dict__)
@@ -209,7 +208,7 @@ def get_repr(data, justify=15, limit=float('inf'), direc="<"):
     if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
-    return f(str_, justify=justify, limit=limit, direc=direc)
+    return f(str_.replace("\n", ""), justify=justify, limit=limit, direc=direc)
 def print_string_list(mylist, char_per_row=125, sep=" ", style=str, _counter=0):
     for item in mylist: print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 Display = SimpleNamespace(set_pandas_display=set_pandas_display, set_pandas_auto_width=set_pandas_auto_width, as_config=as_config, f=f, eng=eng, outline=outline, get_repr=get_repr, print_string_list=print_string_list)  # or D = type('D', (object, ), dict(set_pandas_display

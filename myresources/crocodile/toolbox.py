@@ -47,20 +47,6 @@ datetime = _fm.datetime
 
 
 def reload(verbose=True):
-    import inspect
-    import importlib
-    tb = __import__("sys").modules["crocodile.toolbox"]
-    for val in tb.__dict__.values():
-        if inspect.ismodule(val):
-            importlib.reload(val)
-            if verbose: print(f"Reloading {val}")
-    # importlib.reload(tb)
-    # # import runpy
-    # # mod = runpy.run_path(__file__)
-    # # # globals().update(mod)
-    # # print(f"{__file__=},  {__name__=}")
-    # # current_module = sys.modules["crocodile.toolbox"]
-    # # current_module.__dict__.update(mod)
     return tb
 
 
