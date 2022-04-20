@@ -159,7 +159,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
-    def __repr__(self, limit=150): return "Struct: [" + Display.get_repr(self.keys(), limit=limit, justfy=0) + "]"
+    def __repr__(self, limit=150): return "Struct: " + Display.get_repr(self.keys().list.__repr__(), limit=limit, justify=0)
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key, value): self.__dict__[key] = value
     def __bool__(self): return bool(self.__dict__)
