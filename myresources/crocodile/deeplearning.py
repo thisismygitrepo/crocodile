@@ -59,7 +59,7 @@ class HyperParam(tb.Struct):
 
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(HyperParam, cls).from_saved_data(tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
-    def __repr__(self): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
+    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
     @property
     def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
     @property
