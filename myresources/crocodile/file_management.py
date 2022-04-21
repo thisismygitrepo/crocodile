@@ -191,8 +191,8 @@ class P(type(Path()), Path):
     def __repr__(self):  # this is useful only for the console
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
-            except Exception: target = "BROKEN LINK " + str(self)
-            return "P: Symlink '" + str(self) + "' ==> " + repr(str(target) if target == self else target)    # avoid infinite recursions for broken links.
+            except Exception: target = "BROKEN LINK " + str(self)  # avoid infinite recursions for broken links.
+            return "P: Symlink '" + str(self) + "' ==> " + repr(str(target) if target == self else target)
         elif self.is_absolute(): return "P: " + self._type() + " '" + self.clickable() + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
         elif "http" in str(self): return "P: URL " + self.as_url_str()
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.

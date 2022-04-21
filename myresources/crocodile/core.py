@@ -177,7 +177,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def keys(self, verbose=False) -> 'List': return List(list(self.dict.keys())) if not verbose else install_n_import("tqdm").tqdm(self.dict.keys())
     def values(self, verbose=False) -> 'List': return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
     def items(self, verbose=False, desc="") -> 'List': return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items(), desc=desc)
-    def get_values(self, keys) -> 'List': return List([self[key] for key in keys])
+    def get(self, key=None, default=None, strict=False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in ((keys or []) + ([key] if key is not None else []))])
     def apply_to_keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
     def apply_to_values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
