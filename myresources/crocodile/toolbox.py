@@ -46,9 +46,6 @@ datetime = _fm.datetime
 #     _ = pd
 
 
-def reload(verbose=True):
-    return tb
-
 
 if __name__ == '__main__':
     # get_parser()

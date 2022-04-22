@@ -15,8 +15,7 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 def install_n_import(package, name=None):
     try: return __import__(package)
-    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package])
-    return __import__(package)
+    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package]); return __import__(package)
 
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
@@ -26,7 +25,7 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
             if add_suffix:
                 [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
                 path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext; path = Path(path).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`") if verbose else None  #  |  Directory: `{path.parent.absolute().as_uri()}`
+            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
             return path
         return wrapper
     return decorator
@@ -74,8 +73,7 @@ class Base(object):
         attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
-        filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")
-        install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename), filter=filt)
+        install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename := Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")), filter=filt)
         __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
@@ -99,10 +97,10 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     # ======================== Access Methods ==========================================
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def split(self, every=1, idx=None) -> 'List': return List([(self[idx:idx+every] if idx+every<len(self) else self[idx:len(self)]) for idx in range(0, len(self), every)])
+    def split(self, every=1, idx=None) -> 'List': return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
     def filter(self, func, which=lambda idx, x: x) -> 'List': return List([which(idx, x) for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list)
+    def reduce(self, func=lambda x, y: x+y) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list)
     def append(self, item) -> 'List': self.list.append(item); return self
     def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other) -> 'List': return List(self.list + list(other))

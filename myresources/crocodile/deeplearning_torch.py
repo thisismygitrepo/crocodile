@@ -62,8 +62,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
             print('Number of weights in the NN = ', sum(p.numel() for p in self.model.parameters()))
             print(''.center(57, '='))
 
-    def save_weights(self, save_dir):
-        t.save()
+    def save_weights(self, save_dir): t.save()
 
     def load_weights(self, save_dir, map_location=None):
         if map_location is None:  # auto location.  # load to where ever the model was saved from in the first place
@@ -72,8 +71,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         else: self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location=map_location))
         self.model.eval()
 
-    def save_model(self, save_dir):
-        t.save()
+    def save_model(self, save_dir): t.save()
 
     def load_model(self, save_dir):  # Model class must be defined somewhere
         self.model = t.load(self, save_dir.glob('*.pt').__next__())

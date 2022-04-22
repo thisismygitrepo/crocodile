@@ -79,7 +79,6 @@ class HyperParam(tb.Struct):
             devices = handle.config.experimental.list_physical_devices('CPU')
             devices += handle.config.experimental.list_physical_devices('GPU')
             device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
-
             if self.device_name is Device.auto: chosen_device = Device.gpu0 if len(devices) > 1 else Device.cpu
             else: chosen_device = self.device_name
             device_str = chosen_device.value if 1 > 0 else "haha"
@@ -203,13 +202,8 @@ class DataReader(tb.Base):
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
 
-    def preprocess(self, *args, **kwargs):
-        _ = args, kwargs, self
-        return args[0]  # acts like identity.
-
-    def postprocess(self, *args, **kwargs):
-        _ = args, kwargs, self
-        return args[0]  # acts like identity
+    def preprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity.
+    def postprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity
 
     def standardize(self):
         assert self.split is not None, "Load up the data first before you standardize it."
