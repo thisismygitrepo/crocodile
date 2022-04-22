@@ -85,8 +85,8 @@ class P(type(Path()), Path):
         if content:
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False)); return path  # contents live within this directory.
-        if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr(), verbose=verbose); path.delete(sure=True, verbose=verbose); tmp_path.rename(path, verbose=verbose)  # works if moving a path up and parent has same name
-        else: slf.rename(path, verbose=verbose)
+        if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
+        else: slf.rename(path)  #  self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
@@ -136,7 +136,7 @@ class P(type(Path()), Path):
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
                     else: print(f"SKIPPED RENAMING {repr(self)} ==> {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
-                self.rename(res); msg = f"RENAMED {repr(self)} ==> {repr(res)}"
+                self.rename(res); msg = msg or f"RENAMED {repr(self)} ==> {repr(res)}"
             elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED {repr(self)}."
         print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
