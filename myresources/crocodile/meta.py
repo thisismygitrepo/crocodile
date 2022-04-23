@@ -188,7 +188,7 @@ class Scheduler:
     def record_session_end(self, reason="Not passed to function."):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((tracking := self.sess_stats[1](sched=self))))
         summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait} seconds", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(dict(zip(self.sess_stats[0], tracking))).print(config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(dict(zip(self.sess_stats[0], tracking))).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); raise ex
@@ -222,7 +222,7 @@ def extract_code(func, code: str = None, include_args=True, verbose=True, copy2c
     install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
 def extract_arguments(func, copy2clipboard=False, **kwargs):
     ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and kwargs.
-    res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
+    res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(as_config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
     ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and kwargs = {}
     install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
 def run_cell(pointer, module=sys.modules[__name__]):
