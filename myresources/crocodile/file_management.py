@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import, SimpleNamespace
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
 
 
@@ -55,7 +55,7 @@ def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
 def py(path): return Struct(__import__("runpy").run_path(path))
 def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)
 def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
-Read = SimpleNamespace(read=read, mat=mat, json=json, yaml=yaml, npy=npy, csv=csv, pkl=pkl, py=py, pickle=pickle, txt=lambda path: P(path).read_text())
+class Read: read = read; mat = mat; json = json; yaml = yaml; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 
 
 class P(type(Path()), Path):
@@ -339,7 +339,7 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
         if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
         else: file.extract(fname, **kwargs)
     return P(op_path)
-Compression = SimpleNamespace(compress_folder=compress_folder, zip_file=zip_file, unzip=unzip, gz=gz, ungz=ungz, targ=tar, untar=untar)  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
+class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
 
 
 class MemoryDB:  # This class holds the historical data. It acts like a database, except that is memory based."""

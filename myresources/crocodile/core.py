@@ -2,7 +2,6 @@
 """
 """
 from pathlib import Path
-from types import SimpleNamespace
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
@@ -46,7 +45,7 @@ def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import_
 @save_decorator(".pkl")
 def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))
 def pickles(obj): return __import__("dill").dumps(obj)
-Save = SimpleNamespace(csv=csv, npy=npy, mat=mat, json=json, yaml=yaml, vanilla_pickle=vanilla_pickle, pickle=pickle, pickles=pickles)
+class Save: csv=csv; npy=npy; mat=mat; json=json; yaml=yaml; vanilla_pickle=vanilla_pickle; pickle=pickle; pickles=pickles
 
 
 # ====================================== Object Management ====================================
@@ -185,15 +184,9 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def print(self, dtype=True, return_str=False, justify=50, as_config=False, as_yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return res if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
-    def plot(self, artist=None, use_plt=True):
+    def plot(self, use_plt=True):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
-        plt = __import__("matplotlib").pyplot
-        if artist is None: fig, artist = plt.subplots()  # artist = Artist(figname='Structure Plot')  # removed for disentanglement
-        for key, val in self.items(): artist.plot(val, label=key)
-        try: artist.legend()
-        except AttributeError: pass
-        return artist
-
+        else: artist = __import__("crocodile.matplotlib_management").Artist(figname='Structure Plot'); artist.plot_dict(self.__dict__); return artist
 
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
@@ -208,7 +201,7 @@ def get_repr(data, justify=15, limit=float('inf'), direc="<"):
     return f(str_.replace("\n", ""), justify=justify, limit=limit, direc=direc)
 def print_string_list(mylist, char_per_row=125, sep=" ", style=str, _counter=0):
     for item in mylist: print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
-Display = SimpleNamespace(set_pandas_display=set_pandas_display, set_pandas_auto_width=set_pandas_auto_width, config=config, f=f, eng=eng, outline=outline, get_repr=get_repr, print_string_list=print_string_list)  # or D = type('D', (object, ), dict(set_pandas_display
+class Display: set_pandas_display=set_pandas_display; set_pandas_auto_width=set_pandas_auto_width; config=config; f=f; eng=eng; outline=outline; get_repr=get_repr; print_string_list=print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
 
 
 if __name__ == '__main__':

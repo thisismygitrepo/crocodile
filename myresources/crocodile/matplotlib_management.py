@@ -67,7 +67,7 @@ class FigureManager:  # Handles figures of matplotlib."""
     def annotate(self, event, axis=None, data=None):
         self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
         if not ax: return None
-        if not hasattr(ax, 'annot_obj'):  # first time_produced
+        if not hasattr(ax, 'annot_obj'):  # first time
             ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
                                        va="bottom", ha="left", fontsize=10, bbox=dict(boxstyle="round", fc="w"), )
         else: ax.annot_obj.set_visible(self.annot_flag)
@@ -80,15 +80,13 @@ class FigureManager:  # Handles figures of matplotlib."""
     def previous(self, event): _ = event; self.index = self.index - 1 if self.index > 0 else self.index_max - 1; self.message = f'Previous {self.index}'; self.animate()
     def next(self, event): _ = event; self.index = self.index + 1 if self.index < self.index_max - 1 else 0; self.message = f'Next {self.index}'; self.animate()
     def animate(self): pass  # a method of the artist child class that is inheriting from this class
-    def maximize_fig(self): _ = self; plt.show(); plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
+    def maximize_fig(self): _ = self; plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
     def text_info(self, event): _ = event; self.message = ''
     def update_info_text(self, message): self.message_obj.remove() if self.message_obj else None; self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
     def change_facecolor(self, event): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
-    toggle_ticks = staticmethod(lambda an_ax, state=None: [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()])
     def clear_axes(self): [ax.cla() for ax in self.ax]
     def get_fig(self, figname='', suffix=None, **kwargs): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
     def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
-    set_ax_to_real_life_size = staticmethod(lambda ax, inch_per_unit=1 / 25.4: FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit))
     def close(self): plt.close(self.fig)
     def show_help(self, event):
         _ = event
@@ -153,7 +151,7 @@ class FigureManager:  # Handles figures of matplotlib."""
     def show_cursor(self, event):
         ax = event.inaxes
         if ax:  # don't do this if c was pressed outside an axis.
-            if hasattr(ax, 'cursor_'):  # is this the first time_produced?
+            if hasattr(ax, 'cursor_'):  # is this the first time?
                 if ax.cursor_ is None: ax.cursor_ = widgets.Cursor(ax=ax, vertOn=True, horizOn=True, color='red', lw=1.0)
                 else: ax.cursor_ = None  # toggle the cursor.
                 self.message = f'Cursor flag set to {bool(ax.cursor_)}'
@@ -168,6 +166,10 @@ class FigureManager:  # Handles figures of matplotlib."""
                 self.toggle_ticks(axis)
                 self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
         else: [self.toggle_ticks(ax) for ax in self.ax]
+    @staticmethod
+    def toggle_ticks(an_ax, state=None): [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
+    @staticmethod
+    def set_ax_to_real_life_size(ax, inch_per_unit=1 / 25.4): FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
     @staticmethod
     def show_pixels_values(ax):
         xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
@@ -263,7 +265,7 @@ class FigureSave:
         Limitation of ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc."""
         def __init__(self, interval=100, **kwargs):
             super().__init__(**kwargs); from collections import defaultdict
-            self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time_produced.
+            self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time.
         def _save(self, afigure, aname, cla=False, **kwargs):
             fig_list, subcontainer = self.container[afigure.get_label()], []
             for item in FigureManager.findobj(afigure, 'neo'): item.set_label('processed'); item.set_visible(False); subcontainer += [item]
@@ -308,7 +310,7 @@ class FigureSave:
             self.data_gen, self.saver, self.plotter = None, None, None
         def animate(self):
             self.data_gen = lambda: (i for i in zip(*self.data))
-            self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs); plt.pause(0.5)  # give time_produced for figures to show up before updating them
+            self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs); plt.pause(0.5)  # give time for figures to show up before updating them
             for idx, datum in __import__("tqdm").tqdm(enumerate(self.data_gen())): self.plotter.animate(datum); self.saver.add(names=[self.names_list[idx]])
             self.saver.finish()
     class GIFAuto(GenericAuto):
@@ -318,7 +320,7 @@ class FigureSave:
             if extension == 'gif': writer = animation.PillowWriter(fps=fps)
             elif extension == 'mp4': writer = animation.FFMpegWriter(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=2500)
             self.gen = (i for i in zip(*self.data))
-            self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs); plt.pause(self.delay * 0.001)  # give time_produced for figures to show up before updating them
+            self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
             # noinspection PyTypeChecker
             self.ani = animation.FuncAnimation(self.plotter.fig, self.plotter.animate, frames=self.gen, interval=interval, repeat_delay=1500, fargs=None, cache_frame_data=True, save_count=10000)
             self.fname = f"{os.path.join(self.save_dir, self.save_name)}.{extension}"
@@ -340,7 +342,7 @@ class FigureSave:
             self.fname = os.path.join(self.save_dir, self.save_name + extension)
             self.data = lambda: (i for i in zip(*data))
             self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
-            plt.pause(0.5)  # give time_produced for figures to show up before updating them
+            plt.pause(0.5)  # give time for figures to show up before updating them
             from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
                 for datum in tqdm(self.data()):
@@ -413,14 +415,13 @@ class VisibilityViewerAuto(VisibilityViewer):
         The difference between this class and `VisibilityViewer` is that here the parsing of data is done internally, hence the suffix `Auto`.
         :param data: shoud be of the form [[ip1 list], [ip2 list], ...] i.e. NumArgsPerPlot x NumInputsForAnimation x Input (possible points x signals)
         :param artist: an instance of a class that subclasses `Artist`
-        :param memorize: if set to True, then axes are hidden and shown again, otherwise, plots constructed freshly every time_produced they're shown (axes are cleaned instead of hidden)
-        """
+        :param memorize: if set to True, then axes are hidden and shown again, otherwise, plots constructed freshly every time they're shown (axes are cleaned instead of hidden)"""
         self.max_index_memorized = 0
         self.fname = None
         self.data = np.array(list(zip(*data))) if transpose else data
         self.legends = [f"Curve {i}" for i in range(len(self.data))] if legends is None else legends
         self.titles = titles if titles is not None else np.arange(len(self.data))
-        if artist is None: artist = Artist(*self.data[0], title=self.titles[0], legends=self.legends, create_new_axes=True, **kwargs)
+        if artist is None: artist = Artist(*self.data[0], title=self.titles[0], **kwargs)
         else:
             artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
             if memorize: assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new axes from the artist with every plot"
@@ -435,13 +436,13 @@ class VisibilityViewerAuto(VisibilityViewer):
             if self.memorize:  # ==> plot and use .add() method
                 if self.index > self.max_index_memorized:  # a new plot never done before
                     self.hide_artist_axes()
-                    self.artist.plot(*datum, title=self.titles[i], legends=self.legends)
+                    self.artist.plot(datum, title=self.titles[i], legends=self.legends)
                     self.add(increment_index=False, hide_artist_axes=False)  # index incremented via press_key manually
                     self.max_index_memorized += 1
                 else: super().animate()  # already seen this plot before ==> use animate method of parent class to hide and show,
             else:
                 self.fig.clf()  # instead of making previous axis invisible, delete it completely.
-                self.artist.plot(*datum, title=self.titles[i], legends=self.legends)  # replot the new data point on a new axis.
+                self.artist.plot(datum, title=self.titles[i], legends=self.legends)  # replot the new data point on a new axis.
             self.saver.add()
             if self.pause: break
             else: self.index = i
@@ -487,8 +488,7 @@ class ImShow(FigureManager):
             else: self.index = i
         if self.index == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
     @staticmethod
-    def cm(im, nrows=3, ncols=7, **kwargs):  # Useful for looking at one image in multiple cmaps
-        _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
+    def try_cmaps(im, nrows=3, ncols=7, **kwargs): _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
     def annotate(self, event, axis=None, data=None): [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
     from_img_paths = staticmethod(lambda paths, **kwargs: ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs))
     from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
@@ -497,20 +497,15 @@ class ImShow(FigureManager):
 
 
 class Artist(FigureManager):
-    def __init__(self, *args, ax=None, figname='Graph', title='', label='curve', style='seaborn', create_new_axes=False, figpolicy=FigurePolicy.add_new, figsize=(7, 4), **kwargs):
+    def __init__(self, ax=None, figname='Graph', title='', label='curve', style='seaborn', figpolicy=FigurePolicy.add_new, figsize=(7, 4)):
         super().__init__(figpolicy=figpolicy)
-        self.style, self.title, self.args = style, title, args; self.line = self.cursor = self.check_b = None
+        self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
         if ax is None:  # create a figure
-            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize)
+            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = np.array([self.fig.subplots()])
         else: self.ax = ax; self.fig = ax[0].figure  # use the passed axis
-        if len(args):  # if there's something to plot in the init
-            if not ax: self.create_new_axes = True  # no ax sent but we need to plot, we need an ax, plot will soon call get_axes. # just for the first time_produced in this init method.
-            self.plot(*self.args, label=label, title=title, **kwargs)
-        elif not create_new_axes: self.create_new_axes = True; self.get_axes()  # nothing to be plotted in the init, are we going to ever create new axes?    # if not then let's create one now.
-        self.create_new_axes, self.visibility_ax, self.txt = create_new_axes, [0.01, 0.05, 0.2, 0.15], []
-    def accessorize(self, *args, legends=None, title=None, **kwargs): self.line = self.ax[0].plot(*args, **kwargs); self.ax[0].legend(legends) if legends is not None else None; self.ax[0].set_title(title) if title is not None else None; self.ax[0].grid('on')
-    def plot(self, *args, **kwargs): self.get_axes(); self.accessorize(*args, **kwargs)
-    def get_axes(self): self.ax = np.array([self.fig.subplots()]) if self.create_new_axes else self.ax
+        self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
+    def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax[0].plot(*args, **kwargs); self.ax[0].legend(legends or []); self.ax[0].set_title(title) if title is not None else None; self.ax[0].grid('on')
+    def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax[0].legend(); return self
     def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
     def visibility(self):
         from matplotlib.widgets import CheckButtons; self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
@@ -522,9 +517,8 @@ class Artist(FigureManager):
     @staticmethod
     def styler(plot_gen):
         for astyle in plt.style.available:
-            with plt.style.context(style=astyle):
-                plot_gen(); plt.title(astyle); plt.pause(1); plt.cla()
+            with plt.style.context(style=astyle): plot_gen(); plt.title(astyle); plt.pause(1); plt.cla()
 
 
 if __name__ == '__main__':
-    ImShow.test()
+    pass

@@ -1,6 +1,6 @@
 
 
-from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct, SimpleNamespace
+from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
 from crocodile.file_management import P, datetime
 import logging
 import subprocess
@@ -73,8 +73,6 @@ class Terminal:
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-    @staticmethod
-    def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
     def run(self, *cmds, shell=None, check=False, ip=None):
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
@@ -97,6 +95,8 @@ class Terminal:
         if self.machine == "win32": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
+    @staticmethod
+    def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
     @staticmethod
     def run_script(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
         """This method is a wrapper on top of `run_async" except that the command passed will launch python terminal that will run script passed by user. """
@@ -230,7 +230,7 @@ def run_cell(pointer, module=sys.modules[__name__]):
         if pointer in cell.split('\n')[0]: break  # bingo
     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
     print(cell); install_n_import("clipboard").copy(cell); return cell
-Experimental = SimpleNamespace(try_this=try_this, show_globals=show_globals, monkey_patch=monkey_patch, capture_locals=capture_locals, generate_readme=generate_readme, load_from_source_code=load_from_source_code, extract_code=extract_code, extract_arguments=extract_arguments, run_cell=run_cell)  # Debugging and Meta programming tools"""
+class Experimental: try_this = try_this; show_globals = show_globals; monkey_patch = monkey_patch; capture_locals = capture_locals; generate_readme = generate_readme; load_from_source_code = load_from_source_code; extract_code = extract_code; extract_arguments = extract_arguments; run_cell = run_cell  # Debugging and Meta programming tools"""
 
 
 if __name__ == '__main__':
