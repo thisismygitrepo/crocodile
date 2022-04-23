@@ -81,7 +81,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
-    def print(self, sep='\n', style=repr, return_str=False, **kwargs): res = sep.join([f"{idx:2}- {style(item)}" for idx, item in enumerate(self.list)]); print(str) if not return_str else None; return res if return_str else None
+    def print(self, sep='\n', style=repr, return_str=False, **kwargs): res = sep.join([f"{idx:2}- {style(item)}" for idx, item in enumerate(self.list)]); print(res) if not return_str else None; return res if return_str else None
     def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
