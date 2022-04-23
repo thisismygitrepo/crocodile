@@ -151,7 +151,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.eval(values, func=False))
     def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.eval(keys, func=False), self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
-    def __str__(self, newline=True): return as_config(self.__dict__, newline=newline)
+    def __str__(self, sep="\n"): return as_config(self.__dict__, sep=sep)
     def __getattr__(self, item) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
@@ -197,7 +197,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
 
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-def as_config(mydict, newline=True, justify=15, quotes=False): return ("\n" if newline else ", ").join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+def as_config(mydict, sep="\n", justify=15, quotes=False): return (sep).join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
 def f(str_, limit=float('inf'), justify=50, direc="<"): return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_

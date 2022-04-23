@@ -86,7 +86,7 @@ class P(type(Path()), Path):
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(path=path, content=False)); return path  # contents live within this directory.
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
-        else: slf.rename(path)  #  self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
+        else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=f"_copy_{randstr()}", overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)

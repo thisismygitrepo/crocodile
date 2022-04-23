@@ -12,7 +12,7 @@ from crocodile.core import *
 from crocodile.file_management import *
 from crocodile.meta import *
 # import crocodile.environment as env
-from crocodile.matplotlib_manager import *
+from crocodile.matplotlib_management import *
 import crocodile.toolbox as tb
 D = Display; L = List; E = Experimental; S = Struct
 

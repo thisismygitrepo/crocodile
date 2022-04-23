@@ -20,29 +20,20 @@ class Null:
 class Log(logging.Logger):  #
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0], name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
-        if name is None: print(f"Logger name not passed. It is recommended to pass a name indicating the owner."); name = randstr()
-        file_path = P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers") if (file_path is None and file is True) else (P(file_path).expanduser() if file_path is not None else None)
-        super().__init__(name=name, level=l_level)  # logs everything, finer level of control is given to its handlers
-        if dialect == "colorlog":
-            module = install_n_import("colorlog")
-            processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', })  # see here for format: https://pypi.org/project/colorlog/
+        super().__init__(name := randstr() if name is None and not print(f"Logger name not passed. It is recommended to pass a name indicating the owner.") else name, level=l_level)  # logs everything, finer level of control is given to its handlers
+        if dialect == "colorlog": module = install_n_import("colorlog"); processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', })  # see here for format: https://pypi.org/project/colorlog/
         else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
-        if file or file_path: Log.add_filehandler(self, file_path=file_path, fmt=processed_fmt, f_level=f_level)  # create file handler for the logger.
-        if stream: Log.add_streamhandler(self, s_level, fmt=processed_fmt, module=module)  # ==> create stream handler for the logger.
-        self.specs = dict(dialect=dialect, name=name, file=file, file_path=file_path, stream=stream, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # save speces that are essential to re-create the object at
-        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
-    file = property(lambda self: P(self.specs["file_path"]) if self.specs["file_path"] else None)
-    def close(self): raise NotImplementedError
-    def get_shandler(self, first=True): shandlers = List(handler for handler in self.handlers if "StreamHandler" in str(handler)); return shandlers[0] if first else shandlers
-    def get_fhandler(self, first=True): fhandlers = List(handler for handler in self.handlers if "FileHandler" in str(handler)); return fhandlers[0] if first else fhandlers
+        self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level) if file or file_path else None; self.add_streamhandler(s_level, fmt=processed_fmt, module=module) if stream else None
+        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path; self.specs = dict(dialect=dialect, file=file, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # save speces that are essential to re-create the object at
+    def get_shandler(self): return List(handler for handler in self.handlers if "StreamHandler" in str(handler))
+    def get_fhandler(self): return List(handler for handler in self.handlers if "FileHandler" in str(handler))
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
     def __setstate__(self, state): self.__dict__ = state  # this way of creating relative path makes transferrable across machines.
-    def __getstate__(self):  # logger can be pickled without this method, but its handlers are lost, so what's the point? no perfect reconstruction.
-        specs = self.__dict__['specs'].copy(); specs["file_path"] = specs["file_path"].rel2home() if specs["file_path"] is not None else None; return specs
+    def __getstate__(self): return Struct(self.__dict__['specs'].copy()).update(file_path=self.file_path.rel2home() if self.file_path is not None else None, stream=bool(self.get_shandler()), name=self.name).__dict__
     def __reduce__(self): return self.__class__, tuple(self.specs.values())
-    def __repr__(self): return "".join([f"Logger {self.specs['name']} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
+    def __repr__(self): return "".join([f"Logger {self.name} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
     get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
-    def manual_degug(self, path): _=self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+    def manual_degug(self, path): _ = self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
@@ -51,13 +42,11 @@ class Log(logging.Logger):  #
         if verbose: logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
         else: logger = Log(name=name, dialect="logging", l_level=l_level, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
         install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
-    @staticmethod
-    def add_streamhandler(logger, s_level=logging.DEBUG, fmt=None, module=logging, name="myStream"):
-        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); logger.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{logger.name}` is created.")
-    @staticmethod
-    def add_filehandler(logger, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
-        fhandler = logging.FileHandler(filename=str(file_path), mode=mode); fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); logger.addHandler(fhandler)
-        print(f"    Level {f_level} file handler for Logger `{logger.name}` is created @ " + P(file_path).clickable())
+    def add_streamhandler(self, s_level=logging.DEBUG, fmt=None, module=logging, name="myStreamHandler"):
+        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); self.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{self.name}` is created.")
+    def add_filehandler(self, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
+        fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger", suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
+        fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename; print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self):
         self.debug("this is a debugging message"); self.info("this is an informational message"); self.warning("this is a warning message")
         self.error("this is an error message"); self.critical("this is a critical message"); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
@@ -168,7 +157,7 @@ class SSH(object):
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
-        if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True)))
+        if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True))); _ = pwd
         if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
         print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
         remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
@@ -183,7 +172,7 @@ class Scheduler:
         self.other_routine = (lambda: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
         self.logger, self.exception_handler = logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
-        self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or ([], lambda sched:[])
+        self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or ([], lambda sched: [])
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
@@ -195,9 +184,9 @@ class Scheduler:
             try: __import__("time").sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
         else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
-    def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + self.sess_stats[0])
-    def record_session_end(self, reason="Not passed."):
-        self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file] + (tracking := self.sess_stats[1](sched=self)))
+    def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats[0]))
+    def record_session_end(self, reason="Not passed to function."):
+        self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file] + list((tracking := self.sess_stats[1](sched=self))))
         summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait} seconds", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file}
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(dict(zip(self.sess_stats[0], tracking))).print(config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
     def _handle_exceptions(self, ex, during):
@@ -229,7 +218,7 @@ def extract_code(func, code: str = None, include_args=True, verbose=True, copy2c
     raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
     code_string = '\n'.join([aline if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") for aline in lines])  # remove return statements if there else keep line as is.
     title, args_header, injection_header, body_header, suffix = ((f"\n# " + f"{item} {func.__name__}".center(50, "=") + "\n") for item in ["CODE EXTRACTED FROM", "ARGS KWARGS OF", "INJECTED CODE INTO", "BODY OF", "BODY END OF"])
-    code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix # added later so it has more overwrite authority.
+    code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix  # added later so it has more overwrite authority.
     install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
 def extract_arguments(func, copy2clipboard=False, **kwargs):
     ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and kwargs.
@@ -241,7 +230,7 @@ def run_cell(pointer, module=sys.modules[__name__]):
         if pointer in cell.split('\n')[0]: break  # bingo
     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
     print(cell); install_n_import("clipboard").copy(cell); return cell
-Experimental = SimpleNamespace(try_this=try_this, show_globals=show_globals, monkey_patch=monkey_patch, capture_locals=capture_locals, generate_readme=generate_readme, load_from_source_code=load_from_source_code, extract_code=extract_code,extract_arguments=extract_arguments, run_cell=run_cell)  # Debugging and Meta programming tools"""
+Experimental = SimpleNamespace(try_this=try_this, show_globals=show_globals, monkey_patch=monkey_patch, capture_locals=capture_locals, generate_readme=generate_readme, load_from_source_code=load_from_source_code, extract_code=extract_code, extract_arguments=extract_arguments, run_cell=run_cell)  # Debugging and Meta programming tools"""
 
 
 if __name__ == '__main__':
