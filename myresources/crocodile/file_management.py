@@ -14,9 +14,7 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
     salt = None  # silence the linter.
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
-        if salted: import secrets; salt, iteration = secrets.token_bytes(16), iteration or secrets.randbelow(1_000_000)
-        else: salt, iteration = None, None
-        key = pwd2key(pwd, salt, iteration)
+        salt, iteration = (__import__('secrets').token_bytes(16), iteration or __import__('secrets').randbelow(1_000_000)) if salted else (None, None); key = pwd2key(pwd, salt, iteration)
     elif key is None: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); print(f"KEY SAVED @ {repr(P.tmpdir().joinpath('key.bytes').write_bytes(key))}")  # discouraged, make your keys/pwd before invoking the func. use random bytes, more secure but no string representation
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
@@ -27,8 +25,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
     if pwd is not None:
         assert key is None, f"You can either pass key or pwd, or none of them, but not both."
         if salted:
-            decoded = __import__("base64").urlsafe_b64decode(token)
-            salt, iterations, token = decoded[:16], decoded[16:20], __import__("base64").urlsafe_b64encode(decoded[20:])
+            decoded = __import__("base64").urlsafe_b64decode(token); salt, iterations, token = decoded[:16], decoded[16:20], __import__("base64").urlsafe_b64encode(decoded[20:])
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
         else: key = pwd2key(pwd)
     if type(key) is bytes: pass   # passsed explicitly
@@ -43,19 +40,16 @@ def read(path, **kwargs):
     except AttributeError:
         if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
         raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`")
-def mat(path, remove_meta=False, **kwargs):
-    res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs))
-    if remove_meta: List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x))
-    return res
 def json(path, r=False, **kwargs):
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
     return Struct.recursive_struct(mydict) if r else Struct(mydict)
 def yaml(path, r=False):
-    import yaml
-    with open(str(path), "r") as file: mydict = yaml.load(file, Loader=yaml.FullLoader)
+    import yaml as yaml_
+    with open(str(path), "r") as file: mydict = yaml_.load(file, Loader=yaml_.FullLoader)
     return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
+def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
 def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
 def py(path): return Struct(__import__("runpy").run_path(path))

@@ -112,8 +112,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
             print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss:1.3f}, Test Loss = {test_loss[0]:1.3f}')
 
         self.history.append({'loss': train_losses, 'val_loss': test_losses})
-        if plot:
-            self.plot_loss()
+        if plot: self.plot_loss()
 
     def train_step(self, batch):
         x, y = batch
@@ -154,8 +153,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
 
 
 class ImagesModel(PTBaseModel):
-    def __init__(self, *args):
-        super(ImagesModel, self).__init__(*args)
+    def __init__(self, *args): super(ImagesModel, self).__init__(*args)
 
     # @tb.batcher(func_type='method')
     def preprocess(self, images):

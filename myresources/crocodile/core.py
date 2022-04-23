@@ -197,7 +197,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
 
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-def as_config(mydict, sep="\n", justify=15, quotes=False): return (sep).join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+def as_config(mydict, sep="\n", justify=15, quotes=False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
 def f(str_, limit=float('inf'), justify=50, direc="<"): return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_

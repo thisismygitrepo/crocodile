@@ -169,12 +169,6 @@ class DataReader(tb.Base):
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=False, return_str=True)
 
     def split_the_data(self, *args, strings=None, **kwargs):
-        """
-        :param args: whatever to be sent to train_test_split
-        :param kwargs: whatever to be sent to train_test_split
-        :param strings:
-        :return:
-        """
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = tb.Struct(train_loader=None, test_loader=None)
@@ -192,7 +186,7 @@ class DataReader(tb.Base):
         res1 = selection or np.random.choice(len(self.split[keys[0]]), size=self.hp.batch_size, replace=False)
         res2 = selection or slice(0, self.hp.batch_size)
         selection = res1 if use_default_slice is False and (indices or aslice) is None else (res1 if indices is not None else res2)
-        return tuple([tmp.iloc[selection] if type(tmp:=self.split[key]) is pd.DataFrame else tmp[selection] for key in keys])
+        return tuple([tmp.iloc[selection] if type(tmp := self.split[key]) is pd.DataFrame else tmp[selection] for key in keys])
 
     def get_random_input_output(self, ip_shape=None, op_shape=None):
         if ip_shape is None: ip_shape = self.specs.ip_shape

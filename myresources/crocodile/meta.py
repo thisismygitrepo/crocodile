@@ -21,10 +21,10 @@ class Log(logging.Logger):  #
     def __init__(self, dialect=["colorlog", "logging", "coloredlogs"][0], name=None, file: bool = False, file_path=None, stream=True, fmt=None, sep=" | ",
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
         super().__init__(name := randstr() if name is None and not print(f"Logger name not passed. It is recommended to pass a name indicating the owner.") else name, level=l_level)  # logs everything, finer level of control is given to its handlers
+        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path; self.specs = dict(dialect=dialect, file=file, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # save speces that are essential to re-create the object at
         if dialect == "colorlog": module = install_n_import("colorlog"); processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', })  # see here for format: https://pypi.org/project/colorlog/
         else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
         self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level) if file or file_path else None; self.add_streamhandler(s_level, fmt=processed_fmt, module=module) if stream else None
-        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path; self.specs = dict(dialect=dialect, file=file, fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # save speces that are essential to re-create the object at
     def get_shandler(self): return List(handler for handler in self.handlers if "StreamHandler" in str(handler))
     def get_fhandler(self): return List(handler for handler in self.handlers if "FileHandler" in str(handler))
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
@@ -167,7 +167,7 @@ class SSH(object):
 
 
 class Scheduler:
-    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger=None, sess_stats=None):
+    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats: tuple = None):
         self.routine = (lambda: None) if routine is None else routine  # main routine to be repeated every `wait` time period
         self.other_routine = (lambda: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
@@ -186,8 +186,8 @@ class Scheduler:
         else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
     def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats[0]))
     def record_session_end(self, reason="Not passed to function."):
-        self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file] + list((tracking := self.sess_stats[1](sched=self))))
-        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait} seconds", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file}
+        self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((tracking := self.sess_stats[1](sched=self))))
+        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait} seconds", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(dict(zip(self.sess_stats[0], tracking))).print(config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
