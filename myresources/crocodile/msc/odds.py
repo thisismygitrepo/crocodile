@@ -28,6 +28,7 @@ def pomodoro(work=25, rest=5, repeats=4):
         except ImportError: __import__("os").system('beep -f %s -l %s' % (frequency, 1000 * duration))
         else: winsound.Beep(frequency, 1000 * duration)
     return Scheduler(routine=loop, max_cycles=repeats, logger=logger, wait="0.1m").run()
+
 class Cycle:
     def __init__(self, iterable=None): self.list = iterable; self.index = -1
     def next(self): self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index; return self.list[self.index]

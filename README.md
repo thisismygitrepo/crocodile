@@ -55,7 +55,11 @@ import crocodile.toolbox as tb
 
 
 # A Taste of Power
-Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.
+EX1: Get a list of `.exe` available in terminal.
+
+     tb.P.env().Path.search('*.exe').reduce(lambda x, y: x+y).print()
+
+EX2: Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.
 
 
 To achieve this, all you need is an eminently readable one-liner.

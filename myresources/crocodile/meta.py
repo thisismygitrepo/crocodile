@@ -194,10 +194,11 @@ class Scheduler:
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); raise ex
 
 
-def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
+def try_this(func, return_=None, raise_=None, run=None, handle=None, trace=False, **kwargs):
     try: return func()
     except BaseException as ex:  # or Exception
         if raise_ is not None: raise raise_
+        if trace is True: import pdb; pdb.set_trace()  # TODO see how IPYthon teleports to last step before error.
         if handle is not None: return handle(ex, **kwargs)
         return run() if run is not None else return_
 def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
