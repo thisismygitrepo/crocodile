@@ -159,10 +159,8 @@ class SSH(object):
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True))); _ = pwd
         if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
-        print("\n" * 3, f"Creating Target directory {target} @ remote machine.".center(80, "="))
-        remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
-        print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="), "\n" * 2)
-        self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
+        print("\n" * 3, f"Creating Target directory `{target}` @ remote machine.".center(80, "=")); remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
+        print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="), "\n" * 2); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
         if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)"""); source.delete(sure=True); return resp
 
 
@@ -194,11 +192,10 @@ class Scheduler:
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); raise ex
 
 
-def try_this(func, return_=None, raise_=None, run=None, handle=None, trace=False, **kwargs):
+def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
     try: return func()
     except BaseException as ex:  # or Exception
         if raise_ is not None: raise raise_
-        if trace is True: import pdb; pdb.set_trace()  # TODO see how IPYthon teleports to last step before error.
         if handle is not None: return handle(ex, **kwargs)
         return run() if run is not None else return_
 def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)

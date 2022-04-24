@@ -39,19 +39,17 @@ CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
                                               'drawclosedpath',
                                               'drawcircle',
                                               'drawrect',
-                                              'eraseshape'
-                                              ]
+                                              'eraseshape']
                          )
 
 
 class App:
     @staticmethod
     def run(app, debug=False, random_port=True):
-        """"Random ports prevent multile programs from crashing into each other."""
         host = "127.0.0.1"
-        port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"
+        port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
-        tb.P(rf'http://{host}:{port}/')()
+        tb.P(rf'http://{host}:{port}/')
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod
@@ -71,8 +69,7 @@ class App:
         return tm.run_async("python", "-c", cmd)
 
     @staticmethod
-    def run_async_decorator(func):
-        """Decorate functions with this to make them run_command asynchornously."""
+    def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
         def get_async_version(): return App.run_async(func)
         return get_async_version
 

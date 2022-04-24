@@ -21,15 +21,9 @@ class FigureManager:  # Handles figures of matplotlib."""
     def __init__(self, info_loc=None, figpolicy=FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
-        self.cmaps = Cycle(plt.colormaps())
-        self.mcolors = list(mcolors.CSS4_COLORS.keys())
-        self.facecolor = Cycle(list(mcolors.CSS4_COLORS.values()))
-        self.colors = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+        self.cmaps, self.colors, self.mcolors, self.facecolor = Cycle(plt.colormaps()), Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color']), list(mcolors.CSS4_COLORS.keys()), Cycle(list(mcolors.CSS4_COLORS.values()))
         self.cmaps.set('viridis')
-        self.index = self.pause = self.index_max = None
-        self.auto_brightness = False
-        self.info_loc = [0.8, 0.01] if info_loc is None else info_loc
-        self.pix_vals = False
+        self.index = self.pause = self.index_max = None  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
                           "/": {'help': 'Show/Hide info text', 'func': self.text_info},
                           "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
@@ -42,21 +36,35 @@ class FigureManager:  # Handles figures of matplotlib."""
                           'S': {'help': 'Save Object', 'func': self.save},
                           'c': {'help': 'Show/Hide cursor', 'func': self.show_cursor},
                           'aA': {'help': 'Show/Hide ticks and their labels', 'func': self.show_ticks},
-                          'alt+a': {'help': 'Show/Hide annotations', 'func': self.toggle_annotate}}
-        # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before, otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
+                          'alt+a': {'help': 'Show/Hide annotations', 'func': self.toggle_annotate}}  # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before, otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
+        self.auto_brightness, self.pix_vals = False, False; self.boundaries_flag, self.annot_flag = True, False
+        self.info_loc = [0.8, 0.01] if info_loc is None else info_loc
         self.message, self.message_obj, self.cursor = '', None, None
-        self.boundaries_flag, self.annot_flag = True, False  # one flag for all axes?
+    def connect(self): self.fig.canvas.mpl_connect('key_press_event', self.process_key)
+    def process_key(self, event):
+        self.event = event  # useful for debugging.
+        for key in self.help_menu.keys():
+            if event.key in key: self.help_menu[key]['func'](event); break
+        self.update_info_text(self.message)
+        if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
+    def show_help(self, event):
+        _ = event
+        default_plt = {"q ": {'help': "Quit Figure."},
+                       "Ll": {'help': "change x/y scale to log and back to linear (toggle)"},
+                       "Gg": {'help': "Turn on and off x and y grid respectively."},
+                       "s ": {'help': "Save Figure"},
+                       "f ": {'help': "Toggle Full screen"},
+                       "p ": {'help': "Select / Deselect Pan"}}
+        figs = plt.get_figlabels()
+        if "Keyboard shortcuts" in figs: plt.close("Keyboard shortcuts")  # toggle
+        else:
+            fig = plt.figure(num="Keyboard shortcuts")
+            for i, key in enumerate(self.help_menu.keys()): fig.text(0.1, 1 - 0.05 * (i + 1), f"{key:30s} {self.help_menu[key]['help']}")
+            print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']))
+            print(f"\nDefault plt Keys:\n")
+            print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
     @staticmethod
     def grid(ax, factor=5, x_or_y='both', color='gray', alpha1=0.5, alpha2=0.25):
-        """
-        :param ax: Axis object from matplotlib
-        :param factor: number of major divisions.
-        :param x_or_y: which axis to grid.
-        :param color: grid color
-        :param alpha1: transparancy for x axis grid.
-        :param alpha2: transparancy for y axis grid.
-        :return:
-        """
         if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]  # Turning on major grid for both axes.
         ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
         if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(plt.MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
@@ -67,9 +75,8 @@ class FigureManager:  # Handles figures of matplotlib."""
     def annotate(self, event, axis=None, data=None):
         self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
         if not ax: return None
-        if not hasattr(ax, 'annot_obj'):  # first time
-            ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
-                                       va="bottom", ha="left", fontsize=10, bbox=dict(boxstyle="round", fc="w"), )
+        if not hasattr(ax, 'annot_obj'): ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
+                                                                    va="bottom", ha="left", fontsize=10, bbox=dict(boxstyle="round", fc="w"), )
         else: ax.annot_obj.set_visible(self.annot_flag)
         x, y = int(np.round(e.xdata)), int(np.round(e.ydata))
         z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
@@ -88,40 +95,20 @@ class FigureManager:  # Handles figures of matplotlib."""
     def get_fig(self, figname='', suffix=None, **kwargs): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
     def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
     def close(self): plt.close(self.fig)
-    def show_help(self, event):
-        _ = event
-        default_plt = {"q ": {'help': "Quit Figure."},
-                       "Ll": {'help': "change x/y scale to log and back to linear (toggle)"},
-                       "Gg": {'help': "Turn on and off x and y grid respectively."},
-                       "s ": {'help': "Save Figure"},
-                       "f ": {'help': "Toggle Full screen"},
-                       "p ": {'help': "Select / Deselect Pan"}}
-        figs = plt.get_figlabels()
-        if "Keyboard shortcuts" in figs: plt.close("Keyboard shortcuts")  # toggle
-        else:
-            fig = plt.figure(num="Keyboard shortcuts")
-            for i, key in enumerate(self.help_menu.keys()): fig.text(0.1, 1 - 0.05 * (i + 1), f"{key:30s} {self.help_menu[key]['help']}")
-            print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']))
-            print(f"\nDefault plt Keys:\n")
-            print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
     def adjust_brightness(self, event):
-        ax = event.inaxes
-        if ax is not None and ax.images:
-            message = 'None'
-            if event.key == '\\':
-                self.auto_brightness = not self.auto_brightness
-                message = f"Auto-brightness flag is set to {self.auto_brightness}"
-                if self.auto_brightness:  # this change is only for the current image.
-                    im = self.ax.images[0]
-                    im.norm.autoscale(im.get_array())  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
-            vmin, vmax = ax.images[0].get_clim()
-            if event.key in '-_': message = 'increase vmin'; vmin += 1
-            elif event.key in '[{': message = 'decrease vmin'; vmin -= 1
-            elif event.key in '=+': message = 'increase vmax'; vmax += 1
-            elif event.key in ']}': message = 'decrease vmax'; vmax -= 1
-            self.message = message + '  ' + str(round(vmin, 1)) + '  ' + str(round(vmax, 1))
-            if event.key in '_+}{': [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
-            else: ax.images[0].set_clim((vmin, vmax)) if ax.images else None
+        ax, message = event.inaxes, "None"
+        if ax is None or not ax.images: return None
+        if event.key == '\\':
+            self.auto_brightness = not self.auto_brightness; message = f"Auto-brightness flag is toggled to {self.auto_brightness}"
+            if self.auto_brightness: im = self.ax.images[0]; im.norm.autoscale(im.get_array())  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
+        vmin, vmax = ax.images[0].get_clim()
+        if event.key in '-_': message = 'increase vmin'; vmin += 1
+        elif event.key in '[{': message = 'decrease vmin'; vmin -= 1
+        elif event.key in '=+': message = 'increase vmax'; vmax += 1
+        elif event.key in ']}': message = 'decrease vmax'; vmax -= 1
+        self.message = message + '  ' + str(round(vmin, 1)) + '  ' + str(round(vmax, 1))
+        if event.key in '_+}{': [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
+        else: ax.images[0].set_clim((vmin, vmax)) if ax.images else None
     def change_cmap(self, event):
         if ax := event.inaxes is not None:
             cmap = self.cmaps.next() if event.key in 'tT' else self.cmaps.previous()
@@ -129,17 +116,10 @@ class FigureManager:  # Handles figures of matplotlib."""
             self.message = f"Color map changed to {ax.images[0].cmap.name}"
     def show_pix_val(self, event):
         if ax := event.inaxes is not None:
-            self.pix_vals = not self.pix_vals  # toggle
-            self.message = f"Pixel values flag set to {self.pix_vals}"
+            self.pix_vals = not self.pix_vals; self.message = f"Pixel values flag set to {self.pix_vals}"
             if self.pix_vals: self.show_pixels_values(ax)
             else:
                 while len(ax.texts) > 0: [text.remove() for text in ax.texts]
-    def process_key(self, event):
-        self.event = event  # useful for debugging.
-        for key in self.help_menu.keys():
-            if event.key in key: self.help_menu[key]['func'](event); break
-        self.update_info_text(self.message)
-        if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
     @staticmethod
     def get_nrows_ncols(num_plots, nrows=None, ncols=None):
         if not nrows and not ncols:
@@ -149,22 +129,15 @@ class FigureManager:  # Handles figures of matplotlib."""
         elif not nrows and ncols: nrows = int(np.ceil(num_plots / ncols))
         return nrows, ncols
     def show_cursor(self, event):
-        ax = event.inaxes
-        if ax:  # don't do this if c was pressed outside an axis.
-            if hasattr(ax, 'cursor_'):  # is this the first time?
-                if ax.cursor_ is None: ax.cursor_ = widgets.Cursor(ax=ax, vertOn=True, horizOn=True, color='red', lw=1.0)
-                else: ax.cursor_ = None  # toggle the cursor.
-                self.message = f'Cursor flag set to {bool(ax.cursor_)}'
-            else:  # first call
-                ax.cursor_ = None
-                self.show_cursor(event)
+        if not (ax := event.inaxes): return None  # don't do this if c was pressed outside an axis.
+        if hasattr(ax, 'cursor_'):  # is this the first time?
+            if ax.cursor_ is None: ax.cursor_ = widgets.Cursor(ax=ax, vertOn=True, horizOn=True, color='red', lw=1.0)
+            else: ax.cursor_ = None  # toggle the cursor.
+            self.message = f'Cursor flag set to {bool(ax.cursor_)}'
+        else: ax.cursor_ = None; self.show_cursor(event)  # first call
     def show_ticks(self, event):
         self.boundaries_flag = not self.boundaries_flag
-        axis = event.inaxes
-        if event.key == 'a':
-            if axis:  # event.inaxes.axis(['off', 'on'][self.boundaries_flag])
-                self.toggle_ticks(axis)
-                self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
+        if event.key == 'a' and (axis := event.inaxes): self.toggle_ticks(axis); self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
         else: [self.toggle_ticks(ax) for ax in self.ax]
     @staticmethod
     def toggle_ticks(an_ax, state=None): [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
@@ -175,13 +148,7 @@ class FigureManager:  # Handles figures of matplotlib."""
         xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
         if ymin > ymax: ymin, ymax = ymax, ymin  # default imshow settings
         [ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8) for (j, i), label in np.ndenumerate(ax.images[0].get_array()) if (xmin < i < xmax) and (ymin < j < ymax)]
-    @staticmethod
-    def update(figname, obj_name, data=None):
-        """Fastest update ever. But, you need access to label path.
-        Using this function external to the plotter. But inside the plotter you need to define labels to objects
-        The other alternative is to do the update inside the plotter, but it will become very verbose.
-        """
-        if data is not None: FigureManager.findobj(figname, obj_name).set_data(data)
+    # def update(figname, obj_name, data): FigureManager.findobj(figname, obj_name).set_data(data)
     @staticmethod
     def findobj(figname, obj_name):
         search_results = (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)

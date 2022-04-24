@@ -27,7 +27,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
         if salted:
             decoded = __import__("base64").urlsafe_b64decode(token); salt, iterations, token = decoded[:16], decoded[16:20], __import__("base64").urlsafe_b64encode(decoded[20:])
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
-        else: key = pwd2key(pwd)
+        else: key = pwd2key(pwd)  # trailing `;` prevents IPython from caching the result.
     if type(key) is bytes: pass   # passsed explicitly
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
@@ -101,13 +101,10 @@ class P(type(Path()), Path):
         except IOError: raise IOError
     def start(self, opener=None):
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
-        if __import__("sys").platform == "win32":
-            if opener is None: tmp = f"powershell start '{self.expanduser().resolve().str}'"  # double quotes fail with cmd.
-            else: tmp = rf'powershell {opener} \'{self}\''  # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
-            __import__("subprocess").Popen(tmp)  # fails for folders. Start must be passed, but is not defined.
-        elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str])  # works for files and folders alike
-        else:  __import__("subprocess").call(["open", self.expanduser().resolve().str])  # works for files and folders alike  # mac
-        return self
+        if __import__("sys").platform == "win32":  # double quotes fail with cmd. # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            __import__("subprocess").Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
+        elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
+        else:  __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
     def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Fridge(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
@@ -139,17 +136,14 @@ class P(type(Path()), Path):
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
         `orig`: whether the method returns the original path object or a new one."""
     def prepend(self, prefix, suffix=None, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
-    def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + name + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)
-    def append_time_stamp(self, fmt=None, **kwargs): return self._return(self.append(name="_" + timestamp(fmt=fmt)), operation="rename", **kwargs)
+    def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + (name or "_" + timestamp()) + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)
     def with_trunk(self, name, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", **kwargs)  # Complementary to `with_stem` and `with_suffix`
     def with_name(self, name, verbose=True, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
     def switch(self, key: str, val: str, **kwargs): return self._return(P(str(self).replace(key, val)), operation="rename", **kwargs)  # Like string replce method, but `replace` is an already defined method."""
     def switch_by_index(self, idx: int, val: str, **kwargs): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", **kwargs)
     # ============================= attributes of object ======================================
     trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
-    len = property(lambda self: self.__len__())
-    str = property(lambda self: str(self))  # or self._str
-    items = property(lambda self: List(self.parts))
+    len = property(lambda self: self.__len__()); items = property(lambda self: List(self.parts)); str = property(lambda self: str(self))  # or self._str
     def __len__(self): return len(self.parts)
     def __contains__(self, item): return item in self.parts
     def __iter__(self): return self.parts.__iter__()
@@ -318,7 +312,7 @@ def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
     with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
         jungle_zip.setpassword(pwd=password) if password is not None else None
         jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
-    return op_path
+    return P(op_path)
 def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
     with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
         if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
@@ -327,13 +321,13 @@ def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
 def gz(file, op_file):
     with open(file, 'rb') as f_in:
         with __import__("gzip").open(op_file, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
-    return op_file
+    return P(op_file)
 def ungz(self, op_path=None):
     with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
 def tar(self, op_path):
     with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(self), arcname=__import__("os").path.basename(str(self)))
-    return op_path
+    return P(op_path)
 def untar(self, op_path, fname=None, mode='r', **kwargs):
     with __import__("tarfile").open(str(self), mode) as file:
         if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
@@ -358,7 +352,6 @@ class Fridge:  # This class helps to accelrate access to latest data coming from
         self.time_produced = None
         self.save, self.reader, self.logger, self.expire = save, reader, logger, expire
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
-    def reset(self): self.time_produced = datetime.now()
     def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     def __getstate__(self): state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh=False):
