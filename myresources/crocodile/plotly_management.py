@@ -49,7 +49,7 @@ class App:
         host = "127.0.0.1"
         port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
-        tb.P(rf'http://{host}:{port}/')
+        tb.P(rf'http://{host}:{port}/')()
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod

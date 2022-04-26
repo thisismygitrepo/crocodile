@@ -1,14 +1,19 @@
 
-import enum
-import matplotlib.pyplot as plt
+
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name
 from crocodile.file_management import P
-import os
-import pandas as pd
-import numpy as np
+import matplotlib.pyplot as plt
 from crocodile.msc.odds import Cycle
 from matplotlib import widgets
 import matplotlib.colors as mcolors
+import enum
+import os
+import pandas as pd
+import numpy as np
+
+
+"""TODO: add implementation https://github.com/gustavovelascoh/plot_update
+"""
 
 
 class FigurePolicy(enum.Enum):
@@ -40,29 +45,25 @@ class FigureManager:  # Handles figures of matplotlib."""
         self.auto_brightness, self.pix_vals = False, False; self.boundaries_flag, self.annot_flag = True, False
         self.info_loc = [0.8, 0.01] if info_loc is None else info_loc
         self.message, self.message_obj, self.cursor = '', None, None
-    def connect(self): self.fig.canvas.mpl_connect('key_press_event', self.process_key)
-    def process_key(self, event):
-        self.event = event  # useful for debugging.
-        for key in self.help_menu.keys():
-            if event.key in key: self.help_menu[key]['func'](event); break
-        self.update_info_text(self.message)
-        if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
     def show_help(self, event):
-        _ = event
         default_plt = {"q ": {'help': "Quit Figure."},
                        "Ll": {'help': "change x/y scale to log and back to linear (toggle)"},
                        "Gg": {'help': "Turn on and off x and y grid respectively."},
                        "s ": {'help': "Save Figure"},
                        "f ": {'help': "Toggle Full screen"},
                        "p ": {'help': "Select / Deselect Pan"}}
-        figs = plt.get_figlabels()
-        if "Keyboard shortcuts" in figs: plt.close("Keyboard shortcuts")  # toggle
+        if "Keyboard shortcuts" in plt.get_figlabels(): plt.close("Keyboard shortcuts")  # toggle
         else:
             fig = plt.figure(num="Keyboard shortcuts")
             for i, key in enumerate(self.help_menu.keys()): fig.text(0.1, 1 - 0.05 * (i + 1), f"{key:30s} {self.help_menu[key]['help']}")
-            print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']))
-            print(f"\nDefault plt Keys:\n")
+            print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']), "\nDefault plt Keys:\n")
             print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
+    def connect(self): self.fig.canvas.mpl_connect('key_press_event', self.process_key)
+    def process_key(self, event):
+        self.event = event  # useful for debugging.
+        for key in self.help_menu.keys():
+            if event.key in key: self.help_menu[key]['func'](event); self.update_info_text(self.message); break
+        if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
     @staticmethod
     def grid(ax, factor=5, x_or_y='both', color='gray', alpha1=0.5, alpha2=0.25):
         if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]  # Turning on major grid for both axes.
@@ -115,7 +116,7 @@ class FigureManager:  # Handles figures of matplotlib."""
             [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axe] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
             self.message = f"Color map changed to {ax.images[0].cmap.name}"
     def show_pix_val(self, event):
-        if ax := event.inaxes is not None:
+        if (ax := event.inaxes) is not None:
             self.pix_vals = not self.pix_vals; self.message = f"Pixel values flag set to {self.pix_vals}"
             if self.pix_vals: self.show_pixels_values(ax)
             else:
@@ -463,16 +464,17 @@ class ImShow(FigureManager):
     resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import("skimage").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
 
 
-class Artist(FigureManager):
+class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
     def __init__(self, ax=None, figname='Graph', title='', label='curve', style='seaborn', figpolicy=FigurePolicy.add_new, figsize=(7, 4)):
         super().__init__(figpolicy=figpolicy)
         self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
         if ax is None:  # create a figure
-            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = np.array([self.fig.subplots()])
-        else: self.ax = ax; self.fig = ax[0].figure  # use the passed axis
+            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
+        else: self.ax = ax; self.fig = ax.figure  # use the passed axis
         self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
-    def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax[0].plot(*args, **kwargs); self.ax[0].legend(legends or []); self.ax[0].set_title(title) if title is not None else None; self.ax[0].grid('on')
-    def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax[0].legend(); return self
+    def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
+    def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); return self
+    def plot_twin(self, c1, c2, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2] , [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
     def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
     def visibility(self):
         from matplotlib.widgets import CheckButtons; self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)

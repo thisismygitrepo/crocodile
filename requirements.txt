@@ -6,11 +6,10 @@ pandas
 matplotlib
 
 # Accessories
-# h5py
 joblib  # multitasking
-pip
+pip  # package management.
 setuptools  # for packaging
-wheel
+wheel  # for packaging
 twine  # for pushing package to pypi.org
 pytest  # popular alternative to builtint unittest
 ipython  # interactive python
@@ -24,9 +23,7 @@ cryptography  # for encoding
 paramiko  # for SSH
 requests  # interacting with web
 pyyaml  # storing yaml files.
-cycler
 
-scikit-image  # image processing.  heavy weight library.
-
+# scikit-image  # image processing.  heavy weight library.
 # torch  # for deep learning
 # tensorflow  # for deep learning
