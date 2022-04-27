@@ -308,15 +308,9 @@ class FigureSave:
             elif _type == 'MPEGPipeBasedAuto': from matplotlib.animation import FFMpegWriter as Writer; extension = '.mp4'
             self.saver = Writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
             self.fname = os.path.join(self.save_dir, self.save_name + extension)
-            self.data = lambda: (i for i in zip(*data))
-            self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs)
-            plt.pause(0.5)  # give time for figures to show up before updating them
-            from tqdm import tqdm
+            self.data = lambda: (i for i in zip(*data)); self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs); plt.pause(0.5); from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
-                for datum in tqdm(self.data()):
-                    self.plotter.animate(datum)
-                    self.saver.grab_frame()
-                    plt.pause(self.delay * 0.001)
+                for datum in tqdm(self.data()): self.plotter.animate(datum); self.saver.grab_frame(); plt.pause(self.delay * 0.001)
             print(f"SAVED GIF successfully @ {self.fname}")
     class GIFPipeBasedAuto(GIFFileBasedAuto):
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
@@ -326,54 +320,18 @@ class FigureSave:
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
 
-class VisibilityViewer(FigureManager):
-    artist = ['internal', 'external'][1]
-    parser = ['internal', 'external'][1]
-    stream = ['clear', 'accumulate', 'update'][1]
-    """
-    **Viewer Building Philosophy**: 
-    Viewer should act as Saver and Browser:
-    * How is the data viewed:
-        * Can either be an artist himself, as in ImShow.
-        * external artist is required to view the data (especially non image data)
-    * Data parsing:
-        * internal for loop to go through all the dataset passed. # Allows manual control over parsing.
-        * external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
-    * Streaning (Refresh mechanism):
-        * Clear the axis. (slowest, but easy on memory)
-        * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)
-        * The artist has an update method. (best)
-    The artist has to have:    
-        * fig, ax, txt attributes. ax and txt should be lists.
-        * the ax and txt attributes should always belong to the same figure.
-    Here and in all Visibility classes, the artist is assumed to be always creating new axes along the way.
-    """
-    def __init__(self, artist=None, hide_artist_axes=True):
-        """
-        This class works on hiding axes shown on a plot, so that a new plot can be drawn. Hiding is done via the method `add`. Thus, an external loop is required to parse through the plots one by one.
-        Once the entire loop is finished, you can browse through the plots with the keyboard Animation is done bia method `animate`
-        :param artist: A class that draws on one figure. It should have `.fig` attribute. Can either be passed during instantiation, or everytime when `add` is called.
-        :param hide_artist_axes: """
-        super().__init__()
-        self.index, self.index_max = -1, 0
-        self.current = self.fig = None
-        self.axes_repo, self.texts_repo = [], []
-        if artist: self.fig = artist.fig; self.fig.canvas.mpl_connect('key_press_event', self.process_key); self.add(artist=artist, hide_artist_axes=hide_artist_axes)
-    def add(self, artist=None, increment_index=True, hide_artist_axes=True):
-        if artist is not None: self.artist = artist
-        if self.fig is None: self.fig = artist.fig; self.fig.canvas.mpl_connect('key_press_event', self.process_key)
-        if increment_index: self.index += 1; self.index_max += 1
-        self.current = self.index
-        self.axes_repo.append(self.artist.ax if type(self.artist.ax) is list else self.artist.ax.tolist())
-        self.texts_repo.append(self.artist.txt if type(self.artist.txt) is list else self.artist.txt.tolist())
-        print(f"VViewer added plot number {self.index}", end='\r')
-        if hide_artist_axes: self.hide_artist_axes()
-    def animate(self):  # remove current axes and set self.index as visible.
-        [ax.set_visible(False) for ax in self.axes_repo[self.current]]; [text.set_visible(False) for text in self.texts_repo[self.current]]
-        [ax.set_visible(True) for ax in self.axes_repo[self.index]]; [text.set_visible(True) for text in self.texts_repo[self.index]]
-        self.current = self.index; self.fig.canvas.draw()
+class VisibilityViewer(FigureManager):  # Viewer should act as Saver and Browser:
+    artist = ['internal', 'external'][1]  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
+    parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
+    stream = ['clear', 'accumulate', 'update'][1]  # Streaning (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
+    """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`
+    artist: A class responsible for ploting the data (not relevant to this class per se). Must expose .ax, .txt lists. Just plt figures have .axes and .texts. This class is flexible so it doesn't take those from .fig but rather from the artist."""
+    def __init__(self, artist=None):
+        super().__init__(); self.index, self.index_max = -1, 0; self.axes_repo, self.texts_repo = [], []
+        self.artist = artist; self.artist.fig.canvas.mpl_connect('key_press_event', self.process_key)
+    def add(self): self.index += 1; self.index_max += 1; self.axes_repo += self.artist.ax; self.texts_repo += self.artist.ax; self.hide_artist_axes(); print(f"VViewer added plot number {self.index}", end='\r')
+    def animate(self): [ax.set_visible(True) for ax in self.axes_repo[self.index]]; [text.set_visible(True) for text in self.texts_repo[self.index]]; self.fig.canvas.draw()
     def hide_artist_axes(self): [ax.set_visible(False) for ax in self.artist.ax]; [text.set_visible(False) for text in self.artist.txt]
-    def finish(self): self.current = self.index; self.animate()    # simply: undo the last hiding
 
 
 class VisibilityViewerAuto(VisibilityViewer):
@@ -394,7 +352,7 @@ class VisibilityViewerAuto(VisibilityViewer):
             artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
             if memorize: assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new axes from the artist with every plot"
         self.artist = artist
-        super().__init__(artist=self.artist, hide_artist_axes=False)
+        super().__init__(artist=self.artist)
         self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay)
         self.index_max, self.pause, self.kwargs, self.memorize, self.lables = len(self.data), pause, kwargs, memorize, x_labels
     test = staticmethod(lambda: VisibilityViewerAuto(data=np.random.randn(1, 10, 10, 3)))
@@ -405,7 +363,7 @@ class VisibilityViewerAuto(VisibilityViewer):
                 if self.index > self.max_index_memorized:  # a new plot never done before
                     self.hide_artist_axes()
                     self.artist.plot(datum, title=self.titles[i], legends=self.legends)
-                    self.add(increment_index=False, hide_artist_axes=False)  # index incremented via press_key manually
+                    self.add()
                     self.max_index_memorized += 1
                 else: super().animate()  # already seen this plot before ==> use animate method of parent class to hide and show,
             else:
