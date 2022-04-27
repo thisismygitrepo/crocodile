@@ -28,7 +28,7 @@ class FigureManager:  # Handles figures of matplotlib."""
         self.fig = self.ax = self.event = None
         self.cmaps, self.colors, self.mcolors, self.facecolor = Cycle(plt.colormaps()), Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color']), list(mcolors.CSS4_COLORS.keys()), Cycle(list(mcolors.CSS4_COLORS.values()))
         self.cmaps.set('viridis')
-        self.index = self.pause = self.index_max = None  # animation
+        self.index = self.index_prev = self.pause = self.index_max = None  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
                           "/": {'help': 'Show/Hide info text', 'func': self.text_info},
                           "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
@@ -85,8 +85,8 @@ class FigureManager:  # Handles figures of matplotlib."""
     def save(self, event): _ = event; Save.pickle(P.tmpfile(name="figure_manager"), obj=self)
     def replay(self, event): _ = event; self.pause = False; self.index = 0; self.message = 'Replaying'; self.animate()
     def pause_func(self, event): _ = event; self.pause = not self.pause; self.message = f'Pause flag is set to {self.pause}'; self.animate()
-    def previous(self, event): _ = event; self.index = self.index - 1 if self.index > 0 else self.index_max - 1; self.message = f'Previous {self.index}'; self.animate()
-    def next(self, event): _ = event; self.index = self.index + 1 if self.index < self.index_max - 1 else 0; self.message = f'Next {self.index}'; self.animate()
+    def previous(self, event): _ = event; self.index_prev = self.index; self.index = self.index - 1 if self.index > 0 else self.index_max - 1; self.message = f'Previous {self.index}'; self.animate()
+    def next(self, event): _ = event; self.index_prev = self.index; self.index = self.index + 1 if self.index < self.index_max - 1 else 0; self.message = f'Next {self.index}'; self.animate()
     def animate(self): pass  # a method of the artist child class that is inheriting from this class
     def maximize_fig(self): _ = self; plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
     def text_info(self, event): _ = event; self.message = ''
@@ -325,13 +325,18 @@ class VisibilityViewer(FigureManager):  # Viewer should act as Saver and Browser
     parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
     stream = ['clear', 'accumulate', 'update'][1]  # Streaning (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
     """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`
-    artist: A class responsible for ploting the data (not relevant to this class per se). Must expose .ax, .txt lists. Just plt figures have .axes and .texts. This class is flexible so it doesn't take those from .fig but rather from the artist."""
+    artist: A class responsible for ploting the data (not relevant to this class per se). Must expose .axes, .texts lists. Just plt figures have .axes and .texts. This class is flexible so it doesn't take those from .fig but rather from the artist."""
     def __init__(self, artist=None):
-        super().__init__(); self.index, self.index_max = -1, 0; self.axes_repo, self.texts_repo = [], []
-        self.artist = artist; self.artist.fig.canvas.mpl_connect('key_press_event', self.process_key)
-    def add(self): self.index += 1; self.index_max += 1; self.axes_repo += self.artist.ax; self.texts_repo += self.artist.ax; self.hide_artist_axes(); print(f"VViewer added plot number {self.index}", end='\r')
-    def animate(self): [ax.set_visible(True) for ax in self.axes_repo[self.index]]; [text.set_visible(True) for text in self.texts_repo[self.index]]; self.fig.canvas.draw()
-    def hide_artist_axes(self): [ax.set_visible(False) for ax in self.artist.ax]; [text.set_visible(False) for text in self.artist.txt]
+        super().__init__(); self.index, self.index_prev, self.index_max = -1, 0, 0; self.objs_repo = []  # list of lists of axes and texts.
+        self.artist = artist; self.artist.fig.canvas.mpl_connect('key_press_event', self.process_key); self.fig = self.artist.fig  # superclass methods rely on this attribute for interactive control.
+    def add(self, objs): self.index += 1; self.index_max += 1; self.objs_repo.append(objs); [obj.set_visible(False) for obj in objs]; print(f"VViewer added plot number {self.index}", end='\r')
+    def animate(self): [ax.set_visible(False) for ax in self.objs_repo[self.index_prev]]; [ax.set_visible(True) for ax in self.objs_repo[self.index]]; self.artist.fig.canvas.draw()
+    @staticmethod
+    def test():
+        vv = VisibilityViewer(artist := Artist())
+        for ix, item in enumerate(np.random.randn(5, 100)):
+            vv.add(artist.ax.plot(item) + [artist.ax.set_title(f"Curve {ix}")])
+        vv.animate()
 
 
 class VisibilityViewerAuto(VisibilityViewer):
@@ -361,7 +366,6 @@ class VisibilityViewerAuto(VisibilityViewer):
             datum = self.data[i]
             if self.memorize:  # ==> plot and use .add() method
                 if self.index > self.max_index_memorized:  # a new plot never done before
-                    self.hide_artist_axes()
                     self.artist.plot(datum, title=self.titles[i], legends=self.legends)
                     self.add()
                     self.max_index_memorized += 1
@@ -430,6 +434,7 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
             with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
         else: self.ax = ax; self.fig = ax.figure  # use the passed axis
         self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
+    axes = property(lambda self: self.fig.axes); texts = property(lambda self: self.ax.texts)
     def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
     def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); return self
     def plot_twin(self, c1, c2, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2] , [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
