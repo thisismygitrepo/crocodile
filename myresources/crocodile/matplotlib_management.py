@@ -320,44 +320,65 @@ class FigureSave:
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
 
+class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
+    def __init__(self, ax=None, figname='Graph', title='', label='curve', style='seaborn', figpolicy=FigurePolicy.add_new, figsize=(7, 4)):
+        super().__init__(figpolicy=figpolicy)
+        self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
+        if ax is None:  # create a figure
+            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
+        else: self.ax = ax; self.fig = ax.figure  # use the passed axis
+        self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
+    axes = property(lambda self: self.fig.axes); texts = property(lambda self: self.ax.texts)
+    def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
+    def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); return self
+    def plot_twin(self, c1, c2, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
+    def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
+    def visibility(self):
+        from matplotlib.widgets import CheckButtons; self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
+        rax = self.fig.add_axes(self.visibility_ax)
+        labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
+        self.check_b = CheckButtons(rax, labels, visibility)
+        def func(label): index = labels.index(label); self.ax.lines[index].set_visible(not self.ax.lines[index].get_visible()); self.fig.canvas.draw()
+        self.check_b.on_clicked(func)
+    @staticmethod
+    def styler(plot_gen):
+        for astyle in plt.style.available:
+            with plt.style.context(style=astyle): plot_gen(); plt.title(astyle); plt.pause(1); plt.cla()
+
+
 class VisibilityViewer(FigureManager):  # Viewer should act as Saver and Browser:
     artist = ['internal', 'external'][1]  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
     parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
     stream = ['clear', 'accumulate', 'update'][1]  # Streaning (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
-    """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`
-    artist: A class responsible for ploting the data (not relevant to this class per se). Must expose .axes, .texts lists. Just plt figures have .axes and .texts. This class is flexible so it doesn't take those from .fig but rather from the artist."""
-    def __init__(self, artist=None):
+    """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`"""
+    def __init__(self, fig):
         super().__init__(); self.index, self.index_prev, self.index_max = -1, 0, 0; self.objs_repo = []  # list of lists of axes and texts.
-        self.artist = artist; self.artist.fig.canvas.mpl_connect('key_press_event', self.process_key); self.fig = self.artist.fig  # superclass methods rely on this attribute for interactive control.
-    def add(self, objs): self.index += 1; self.index_max += 1; self.objs_repo.append(objs); [obj.set_visible(False) for obj in objs]; print(f"VViewer added plot number {self.index}", end='\r')
-    def animate(self): [ax.set_visible(False) for ax in self.objs_repo[self.index_prev]]; [ax.set_visible(True) for ax in self.objs_repo[self.index]]; self.artist.fig.canvas.draw()
+        self.fig = fig; self.fig.canvas.mpl_connect('key_press_event', self.process_key)  # superclass methods rely on this attribute for interactive control.
+    def add(self, objs): self.index += 1; self.index_max += 1; self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.index}", end='\r')
+    def animate(self): [ax.set_visible(False) for ax in self.objs_repo[self.index_prev]]; [ax.set_visible(True) for ax in self.objs_repo[self.index]]; self.fig.canvas.draw()
     @staticmethod
-    def test():
-        vv = VisibilityViewer(artist := Artist())
-        for ix, item in enumerate(np.random.randn(5, 100)):
-            vv.add(artist.ax.plot(item) + [artist.ax.set_title(f"Curve {ix}")])
-        vv.animate()
+    def test():  # Downside: if number of axes, lines, texts, etc. are too large, it will be slow. In that case, it is better to avoid this viewer and plot on the fly during animation.
+        vv = VisibilityViewer(plt.figure(figsize=(10, 10)))
+        for ix, item in enumerate(np.random.rand(5, 100, 2)):
+            with plt.style.context(style='seaborn-darkgrid'): ax = vv.fig.add_subplot(); ax.plot(item); ax.set_title(f"Curve {ix}")
+            vv.add([ax])  # use keys 1 and 2 to navigate.
 
 
 class VisibilityViewerAuto(VisibilityViewer):
-    def __init__(self, data=None, artist=None, memorize=False, transpose=True, save_type=FigureSave.Null, save_dir=None, save_name=None, delay=1,
+    parser = ['internal', 'external'][0]
+    def __init__(self, data=None, artist=None, memorize=False, save_type=FigureSave.Null, save_dir=None, save_name=None, delay=1,
                  titles=None, legends=None, x_labels=None, pause=True, **kwargs):
         """
-        The difference between this class and `VisibilityViewer` is that here the parsing of data is done internally, hence the suffix `Auto`.
-        :param data: shoud be of the form [[ip1 list], [ip2 list], ...] i.e. NumArgsPerPlot x NumInputsForAnimation x Input (possible points x signals)
+        :param data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
         :param artist: an instance of a class that subclasses `Artist`
         :param memorize: if set to True, then axes are hidden and shown again, otherwise, plots constructed freshly every time they're shown (axes are cleaned instead of hidden)"""
         self.max_index_memorized = 0
         self.fname = None
-        self.data = np.array(list(zip(*data))) if transpose else data
+        self.data = data
         self.legends = [f"Curve {i}" for i in range(len(self.data))] if legends is None else legends
         self.titles = titles if titles is not None else np.arange(len(self.data))
-        if artist is None: artist = Artist(*self.data[0], title=self.titles[0], **kwargs)
-        else:
-            artist.plot(*self.data[0], title=self.titles[0], legends=self.legends)
-            if memorize: assert artist.create_new_axes is True, "Auto Viewer is based on hiding and showing and requires new axes from the artist with every plot"
         self.artist = artist
-        super().__init__(artist=self.artist)
+        super().__init__(fig=self.fig)
         self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay)
         self.index_max, self.pause, self.kwargs, self.memorize, self.lables = len(self.data), pause, kwargs, memorize, x_labels
     test = staticmethod(lambda: VisibilityViewerAuto(data=np.random.randn(1, 10, 10, 3)))
@@ -424,32 +445,6 @@ class ImShow(FigureManager):
     from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
     test = staticmethod(lambda: ImShow(np.random.rand(12, 10, 80, 120, 3)))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
     resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import("skimage").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
-
-
-class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
-    def __init__(self, ax=None, figname='Graph', title='', label='curve', style='seaborn', figpolicy=FigurePolicy.add_new, figsize=(7, 4)):
-        super().__init__(figpolicy=figpolicy)
-        self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
-        if ax is None:  # create a figure
-            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
-        else: self.ax = ax; self.fig = ax.figure  # use the passed axis
-        self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
-    axes = property(lambda self: self.fig.axes); texts = property(lambda self: self.ax.texts)
-    def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
-    def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); return self
-    def plot_twin(self, c1, c2, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2] , [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
-    def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
-    def visibility(self):
-        from matplotlib.widgets import CheckButtons; self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
-        rax = self.fig.add_axes(self.visibility_ax)
-        labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
-        self.check_b = CheckButtons(rax, labels, visibility)
-        def func(label): index = labels.index(label); self.ax.lines[index].set_visible(not self.ax.lines[index].get_visible()); self.fig.canvas.draw()
-        self.check_b.on_clicked(func)
-    @staticmethod
-    def styler(plot_gen):
-        for astyle in plt.style.available:
-            with plt.style.context(style=astyle): plot_gen(); plt.title(astyle); plt.pause(1); plt.cla()
 
 
 if __name__ == '__main__':
