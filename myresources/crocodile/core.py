@@ -39,7 +39,8 @@ def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in
 @save_decorator(".json")
 def json(obj, path=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
 @save_decorator(".yml")
-def yaml(obj, path, **kwargs): return Path(path).write_bytes(__import__("yaml").dumps(obj, **kwargs))
+def yaml(obj, path, **kwargs):
+    with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file)
 @save_decorator(".pkl")
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
@@ -186,7 +187,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, use_plt=True, **kwargs):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
-        else: artist = __import__("crocodile.matplotlib_management").Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__); return artist
+        else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__); return artist
 
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.

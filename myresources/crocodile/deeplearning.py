@@ -309,7 +309,7 @@ class BaseModel(ABC):
     def load_weights(self, directory): self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
     def summary(self): return self.model.summary()
     def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-    def plot_loss(self): return tb.Struct.concat_values(*self.history).plot()
+    def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, **kwargs)
 
     def infer(self, x):
         """
