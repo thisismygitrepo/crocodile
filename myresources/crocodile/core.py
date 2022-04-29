@@ -12,7 +12,7 @@ def str2timedelta(shift):  # Converts a human readable string like '1m' or '1d' 
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
-def install_n_import(package, name=None):
+def install_n_import(package, name=None):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(package)
     except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package]); return __import__(package)
 
@@ -40,7 +40,7 @@ def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in
 def json(obj, path=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
 @save_decorator(".yml")
 def yaml(obj, path, **kwargs):
-    with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file)
+    with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)
 @save_decorator(".pkl")
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
