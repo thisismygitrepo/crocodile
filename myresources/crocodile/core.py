@@ -24,7 +24,7 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
             if add_suffix:
                 [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
                 path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext; path = Path(path).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
+            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size (MB) = {path.stat().st_size / 1024**2:0.2f}") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
             return path
         return wrapper
     return decorator
@@ -44,7 +44,7 @@ def yaml(obj, path, **kwargs):
 @save_decorator(".pkl")
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
-def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))
+def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
 def pickles(obj): return __import__("dill").dumps(obj)
 class Save: csv = csv; npy = npy; mat = mat; json = json; yaml = yaml; vanilla_pickle = vanilla_pickle; pickle = pickle; pickles = pickles
 
