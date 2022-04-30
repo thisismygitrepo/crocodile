@@ -199,7 +199,7 @@ def get_repr(data, justify=15, limit=float('inf'), direc="<"):
     if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
-    return f(str_.replace("\n", ""), justify=justify, limit=limit, direc=direc)
+    return f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
 def print_string_list(mylist, char_per_row=125, sep=" ", style=str, _counter=0):
     for item in mylist: print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 class Display: set_pandas_display = set_pandas_display; set_pandas_auto_width = set_pandas_auto_width; config = config; f = f; eng = eng; outline = outline; get_repr = get_repr; print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display

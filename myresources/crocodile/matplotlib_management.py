@@ -52,7 +52,7 @@ class FigureManager:  # Handles figures of matplotlib."""
                        "s ": {'help': "Save Figure"},
                        "f ": {'help': "Toggle Full screen"},
                        "p ": {'help': "Select / Deselect Pan"}}
-        if "Keyboard shortcuts" in plt.get_figlabels(): plt.close("Keyboard shortcuts")  # toggle
+        if "Keyboard shortcuts" in plt.get_figlabels(): plt.close("Keyboard shortcuts"); _ = event  # toggle
         else:
             fig = plt.figure(num="Keyboard shortcuts")
             for i, key in enumerate(self.help_menu.keys()): fig.text(0.1, 1 - 0.05 * (i + 1), f"{key:30s} {self.help_menu[key]['help']}")
@@ -348,7 +348,7 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
         self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
     def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
     def plot_dict(self, adict): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); return self
-    def plot_twin(self, c1, c2, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
+    def plot_twin(self, c1, c2, x=None, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
     def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
     def clear(self): self.fig.clf()  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     def axes(self): return [self.ax]  # objects that use this class will demand that the artist expose this method, in addition to .plot()

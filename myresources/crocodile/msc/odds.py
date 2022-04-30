@@ -10,7 +10,7 @@ def share(path):
 
 
 def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
-def capture_photo(): cv2 = install_n_import("opencv-python"", cv2"); cam = cv2.VideoCapture(); cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3000); cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000); _, frame = cam.read(); cam.releaes(); return frame
+def capture_photo(): cv2 = install_n_import("cv2", "opencv-python"); cam = cv2.VideoCapture(); cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3000); cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000); _, frame = cam.read(); cam.releaes(); return frame
 def count_number_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True, **kwargs): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
 def profile_memory(command): psutil = install_n_import("psutil"); before = psutil.virtual_memory(); exec(command); after = psutil.virtual_memory(); print(f"Memory used = {(after.used - before.used) / 1e6}")
 def pomodoro(work=25, rest=5, repeats=4):
@@ -44,7 +44,7 @@ class DictCycle(Cycle):
 
 
 def capture_from_webcam():
-    import cv2
+    cv2 = install_n_import("cv2", "opencv-python")
     cap = cv2.VideoCapture(0)
     while True:
         ret, frame = cap.read()
