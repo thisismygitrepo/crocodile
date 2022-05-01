@@ -33,12 +33,13 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 
+
 # %% =================================== File ============================================
 def read(path, **kwargs):
-    suffix = Path(path).suffix[1:]
-    try: return getattr(Read, suffix)(str(path), **kwargs)
-    except AttributeError:
-        if suffix in ['eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff']: return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
+    try: return getattr(Read, suffix := Path(path).suffix[1:])(str(path), **kwargs)
+    except AttributeError as err:
+        if not "type object 'Read' has no attribute" in str(err): raise AttributeError(err)
+        if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
         raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`")
 def json(path, r=False, **kwargs):
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
@@ -51,10 +52,10 @@ def yaml(path, r=False):
 def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
 def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
-def pkl(*args, **kwargs): return Read.pickle(*args, **kwargs)
 def py(path): return Struct(__import__("runpy").run_path(path))
-def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)
+def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
 def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+def pkl(*args, **kwargs): return pickle(*args, **kwargs)
 class Read: read = read; mat = mat; json = json; yaml = yaml; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 
 
@@ -153,9 +154,9 @@ class P(type(Path()), Path):
     def __add__(self, other): return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
     def __radd__(self, other): return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
     def __sub__(self, other): res = P(str(self).replace(str(other), "")); return res[1:] if str(res[0]) in {"\\", "/"} else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
-    def rel2cwd(self, inlieu=False): return self._return(P(self.relative_to(Path.cwd())), inlieu)
-    def rel2home(self, inlieu=False): return self._return(P(self.relative_to(Path.home())), inlieu)  # opposite of `expanduser`
-    def collapseuser(self, strict=True): assert str(P.home()) in str(self.expanduser()), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self - P.home()))
+    def rel2cwd(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
+    def rel2home(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
+    def collapseuser(self, strict=True): assert str(P.home()) in str(self.expanduser()), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self - P.home()))    # opposite of `expanduser`
     def __getitem__(self, slici): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
     def __setitem__(self, key: str or int or slice, value: str or Path):
         fullparts, new = list(self.parts), list(P(value).parts)
