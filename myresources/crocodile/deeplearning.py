@@ -332,9 +332,9 @@ class BaseModel(ABC):
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
         x_test, y_test = x_test if x_test is not None else self.data.split.x_test, y_test if y_test is not None else self.data.split.y_test
-        names_test = names_test if names_test is not None else (self.data.split.names_test if hasattr(self.data.split, "names_test") else range(len(x_test)))
+        names_test = names_test if names_test is not None else (self.data.split.names_test if hasattr(self.data.split, "names_test") else np.arange(len(x_test)))
         idx = np.random.choice(len(x_test) - 1, size=sample, replace=False) if idx is None else (slice(idx, idx + 1, 1) if isinstance(idx, int) else idx)
-        x_test, y_test, names_test = x_test[idx], y_test[idx], names_test[idx]
+        x_test, y_test, names_test = x_test[idx] if "DataFrame" not in str(type(x_test)) else x_test.iloc[idx], y_test[idx] , names_test[idx]
         # ==========================================================================
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
