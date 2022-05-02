@@ -79,7 +79,7 @@ class P(type(Path()), Path):
         path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
-            self.search("*").apply(lambda x: x.move(path=path, content=False)); return path  # contents live within this directory.
+            self.search("*").apply(lambda x: x.move(folder=path.parent, content=False, overwrite=overwrite)); return path  # contents live within this directory.
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
         else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
@@ -337,14 +337,6 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
 class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
 
 
-class MemoryDB:  # This class holds the historical data. It acts like a database, except that is memory based."""
-    def __init__(self, size=5): self.size, self.list = size, List()
-    def __repr__(self): return f"MemoryDB. Size={self.size}. Current length = {self.len}"
-    def __getitem__(self, item): return self.list[item]
-    len = property(lambda self: len(self.list))
-    def append(self, item): self.list.append(item); self.list = self.list[-self.size:] if self.len > self.size else self.list  # take latest frames and drop the older ones.
-
-
 class Fridge:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
     def __init__(self, source_func, expire="1m", logger=None, path=None, save=Save.pickle, reader=Read.read):
         self.cache = None  # fridge content
@@ -367,4 +359,4 @@ class Fridge:  # This class helps to accelrate access to latest data coming from
 
 
 if __name__ == '__main__':
-    pass
+    P(r"C:\Users\Alex\Downloads\encrypted_data").move(folder=r'C:/Users/Alex/data/crypto', content=True)
