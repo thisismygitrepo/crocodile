@@ -59,7 +59,7 @@ class HyperParam(tb.Struct):
 
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(HyperParam, cls).from_saved_data(tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
-    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(config=True, return_str=True)
+    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
     def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
     @property
@@ -166,7 +166,7 @@ class DataReader(tb.Base):
     def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
     def __getstate__(self): return dict(specs=self.specs, scaler=self.scaler)
     def __setstate__(self, state): return self.__dict__.update(state)
-    def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(config=False, return_str=True)
+    def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
     def split_the_data(self, *args, strings=None, **kwargs):
         from sklearn.model_selection import train_test_split
@@ -300,7 +300,6 @@ class BaseModel(ABC):
 
     def postprocess(self, *args, **kwargs): return self.data.postprocess(*args, **kwargs)
     def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
-    def predict(self, x, **kwargs): return self.postprocess(self.infer(x), **kwargs)
     def viz(self, *args, **kwargs): self.data.viz(*args, **kwargs)
     def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
@@ -312,13 +311,12 @@ class BaseModel(ABC):
     def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, **kwargs)
 
     def infer(self, x):
-        """
-        This method assumes numpy input, datatype-wise and is also preprocessed.
+        """ This method assumes numpy input, datatype-wise and is also preprocessed.
         NN is put in eval mode.
         :param x:
         :return: prediction as numpy
         """
-        return self.model.predict(x)  # Keras automatically handles special layers.
+        return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
 
     def deduce(self, obj, viz=True, **kwargs):
         """Assumes that contents of the object are in the form of a batch."""
@@ -328,6 +326,10 @@ class BaseModel(ABC):
         result = tb.Struct(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz: self.viz(postprocessed, **kwargs)
         return result
+
+    def predict(self, x, **kwargs):
+        """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
+        return self.postprocess(self.infer(x), **kwargs)
 
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
