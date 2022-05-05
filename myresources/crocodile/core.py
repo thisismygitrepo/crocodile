@@ -97,7 +97,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     # ======================== Access Methods ==========================================
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def split(self, every=1, idx=None) -> 'List': return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
+    def split(self, every=1) -> 'List': return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
     def filter(self, func, which=lambda idx, x: x) -> 'List': return List([which(idx, x) for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func=lambda x, y: x+y) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list)
@@ -175,8 +175,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def values(self, verbose=False) -> 'List': return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
     def items(self, verbose=False, desc="") -> 'List': return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items(), desc=desc)
     def get(self, key=None, default=None, strict=False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in ((keys or []) + ([key] if key is not None else []))])
-    def apply_to_keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
-    def apply_to_values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
+    def apply2keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
+    def apply2values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self

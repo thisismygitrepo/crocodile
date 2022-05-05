@@ -36,9 +36,10 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
 
 # %% =================================== File ============================================
 def read(path, **kwargs):
-    try: return getattr(Read, suffix := Path(path).suffix[1:])(str(path), **kwargs)
+    suffix = Path(path).suffix[1:]
+    try: return getattr(Read, suffix)(str(path), **kwargs)
     except AttributeError as err:
-        if not "type object 'Read' has no attribute" in str(err): raise AttributeError(err)
+        if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err)
         if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
         raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`")
 def json(path, r=False, **kwargs):

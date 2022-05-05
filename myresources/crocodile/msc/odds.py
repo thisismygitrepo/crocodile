@@ -43,16 +43,14 @@ class DictCycle(Cycle):
     def set_key(self, key): self.index = list(self.keys).index(key)
 
 
-def capture_from_webcam():
+def capture_from_webcam(show=True):
     cv2 = install_n_import("cv2", "opencv-python")
     cap = cv2.VideoCapture(0)
     while True:
         ret, frame = cap.read()
-        cv2.imshow('frame', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    cap.release()
-    cv2.destroyAllWindows()
+        if show: cv2.imshow('frame', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'): break
+    cap.release(); cv2.destroyAllWindows(); return frame
 
 
 def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
