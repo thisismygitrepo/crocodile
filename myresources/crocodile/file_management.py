@@ -315,8 +315,9 @@ def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
         jungle_zip.setpassword(pwd=password) if password is not None else None
         jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
     return P(op_path)
-def unzip(ip_path, op_path, fname=None, password=None, **kwargs):
+def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwargs):
     with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
+        if memory: return Struct({name: zipObj.read(name) for name in zipObj.namelist()}) if fname is None else zipObj.read(fname)
         if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
         else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); op_path = P(op_path) / fname
     return P(op_path)
@@ -360,4 +361,4 @@ class Fridge:  # This class helps to accelrate access to latest data coming from
 
 
 if __name__ == '__main__':
-    P(r"C:\Users\Alex\Downloads\encrypted_data").move(folder=r'C:/Users/Alex/data/crypto', content=True)
+    pass

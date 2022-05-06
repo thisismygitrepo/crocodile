@@ -3,6 +3,7 @@ from crocodile.file_management import P, install_n_import, datetime
 from crocodile.meta import Scheduler, Log
 import time
 
+
 def share(path):
     response = install_n_import("requests").post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False,
                                                  description="its a file, init?", ), files={'file': path.read_bytes()})
@@ -28,6 +29,7 @@ def pomodoro(work=25, rest=5, repeats=4):
         except ImportError: __import__("os").system('beep -f %s -l %s' % (frequency, 1000 * duration))
         else: winsound.Beep(frequency, 1000 * duration)
     return Scheduler(routine=loop, max_cycles=repeats, logger=logger, wait="0.1m").run()
+
 
 class Cycle:
     def __init__(self, iterable=None): self.list = iterable; self.index = -1

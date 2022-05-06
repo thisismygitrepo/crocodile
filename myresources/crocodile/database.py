@@ -1,5 +1,5 @@
 
-
+import time
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.sql.schema import MetaData
@@ -53,7 +53,7 @@ class DBMS:
     def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(path, echo))
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
-    def close(self): self.con.close(); self.ses.close(); self.eng.dispose()
+    def close(self, sleep=2): self.con.close(); self.ses.close(); self.eng.dispose(); time.sleep(sleep)
 
     @staticmethod
     def make_sql_db(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):

@@ -1,6 +1,6 @@
 
 
-class Manipulator:
+class IndexJuggler:
     @staticmethod
     def merge_adjacent_axes(array, ax1, ax2):
         """Multiplies out two axes to generate reduced order array."""
