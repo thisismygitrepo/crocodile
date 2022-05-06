@@ -166,8 +166,8 @@ class SSH(object):
 
 class Scheduler:
     def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats=None):
-        self.routine = (lambda: None) if routine is None else routine  # main routine to be repeated every `wait` time period
-        self.other_routine = (lambda: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
+        self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
+        self.other_routine = (lambda sched: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
         self.logger, self.exception_handler = logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
@@ -175,8 +175,11 @@ class Scheduler:
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now(); self.logger.info(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
-            Experimental.try_this(self.routine, handle=self._handle_exceptions, during="routine")  # 2- Perform logic
-            if self.cycle % self.other_ratio == 0: Experimental.try_this(self.other_routine, handle=self._handle_exceptions, during="occasional")  # 3- Optional logic every while
+            try: self.routine(sched=self)
+            except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
+            if self.cycle % self.other_ratio == 0:
+                try: self.other_routine(sched=self)
+                except BaseException as ex: self._handle_exceptions(ex=ex, during="occasional")  # 3- Optional logic every while
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1; self.logger.info(f"Finishing Cycle {self.cycle - 1: <4}. Sleeping for {self.wait} seconds. ({time_left} seconds left)\n" + "-" * 100)
             try: __import__("time").sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep

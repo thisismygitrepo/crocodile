@@ -16,8 +16,8 @@ def count_number_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True,
 def profile_memory(command): psutil = install_n_import("psutil"); before = psutil.virtual_memory(); exec(command); after = psutil.virtual_memory(); print(f"Memory used = {(after.used - before.used) / 1e6}")
 def pomodoro(work=25, rest=5, repeats=4):
     logger = Log(name="pomodoro", file=False, stream=True)
-    def loop():
-        speak("Alright, time to start working..."); start = datetime.now()
+    def loop(sched):
+        speak("Alright, time to start working..."); start = datetime.now(); _ = sched
         while (diff := work - ((datetime.now() - start).seconds / 60)) > 0: logger.debug(f"Keep working. Time Left: {round(diff)} minutes"); time.sleep(60 * 1)
         speak("Now, its time to take a break."); start = datetime.now()
         while (diff := rest - ((datetime.now() - start).seconds / 60)) > 0: logger.critical(f"Keep Resting. Time Left: {round(diff)} minutes"); time.sleep(60 * 1)

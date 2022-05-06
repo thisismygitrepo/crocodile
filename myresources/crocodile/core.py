@@ -119,7 +119,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
         if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
-    def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, prefer=['loky', 'threads'][0], depth=1, verbose=False, desc=None, **kwargs) -> 'List':
+    def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, prefer=['processes', 'threads'][0], depth=1, verbose=False, desc=None, **kwargs) -> 'List':
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))
