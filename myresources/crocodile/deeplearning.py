@@ -359,7 +359,7 @@ class BaseModel(ABC):
             if hasattr(a_metric, "path"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
             else: name = "unknown"
-            # try:  # EAFP principle.
+            # try:  # EAFP vs LBYL: both are duck-typing styles as they ask for what object can do (whether by introspection or trial) as opposed to checking its type.
             #     path = a_metric.path  # works for subclasses Metrics
             # except AttributeError: path = a_metric.__name__  # works for functions.
             loss_dict[name] = []

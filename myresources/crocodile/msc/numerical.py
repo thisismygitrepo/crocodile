@@ -1,4 +1,6 @@
 
+import numpy as np
+
 
 class IndexJuggler:
     @staticmethod
@@ -14,8 +16,8 @@ class IndexJuggler:
     @staticmethod
     def merge_axes(array, ax1, ax2):
         """Brings ax2 next to ax1 first, then combine the two axes into one."""
-        array2 = __import__("numpy").moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
-        return Manipulator.merge_adjacent_axes(array2, ax1, ax1 + 1)
+        array2 = np.moveaxis(array, ax2, ax1 + 1)  # now, previously known as ax2 is located @ ax1 + 1
+        return IndexJuggler.merge_adjacent_axes(array2, ax1, ax1 + 1)
 
     @staticmethod
     def expand_axis(array, ax_idx, factor, curtail=False):
@@ -23,7 +25,7 @@ class IndexJuggler:
         if curtail:  # if size at ax_idx doesn't divide evenly factor, it will be curtailed.
             size_at_idx = array.shape[ax_idx]
             extra = size_at_idx % factor
-            array = array[Manipulator.indexer(axis=ax_idx, myslice=slice(0, -extra))]
+            array = array[IndexJuggler.indexer(axis=ax_idx, myslice=slice(0, -extra))]
         total_shape = list(array.shape)
         for index, item in enumerate((int(total_shape.pop(ax_idx) / factor), factor)): total_shape.insert(ax_idx + index, item)
         return array.reshape(tuple(total_shape))  # should be same as return __import__("numpy)s.plit(array, new_shape, ax_idx)
@@ -36,10 +38,10 @@ class IndexJuggler:
         lower_ = lower_ % n  # if negative, you get the positive equivalent. If > n, you get principal value.
         roll = lower_
         lower_, upper_ = lower_ - roll, upper_ - roll
-        array_ = __import__("numpy").roll(array, -roll, axis=axis)
+        array_ = np.roll(array, -roll, axis=axis)
         upper_ = upper_ % n
         new_slice = slice(lower_, upper_, a_slice.step)
-        return array_[Manipulator.indexer(axis=axis, myslice=new_slice, rank=array.ndim)]
+        return array_[IndexJuggler.indexer(axis=axis, myslice=new_slice, rank=array.ndim)]
 
     @staticmethod
     def indexer(axis, myslice, rank=None):
