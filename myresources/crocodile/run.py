@@ -5,12 +5,8 @@ Functionality offered her is made redundant by the fire library par for importin
 
 Choices made by default:
 * ipython over python
-* -interactive is the default
-* -m is the default (run as module)
-
-If the file is to be loaded as a module (-m), then it will be `imported` into a script, rather than being
-executed by data_only, in which case the file data_only will be __main__.
-The advantage of running it as a module is having reference to the file from which classes came. This is vital for pickling.
+* interactive is the default
+* importing the file to be run (as opposed to running it as main) is the default. The advantage of running it as an imported module is having reference to the file from which classes came. This is vital for pickling.
 
 """
 
@@ -43,7 +39,7 @@ def build_parser():
 
     args = parser.parse_args()
     print(f"Crocodile.run: args of the firing command: ")
-    tb.Struct(args.__dict__).print(dtype=False)
+    tb.Struct(args.__dict__).print(as_config=True)
 
     # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file path (-f)")
     # ==================================================================================

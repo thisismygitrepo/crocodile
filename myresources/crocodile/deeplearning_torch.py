@@ -63,6 +63,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
             print(''.center(57, '='))
 
     def save_weights(self, save_dir): t.save()
+    def save_model(self, save_dir): t.save()
 
     def load_weights(self, save_dir, map_location=None):
         if map_location is None:  # auto location.  # load to where ever the model was saved from in the first place
@@ -71,23 +72,19 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         else: self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location=map_location))
         self.model.eval()
 
-    def save_model(self, save_dir): t.save()
-
     def load_model(self, save_dir):  # Model class must be defined somewhere
         self.model = t.load(self, save_dir.glob('*.pt').__next__())
         self.model.eval()
 
     def infer(self, xx):
         self.model.eval()
-        with t.no_grad():
-            op = self.model(self.data.to_torch_tensor(xx))
+        with t.no_grad(): op = self.model(self.data.to_torch_tensor(xx))
         return self.data.to_numpy(op)
 
     def fit(self, epochs=None, plot=True, **kwargs):
         """
         """
-        if epochs is None:
-            epochs = self.hp.epochs
+        if epochs is None: epochs = self.hp.epochs
         train_losses = []
         test_losses = []
         print('Training'.center(100, '-'))
@@ -110,7 +107,6 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
             test_loss = self.test(self.data.test_loader)
             test_losses.append(test_loss[0])
             print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss:1.3f}, Test Loss = {test_loss[0]:1.3f}')
-
         self.history.append({'loss': train_losses, 'val_loss': test_losses})
         if plot: self.plot_loss()
 
@@ -142,8 +138,6 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
                     per_batch_losses.append(loss.item())
                 losses.append(per_batch_losses)
             return [np.mean(tmp) for tmp in zip(*losses)]
-        else:
-            return None
 
     def deploy(self, dummy_ip=None):
         if not dummy_ip:
@@ -154,7 +148,6 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
 
 class ImagesModel(PTBaseModel):
     def __init__(self, *args): super(ImagesModel, self).__init__(*args)
-
     # @tb.batcher(func_type='method')
     def preprocess(self, images):
         """Recieves Batch of 2D numpy input and returns tensors ready to be fed to Pytorch model.
@@ -168,26 +161,16 @@ class ImagesModel(PTBaseModel):
     # @tb.batcher(func_type='method')
     def postprocess(self, images, *args, **kwargs):
         """  > cpu > squeeeze > np > undo norm
-        Recieves tensors from model and returns numpy images.
-        """
+        Recieves tensors from model and returns numpy images. """
         images = self.data.to_numpy(images)
         images = images[:, 0, ...]  # removing channel axis.
         images = (images * self.hp.op_sig) + self.hp.op_mu
         return images
 
     @staticmethod
-    def make_channel_last(images):
-        if len(images.shape) == 4:  # batch of images
-            return images.transpose((0, 2, 3, 1))
-        else:
-            return images.transpose((1, 2, 0))
-
+    def make_channel_last(images): return images.transpose((0, 2, 3, 1)) if len(images.shape) == 4 else images.transpose((1, 2, 0))
     @staticmethod
-    def make_channel_first(images):
-        if len(images.shape) == 4:  # batch of images
-            return images.transpose((0, 3, 1, 2))
-        else:
-            return images.transpose((2, 0, 1))
+    def make_channel_first(images): return images.transpose((0, 3, 1, 2)) if len(images.shape) == 4 else images.transpose((2, 0, 1))
 
 
 def check_shapes(module, ip):
@@ -242,29 +225,22 @@ class Accuracy(object):
         """
         return t.tensor(t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
 
-    def result(self):
-        return self.total / self.counter
+    def result(self): return self.total / self.counter
 
 
 class View(t.nn.Module, ABC):
     def __init__(self, shape):
         super(View, self).__init__()
         self.shape = shape
-
-    def forward(self, xx):
-        return xx.view(*self.shape)
+    def forward(self, xx): return xx.view(*self.shape)
 
 
 class MeanSquareError:
-    """
-    Only for Pytorch models
-    """
-
+    """Only for Pytorch models"""
     def __init__(self, x_mask=1, y_mask=1):
         self.name = 'MeanSquaredError'
         self.x_mask = x_mask
         self.y_mask = y_mask
-
     def __call__(self, x, y):
         x = self.x_mask * x
         y = self.y_mask * y
@@ -276,12 +252,10 @@ class MeanAbsoluteError:
     """
     Only for Pytorch models
     """
-
     def __init__(self, x_mask=1, y_mask=1):
         self.name = 'L1Loss'
         self.x_mask = x_mask
         self.y_mask = y_mask
-
     def __call__(self, x, y):
         x = self.x_mask * x
         y = self.y_mask * y

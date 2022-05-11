@@ -16,7 +16,6 @@ exe = P(sys.executable)
 tm = tb.Terminal()
 
 # ============================== Common Paths ============================
-DotFiles = P.home().joinpath("dotfiles")
 
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
@@ -51,6 +50,7 @@ OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else Non
 OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
 OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe") if LocalAppData else None
 
+DotFiles = P.home().joinpath("dotfiles")
 
 # ============================== Networking ==============================
 
@@ -98,12 +98,9 @@ class EnvVar:
             if temp is False:
                 res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters # in case the variable included ";" separated paths, this limit can be exceeded.
                 return res if not run else tm.run(res, shell="powershell")
-            else:
-                raise NotImplementedError
-        elif system == "Linux":
-            return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
-        else:
-            raise NotImplementedError
+            else: raise NotImplementedError
+        elif system == "Linux": return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
+        else: raise NotImplementedError
 
     @staticmethod
     def get(key, run=False):
