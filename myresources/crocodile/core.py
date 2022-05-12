@@ -12,9 +12,9 @@ def str2timedelta(shift):  # Converts a human readable string like '1m' or '1d' 
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
-def install_n_import(package, name=None):  # sometimes package name is different from import, e.g. skimage.
-    try: return __import__(package)
-    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package]); return __import__(package)
+def install_n_import(package, name=None, **kwargs):  # sometimes package name is different from import, e.g. skimage.
+    try: return __import__(package, **kwargs)
+    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package]); return __import__(package, **kwargs)
 
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path

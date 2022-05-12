@@ -23,7 +23,7 @@ class Log(logging.Logger):  #
                  s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False, log_colors=None):
         super().__init__(name := randstr() if name is None and not print(f"Logger name not passed. It is recommended to pass a name indicating the owner.") else name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path  # proper update to this value by self.add_filehandler()
-        if dialect == "colorlog": module = install_n_import("colorlog"); processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red', })  # see here for format: https://pypi.org/project/colorlog/
+        if dialect == "colorlog": module = install_n_import("colorlog"); processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
         else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
         self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level) if file or file_path else None; self.add_streamhandler(s_level, fmt=processed_fmt, module=module) if stream else None
         self.specs = dict(dialect=dialect, name=self.name, file=file, file_path=self.file_path, stream=bool(self.get_shandler()), fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # # this way of creating relative path makes transferrable across machines.
@@ -73,21 +73,20 @@ class Terminal:
     def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-    def run(self, *cmds, shell=None, check=False, ip=None):
+    def run(self, *cmds, shell=None, check=False, ip=None):  # Runs SYSTEM commands like subprocess.run
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched."""
         my_list = list(cmds)  # `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job. `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task. `suprocess.call` is an archaic command for pre-Python-3.5.
         if self.machine == "win32" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
-        if self.elevated is False or self.is_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
+        if self.elevated is False or self.is_user_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         """ The advantage of addig `powershell -Command` is to give access to wider range of options. Other wise, command prompt shell doesn't recognize commands like `ls`.
         `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned. # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`"""
         return self.Response.from_completed_process(resp)
-    def run_async(self, *cmds, new_window=True, shell=None, terminal=None):
+    def run_async(self, *cmds, new_window=True, shell=None, terminal=None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
-        commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it.
-        https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
+        commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None: shell = "" if self.machine == "win32" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
         new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.  adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from e.g. conda
@@ -96,45 +95,23 @@ class Terminal:
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     @staticmethod
-    def is_admin(): return Experimental.try_this(lambda: __import__("ctypes").windll.shell32.IsUserAnAdmin(), return_=False)  # https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
-    @staticmethod
-    def run_script(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
-        """This method is a wrapper on top of `run_async" except that the command passed will launch python terminal that will run script passed by user. """
-        header_script = f"""\n# {'Code prepended by Terminal.run_script'.center(80, '=')}; import crocodile.toolbox as tb; tb.sys.path.insert(0, r'{wdir or P.cwd()}'); # {'End of header, start of script passed'.center(80, '=')}\n""".replace("; ", "\n")  # this header is necessary so import statements in the script passed are identified relevant to wdir.
+    def run_pyscript(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
+        header_script = f"""\n# {'Code prepended by Terminal.run_pyscript'.center(80, '=')}; import crocodile.toolbox as tb; tb.sys.path.insert(0, r'{wdir or P.cwd()}'); # {'End of header, start of script passed'.center(80, '=')}\n""".replace("; ", "\n")  # this header is necessary so import statements in the script passed are identified relevant to wdir.
         script = (header_script + script if header else script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script); print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         _ = delete  # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
-    replicate_in_new_session = staticmethod(lambda obj, cmd="": Terminal.run_script(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
+    replicate_in_new_session = staticmethod(lambda obj, cmd="": Terminal.run_pyscript(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
     @staticmethod
-    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_script(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
+    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_pyscript(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
     @staticmethod
     def is_user_admin():  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name == 'nt':
-            import ctypes
-            try: return ctypes.windll.shell32.IsUserAnAdmin()
+            try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
             except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
-    def run_code_as_admin(params):
-        _ = install_n_import("win32api", name="pypiwin32")
-        win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
-        win32com.shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=params)
-    @staticmethod
-    def run_as_admin(cmd_line=None, wait=True):
-        """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new command.  It must be a list of [command, arg1, arg2...] format.
-        Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
-        Returns the sub-process return code, unless wait is False in which case it returns None. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
-        if __import__('os').name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
-        _ = install_n_import("win32api", name="pypiwin32")
-        win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
-        win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
-        if cmd_line is None: cmd_line = [sys.executable] + sys.argv
-        elif type(cmd_line) not in (tuple, list): raise ValueError("cmdLine is not a sequence.")
-        cmd, params = '"%s"' % (cmd_line[0],), " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
-        proce_info = win32com.shell.shell.ShellExecuteEx(nShow=__import__("win32con").SW_SHOWNORMAL, fMask=__import__("win32com", fromlist=["shell.shellcon"]).shell.shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas', lpFile=cmd, lpParameters=params)  # causes UAC elevation prompt.
-        if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); return win32process.GetExitCodeProcess(proc_handle)
-        else: return None
+    def run_code_as_admin(code): return install_n_import("win32api", name="pypiwin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=code)
 
 
 class SSH(object):

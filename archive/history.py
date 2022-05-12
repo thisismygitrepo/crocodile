@@ -117,6 +117,23 @@ class SaveDecorator(object):
         print(f"File {obj} saved @ ", path.absolute().as_uri(), ". Directory: ", path.parent.absolute().as_uri())
         return path
 
+
+def run_as_admin(cmd_line=None, wait=True):
+    """Attempt to relaunch the current script as an admin using the same command line parameters.  Pass cmdLine in to override and set a new command.  It must be a list of [command, arg1, arg2...] format.
+    Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
+    Returns the sub-process return code, unless wait is False in which case it returns None. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
+    if __import__('os').name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
+    _ = install_n_import("win32api", name="pypiwin32")
+    win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
+    win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
+    if cmd_line is None: cmd_line = [sys.executable] + sys.argv
+    elif type(cmd_line) not in (tuple, list): raise ValueError("cmdLine is not a sequence.")
+    cmd, params = '"%s"' % (cmd_line[0],), " ".join(['"%s"' % (x,) for x in cmd_line[1:]])
+    proce_info = win32com.shell.shell.ShellExecuteEx(nShow=__import__("win32con").SW_SHOWNORMAL, fMask=__import__("win32com", fromlist=["shell.shellcon"]).shell.shellcon.SEE_MASK_NOCLOSEPROCESS, lpVerb='runas', lpFile=cmd, lpParameters=params)  # causes UAC elevation prompt.
+    if wait: proc_handle = proce_info['hProcess']; _ = win32event.WaitForSingleObject(proc_handle, win32event.INFINITE); return win32process.GetExitCodeProcess(proc_handle)
+    else: return None
+
+
 #
 # class Base:
 #     def save_code(self, path):  # a usecase for including code in the save is when the source code is continously changing and still you want to reload an old version."""
