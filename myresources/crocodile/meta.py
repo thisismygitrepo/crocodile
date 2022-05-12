@@ -84,6 +84,14 @@ class Terminal:
         """ The advantage of addig `powershell -Command` is to give access to wider range of options. Other wise, command prompt shell doesn't recognize commands like `ls`.
         `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned. # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`"""
         return self.Response.from_completed_process(resp)
+    @staticmethod
+    def is_user_admin():  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
+        if __import__('os').name == 'nt':
+            try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
+            except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
+        else: return __import__('os').getuid() == 0  # Check for root on Posix
+    @staticmethod
+    def run_as_admin(file, params, wait=False): proce_info = install_n_import("win32api", name="pypiwin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); __import__("time").sleep(wait) if wait is not False and wait is not True else None; return proce_info
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
@@ -101,17 +109,20 @@ class Terminal:
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script); print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         _ = delete  # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
-    replicate_in_new_session = staticmethod(lambda obj, cmd="": Terminal.run_pyscript(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
+    pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal.run_pyscript(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
+    @staticmethod
+    def import_to_new_session(func, cmd=""):
+        if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
+            module = P(sys.modules['__main__'].__file__).rel2cwd().stem if (module := func.__module__) == "__main__" else module
+            cmd = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}\n{cmd}"
+        else:  # it is a standalone function.
+            module = P(func.__code__.co_filename)  # module = func.__module__  # fails if the function comes from main as it returns __main__.
+            sys.path.insert(0, module.parent)  # potentially dangerous as it leads to perplexing behaviour.
+            cmd = f"import {module.stem} as m\nobj=m.{func.__name__}\n{cmd}"
+        return Terminal().run_async("python", "-c", cmd)
+
     @staticmethod
     def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_pyscript(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
-    @staticmethod
-    def is_user_admin():  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
-        if __import__('os').name == 'nt':
-            try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
-            except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
-        else: return __import__('os').getuid() == 0  # Check for root on Posix
-    @staticmethod
-    def run_code_as_admin(code): return install_n_import("win32api", name="pypiwin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=sys.executable, lpParameters=code)
 
 
 class SSH(object):
@@ -151,7 +162,7 @@ class Scheduler:
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
-            time1 = datetime.now(); self.logger.info(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='minutes', sep=' ')}")
+            time1 = datetime.now(); self.logger.info(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='seconds', sep=' ')}")
             try: self.routine(sched=self)
             except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
             if self.cycle % self.other_ratio == 0:

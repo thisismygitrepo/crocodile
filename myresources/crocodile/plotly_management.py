@@ -56,19 +56,6 @@ class App:
     def get_app(name=""): return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
 
     @staticmethod
-    def run_async(func):
-        if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
-            cn = func.__qualname__.split(".")[0]  # class name is obtained.
-            module = tb.P(sys.modules['__main__'].__file__).rel2cwd().stem if (module := func.__module__) == "__main__" else module
-            cmd = f"import {module} as m; inst=m.{cn}(); inst.{func.__name__}()"
-        else:  # it is a standalone function.
-            # module = func.__module__  # fails if the function comes from main as it returns __main__.
-            module = tb.P(func.__code__.co_filename)
-            tb.sys.path.insert(0, module.parent)  # potentially dangerous as it leads to perplexing behaviour.
-            cmd = f"import {module.stem} as m; m.{func.__name__}()"
-        return tm.run_async("python", "-c", cmd)
-
-    @staticmethod
     def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
         def get_async_version(): return App.run_async(func)
         return get_async_version
