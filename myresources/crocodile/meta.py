@@ -2,6 +2,7 @@
 
 from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
 from crocodile.file_management import P, datetime
+import time
 import logging
 import subprocess
 import sys
@@ -91,7 +92,7 @@ class Terminal:
             except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
-    def run_as_admin(file, params, wait=False): proce_info = install_n_import("win32api", name="pypiwin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); __import__("time").sleep(wait) if wait is not False and wait is not True else None; return proce_info
+    def run_as_admin(file, params, wait=False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
     def run_async(self, *cmds, new_window=True, shell=None, terminal=None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
@@ -153,26 +154,26 @@ class SSH(object):
 
 
 class Scheduler:
-    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats=None):
+    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), goal=None, exception_handler=None, logger: Log = None, sess_stats=None):
         self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
         self.other_routine = (lambda sched: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
-        self.logger, self.exception_handler = logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
+        self.goal, self.logger, self.exception_handler = (lambda sched: False) if goal is None else goal, logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
-        while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
-            time1 = datetime.now(); self.logger.info(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='seconds', sep=' ')}")
+        while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles and not self.goal(self):  # 1- Time before Ops, and Opening Message
+            time1 = datetime.now(); self.logger.warning(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='seconds', sep=' ')}")
             try: self.routine(sched=self)
             except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
             if self.cycle % self.other_ratio == 0:
                 try: self.other_routine(sched=self)
                 except BaseException as ex: self._handle_exceptions(ex=ex, during="occasional")  # 3- Optional logic every while
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
-            self.cycle += 1; self.logger.info(f"Finishing Cycle {self.cycle - 1: <4}. Sleeping for {self.wait} seconds. ({time_left} seconds left)\n" + "-" * 100)
-            try: __import__("time").sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
+            self.cycle += 1; self.logger.warning(f"Finishing Cycle {self.cycle - 1: <4}. Sleeping for {self.wait} seconds. ({time_left} seconds left)\n" + "-" * 100)
+            try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
-        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
+        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else (f"Reached due stop time ({until})" if datetime.now() > datetime.fromisoformat(until) else "Achieved goal.")); return self
     def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
     def record_session_end(self, reason="Not passed to function."):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((sess_stats := self.sess_stats(sched=self)).values()))

@@ -123,7 +123,7 @@ def run_as_admin(cmd_line=None, wait=True):
     Set wait to False to avoid waiting for the sub-process to finish. You will not be able to fetch the exit code of the process if wait is False.
     Returns the sub-process return code, unless wait is False in which case it returns None. adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
     if __import__('os').name != 'nt': raise RuntimeError("This function is only implemented on Windows.")
-    _ = install_n_import("win32api", name="pypiwin32")
+    # _ = install_n_import("win32api", name="pypiwin32")
     win32event, win32process = install_n_import("win32event"), install_n_import("win32process")
     win32com = __import__("win32com", fromlist=["shell.shell.ShellExecuteEx"])
     if cmd_line is None: cmd_line = [sys.executable] + sys.argv
