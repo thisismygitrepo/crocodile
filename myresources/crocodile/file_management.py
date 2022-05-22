@@ -67,11 +67,10 @@ class P(type(Path()), Path):
     Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace` it defaults to False and in essence, it deletes the original underlying object.
     This can be seen in `zip` and `encrypt` but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
     Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
-    def delete(self, sure=False, verbose=True):
-        slf = self  # slf = self.expanduser().resolve() don't resolve symlinks.
-        if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(slf)}.") if verbose else None; return self
-        if not slf.exists(): slf.unlink(missing_ok=True); print(f"Could NOT DELETE nonexisting file {repr(slf)}. ") if verbose else None; return slf  # broken symlinks exhibit funny existence behaviour, catch them here.
-        slf.unlink(missing_ok=True) if slf.is_file() or slf.is_symlink() else __import__("shutil").rmtree(slf, ignore_errors=False); print(f"DELETED {repr(slf)}.") if verbose else None; return self
+    def delete(self, sure=False, verbose=True):  # slf = self.expanduser().resolve() don't resolve symlinks.
+        if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
+        if not self.exists(): self.unlink(missing_ok=True); print(f"Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
+        self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); print(f"DELETED {repr(self)}.") if verbose else None; return self
     def send2trash(self, verbose=True):
         if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
@@ -109,7 +108,7 @@ class P(type(Path()), Path):
         else:  __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
-    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Fridge(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
+    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt)
         lines, bingo = self.read_text(encoding=encoding).split("\n"), False
@@ -339,18 +338,17 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
 class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
 
 
-class Fridge:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
+class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
     def __init__(self, source_func, expire="1m", logger=None, path=None, save=Save.pickle, reader=Read.read):
         self.cache = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
-        self.time_produced = None
-        self.save, self.reader, self.logger, self.expire = save, reader, logger, expire
+        self.time_produced, self.save, self.reader, self.logger, self.expire = None, save, reader, logger, expire
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
     def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     def __getstate__(self): state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh=False):
-        if self.path is None:  # Memory Fridge
+        if self.path is None:  # Memory Cache
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire): self.cache, self.time_produced = self.source_func(), datetime.now(); self.logger.debug(f"Updating / Saving data from {self.source_func}") if self.logger else None
             elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
         elif fresh or not self.path.exists() or self.age > str2timedelta(self.expire):  # disk fridge

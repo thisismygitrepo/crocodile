@@ -57,8 +57,7 @@ class App:
 
     @staticmethod
     def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
-        def get_async_version(): return App.run_async(func)
-        return get_async_version
+        raise NotImplementedError
 
 
 if __name__ == '__main__':
