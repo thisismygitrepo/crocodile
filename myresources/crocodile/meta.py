@@ -33,7 +33,7 @@ class Log(logging.Logger):  #
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
     def __reduce_ex__(self, protocol): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. Its lower than getstate and setstate. It uses init method to create an instance.
     def __repr__(self): return "".join([f"Logger {self.name} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
-    get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s{sep}%(levelno)s{sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
+    get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
     def manual_degug(self, path): _ = self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
@@ -75,7 +75,7 @@ class Terminal:
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
     def run(self, *cmds, shell=None, check=False, ip=None):  # Runs SYSTEM commands like subprocess.run
-        """Blocking operation. Thus, if you start a shell via this method, it will run in the main an won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
+        """Blocking operation. Thus, if you start a shell via this method, it will run in the main and won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched."""
         my_list = list(cmds)  # `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job. `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task. `suprocess.call` is an archaic command for pre-Python-3.5.
@@ -104,26 +104,26 @@ class Terminal:
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     @staticmethod
-    def run_pyscript(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):
-        header_script = f"""\n# {'Code prepended by Terminal.run_pyscript'.center(80, '=')}; import crocodile.toolbox as tb; tb.sys.path.insert(0, r'{wdir or P.cwd()}'); # {'End of header, start of script passed'.center(80, '=')}\n""".replace("; ", "\n")  # this header is necessary so import statements in the script passed are identified relevant to wdir.
-        script = (header_script + script if header else script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
+    def run_pyscript(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):  # async run, since sync run is meaningless.
+        script = ((Terminal.get_header(wdir=wdir) if header else "") + script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script); print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         _ = delete  # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
     pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal.run_pyscript(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
     @staticmethod
-    def import_to_new_session(func, cmd=""):
+    def import_to_new_session(func, cmd="", header=True, interactive=True, ipython=True, **kwargs):
+        load_kwargs_string = f"""loaded_kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nloaded_kwargs.print()\nobj(**loaded_kwargs)""" if kwargs is not {} else ""
         if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
             module = P(sys.modules['__main__'].__file__).rel2cwd().stem if (module := func.__module__) == "__main__" else module
-            cmd = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}\n{cmd}"
+            load_func_string = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}"
         else:  # it is a standalone function.
             module = P(func.__code__.co_filename)  # module = func.__module__  # fails if the function comes from main as it returns __main__.
-            sys.path.insert(0, module.parent)  # potentially dangerous as it leads to perplexing behaviour.
-            cmd = f"import {module.stem} as m\nobj=m.{func.__name__}\n{cmd}"
-        return Terminal().run_async("python", "-c", cmd)
-
+            load_func_string = f"tb.sys.path.insert(0, r'{module.parent}')\nimport {module.stem} as m\nobj=m.{func.__name__}"
+        return Terminal.run_pyscript(load_func_string + f"\n{cmd}\n{load_kwargs_string}\n", header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
     def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_pyscript(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
+    @staticmethod
+    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(80, '=')}\nimport crocodile.toolbox as tb\ntb.sys.path.insert(0, r'{wdir or P.cwd()}')\n# {'End of header, start of script passed'.center(80, '=')}\n\n"""
 
 
 class SSH(object):
@@ -142,7 +142,7 @@ class SSH(object):
     def open_console(self, new_window=True): Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def copy_to_here(self, source, target=None): pass
-    def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c 'import crocodile.toolbox as tb; {cmd} ' """)
+    def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c '{Terminal.get_header()}{cmd} ' """)
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
@@ -158,26 +158,26 @@ class Scheduler:
         self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
         self.other_routine = (lambda sched: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
-        self.goal, self.logger, self.exception_handler = (lambda sched: False) if goal is None else goal, logger or Log(name="SchedulerAutoLogger_" + randstr()), exception_handler
+        self.goal, self.logger, self.exception_handler = (lambda sched: False) if goal is None else goal, logger or Log(name="SchedLogger_" + randstr(length=2)), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles and not self.goal(self):  # 1- Time before Ops, and Opening Message
-            time1 = datetime.now(); self.logger.warning(f"Starting Cycle {self.cycle: <5}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='seconds', sep=' ')}")
+            time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)[:-7]: <10}. UTC Time: {datetime.utcnow().isoformat(timespec='seconds', sep=' ')}")
             try: self.routine(sched=self)
             except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
             if self.cycle % self.other_ratio == 0:
                 try: self.other_routine(sched=self)
                 except BaseException as ex: self._handle_exceptions(ex=ex, during="occasional")  # 3- Optional logic every while
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
-            self.cycle += 1; self.logger.warning(f"Finishing Cycle {self.cycle - 1: <4}. Sleeping for {self.wait} seconds. ({time_left} seconds left)\n" + "-" * 100)
+            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)}. Sleeping for {self.wait}s. ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
         else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else (f"Reached due stop time ({until})" if datetime.now() > datetime.fromisoformat(until) else "Achieved goal.")); return self
     def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
     def record_session_end(self, reason="Not passed to function."):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((sess_stats := self.sess_stats(sched=self)).values()))
-        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait} seconds", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
+        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.

@@ -8,6 +8,10 @@ def share(path):
     response = install_n_import("requests").post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False,
                                                  description="its a file, init?", ), files={'file': path.read_bytes()})
     return response.json()['link'] if ['link'] in response.json() else response.json()
+def edit_video(path, t_start=0, t_end=None, speed=1, suffix=None, rotate=0, volume=1.0, fps=25):
+    from moviepy.editor import VideoFileClip, vfx
+    clip = VideoFileClip(path); print(f"{clip.size=}, {clip.duration=}, {clip.fps=}")
+    clip.subclip(t_start=t_start, t_end=t_end).rotate(rotate).volumex(volume).fx(vfx.speedx, speed).write_videofile(path.append("_modified").with_suffix(path.suffix if suffix is None else suffix), fps=fps)
 
 
 def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()

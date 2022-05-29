@@ -8,7 +8,7 @@ from plotly.subplots import make_subplots
 import plotly.io as pio
 
 import dash
-from dash.dependencies import Input, Output, State
+from dash import Input, Output, State, callback_context as ctx
 from dash import dcc
 from dash import html
 import dash_daq as daq

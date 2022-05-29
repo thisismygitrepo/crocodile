@@ -108,7 +108,7 @@ class P(type(Path()), Path):
         else:  __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
-    def read_fresh_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
+    def cache_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt)
         lines, bingo = self.read_text(encoding=encoding).split("\n"), False
@@ -239,7 +239,6 @@ class P(type(Path()), Path):
     def create(self, parents=True, exist_ok=True, parents_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     def chdir(self): __import__("os").chdir(str(self.expanduser())); return self
     def listdir(self): return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
-    pwd = staticmethod(lambda: P.cwd())
     tempdir = staticmethod(lambda: P(__import__("tempfile").mktemp()))
     temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))
     tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
