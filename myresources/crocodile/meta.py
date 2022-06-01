@@ -163,7 +163,7 @@ class Scheduler:
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles and not self.goal(self):  # 1- Time before Ops, and Opening Message
-            time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time): <10}. UTC Time {datetime.utcnow().strftime('%d %H:%M:%S')}")
+            time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
             try: self.routine(sched=self)
             except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
             if self.cycle % self.other_ratio == 0:
