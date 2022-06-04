@@ -104,12 +104,12 @@ class Terminal:
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     @staticmethod
-    def run_pyscript(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):  # async run, since sync run is meaningless.
+    def run_py(script, wdir=None, interactive=True, ipython=True, shell=None, delete=False, terminal="", new_window=True, header=True):  # async run, since sync run is meaningless.
         script = ((Terminal.get_header(wdir=wdir) if header else "") + script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         file = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script); print(f"Script to be executed asyncronously: ", file.absolute().as_uri())
         Terminal().run_async(f"{'ipython' if ipython else 'python'}", f"{'-i' if interactive else ''}", f"{file}", terminal=terminal, shell=shell, new_window=new_window)  # python will use the same dir as the one from console this method is called.
         _ = delete  # we need to ensure that async process finished reading before deleteing: file.delete(sure=delete, verbose=False)
-    pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal.run_pyscript(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
+    pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal.run_py(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
     @staticmethod
     def import_to_new_session(func, cmd="", header=True, interactive=True, ipython=True, **kwargs):
         load_kwargs_string = f"""loaded_kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nloaded_kwargs.print()\nobj(**loaded_kwargs)""" if kwargs is not {} else ""
@@ -119,11 +119,11 @@ class Terminal:
         else:  # it is a standalone function.
             module = P(func.__code__.co_filename)  # module = func.__module__  # fails if the function comes from main as it returns __main__.
             load_func_string = f"tb.sys.path.insert(0, r'{module.parent}')\nimport {module.stem} as m\nobj=m.{func.__name__}"
-        return Terminal.run_pyscript(load_func_string + f"\n{cmd}\n{load_kwargs_string}\n", header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
+        return Terminal.run_py(load_func_string + f"\n{cmd}\n{load_kwargs_string}\n", header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
-    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_pyscript(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
+    def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
     @staticmethod
-    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(80, '=')}\nimport crocodile.toolbox as tb\ntb.sys.path.insert(0, r'{wdir or P.cwd()}')\n# {'End of header, start of script passed'.center(80, '=')}\n\n"""
+    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(80, '=')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(80, '=')}\n\n"""
 
 
 class SSH(object):
@@ -137,20 +137,20 @@ class SSH(object):
         self.remote_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.remote_machine == "Windows" else rf"""source ~/venvs/ve/bin/activate"""
         self.local_python_cmd = rf"""~/venvs/ve/Scripts/activate""" if self.platform.system() == "Windows" else rf"""source ~/venvs/ve/bin/activate"""  # works for both cmd and pwsh
     def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
-    def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] SSH connection to {self.get_repr('remote')} [{self.remote_machine}] "
-    def get_repr(self, which="remote"): return f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}"
+    def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH connection to >>>>>>>>> {self.get_repr('remote')} [{self.remote_machine}] "
+    def get_repr(self, which="remote"): return f"{which} " + (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
     def open_console(self, new_window=True): Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def copy_to_here(self, source, target=None): pass
-    def runpy(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c '{Terminal.get_header()}{cmd} ' """)
+    def run_py(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c '{Terminal.get_header(wdir=None)}{cmd} ' """)
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True))); _ = pwd
-        if target is None: target = P(source).collapseuser(); print(target, P(source), P(source).collapseuser()); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
-        print("\n" * 3, f"Creating Target directory `{target}` @ remote machine.".center(80, "=")); remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
-        print(f"SENT `{source}` ==> `{remotepath}`".center(80, "="), "\n" * 2); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath)
-        if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.runpy(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)"""); source.delete(sure=True); return resp
+        if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
+        print("\n" * 3, f"Creating Target directory `{target}` @ {self.get_repr('remote')}.".center(80, "=")); remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
+        print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath); print(f"all done".center(80, "="), "\n" * 2)
+        if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.run_py(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)"""); source.delete(sure=True); return resp
 
 
 class Scheduler:
