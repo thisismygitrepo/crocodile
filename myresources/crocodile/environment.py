@@ -108,7 +108,6 @@ class EnvVar:
         return result if run is False else tm.run(result, shell="powershell")
 
     # in windows cmd `%key%`
-
     @staticmethod
     def delete(key, temp=True, scope=["User", "system"][0], run=False):
         if system == "Windows":
@@ -127,6 +126,9 @@ class PathVar:
     def append_temporarily(path, kind="append", run=False):
         if system == "Windows":
             """Source: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.2"""
+            if tb.P(path) in Path:
+                print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+                return None
             if kind == "append": command = fr'$env:Path += ";{path}"'  # Append to the Path variable in the current window:
             elif kind == "prefix": command = fr'$env:Path = "{path};" + $env:Path'  # Prefix the Path variable in the current window:
             elif kind == "replace": command = fr'$env:Path = "{path}"'  # Replace the Path variable in the current window (use with caution!):
@@ -139,22 +141,23 @@ class PathVar:
     def append_permanently(path, scope=["User", "system"][0], run=False):
         if system == "Windows":
             # AVOID THIS AND OPT TO SAVE IT IN $profile.
-            backup = fr'$env:PATH >> {tb.P.tmpfile()}.path_backup; '
+            tmp_path = tb.P.tmpfile(suffix=".path_backup")
+            if tb.P(path) in Path:
+                print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+                return None
+            backup = fr'$env:PATH >> {tmp_path}; '
             command = fr'[Environment]::SetEnvironmentVariable("Path", $env:PATH + ";{path}", "{scope}")'
             result = backup + command
-            return result if run is False else tm.run(result, shell="powershell")
+            return result if run is False else tm.run(result, shell="powershell").print()
         else: tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
 
     @staticmethod
     def set_permanetly(path, scope=["User", "system"][0], run=False):
-        """This is useful if path is manipulated with a text editor or Python string manipulation
-        (not recommended programmatically even if original is backed up) and set the final value.
-        On a windows machine, system and user variables are kept separately. env:Path returns the combination
-        of both, starting from system then user.
-        To see impact of change, you will need to restart the process from which the shell started. This is probably
-        windows explorer. This can be achieved by suspending the process, alternatively you need to logoff and on.
-        This is because enviroment variables are inherited from parent process, and so long explorere is not updated,
-        restarting the shell would not help."""
+        """This is useful if path is manipulated with a text editor or Python string manipulation (not recommended programmatically even if original is backed up) and set the final value.
+        On a windows machine, system and user variables are kept separately. env:Path returns the combination of both, starting from system then user.
+        To see impact of change, you will need to restart the process from which the shell started. This is probably windows explorer.
+        This can be achieved by suspending the process, alternatively you need to logoff and on.
+        This is because enviroment variables are inherited from parent process, and so long explorere is not updated, restarting the shell would not help."""
         tmpfile = tb.P.tmpfile(suffix=".path_backup")
         print(f"Saving original path to {tmpfile}")
         backup = fr'$env:PATH >> {tmpfile}; '
@@ -184,7 +187,7 @@ def get_shell_profiles(shell):
 
 
 def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
-def get_defined_programs(string_="*.exe"): return tb.P.env().Path.search(string_).reduce(lambda x, y: x+y).print()
+def get_path_defined_files(string_="*.exe"): return tb.P.env().Path.search(string_).reduce(lambda x, y: x+y).print()
 
 
 if __name__ == '__main__':

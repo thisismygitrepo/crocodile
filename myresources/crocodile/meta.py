@@ -148,7 +148,7 @@ class SSH(object):
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True))); _ = pwd
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
-        print("\n" * 3, f"Creating Target directory `{target}` @ {self.get_repr('remote')}.".center(80, "=")); remotepath = P(self.runpy(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
+        print("\n" * 3, f"Creating Target directory `{target}` @ {self.get_repr('remote')}.".center(80, "=")); remotepath = P(self.run_py(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
         print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath); print(f"all done".center(80, "="), "\n" * 2)
         if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.run_py(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)"""); source.delete(sure=True); return resp
 
