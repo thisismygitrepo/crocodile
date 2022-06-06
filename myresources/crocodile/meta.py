@@ -66,7 +66,7 @@ class Terminal:
         returncode = property(lambda self: self.output["returncode"])
         as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print(self): self.capture(); print(f"Terminal Response:\nInput Command: {self.input}\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 50, "\n\n"); return self
+        def print(self, desc=""): self.capture(); print(desc.center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 80, "\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
@@ -116,14 +116,14 @@ class Terminal:
         if func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
             module = P(sys.modules['__main__'].__file__).rel2cwd().stem if (module := func.__module__) == "__main__" else module
             load_func_string = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}"
-        else:  # it is a standalone function.
+        else:  # it is a standalone function...
             module = P(func.__code__.co_filename)  # module = func.__module__  # fails if the function comes from main as it returns __main__.
             load_func_string = f"tb.sys.path.insert(0, r'{module.parent}')\nimport {module.stem} as m\nobj=m.{func.__name__}"
         return Terminal.run_py(load_func_string + f"\n{cmd}\n{load_kwargs_string}\n", header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
     def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}'); tb.dill.load_session(str(path)); path.delete(sure=True, verbose=False); {cmd}""".replace("; ", "\n"))
     @staticmethod
-    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(80, '=')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(80, '=')}\n\n"""
+    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(1, '=')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(1, '=')}\n"""
 
 
 class SSH(object):
@@ -139,18 +139,25 @@ class SSH(object):
     def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
     def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH connection to >>>>>>>>> {self.get_repr('remote')} [{self.remote_machine}] "
     def get_repr(self, which="remote"): return f"{which} " + (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
-    def open_console(self, new_window=True): Terminal().run_async(f"""ssh -i {self.sshkey} {self.username}@{self.hostname}""", new_window=new_window)
-    def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
-    def copy_to_here(self, source, target=None): pass
-    def run_py(self, cmd): return self.run(f"""{self.remote_python_cmd}; python -c '{Terminal.get_header(wdir=None)}{cmd} ' """)
+    def open_console(self, new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", *f""" {self.username}@{self.hostname}""".split(" "), new_window=new_window, terminal=terminal)
+    def run(self, cmd, verbose=True, desc=""): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print(desc=desc) if verbose else None; return res
+    def run_py(self, cmd, desc="", return_obj=False): return self.run(f"""{self.remote_python_cmd}; python -c '{Terminal.get_header(wdir=None)}{cmd} ' """, desc=desc) if not return_obj else self.copy_to_here(source=self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile())\nprint(path)""").op.split('\n')[-1], target=P.tmpfile(suffix='.pkl')).readit()
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
-    def run(self, cmd, verbose=True): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print() if verbose else None; return res
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
+        if (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False).apply(lambda file: self.copy_from_here(source=file))
         if zip_n_encrypt: print(f"ZIPPING & ENCRYPTING".center(80, "=")); source = P(source).expanduser().zip_n_encrypt(pwd=(pwd := randstr(length=10, safe=True))); _ = pwd
-        if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."; target = target.as_posix()
-        print("\n" * 3, f"Creating Target directory `{target}` @ {self.get_repr('remote')}.".center(80, "=")); remotepath = P(self.run_py(f'print(tb.P(r"{target}").expanduser().parent.create())').op or '').joinpath(P(target).name).as_posix()
-        print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath); print(f"all done".center(80, "="), "\n" * 2)
-        if zip_n_encrypt: print(f"UNZIPPING & DECRYPTING".center(80, "=")); resp = self.run_py(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)"""); source.delete(sure=True); return resp
+        if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        remotepath = P(self.run_py(f'print(tb.P(r"{P(target).as_posix()}").expanduser().parent.create())', desc=f"Creating Target directory `{target}` @ {self.get_repr('remote')}.").op or '').joinpath(P(target).name)
+        print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
+        if zip_n_encrypt: resp = self.run_py(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)""", desc=f"UNZIPPING & DECRYPTING"); source.delete(sure=True); return resp
+    def copy_to_here(self, source, target=None, zip_first=False):
+        if zip_first: source = P(self.run_py(f"""print(tb.P(r"{source}").expanduser().zip(inplace=False, verbose=False))""", desc=f"Zipping source file").op)
+        if target is None: target = P(self.run_py(f"""print(tb.P(r"{source.as_posix()}").collapseuser())""", desc=f"Finding default target via relative source path").op); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        target = P(target).expanduser().create(parents_only=True)
+        source = P(self.run_py(f'print(tb.P(r"{source}").expanduser())', desc=f"# Resolving source path address by expanding user").op) if "~" in str(source) else P(source)
+        print(f"RECEVING `{source}` ==> `{target}`".center(80, "=")); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
+        return target if not zip_first else target.unzip(inplace=True)  # todo, add garbage cleaning after zipping,
+    def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
 
 
 class Scheduler:
