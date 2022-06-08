@@ -5,7 +5,7 @@ from pathlib import Path
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
-def timestamp(fmt=None, name=None): return (name + '_' + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')) if name is not None else __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
+def timestamp(fmt=None, name=None): return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f') # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift):  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
@@ -189,13 +189,13 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__); return artist
 
-def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40): import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
+def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
 def config(mydict, sep="\n", justify=15, quotes=False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
-def f(str_, limit=float('inf'), justify=50, direc="<"): return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
+def f(str_, limit=float('inf'), justify=50, direc="<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
-def get_repr(data, justify=15, limit=float('inf'), direc="<"):
+def get_repr(data, justify=15, limit=float('inf'), direc="<") -> str:
     if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
