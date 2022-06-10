@@ -32,8 +32,8 @@ class Log(logging.Logger):  #
     def get_fhandler(self): return List(handler for handler in self.handlers if "FileHandler" in str(handler))
     def set_level(self, level, which=["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
     def __reduce_ex__(self, protocol): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. Its lower than getstate and setstate. It uses init method to create an instance.
-    def __repr__(self): return "".join([f"Logger {self.name} with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
-    get_format = staticmethod(lambda sep: f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
+    def __repr__(self): return "".join([f"Logger {self.name} (level {self.level}) with handlers: \n"] + [repr(h) + f"" + "\n" for h in self.handlers])
+    get_format = staticmethod(lambda sep=' | ': f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
     def manual_degug(self, path): _ = self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name=None, file=False, file_path=None, stream=True, fmt=None, sep=" | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
@@ -141,7 +141,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
     def get_repr(self, which="remote"): return f"{which} " + (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
     def open_console(self, new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", *f""" {self.username}@{self.hostname}""".split(" "), new_window=new_window, terminal=terminal)
     def run(self, cmd, verbose=True, desc=""): res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd); res.print(desc=desc) if verbose else None; return res
-    def run_py(self, cmd, desc="", return_obj=False): return self.run(f"""{self.remote_python_cmd}; python -c @'{Terminal.get_header(wdir=None)}{cmd}\n'@""", desc=desc) if not return_obj else self.copy_to_here(source=self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile())\nprint(path)""").op.split('\n')[-1], target=P.tmpfile(suffix='.pkl')).readit()
+    def run_py(self, cmd, desc="", return_obj=False, verbose=True): return self.run(f"""{self.remote_python_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc, verbose=verbose) if not return_obj else self.copy_to_here(source=self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile())\nprint(path)""", desc=desc, verbose=verbose).op.split('\n')[-1], target=P.tmpfile(suffix='.pkl')).readit()
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def copy_from_here(self, source, target=None, zip_n_encrypt=False):
         if not zip_n_encrypt and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False).apply(lambda file: self.copy_from_here(source=file, target=target))
@@ -150,8 +150,8 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         remotepath = P(self.run_py(f"print(tb.P(r'{P(target).as_posix()}').expanduser().parent.create())", desc=f"Creating Target directory `{target}` @ {self.get_repr('remote')}.").op or '').joinpath(P(target).name)
         print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
         if zip_n_encrypt: resp = self.run_py(f"""tb.P(r"{remotepath}").expanduser().decrypt_n_unzip(pwd="{eval('pwd')}", inplace=True)""", desc=f"UNZIPPING & DECRYPTING"); source.delete(sure=True); return resp
-    def copy_to_here(self, source, target=None, zip_first=False):
-        if not zip_first and self.run_py(f"print(tb.P(r'{source}').is_dir())").op == 'True': return self.run_py(f"obj=tb.P(r'{source}').search(folders=False)", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=target))
+    def copy_to_here(self, source, target=None, zip_first=False, _check_for_dir=True):
+        if not zip_first and _check_for_dir and self.run_py(f"print(tb.P(r'{source}').is_dir())", desc="Check if source is a dir", verbose=True).op == 'True': return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True)", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=target, _check_for_dir=False))
         if zip_first: source = P(self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file").op)
         if target is None: target = P(self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path").op); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True)
@@ -163,15 +163,15 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
 
 
 class Scheduler:
-    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), goal=None, exception_handler=None, logger: Log = None, sess_stats=None):
+    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats=None):
         self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
         self.other_routine = (lambda sched: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
-        self.goal, self.logger, self.exception_handler = (lambda sched: False) if goal is None else goal, logger or Log(name="SchedLogger_" + randstr(length=2)), exception_handler
+        self.logger, self.exception_handler = logger or Log(name="SchedLogger_" + randstr(length=2)), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
-        while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles and not self.goal(self):  # 1- Time before Ops, and Opening Message
+        while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
             try: self.routine(sched=self)
             except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
@@ -182,7 +182,7 @@ class Scheduler:
             self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
-        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else (f"Reached due stop time ({until})" if datetime.now() > datetime.fromisoformat(until) else "Achieved goal.")); return self
+        else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
     def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
     def record_session_end(self, reason="Not passed to function."):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((sess_stats := self.sess_stats(sched=self)).values()))

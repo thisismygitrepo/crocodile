@@ -24,7 +24,7 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
             if add_suffix:
                 [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
                 path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext; path = Path(path).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size (MB) = {path.stat().st_size / 1024**2:0.2f}") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
+            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size (MB) = {path.stat().st_size / 1024**2:0.2f}") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
             return path
         return wrapper
     return decorator
@@ -177,6 +177,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def get(self, key=None, default=None, strict=False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys or [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
     def apply2keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
     def apply2values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
+    def apply(self, kv_func) -> 'List': return self.items().apply(lambda item: kv_func(item[0], item[1]))
     def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
