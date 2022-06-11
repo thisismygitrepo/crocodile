@@ -1,5 +1,6 @@
 
 from crocodile.file_management import P, install_n_import, datetime
+from crocodile.core import List
 from crocodile.meta import Scheduler, Log
 import time
 
@@ -75,6 +76,21 @@ def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit
             elif not limit_to_directories: yield prefix + pointer + path.name + get_stats(path); files += 1
     print(dir_path.name); iterator = inner(dir_path, level_=level)
     [print(line) for line in __import__("itertools").islice(iterator, length_limit)]; print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None; print(f'\n{directories} directories' + (f', {files} files' if files else ''))
+
+
+def compress_directory(path, max_size=15_000, lenient=False):
+    def probe_dir(directory):
+        tmp_results = directory.search("*")
+        final_results = List()
+        for item in tmp_results:
+            if item.size() > max_size:
+                if item.is_file():
+                    if not lenient: raise RuntimeError(f"A single file `{item}` with larger size than maximum allowed, the plan can not be carried out.")
+                    else: final_results.append(item)
+                else: final_results += probe_dir(item)
+            else: final_results.append(item)
+        return final_results
+    return probe_dir(path)
 
 
 if __name__ == '__main__':
