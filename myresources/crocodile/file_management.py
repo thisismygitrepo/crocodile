@@ -256,13 +256,15 @@ class P(type(Path()), Path):
                 root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
                 path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, **kwargs):
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, pwd=None, **kwargs):
         slf = zipfile = self.expanduser().resolve()
-        if slf.suffix != ".zip":  # may be there is .zip somewhere in the path.
-            if ".zip" not in str(slf): return slf
-            zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ".zip" in x)[0], sep=-1)
+        if slf.suffix not in (".zip", ".7z"):  # may be there is .zip somewhere in the path.
+            if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
+            zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).joinpath(zipfile.stem).expanduser().resolve()
-        result = Compression.unzip(zipfile, folder if not content else folder.parent, fname, **kwargs)
+        folder = folder if not content else folder.parent
+        if slf.suffix == ".7z": result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
+        else: result = Compression.unzip(zipfile, folder, fname, **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
     def untar(self, path, verbose=True): _ = self, path, verbose; return P()
@@ -280,10 +282,9 @@ class P(type(Path()), Path):
         _ = self, path, base_dir, kwargs, inplace
         pass
     def decompress(self): pass
-    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
-        if use_7z: path = seven_zip(path=slf, op_path=path, pwd=pwd)
-        else: assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
+        assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", **kwargs):
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(append, "") if "_encrypted" in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
@@ -322,11 +323,13 @@ def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and e
     if (env := P.env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.success, res.print(); return op_path
+    elif env.system == "Linux":
+        env.tm.run('sudo apt install p7zip-full p7zip-rar')
     else: raise NotImplementedError("7z not implemented for Linux")
 def un_seven_zip(path, op_dir, pwd=None):
     if (env := P.env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        env.tm.run(f"&'{program}' e {path} -o{op_dir} {f'-p{pwd}' if pwd is not None else ''}", shell="powershell")
+        res = env.tm.run(f"&'{program}' x {path} -o\"{op_dir}\" {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.success, res.print(); return op_dir
     else: raise NotImplementedError("7z not implemented for Linux")
 def gz(file, op_file):
     with open(file, 'rb') as f_in:

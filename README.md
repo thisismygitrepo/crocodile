@@ -1,22 +1,21 @@
 
 # Welcome to crocodile
 
-Crocodile is a library aiming at facilitating the use of Python in scripting, thus, offering an alternative to `PowerShell` & `Bash` which have absurdly complex commands that are nothing but jumble of ad-hoc developments piled over decades to save some programmers a key stroke or two. This heritage poses huge burden on the people coming into the computer science field. A full rant bashing those shells by `Brian Will` [is here on Youtube](<https://www.youtube.com/watch?v=L9v4Mg8wi4U`>). Crocodile offers Pythonic solution to scripting:
+Crocodile is a library aiming at facilitating the use of Python in scripting, thus, offering an alternative to `PowerShell` & `Bash` which have absurdly complex commands that are nothing but jumble of ad-hoc developments piled over decades to save some programmers a key stroke or two. This heritage poses huge burden on the people coming into the computer science field. A full rant bashing those shells by `Brian Will` [is here](<https://www.youtube.com/watch?v=L9v4Mg8wi4U`>).
 
-The core concept is:
-* No one has the time to listen to hours long tutorials on how powerful and versatile `ls` or `grep` are, let alone keeping the random syntax in mind (unless used on daily basis).  
-* Python shell on the other hand, offers benign syntax and eminent readibility but it comes at the rather hefty cost of terseness. For example, to make up for just `ls`, you need to import some libraries and it will eventually set you back a couple of lines of code. That's simply not acceptable for the simple task of listing directory contents, let alone compressing a directory.
-* Crocodile comes here to make Python terser and friendlier by offering functionality for everyday use, like **file management, SSH, enviroment variables management, etc**. In essence, croshell to IPython is what IPython to Python shell is; that is, the basic Python shell that can only do arithmetic is turbo-boosted making it perfect for everyday errands. 
-* Besides scriptting in crocodile shell, one can use crocodile in coding. This will fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
+The core rationale is:
+* No one has the time to listen to hours long tutorials on how powerful and versatile `ls` or `grep` are, let alone keeping the random syntax in mind (unless used on daily basis). 
+* Python shell on the other hand, offers benign syntax and eminent readibility but it comes at the rather hefty cost of terseness, or the lack of it. For example, to make up for just `ls`, you need to import some libraries and it will eventually set you back a couple of lines of code. That's not acceptable for the simple task of listing directory contents, let alone a task of compressing a directory.
+* Crocodile comes here to make Python terser and friendlier by offering functionality for everyday use, like **file management, SSH, enviroment variables management, etc**. In essence, croshell to IPython is what IPython to Python shell is; that is, the basic Python shell that can only do arithmetic is turbo-boosted making it perfect for everyday errands.
+* The library, if used in coding, will fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
 
-
-The name `crocodile` signifies the use of brute force in its implementation. The focus is on ease of use, never efficiency.
+The name `crocodile` signifies the use of brute force in its implementation. The focus is on ease of use, as oppoesd to beating the existing shells in speed.
 `Crocodile` designed carefully to be loved, learning curve cound't be flattened further.
 
 This package extends many native Python classes to equip you with an uneasy-to-tame power. The major classes extended are:
 
  * `pathlib.Path` is  extended to `P`
-      * Forget about importing all the **archaic** Python libraries `os`, `glob`, `shutil`, `sys`, `zipfile` etc. `P` makes the path an object, not a lame string. `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a shufti at this:
+      * Forget about importing all the **archaic** Python libraries `os`, `glob`, `shutil`, `sys`, `zipfile` etc. `P` makes the path an object, not a lame string. `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a squint at this:
       ```
    path = P("dataset/type1/meta/images/file3.ext")
      >> path[0]  # allows indexing! makes sense, hah?
