@@ -246,9 +246,9 @@ class P(type(Path()), Path):
     tmp = staticmethod(lambda folder=None, file=None, root="~/tmp_results": P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False))
     env = staticmethod(lambda: __import__("crocodile.environment").environment)
     # ====================================== Compression & Encryption ===========================================
-    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, **kwargs):
+    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, **kwargs):
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
-        if use_7z: seven_zip(path=slf, op_path=path)
+        if use_7z: path = seven_zip(path=slf, op_path=path, pwd=pwd)
         else:
             if (arcname := P(arcname or slf.name)).name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
             if slf.is_file(): path = Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, **kwargs)
@@ -281,9 +281,9 @@ class P(type(Path()), Path):
         pass
     def decompress(self): pass
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False, use_7z=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name); assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
-        if use_7z: seven_zip(path=slf, op_path=path, pwd=pwd)
-        else: path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
+        if use_7z: path = seven_zip(path=slf, op_path=path, pwd=pwd)
+        else: assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", **kwargs):
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(append, "") if "_encrypted" in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
@@ -317,11 +317,11 @@ def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwar
         if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
         else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); op_path = P(op_path) / fname
     return P(op_path)
-def seven_zip(path, op_path, pwd=None):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
+def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
+    op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path
     if (env := P.env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        op_path += '.7z' if not op_path.suffix == '.7z' else ''
-        env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell")
+        res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.success, res.print(); return op_path
     else: raise NotImplementedError("7z not implemented for Linux")
 def un_seven_zip(path, op_dir, pwd=None):
     if (env := P.env()).system == "Windows":
