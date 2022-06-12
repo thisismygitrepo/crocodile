@@ -1,31 +1,39 @@
 
 # Welcome to crocodile
 
-Fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
+Crocodile is a library aiming at facilitating the use of Python in scripting, thus, offering an alternative to `PowerShell` & `Bash` which have absurdly complex commands that are nothing but jumble of ad-hoc developments piled over decades to save some programmers a key stroke or two. This heritage poses huge burden on the people coming into the computer science field. A full rant bashing those shells by `Brian Will` [is here on Youtube](<https://www.youtube.com/watch?v=L9v4Mg8wi4U`>). Crocodile offers Pythonic solution to scripting:
+
+The core concept is:
+* No one has the time to listen to hours long tutorials on how powerful and versatile `ls` or `grep` are, let alone keeping the random syntax in mind (unless used on daily basis).  
+* Python shell on the other hand, offers benign syntax and eminent readibility but it comes at the rather hefty cost of terseness. For example, to make up for just `ls`, you need to import some libraries and it will eventually set you back a couple of lines of code. That's simply not acceptable for the simple task of listing directory contents, let alone compressing a directory.
+* Crocodile comes here to make Python terser and friendlier by offering functionality for everyday use, like **file management, SSH, enviroment variables management, etc**. In essence, croshell to IPython is what IPython to Python shell is; that is, the basic Python shell that can only do arithmetic is turbo-boosted making it perfect for everyday errands. 
+* Besides scriptting in crocodile shell, one can use crocodile in coding. This will fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
+
+
+The name `crocodile` signifies the use of brute force in its implementation. The focus is on ease of use, never efficiency.
+`Crocodile` designed carefully to be loved, learning curve cound't be flattened further.
 
 This package extends many native Python classes to equip you with an uneasy-to-tame power. The major classes extended are:
- 
- * `list` is  extended to `List`
-    * Forget that `for` loops exist, because with this class, `for` loops are implicitly used to apply a function to all items.
-      Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them.  `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. Behaviour is ala-JavaScript implementation of ``forEach`` method of Arrays.
 
-  * `dict` is  extended to `Struct`.
-    * Combines the power of dot notation like classes and key access like dictionaries.
-    
-   * `pathlib.Path` is  extended to `P`
-        * `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a shufti at this:
-        ```
-     path = tb.P("dataset/type1/meta/images/file3.ext")
-     >> path[0]  # allows indexing!
-        P("dataset")
+ * `pathlib.Path` is  extended to `P`
+      * Forget about importing all the **archaic** Python libraries `os`, `glob`, `shutil`, `sys`, `zipfile` etc. `P` makes the path an object, not a lame string. `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a shufti at this:
+      ```
+   path = P("dataset/type1/meta/images/file3.ext")
+     >> path[0]  # allows indexing! makes sense, hah?
+      P("dataset")
      >> path[-1]  # nifty!
-        P("file3.ext")
+      P("file3.ext")
      >> path[2:-1]  # even slicing!
-        P("meta/images/file3.ext")
-     ```
-     This and much more, is only on top of the indespensible `pathlib.Path` functionalities.
-        
-   * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensive support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and loading in one line.
+      P("meta/images/file3.ext")
+   ```
+ * `list` is  extended to `List`
+   * Forget that `for` loops exist, because with this class, `for` loops are implicitly used to apply a function to all items.
+     Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them.  `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. Behaviour is ala-JavaScript implementation of ``forEach`` method of Arrays.
+
+ * `dict` is  extended to `Struct`.
+     * Combines the power of dot notation like classes and key access like dictionaries.
+
+ * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensive support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and loading in one line.
 
    
 Furthermore, those classes are inextricably connected. For example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.
@@ -57,7 +65,7 @@ import crocodile.toolbox as tb
 # A Taste of Power
 EX1: Get a list of `.exe` available in terminal.
 
-     tb.P.env().Path.search('*.exe').reduce(lambda x, y: x+y).print()
+     P.env().Path.search('*.exe').reduce(lambda x, y: x+y).print()
 
 EX2: Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.
 

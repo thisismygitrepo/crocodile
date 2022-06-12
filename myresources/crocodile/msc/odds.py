@@ -79,18 +79,16 @@ def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit
 
 
 def compress_directory(path, max_size=15_000, lenient=False):
-    def probe_dir(directory):
-        tmp_results = directory.search("*")
-        final_results = List()
-        for item in tmp_results:
-            if item.size() > max_size:
-                if item.is_file():
-                    if not lenient: raise RuntimeError(f"A single file `{item}` with larger size than maximum allowed, the plan can not be carried out.")
-                    else: final_results.append(item)
-                else: final_results += probe_dir(item)
-            else: final_results.append(item)
-        return final_results
-    return probe_dir(path)
+    tmp_results = path.search("*")
+    final_results = List()
+    for item in tmp_results:
+        if item.size() > max_size:
+            if item.is_file():
+                if not lenient: raise RuntimeError(f"A single file `{item}` with larger size than maximum allowed, the plan can not be carried out.")
+                else: final_results.append(item)
+            else: final_results += compress_directory(item, max_size=max_size, lenient=lenient)
+        else: final_results.append(item)
+    return final_results
 
 
 if __name__ == '__main__':
