@@ -329,7 +329,7 @@ def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and e
 def un_seven_zip(path, op_dir, pwd=None):
     if (env := P.env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        res = env.tm.run(f"&'{program}' x {path} -o\"{op_dir}\" {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.success, res.print(); return op_dir
+        res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.success, res.print(); return op_dir
     else: raise NotImplementedError("7z not implemented for Linux")
 def gz(file, op_file):
     with open(file, 'rb') as f_in:
