@@ -261,7 +261,7 @@ class P(type(Path()), Path):
         if slf.suffix not in (".zip", ".7z"):  # may be there is .zip somewhere in the path.
             if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
-        folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).joinpath(zipfile.stem).expanduser().resolve()
+        folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
         if slf.suffix == ".7z": result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
         else: result = Compression.unzip(zipfile, folder, fname, **kwargs)
