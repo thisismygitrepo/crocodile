@@ -32,6 +32,10 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
+def unlock(drive="D:", pwd=None, auto_unlock=False):
+    return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/bitlocker_pwd").read_text()}" -AsPlainText -Force
+          Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString
+          """ + f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else '')
 
 
 # %% =================================== File ============================================

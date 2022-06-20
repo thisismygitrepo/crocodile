@@ -126,44 +126,44 @@ class Terminal:
 
 
 class SSH(object):  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
-    def __init__(self, username, hostname, sshkey=None, pwd=None, ve="ve"):
-        _ = False; super().__init__() if _ else None
+    def __init__(self, username, hostname=None, sshkey=None, pwd=None, env="ve"):
+        _ = False; super().__init__() if _ else None; username, hostname = username.split("@") if "@" in username else (username, hostname)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
         self.hostname, self.username, self.sftp, self.platform = hostname, username, self.ssh.open_sftp(), __import__("platform")
         self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" else "Linux"  # echo %OS%
-        self.remote_python_cmd = rf"""~/venvs/{ve}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{ve}/bin/activate"""
-        self.local_python_cmd = rf"""~/venvs/{ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{ve}/bin/activate"""  # works for both cmd and pwsh
+        self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
+        self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
     def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
     def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH TO >>>>>>>>> {self.get_repr('remote')} [{self.remote_machine}] "
     def get_repr(self, which="remote"): return f"{which} " + (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
     def open_console(self, new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", *f""" {self.username}@{self.hostname}""".split(" "), new_window=new_window, terminal=terminal)
-    def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False):
-        res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
+    def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False, env_prefix=False):
+        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
         if strict_err or strict_returncode: assert res.is_successfull(strict_err=strict_err, strict_returcode=strict_returncode), res.print(desc=desc)
         res.print(desc=desc) if verbose else None; return res
     def run_py(self, cmd, desc="", return_obj=False, verbose=True, strict_err=False, strict_returncode=False):
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
-        if not return_obj: return self.run(f"""{self.remote_python_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
+        if not return_obj: return self.run(f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
         else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile())\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def copy_from_here(self, source, target=None, zip_first=False, r=False):
         if not zip_first and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        if zip_first: print(f"ZIPPING".center(80, "=")); source = P(source).expanduser().zip()
+        if zip_first: print(f"ZIPPING".center(80, "=")); source = P(source).expanduser().zip().append(f"_{randstr()}", inplace=True)
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = P(self.run_py(f"print(tb.P(r'{P(target).as_posix()}').expanduser().parent.create())", desc=f"Creating Target directory `{target}` @ {self.get_repr('remote')}.").op or '').joinpath(P(target).name)
         print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
-        if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath}').expanduser().unzip(inplace=True)""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
+        if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath}').expanduser().unzip(content=True, inplace=True)""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False):
-        if not zip_first and self.run_py(f"print(tb.P(r'{source}').is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
-            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True)", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=target, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+        if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
+            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True)", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=P(target).joinpath(P(file).relative_to(source)), r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", strict_returncode=True, strict_err=True).as_path
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).as_path; assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        target = P(target).expanduser().create(parents_only=True)
+        target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source)
         print(f"RECEVING `{source}` ==> `{target}`".center(80, "=")); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
-        if zip_first: target = target.unzip(inplace=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True)
+        if zip_first: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True)
         return target
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
 
@@ -212,8 +212,10 @@ def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=Tr
     text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
     text += (f"# Code to generate the result\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     text += (f"# Source code file generated me was located here: \n'{__import__('inspect').getfile(obj)}'\n" + separator) if obj is not None else ""
+    if (res := Terminal().run("echo '## Last Commit'; git log -1; echo '## Remote Repo:'; git remote -v", shell="pwsh")).is_successfull(strict_err=True, strict_returcode=True):
+        text += res.op + "\nlink to files: " + res.op.split("## Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0]
     readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
-    if save_source_code: P(__import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+    if save_source_code: P(obj.__code__.co_filename or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
 def load_from_source_code(directory, obj=None, delete=False):
     P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
     sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
