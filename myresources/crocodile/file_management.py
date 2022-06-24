@@ -150,7 +150,7 @@ class P(type(Path()), Path):
     trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
     len = property(lambda self: self.__len__()); items = property(lambda self: List(self.parts)); str = property(lambda self: str(self))  # or self._str
     def __len__(self): return len(self.parts)
-    def __contains__(self, item): return item in self.parts
+    def __contains__(self, item): return item in str(self)
     def __iter__(self): return self.parts.__iter__()
     def __deepcopy__(self): return P(str(self))
     def __getstate__(self): return str(self)
@@ -170,7 +170,7 @@ class P(type(Path()), Path):
         self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
     def split(self, at: str = None, index: int = None, sep=[-1, 0, 1][-1], strict=True):
         if index is None and (at is not None):  # at is provided  # ====================================   Splitting
-            if not strict:  # bevaes like split method of string
+            if not strict:  # behaves like split method of string
                 one, two = (items := str(self).split(sep=str(at)))[0], items[1]; one, two = P(one[:-1]) if one.endswith("/") else P(one), P(two[1:]) if two.startswith("/") else P(two)
             else:  # "strict": # raises an error if exact match is not found.
                 index = self.parts.index(str(at)); one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
@@ -200,6 +200,7 @@ class P(type(Path()), Path):
     def as_url_str(self, inlieu=False): return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
     def as_url_obj(self, inlieu=False): return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
     def as_unix(self, inlieu=False): return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
+    def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
@@ -225,14 +226,12 @@ class P(type(Path()), Path):
     # ======================================== Folder management =======================================
     def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
         filters = (filters or []) + ([lambda x: all([str(notin) not in str(x) for notin in not_in])] if not_in is not None else []) + ([lambda x: any([ext in x.name for ext in exts])] if exts is not None else [])
-        if (slf := self.expanduser().resolve()).suffix == ".zip" and compressed:
-            with __import__("zipfile").ZipFile(str(slf)) as z: content = List(z.namelist())
-            raw = content.filter(lambda x: __import__("fnmatch").fnmatch(x, pattern)).apply(lambda x: slf / x)
+        if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
+            root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(lambda x: root.joinpath(x))
+            return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
-        if compressed:
-            comp_files = List(raw).filter(lambda x: '.zip' in str(x))
-            for comp_file in comp_files: raw += P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=compressed, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order)
+        if ".zip" not in slf and compressed: raw += [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in List(raw).filter(lambda x: '.zip' in str(x))]
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
     def tree(self, *args, **kwargs): return __import__("crocodile").msc.odds.__dict__['tree'](self, *args, **kwargs)
@@ -262,13 +261,13 @@ class P(type(Path()), Path):
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, pwd=None, **kwargs):
         slf = zipfile = self.expanduser().resolve()
-        if slf.suffix not in (".zip", ".7z"):  # may be there is .zip somewhere in the path.
+        if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
             if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
         if slf.suffix == ".7z": result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
-        else: result = Compression.unzip(zipfile, folder, fname, **kwargs)
+        else: result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
     def untar(self, path, verbose=True): _ = self, path, verbose; return P()
@@ -303,6 +302,7 @@ class P(type(Path()), Path):
             return path
         name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
         return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
+    def checksum(self, kind=["md5", "sha256"][1]): import hashlib; hash_md5 = hashlib.md5() if kind == "md5" else hashlib.sha256(); hash_md5.update(self.read_bytes()); return hash_md5.hexdigest()
 
 
 def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""

@@ -20,6 +20,7 @@ P, Read, Compression, Cache, encrypt, decrypt = _fm.P, _fm.Read, _fm.Compression
 # META ====================================
 Experimental, Terminal, Log, Null, Scheduler, SSH = meta.Experimental, meta.Terminal, meta.Log, meta.Null, meta.Scheduler, meta.SSH
 
+Path = P
 L = List
 S = Struct
 D = Display

@@ -50,7 +50,7 @@ class DBMS:
     def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_db(self.path)
 
     @classmethod
-    def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(path, echo))
+    def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(tb.P(path).create(parents_only=True).str, echo))
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
     def close(self, sleep=2): self.con.close(); self.ses.close(); self.eng.dispose(); time.sleep(sleep)
