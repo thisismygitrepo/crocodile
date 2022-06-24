@@ -187,7 +187,7 @@ def get_shell_profiles(shell):
 
 
 def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
-def get_path_defined_files(string_="*.exe"): return tb.P.env().Path.search(string_).reduce(lambda x, y: x+y).print()
+def get_path_defined_files(string_="*.exe"): res = tb.P.get_env().Path.search(string_).reduce(lambda x, y: x + y); res.print(); return res
 
 
 if __name__ == '__main__':

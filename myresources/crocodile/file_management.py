@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, get_env, install_n_import
 from datetime import datetime
 
 
@@ -36,7 +36,6 @@ def unlock(drive="D:", pwd=None, auto_unlock=False):
     return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/bitlocker_pwd").read_text()}" -AsPlainText -Force
           Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString
           """ + f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else '')
-
 
 # %% =================================== File ============================================
 def read(path, **kwargs):
@@ -247,7 +246,6 @@ class P(type(Path()), Path):
     tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
     tmpfile = staticmethod(lambda name=None, suffix="", folder=None, tstamp=False: P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files"))
     tmp = staticmethod(lambda folder=None, file=None, root="~/tmp_results": P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False))
-    env = staticmethod(lambda: __import__("crocodile.environment").environment)
     # ====================================== Compression & Encryption ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, **kwargs):
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
@@ -324,16 +322,16 @@ def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwar
     return P(op_path)
 def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
     op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path
-    if (env := P.env()).system == "Windows":
+    if (env := get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.success, res.print(); return op_path
+        res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.is_successful, res.print(); return op_path
     elif env.system == "Linux":
         env.tm.run('sudo apt install p7zip-full p7zip-rar')
     else: raise NotImplementedError("7z not implemented for Linux")
 def un_seven_zip(path, op_dir, pwd=None):
-    if (env := P.env()).system == "Windows":
+    if (env := get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.success, res.print(); return op_dir
+        res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.is_successful, res.print(); return op_dir
     else: raise NotImplementedError("7z not implemented for Linux")
 def gz(file, op_file):
     with open(file, 'rb') as f_in:

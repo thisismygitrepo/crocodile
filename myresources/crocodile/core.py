@@ -15,6 +15,7 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
 def install_n_import(package, name=None, **kwargs):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(package, **kwargs)
     except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package]); return __import__(package, **kwargs)
+def get_env(): import crocodile.environment as env; return env
 
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path

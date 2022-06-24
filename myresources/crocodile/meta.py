@@ -63,7 +63,7 @@ class Terminal:
         err = property(lambda self: self.output["stderr"])
         returncode = property(lambda self: self.output["returncode"])
         as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
-        def is_successfull(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
+        def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
         def print(self, desc=""): self.capture(); print(desc.center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 80, "\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
@@ -141,7 +141,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
     def open_console(self, new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", *f""" {self.username}@{self.hostname}""".split(" "), new_window=new_window, terminal=terminal)
     def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False, env_prefix=False):
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
-        if strict_err or strict_returncode: assert res.is_successfull(strict_err=strict_err, strict_returcode=strict_returncode), res.print(desc=desc)
+        if strict_err or strict_returncode: assert res.is_successful(strict_err=strict_err, strict_returcode=strict_returncode), res.print(desc=desc)
         res.print(desc=desc) if verbose else None; return res
     def run_py(self, cmd, desc="", return_obj=False, verbose=True, strict_err=False, strict_returncode=False):
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
@@ -212,7 +212,7 @@ def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=Tr
     text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
     text += (f"# Code to generate the result\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     text += (f"# Source code file generated me was located here: \n'{__import__('inspect').getfile(obj)}'\n" + separator) if obj is not None else ""
-    if (res := Terminal().run("echo '## Last Commit'; git log -1; echo '## Remote Repo:'; git remote -v", shell="pwsh")).is_successfull(strict_err=True, strict_returcode=True):
+    if (res := Terminal().run("echo '## Last Commit'; git log -1; echo '## Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
         text += res.op + "\nlink to files: " + res.op.split("## Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0]
     readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P(obj.__code__.co_filename or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())

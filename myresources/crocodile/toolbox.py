@@ -13,7 +13,7 @@ from crocodile import file_management as _fm
 # from crocodile import run
 
 # CORE =====================================
-str2timedelta, timestamp, randstr, validate_name, install_n_import = core.str2timedelta, core.timestamp, core.randstr, core.validate_name, core.install_n_import
+str2timedelta, timestamp, randstr, validate_name, install_n_import, get_env= core.str2timedelta, core.timestamp, core.randstr, core.validate_name, core.install_n_import, core.get_env
 Base, Struct, Display, Save, List = core.Base, core.Struct, core.Display, core.Save, core.List
 # File Management ==========================
 P, Read, Compression, Cache, encrypt, decrypt = _fm.P, _fm.Read, _fm.Compression, _fm.Cache, _fm.encrypt, _fm.decrypt
