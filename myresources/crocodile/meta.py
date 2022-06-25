@@ -126,7 +126,7 @@ class Terminal:
 
 
 class SSH(object):  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
-    def __init__(self, username, hostname=None, sshkey=None, pwd=None, env="ve"):
+    def __init__(self, username, hostname=None, sshkey=None, pwd=None, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         _ = False; super().__init__() if _ else None; username, hostname = username.split("@") if "@" in username else (username, hostname)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -135,7 +135,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" else "Linux"  # echo %OS%
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
-    def get_key(self): return f"""-i "{str(P(self.sshkey).expanduser())}" """ if self.sshkey is not None else ""  # SSH cmd: scp -r {self.get_key()} "{str(source.expanduser())}" "{self.username}@{self.hostname}:'{target}'
+    def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.remote_machine == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
     def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH TO >>>>>>>>> {self.get_repr('remote')} [{self.remote_machine}] "
     def get_repr(self, which="remote"): return f"{which} " + (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
     def open_console(self, new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", *f""" {self.username}@{self.hostname}""".split(" "), new_window=new_window, terminal=terminal)

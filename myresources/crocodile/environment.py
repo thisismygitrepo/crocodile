@@ -36,14 +36,14 @@ Temp = Tmp
 Path = L(os.getenv("PATH").split(sep)).apply(P)
 PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
 
-HostName = os.getenv("COMPUTERNAME")  # e.g. "MY-SURFACE"
-LogonServer = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
-UserDomain = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
+HostName          = os.getenv("COMPUTERNAME")  # e.g. "MY-SURFACE"
+LogonServer       = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
+UserDomain        = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
 UserDomainRoaming = P(tmp) if (tmp := os.getenv("USERDOMAIN_ROAMINGPROFILE")) else None  # e.g. SURFACE
-UserName = os.getenv("USERNAME")  # e.g: username
-UserProfile = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\username
-HomePath = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
-Public = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
+UserName          = os.getenv("USERNAME")  # e.g: username
+UserProfile       = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\username
+HomePath          = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
+Public            = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
 
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
 OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
@@ -66,9 +66,7 @@ def get_address():
     # else: return mac
     import socket
     local_ip_v4 = socket.gethostbyname(socket.gethostname())
-    from requests import get
-    public_ip = get('https://api.ipify.org').text
-    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip=public_ip)
+    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip=P('https://api.ipify.org').download(memory=True).text)
 
 
 # ============================== System Variables ==============================
