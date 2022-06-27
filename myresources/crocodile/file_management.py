@@ -33,9 +33,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 def unlock(drive="D:", pwd=None, auto_unlock=False):
-    return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/bitlocker_pwd").read_text()}" -AsPlainText -Force
-          Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString
-          """ + f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else '')
+    return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="pwsh")
 
 # %% =================================== File ============================================
 def read(path, **kwargs):
@@ -230,7 +228,7 @@ class P(type(Path()), Path):
             return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
-        if ".zip" not in slf and compressed: raw += [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in List(raw).filter(lambda x: '.zip' in str(x))]
+        if ".zip" not in slf and compressed: raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=True)]).reduce().list
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
     def tree(self, *args, **kwargs): return __import__("crocodile").msc.odds.__dict__['tree'](self, *args, **kwargs)
@@ -268,8 +266,8 @@ class P(type(Path()), Path):
         else: result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
-    def untar(self, path, verbose=True): _ = self, path, verbose; return P()
-    def gz(self, path, verbose=True): _ = self, path, verbose; return P()
+    def untar(self, folder=None, path=None, name=None, verbose=True): slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
+    def gz(self, path=None, folder=None, verbose=True): _ = self, path, verbose; return P()
     def ungz(self, path, verbose=True): _ = self, path, verbose; return P()
     def tar_gz(self): pass
     def untar_ungz(self, folder=None, inplace=False, verbose=True, orig=False):
@@ -278,11 +276,6 @@ class P(type(Path()), Path):
         result = intrem.untar(path=folder, verbose=verbose)
         intrem.delete(sure=True, verbose=verbose)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(result)}")
-    def compress(self, path=None, base_dir=None, fmt="zip", inplace=False, **kwargs):
-        assert fmt in (fmts := ["zip", "tar", "gzip"]), f"Unsupported format {fmt}. The supported formats are {fmts}"
-        _ = self, path, base_dir, kwargs, inplace
-        pass
-    def decompress(self): pass
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
@@ -300,17 +293,17 @@ class P(type(Path()), Path):
             return path
         name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
         return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
-    def checksum(self, kind=["md5", "sha256"][1]): import hashlib; hash_md5 = hashlib.md5() if kind == "md5" else hashlib.sha256(); hash_md5.update(self.read_bytes()); return hash_md5.hexdigest()
+    def checksum(self, kind=["md5", "sha256"][1]): import hashlib; myhash = {"md5": hashlib.md5, "sha256": hashlib.sha256}[kind](); myhash.update(self.read_bytes()); return myhash.hexdigest()
 
 
 def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
-    assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"} and P(op_path).suffix != ".zip", f"Don't add zip extention to this method, it is added automatically."
-    return P(__import__('shutil').make_archive(base_name=str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
-def zip_file(ip_path, op_path, arcname=None, password=None, **kwargs):
+    assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}  # .zip is added automatically by library, hence we'd like to avoid repeating it if user sent it.
+    return P(__import__('shutil').make_archive(base_name=str(op_path)[:-4] if str(op_path).endswith(".zip") else str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
+def zip_file(ip_path, op_path, arcname=None, password=None, mode='w', **kwargs):
     """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
     When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
     import zipfile
-    with zipfile.ZipFile(str(op_path), 'w') as jungle_zip:
+    with zipfile.ZipFile(str(op_path), mode=mode) as jungle_zip:
         jungle_zip.setpassword(pwd=password) if password is not None else None
         jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
     return P(op_path)
@@ -348,7 +341,7 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
         if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
         else: file.extract(fname, **kwargs)
     return P(op_path)
-class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods. Both files and folders when compressed, default is being under the root of archive."""
+class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods. see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
