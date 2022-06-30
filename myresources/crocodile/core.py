@@ -101,7 +101,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def split(self, every=1) -> 'List': return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
     def filter(self, func, which=lambda idx, x: x) -> 'List': return List([which(idx, x) for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func=lambda x, y: x+y) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list)
+    def reduce(self, func=lambda x, y: x+y, default=None) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list, default if default is not None else List())
     def append(self, item) -> 'List': self.list.append(item); return self
     def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other) -> 'List': return List(self.list + list(other))
