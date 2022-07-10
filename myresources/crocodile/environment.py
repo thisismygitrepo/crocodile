@@ -9,7 +9,7 @@ L = tb.L
 
 system = platform.system()
 OS = os.getenv("OS")  # Windows_NT
-sep = ";" if system == "Windows" else ":"  # path separator, not to be confused with P.sep
+sep = ";" if system == "Windows" else ":"  # PATH separator, this is special for PATH object, not to be confused with P.sep (normal paths).
 env = tb.Struct(dict(os.environ)).clean_view
 exe = P(sys.executable)
 
@@ -36,13 +36,13 @@ Temp = Tmp
 Path = L(os.getenv("PATH").split(sep)).apply(P)
 PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
 
-HostName          = os.getenv("COMPUTERNAME")  # e.g. "MY-SURFACE"
-LogonServer       = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
+HostName          = platform.node()  # e.g. "MY-SURFACE", os.getenv("COMPUTERNAME") only works for windows.
+UserName          = os.getenv("USERNAME")  # e.g: username
 UserDomain        = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
 UserDomainRoaming = P(tmp) if (tmp := os.getenv("USERDOMAIN_ROAMINGPROFILE")) else None  # e.g. SURFACE
-UserName          = os.getenv("USERNAME")  # e.g: username
-UserProfile       = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\username
-HomePath          = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
+LogonServer       = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
+# UserProfile       = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\username
+# HomePath          = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
 Public            = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
 
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None

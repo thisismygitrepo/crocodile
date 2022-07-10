@@ -54,6 +54,10 @@ class DBMS:
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
     def close(self, sleep=2): self.con.close(); self.ses.close(); self.eng.dispose(); time.sleep(sleep)
+    def _get_table_identifier(self, table, sch):
+        if sch is None: sch = self.sch
+        if sch is not None: return sch + "." + table
+        else: return table
 
     @staticmethod
     def make_sql_db(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
@@ -80,11 +84,6 @@ class DBMS:
         with self.eng.begin() as conn: result = conn.execute(text(command))
         return result if not df else pd.DataFrame(result)
 
-    def _get_table_identifier(self, table, sch):
-        if sch is None: sch = self.sch
-        if sch is not None: return sch + "." + table
-        else: return table
-
     # ========================== TABLES =====================================
     def read_table(self, table, sch=None, size=100):
         res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
@@ -101,7 +100,7 @@ class DBMS:
         tbl = self.meta.tables[table]
         count = self.ses.query(tbl).count()
         res = tb.Struct(name=table , count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
-        res.print(dtype=False, config=True)
+        res.print(dtype=False, as_config=True)
         dat = self.read_table(table=table, sch=sch, size=2)
         cols = self.get_columns(table, sch=sch)
         df = pd.DataFrame.from_records(dat, columns=cols)

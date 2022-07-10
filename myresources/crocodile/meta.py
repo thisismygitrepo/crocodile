@@ -47,9 +47,7 @@ class Log(logging.Logger):  #
     def add_filehandler(self, file_path=None, fmt=None, f_level=logging.DEBUG, mode="a", name="myFileHandler"):
         fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
-    def test(self):
-        self.debug("this is a debugging message"); self.info("this is an informational message"); self.warning("this is a warning message")
-        self.error("this is an error message"); self.critical("this is a critical message"); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
+    def test(self): List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message")); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
 
 
 class Terminal:
@@ -62,7 +60,7 @@ class Terminal:
         ip = property(lambda self: self.output["stdin"])
         err = property(lambda self: self.output["stderr"])
         returncode = property(lambda self: self.output["returncode"])
-        as_path = property(lambda self: P(self.op.rstrip()) if self.err == "" else None)
+        as_path = property(lambda self: P(self.op.rstrip()) if self.is_successful(strict_returcode=True, strict_err=False) else None)
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
         def print(self, desc=""): self.capture(); print(desc.center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 80, "\n\n"); return self
@@ -153,7 +151,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if zip_first: print(f"ZIPPING".center(80, "=")); source = P(source).expanduser().zip().append(f"_{randstr()}", inplace=True)
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = P(self.run_py(f"print(tb.P(r'{P(target).as_posix()}').expanduser().parent.create())", desc=f"Creating Target directory `{target}` @ {self.get_repr('remote')}.").op or '').joinpath(P(target).name)
-        print(f"SENDING `{source}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
+        print(f"SENDING `{P(source)}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
         if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath}').expanduser().unzip(content=True, inplace=True)""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False):
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
