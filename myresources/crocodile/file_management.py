@@ -262,10 +262,10 @@ class P(type(Path()), Path):
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
-        if slf.suffix == ".7z": P(overwrite).delete(sure=True) if overwrite else None; result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
-        else:  # TODO: overwrite deletes entire folder, but if content flag is raised, this could delete more files than desired.
+        if slf.suffix == ".7z": P(folder).delete(sure=True) if overwrite else None; result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
+        else:  # TODO: overwrite deletes entire folder, but if content flag is raised, this could delete more files than desired: consider deleting root contents only.
             (P(folder).delete(sure=True) if fname is None else (P(folder) / fname).delete(sure=True)) if overwrite else None
-            result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), overwrite=overwrite, **kwargs)
+            result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
     def untar(self, folder=None, path=None, name=None, verbose=True): slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
