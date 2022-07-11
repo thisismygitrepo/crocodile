@@ -137,12 +137,12 @@ class P(type(Path()), Path):
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
         `orig`: whether the method returns the original path object or a new one."""
-    def prepend(self, prefix, suffix=None, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
-    def append(self, name='', suffix=None, **kwargs): return self._return(self.parent.joinpath(self.trunk + (name or "_" + timestamp()) + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", **kwargs)
-    def with_trunk(self, name, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", **kwargs)  # Complementary to `with_stem` and `with_suffix`
+    def prepend(self, prefix, suffix=None, verbose=True, **kwargs): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", verbose=verbose, **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
+    def append(self, name='', suffix=None, verbose=True, **kwargs): return self._return(self.parent.joinpath(self.trunk + (name or "_" + timestamp()) + (suffix or ''.join(('bruh'+self).suffixes))), operation="rename", verbose=verbose, **kwargs)
+    def with_trunk(self, name, verbose=True, **kwargs): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", verbose=verbose, **kwargs)  # Complementary to `with_stem` and `with_suffix`
     def with_name(self, name, verbose=True, **kwargs): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
-    def switch(self, key: str, val: str, **kwargs): return self._return(P(str(self).replace(key, val)), operation="rename", **kwargs)  # Like string replce method, but `replace` is an already defined method."""
-    def switch_by_index(self, idx: int, val: str, **kwargs): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", **kwargs)
+    def switch(self, key: str, val: str, verbose=True, **kwargs): return self._return(P(str(self).replace(key, val)), operation="rename", verbose=verbose, **kwargs)  # Like string replce method, but `replace` is an already defined method."""
+    def switch_by_index(self, idx: int, val: str, verbose=True, **kwargs): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", verbose=verbose, **kwargs)
     # ============================= attributes of object ======================================
     trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
     len = property(lambda self: self.__len__()); items = property(lambda self: List(self.parts)); str = property(lambda self: str(self))  # or self._str
@@ -255,15 +255,17 @@ class P(type(Path()), Path):
                 root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
                 path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, orig=False, pwd=None, **kwargs):
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, orig=False, pwd=None, **kwargs):
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
             if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
-        if slf.suffix == ".7z": result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
-        else: result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
+        if slf.suffix == ".7z": P(overwrite).delete(sure=True) if overwrite else None; result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
+        else:
+            (P(op_path).delete(sure=True) if overwrite else None) if fname is not None else ((P(op_path) / fname).delete(sure=True) if overwrite else None)
+            result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), overwrite=overwrite, **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
     def untar(self, folder=None, path=None, name=None, verbose=True): slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
@@ -308,9 +310,8 @@ def zip_file(ip_path, op_path, arcname=None, password=None, mode='w', **kwargs):
 def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwargs):
     with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
         if memory: return Struct({name: zipObj.read(name) for name in zipObj.namelist()}) if fname is None else zipObj.read(fname)
-        if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs)
-        else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); op_path = P(op_path) / fname
-    return P(op_path)
+        if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs); return P(op_path)
+        else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); return P(op_path) / fname
 def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
     op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path
     if (env := get_env()).system == "Windows":
@@ -319,7 +320,7 @@ def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and e
     elif env.system == "Linux":
         env.tm.run('sudo apt install p7zip-full p7zip-rar')
     else: raise NotImplementedError("7z not implemented for Linux")
-def un_seven_zip(path, op_dir, pwd=None):
+def un_seven_zip(path, op_dir, overwrite=False, pwd=None):
     if (env := get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.is_successful, res.print(); return op_dir

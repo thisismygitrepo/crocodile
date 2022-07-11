@@ -146,13 +146,13 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if not return_obj: return self.run(f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
         else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile())\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
-    def copy_from_here(self, source, target=None, zip_first=False, r=False):
+    def copy_from_here(self, source, target=None, zip_first=False, r=False, overwrite=False):
         if not zip_first and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        if zip_first: print(f"ZIPPING".center(80, "=")); source = P(source).expanduser().zip().append(f"_{randstr()}", inplace=True)
+        if zip_first: print(f"ZIPPING".center(120, "=")); source = P(source).expanduser().zip()  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        remotepath = P(self.run_py(f"print(tb.P(r'{P(target).as_posix()}').expanduser().parent.create())", desc=f"Creating Target directory `{target}` @ {self.get_repr('remote')}.").op or '').joinpath(P(target).name)
-        print(f"SENDING `{P(source)}` ==> `{remotepath}`".center(80, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
-        if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath}').expanduser().unzip(content=True, inplace=True)""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
+        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).as_posix()}` @ {self.get_repr('remote')}.").op or ''; remotepath=P(remotepath.split("\n")[-1]).joinpath(P(target).name)
+        print(f"SENDING `{P(source)}` ==> `{remotepath.as_posix()}`".center(120, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(120, "="), "\n" * 2)
+        if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=True, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False):
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True)", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
@@ -160,7 +160,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).as_path; assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source)
-        print(f"RECEVING `{source}` ==> `{target}`".center(80, "=")); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"all done".center(80, "="), "\n" * 2)
+        print(f"RECEVING `{source}` ==> `{target}`".center(120, "=")); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"all done".center(120, "="), "\n" * 2)
         if zip_first: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True)
         return target
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")

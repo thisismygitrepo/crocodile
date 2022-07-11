@@ -99,7 +99,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
     def split(self, every=1) -> 'List': return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
-    def filter(self, func, which=lambda idx, x: x) -> 'List': return List([which(idx, x) for idx, x in enumerate(self.list) if self.eval(func, func=True)(x)])
+    def filter(self, func, which=lambda idx, x: x) -> 'List': self.eval(func, func=True); return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func=lambda x, y: x+y, default=None) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list, default if default is not None else List())
     def append(self, item) -> 'List': self.list.append(item); return self
@@ -116,7 +116,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def to_numpy(self): import numpy as np; return np.array(self.list)
     np = property(lambda self: self.to_numpy())
     def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
-    def __getitem__(self, key: str or list or slice) -> 'List':
+    def __getitem__(self, key: str or list or slice):
         if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
