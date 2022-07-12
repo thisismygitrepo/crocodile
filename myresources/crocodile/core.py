@@ -91,6 +91,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def __setstate__(self, state): self.list = state
     def __len__(self): return len(self.list)
     def __iter__(self): return iter(self.list)
+    def __array__(self): return self.list  # compatibility with numpy
     len = property(lambda self: self.list.__len__())
     # ================= call methods =====================================
     def __getattr__(self, name) -> 'List': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
@@ -113,7 +114,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def remove(self, value=None, values=None, strict=True) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list: return self.list
-    def to_numpy(self): import numpy as np; return np.array(self.list)
+    def to_numpy(self, **kwargs): import numpy as np; return np.array(self.list, **kwargs)
     np = property(lambda self: self.to_numpy())
     def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
     def __getitem__(self, key: str or list or slice):
@@ -184,7 +185,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
     def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, justify, return_str=False, limit=30): res = __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"]); return res if not return_str else str(res)
-    def print(self, dtype=True, return_str=False, justify=50, as_config=False, as_yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return str(res) if return_str else self
+    def print(self, dtype=True, return_str=False, justify=80, as_config=False, as_yaml=False, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return str(res) if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, use_plt=True, **kwargs):
