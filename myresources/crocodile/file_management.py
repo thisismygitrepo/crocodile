@@ -95,10 +95,10 @@ class P(type(Path()), Path):
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
     def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs):
-        if not self.exists():
-            if strict: raise FileNotFoundError(f"`{self}` is no where to be found!")
+        if not (slf:=self.expanduser().resolve()).exists():
+            if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else: return notfound
-        filename = self.unzip(folder=self.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(self) else self
+        filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
     def start(self, opener=None):

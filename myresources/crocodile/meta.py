@@ -63,7 +63,7 @@ class Terminal:
         as_path = property(lambda self: P(self.op.rstrip()) if self.is_successful(strict_returcode=True, strict_err=False) else None)
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print(self, desc=""): self.capture(); print(desc.center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + "=" * 80, "\n\n"); return self
+        def print(self, desc=""): self.capture(); print(desc.center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + ('COMPLETED '+desc).center(80, "="), "\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
@@ -151,7 +151,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if zip_first: print(f"ZIPPING".center(120, "=")); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).as_posix()}` @ {self.get_repr('remote')}.").op or ''; remotepath=P(remotepath.split("\n")[-1]).joinpath(P(target).name)
-        print(f"SENDING `{P(source)}` ==> `{remotepath.as_posix()}`".center(120, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"all done".center(120, "="), "\n" * 2)
+        print(f"SENDING `{P(source)}` ==> `{remotepath.as_posix()}`".center(120, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"SENDING COMPLETED", "\n" * 2)
         if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False):
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
@@ -160,7 +160,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).as_path; assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source)
-        print(f"RECEVING `{source}` ==> `{target}`".center(120, "=")); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"all done".center(120, "="), "\n" * 2)
+        print(f"RECEVING `{source}` ==> `{target}`".center(120, "=")); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"RECEVING COMPLETED", "\n" * 2)
         if zip_first: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True)
         return target
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
