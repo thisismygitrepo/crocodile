@@ -129,7 +129,9 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
-        self.hostname, self.username, self.sftp, self.platform = hostname, username, self.ssh.open_sftp(), __import__("platform")
+        self.hostname, self.username, self.platform = hostname, username, __import__("platform")
+        try: self.sftp = self.ssh.open_sftp()
+        except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
         self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" else "Linux"  # echo %OS%
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
