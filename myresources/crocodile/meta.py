@@ -134,9 +134,9 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.remote_machine == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
-    def __repr__(self): return f"{self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH TO >>>>>>>>> {self.get_repr('remote')} [{self.remote_machine}] "
-    def get_repr(self, which="remote"): return f"{which} " + (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
-    def open_console(self, new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", *f""" {self.username}@{self.hostname}""".split(" "), new_window=new_window, terminal=terminal)
+    def __repr__(self): return f"local {self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH TO >>>>>>>>> remote {self.get_repr('remote')} [{self.remote_machine}] "
+    def get_repr(self, which="remote"): return (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
+    def open_console(self, cmd='', new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", '-t', *f""" {self.get_repr('remote')}""".split(" "), repr(cmd), new_window=new_window, terminal=terminal)
     def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False, env_prefix=False):
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
         if strict_err or strict_returncode: assert res.is_successful(strict_err=strict_err, strict_returcode=strict_returncode), res.print(desc=desc)
@@ -150,7 +150,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if not zip_first and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if zip_first: print(f"ZIPPING".center(120, "=")); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).as_posix()}` @ {self.get_repr('remote')}.").op or ''; remotepath=P(remotepath.split("\n")[-1]).joinpath(P(target).name)
+        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}.").op or ''; remotepath=P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{P(source)}` ==> `{remotepath.as_posix()}`".center(120, "=")); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"SENDING COMPLETED", "\n" * 2)
         if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False):
