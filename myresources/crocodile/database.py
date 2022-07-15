@@ -22,11 +22,11 @@ class DBMS:
     """
     def __init__(self, engine, db=None, sch=None, vws=False):
         self.eng = engine
-        self.path = tb.P(self.eng.url.database)
-        self.con = self.eng.connect()
-        self.ses = sessionmaker()(bind=self.eng)  # ORM style
+        self.con = None
+        self.ses = None
         self.insp = None
-        self.meta = MetaData()
+        self.meta = None
+        self.path = tb.P(self.eng.url.database)
 
         self.db = db
         self.sch = sch
@@ -39,6 +39,9 @@ class DBMS:
         self.refresh()
 
     def refresh(self, sch=None):  # fails if multiple schemas are there and None is specified
+        self.con = self.eng.connect()
+        self.ses = sessionmaker()(bind=self.eng)  # ORM style
+        self.meta = MetaData()
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
         self.insp = inspect(subject=self.eng)
         self.schema = tb.L(self.insp.get_schema_names())
@@ -46,8 +49,8 @@ class DBMS:
         self.sch_vws = tb.Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
         return self
 
-    def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.rel2home()).__dict__
-    def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_db(self.path)
+    def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser()).__dict__
+    def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_db(self.path); self.refresh()
 
     @classmethod
     def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(tb.P(path).create(parents_only=True).str, echo))
@@ -63,8 +66,8 @@ class DBMS:
     def make_sql_db(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
         """Establish lazy initialization with database"""
         if path == "memory": return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True)
-        if path is None: path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db")
-        print(f"Linking to database at {tb.P(path).as_uri()}")
+        path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else tb.P(path).expanduser().absolute()
+        print(f"Linking to database at {path.as_uri()}")
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True) # echo flag is just a short for the more formal way of logging sql commands.
 
     # ==================== QUERIES =====================================
