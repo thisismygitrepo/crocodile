@@ -317,15 +317,16 @@ def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and e
     if (env := get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.is_successful, res.print(); return op_path
-    elif env.system == "Linux":
-        env.tm.run('sudo apt install p7zip-full p7zip-rar')
-    else: raise NotImplementedError("7z not implemented for Linux")
-def un_seven_zip(path, op_dir, overwrite=False, pwd=None):
+    elif env.system == "Linux":  # python variant is much slower than 7-zip, and consumes more memroy, see py7zr project on github.
+        op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path; py7zr = install_n_import("py7zr")
+        with py7zr.SevenZipFile(op_path, mode, password=pwd) as archive: archive.writeall(path)
+        return op_path
+def un_seven_zip(path, op_dir, overwrite=False, pwd=None):  # TODO: use py7zr instead of two implementations for linux and windows.
     if (env := get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.is_successful, res.print(); return op_dir
     else: raise NotImplementedError("7z not implemented for Linux")
-def gz(file, op_file):
+def gz(file, op_file):  # see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
     with open(file, 'rb') as f_in:
         with __import__("gzip").open(op_file, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_file)
@@ -340,7 +341,7 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
         if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
         else: file.extract(fname, **kwargs)
     return P(op_path)
-class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods. see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
+class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
