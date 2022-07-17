@@ -22,7 +22,6 @@ def build_parser():
     parser.add_argument(dest="file", help="Python file path.", default="this")
     # if dest is not specified, then, it has same path as keyword, e.g. "--dest"
     # parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
-    parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
 
     # A FLAG:
     parser.add_argument("--main", help="Flag tells to run the file as main.", action="store_true")  # default is False
@@ -33,6 +32,8 @@ def build_parser():
     parser.add_argument("-e", help="Explore the file (what are its contents).", action="store_true")  # default is False
 
     # OPTIONAL KEYWORD
+    parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
+    parser.add_argument("--read", "-r", dest="dat_path", help="Read file", default="")
     parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
     parser.add_argument("--terminal", "-t", dest="terminal",  help=f"Flag to specify which terminal to be used. Default CMD.", default="")  # can choose `wt`
     parser.add_argument("--shell", "-S", dest="shell", help=f"Flag to specify which terminal to be used. Default CMD.", default="")
@@ -44,7 +45,7 @@ def build_parser():
     # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file path (-f)")
     # ==================================================================================
 
-    if args.main is True and args.file != "":  # run the file data_only, don't import it.
+    if args.main is True and args.file != "":  # run the file, don't import it.
         tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal, new_window=not args.here)
     else:  # run as a module (i.e. import it)
         if args.file != "":  # non empty file path:
@@ -59,7 +60,7 @@ from {path} import *
 """ + args.cmd + "\n"
         else: script = args.cmd
         if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
-        tb.Terminal().run_pyscript(script=script, terminal=args.terminal, new_window=not args.here, interactive=not args.solitary, ipython=not args.python)
+        tb.Terminal().run_py(script=script, terminal=args.terminal, new_window=not args.here, interactive=not args.solitary, ipython=not args.python)
 
 
 # tips: to launch python in the same terminal, simply don't use crocodile.run

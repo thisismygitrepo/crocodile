@@ -152,7 +152,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         if not zip_first and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if zip_first: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}.").op or ''; remotepath=P(remotepath.split("\n")[-1]).joinpath(P(target).name)
+        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}").op or ''; remotepath=P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{P(source)}` ==> `{remotepath.as_posix()}`"); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"SENDING COMPLETED", "\n" * 2)
         if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False):
@@ -211,7 +211,7 @@ def capture_locals(func, scope, args=None, self: str = None, update_scope=True):
 def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
     text = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n")
     text += (f"# Code to generate the result\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
-    text += (f"# Source code file generated me was located here: \n'{__import__('inspect').getfile(obj)}'\n" + separator) if obj is not None else ""
+    text += (f"# Source code file generated me was located here: \n`{__import__('inspect').getfile(obj)}`\n" + separator) if obj is not None else ""
     if (res := Terminal().run("echo '## Last Commit'; git log -1; echo '## Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
         text += res.op + "\nlink to files: " + res.op.split("## Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0]
     readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None

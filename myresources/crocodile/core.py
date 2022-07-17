@@ -62,7 +62,7 @@ class Base(object):
     def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__ + (".dat" if data_only else ""), desc=desc or (f"Data of {self.__class__}" if data_only else desc))
-        if save_code: self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")); return self
+        self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
     def save_code(self, path):
