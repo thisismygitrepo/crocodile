@@ -1,6 +1,7 @@
 
 import crocodile.toolbox as tb
 import platform
+import getpass
 import os
 import sys
 
@@ -37,7 +38,7 @@ Path = L(os.getenv("PATH").split(sep)).apply(P)
 PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
 
 HostName          = platform.node()  # e.g. "MY-SURFACE", os.getenv("COMPUTERNAME") only works for windows.
-UserName          = os.getenv("USERNAME")  # e.g: username
+UserName          = getpass.getuser()  # e.g: username, os.getenv("USERNAME") only works for windows.
 UserDomain        = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
 UserDomainRoaming = P(tmp) if (tmp := os.getenv("USERDOMAIN_ROAMINGPROFILE")) else None  # e.g. SURFACE
 LogonServer       = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
