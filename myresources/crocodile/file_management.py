@@ -95,7 +95,7 @@ class P(type(Path()), Path):
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
     def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs):
-        if not (slf:=self.expanduser().resolve()).exists():
+        if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else: return notfound
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
@@ -269,13 +269,13 @@ class P(type(Path()), Path):
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
     def untar(self, folder=None, path=None, name=None, verbose=True): slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
-    def gz(self, path=None, folder=None, verbose=True): _ = self, path, verbose; return P()
+    def gz(self, path=None, folder=None, verbose=True): _ = self, path, verbose, folder; return P()
     def ungz(self, path, verbose=True): _ = self, path, verbose; return P()
     def tar_gz(self): pass
     def untar_ungz(self, folder=None, inplace=False, verbose=True, orig=False):
         folder = folder or P(self.parent) / P(self.stem)
         intrem = self.ungz(path=folder, verbose=verbose); intrem.untar(path=folder, verbose=verbose); intrem.delete(sure=True, verbose=verbose)
-        return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(result)}")
+        return self._return(intrem, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(intrem)}")
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
@@ -299,7 +299,7 @@ class P(type(Path()), Path):
 def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
     assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}  # .zip is added automatically by library, hence we'd like to avoid repeating it if user sent it.
     return P(__import__('shutil').make_archive(base_name=str(op_path)[:-4] if str(op_path).endswith(".zip") else str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
-def zip_file(ip_path, op_path, arcname=None, password=None, mode='w', **kwargs):
+def zip_file(ip_path, op_path, arcname=None, password=None, mode="w", **kwargs):
     """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
     When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
     import zipfile
@@ -312,7 +312,7 @@ def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwar
         if memory: return Struct({name: zipObj.read(name) for name in zipObj.namelist()}) if fname is None else zipObj.read(fname)
         if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs); return P(op_path)
         else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); return P(op_path) / fname
-def seven_zip(path: P, op_path: P, pwd=None):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
+def seven_zip(path: P, op_path: P, pwd=None, mode='w'):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
     op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path
     if (env := get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None

@@ -45,6 +45,10 @@ LogonServer       = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
 # HomePath          = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
 Public            = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
 
+WSL_HOME = P(rf"\\wsl$\Ubuntu\home\{UserName}")
+WIN_HOME = P(rf"/mnt/c/Users/{UserName}")
+
+
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
 OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
 OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None

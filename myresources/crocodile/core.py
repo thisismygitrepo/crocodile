@@ -1,7 +1,9 @@
 
 """
 """
+
 from pathlib import Path
+
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'^(?=\d)|\W', replace, str(astring))
