@@ -50,10 +50,10 @@ class DBMS:
         return self
 
     def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser()).__dict__
-    def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_db(self.path); self.refresh()
+    def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_engine(self.path); self.refresh()
 
     @classmethod
-    def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_db(tb.P(path).create(parents_only=True).str, echo))
+    def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_engine(path=path, echo=echo))
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
     def close(self, sleep=2): self.con.close(); self.ses.close(); self.eng.dispose(); time.sleep(sleep)
@@ -63,7 +63,7 @@ class DBMS:
         else: return table
 
     @staticmethod
-    def make_sql_db(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
+    def make_sql_engine(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
         """Establish lazy initialization with database"""
         if path == "memory": return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True)
         path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else tb.P(path).expanduser().absolute()
