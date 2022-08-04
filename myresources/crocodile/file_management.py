@@ -119,7 +119,7 @@ class P(type(Path()), Path):
         return self.write_text("\n".join(lines), encoding=encoding)
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(name or self.name).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
+        return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
     def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg="", __delayed_msg__=""):
         if inlieu: self._str = str(res)
         if inplace:

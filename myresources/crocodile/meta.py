@@ -132,7 +132,7 @@ class SSH(object):  # if remote is Windows, this class assumed default shell in 
         self.hostname, self.username, self.platform = hostname, username, __import__("platform")
         try: self.sftp = self.ssh.open_sftp()
         except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
-        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" else "Linux"  # echo %OS%
+        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" else ("Linux")  # echo %OS% uname on linux
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
     def restart_computer(self): self.run("Restart-Computer -Force" if self.remote_machine == "Windows" else "sudo reboot")

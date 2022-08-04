@@ -60,7 +60,7 @@ DotFiles = P.home().joinpath("dotfiles")
 # ============================== Networking ==============================
 
 
-def get_address():
+def get_addresses():
     netifaces = tb.install_n_import("netifaces")
     subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
     default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
@@ -70,8 +70,8 @@ def get_address():
     # elif hex_format: return hex(mac)
     # else: return mac
     import socket
-    local_ip_v4 = socket.gethostbyname(socket.gethostname())
-    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip=P('https://api.ipify.org').download(memory=True).text)
+    local_ip_v4 = socket.gethostbyname(socket.gethostname() + ".local")  # without .local, in linux machines, '/etc/hosts' file content, you have an IP address mapping with '127.0.1.1' to your hostname
+    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip_v4=P('https://api.ipify.org').download(memory=True).text)
 
 
 # ============================== System Variables ==============================

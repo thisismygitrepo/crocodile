@@ -59,7 +59,6 @@ class Base(object):
     def __setstate__(self, state): self.__dict__.update(state)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
-    def print(self, dtype=False, attrs=False, **kwargs): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
     def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
     def save(self, path=None, add_suffix=True, save_code=False, verbose=True, data_only=False, desc=""):
@@ -76,6 +75,7 @@ class Base(object):
         attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     @staticmethod
+    def print(self, dtype=False, attrs=False, **kwargs): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     def get_state(obj, repr_func=lambda x: x, exclude=None) -> dict: return repr_func(obj) if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]) else (tmp if type(tmp:=obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).dict)
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename := Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")), filter=filt)
@@ -106,7 +106,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def split(self, every=1) -> 'List': return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
     def filter(self, func, which=lambda idx, x: x) -> 'List': self.eval(func, func=True); return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func=lambda x, y: x+y, default=None) -> 'List': return __import__("functools").reduce(self.eval(func, func=True, other=True), self.list, default if default is not None else List())
+    def reduce(self, func=lambda x, y: x+y, default=None) -> 'List': args = (self.eval(func, func=True, other=True), self.list) + ((default,) if default is not None else ()); return __import__("functools").reduce(*args)
     def append(self, item) -> 'List': self.list.append(item); return self
     def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other) -> 'List': return List(self.list + list(other))
