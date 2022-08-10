@@ -175,7 +175,8 @@ class DataReader(tb.Base):
         if strings is None: strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        self.specs.ip_shape = self.split.x_train[0].shape  # useful info for instantiating models.
+        x = self.split.x_train
+        self.specs.ip_shape = x.iloc[0].shape if type(x) is pd.DataFrame else x[0].shape  # useful info for instantiating models.
         self.specs.op_shape = self.split.y_train[0].shape  # useful info for instantiating models.
         print(f"================== Training Data Split ===========================")
         self.split.print()
