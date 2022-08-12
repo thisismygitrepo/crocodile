@@ -231,7 +231,7 @@ class P(type(Path()), Path):
         if ".zip" not in slf and compressed: raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]).reduce().list
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
-    def tree(self, *args, **kwargs): return __import__("crocodile").msc.odds.__dict__['tree'](self, *args, **kwargs)
+    def tree(self, *args, **kwargs): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
     def find(self, *args, r=True, compressed=True, **kwargs):  # short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
         if compressed is False and self.is_file(): return self
         if len(results := self.search(*args, r=r, compressed=compressed, **kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]

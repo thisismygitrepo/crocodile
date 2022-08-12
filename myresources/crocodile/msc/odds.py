@@ -74,8 +74,11 @@ def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit
                 directories, extension = directories + 1, branch if pointer == tee else space
                 yield from inner(path, prefix=prefix + extension, level_=level_ - 1)
             elif not limit_to_directories: yield prefix + pointer + path.name + get_stats(path); files += 1
-    print(dir_path.name); iterator = inner(dir_path, level_=level)
-    [print(line) for line in __import__("itertools").islice(iterator, length_limit)]; print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None; print(f'\n{directories} directories' + (f', {files} files' if files else ''))
+    print(dir_path.name)
+    iterator = inner(dir_path, level_=level)
+    [print(line) for line in __import__("itertools").islice(iterator, length_limit)]
+    print(f'... length_limit, {length_limit}, reached, counted:') if next(iterator, None) else None
+    print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
 
 def compress_directory(path, max_size=15_000, lenient=False):
