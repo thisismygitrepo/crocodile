@@ -133,7 +133,7 @@ class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as
         self.hostname, self.username, self.platform = hostname, username, __import__("platform")
         try: self.sftp = self.ssh.open_sftp()
         except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
-        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" or self.run("echo %OS%").op == "Windows_NT" else ("Linux")  # echo %OS% TODO: uname on linux
+        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" or self.run("echo %OS%", verbose=False).op == "Windows_NT" else ("Linux")  # echo %OS% TODO: uname on linux
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
     def restart_computer(self): self.run("Restart-Computer -Force" if self.remote_machine == "Windows" else "sudo reboot")
@@ -198,7 +198,7 @@ class Scheduler:
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
-        else: self.record_session_end(reason=f"during {during}, " + str(ex)); raise ex
+        else: self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
 
 def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
