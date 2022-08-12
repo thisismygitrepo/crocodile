@@ -123,22 +123,23 @@ class Terminal:
     def get_header(wdir=None): return f"""\n# {'Code prepended'.center(1, '=')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(1, '=')}\n"""
 
 
-class SSH(object):  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
-    def __init__(self, username, hostname=None, sshkey=None, pwd=None, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        _ = False; super().__init__() if _ else None; username, hostname = username.split("@") if "@" in username else (username, hostname)
+class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
+    def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
+        if username is None and hostname is None: username, hostname = __import__('os').getlogin(), __import__("platform").node()  # aka localhost.
+        username, hostname = username.split("@") if "@" in username else (username, hostname)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
         self.hostname, self.username, self.platform = hostname, username, __import__("platform")
         try: self.sftp = self.ssh.open_sftp()
         except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
-        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" else ("Linux")  # echo %OS% uname on linux
+        self.remote_machine = "Windows" if self.run("$env:OS", verbose=False).capture().op == "Windows_NT" or self.run("echo %OS%").op == "Windows_NT" else ("Linux")  # echo %OS% TODO: uname on linux
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.remote_machine == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
     def restart_computer(self): self.run("Restart-Computer -Force" if self.remote_machine == "Windows" else "sudo reboot")
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.remote_machine == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
-    def __repr__(self): return f"local {self.get_repr('local')} [{self.platform.system()}] >>>>>>>>> SSH TO >>>>>>>>> remote {self.get_repr('remote')} [{self.remote_machine}] "
-    def get_repr(self, which="remote"): return (f"{self.username}@{self.hostname}" if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}")
+    def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>>>>>>>> SSH TO >>>>>>>>> remote {self.get_repr('remote', add_machine=Struct)}"
+    def get_repr(self, which="remote", add_machine=False): return (f"{self.username}@{self.hostname}" + (f" [{self.remote_machine}]" if add_machine else "")) if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}" + (f" [{self.platform.system()}]" if add_machine else "")
     def open_console(self, cmd='', new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", '-t' if cmd!='' else '', *f""" {self.get_repr('remote')}""".split(" "), cmd, new_window=new_window, terminal=terminal)
     def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False, env_prefix=False):
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd)
