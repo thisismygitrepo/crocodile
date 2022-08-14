@@ -61,6 +61,17 @@ def pkl(*args, **kwargs): return pickle(*args, **kwargs)
 class Read: read = read; mat = mat; json = json; yaml = yaml; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 
 
+def modify_text(raw, txt, alt, newline=True, notfound_append=False):
+    lines, bingo = txt.split("\n"), False
+    for idx, line in enumerate(lines):
+        if txt in line: lines[idx], bingo = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line)), True
+    if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
+    return "\n".join(lines)
+
+
+# def grep_line(txt):
+
+
 class P(type(Path()), Path):
     # ============= Path management ==================
     """ The default behaviour of methods acting on underlying disk object is to perform the action and return a new path referring to the mutated object in disk drive.
@@ -112,11 +123,7 @@ class P(type(Path()), Path):
     def cache_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt)
-        lines, bingo = self.read_text(encoding=encoding).split("\n"), False
-        for idx, line in enumerate(lines):
-            if txt in line: lines[idx], bingo = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line)), True
-        if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
-        return self.write_text("\n".join(lines), encoding=encoding)
+        return self.write_text(modify_text(raw=self.read_text(encoding=encoding), txt=txt, alt=alt, newline=newline, notfound_append=notfound_append), encoding=encoding)
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
