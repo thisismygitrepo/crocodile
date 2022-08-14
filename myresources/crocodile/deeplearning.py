@@ -175,7 +175,8 @@ class DataReader(tb.Base):
         if strings is None: strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        self.specs.ip_shape = self.split.x_train[0].shape  # useful info for instantiating models.
+        x = self.split.x_train
+        self.specs.ip_shape = x.iloc[0].shape if type(x) is pd.DataFrame else x[0].shape  # useful info for instantiating models.
         self.specs.op_shape = self.split.y_train[0].shape  # useful info for instantiating models.
         print(f"================== Training Data Split ===========================")
         self.split.print()
@@ -395,6 +396,7 @@ class BaseModel(ABC):
         if device_name: hp_obj.device_name = device_name
         if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
         else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
+        if hp_obj.root != path.parent: hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
         d_obj.hp = hp_obj
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
