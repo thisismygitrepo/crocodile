@@ -1,3 +1,4 @@
+import sys
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, get_env, install_n_import
 from datetime import datetime
@@ -56,7 +57,9 @@ def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").
 def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
 def py(path, init_globals=None, run_name=None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
 def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
-def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+def pickle(path, **kwargs):
+    if (load_path := P(path).with_name("PYTHONPATH.txt")).exists(): sys.path.insert(0, P(res.strip()).expanduser().str) if (res := load_path.read_text()) != "" else None
+    obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 def pkl(*args, **kwargs): return pickle(*args, **kwargs)
 class Read: read = read; mat = mat; json = json; yaml = yaml; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 

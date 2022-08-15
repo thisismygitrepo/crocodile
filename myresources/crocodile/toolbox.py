@@ -17,7 +17,7 @@ str2timedelta, timestamp, randstr, validate_name, install_n_import, get_env= cor
 Base, Struct, Display, Save, List = core.Base, core.Struct, core.Display, core.Save, core.List
 # File Management ==========================
 P, Read, Compression, Cache, encrypt, decrypt, modify_text = _fm.P, _fm.Read, _fm.Compression, _fm.Cache, _fm.encrypt, _fm.decrypt, _fm.modify_text
-# META ====================================
+# META =====================================
 Experimental, Terminal, Log, Null, Scheduler, SSH = meta.Experimental, meta.Terminal, meta.Log, meta.Null, meta.Scheduler, meta.SSH
 
 Path = P

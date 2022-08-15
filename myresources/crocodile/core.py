@@ -48,7 +48,7 @@ def yaml(obj, path, **kwargs):
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
 def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
-def pickles(obj): return __import__("dill").dumps(obj)
+def pickles(obj, r=False, **kwargs): return __import__("dill").dumps(obj, r=False, **kwargs)
 class Save: csv = csv; npy = npy; mat = mat; json = json; yaml = yaml; vanilla_pickle = vanilla_pickle; pickle = pickle; pickles = pickles
 
 
