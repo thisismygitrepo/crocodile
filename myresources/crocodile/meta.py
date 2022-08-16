@@ -175,7 +175,7 @@ class Scheduler:
         self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
         self.other_routine = (lambda sched: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
         self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
-        self.logger, self.exception_handler = logger or Log(name="SchedLogger_" + randstr(length=2)), exception_handler
+        self.logger, self.exception_handler = logger if logger is not None else Log(name="SchedLogger_" + randstr(length=2)), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
     def run(self, max_cycles=None, until="2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
