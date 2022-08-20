@@ -124,12 +124,12 @@ class Terminal:
 
 
 class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
-    def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
+    def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         if username is None and hostname is None: username, hostname = __import__('os').getlogin(), __import__("platform").node()  # aka localhost.
         username, hostname = username.split("@") if "@" in username else (username, hostname)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh.connect(hostname=hostname, username=username, password=pwd, port=22, key_filename=self.sshkey)
+        self.ssh.connect(hostname=hostname, username=username, password=pwd, port=port, key_filename=self.sshkey)
         self.hostname, self.username, self.platform = hostname, username, __import__("platform")
         try: self.sftp = self.ssh.open_sftp()
         except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
@@ -216,8 +216,7 @@ def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=Tr
     text += (f"# Source code file generated me was located here: \n`{__import__('inspect').getfile(obj)}`\n" + separator) if obj is not None else ""
     if (res := Terminal().run("echo '## Last Commit'; git log -1; echo '## Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
         text += res.op + "\nlink to files: " + res.op.split("## Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0]
-    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None
-    savepath = Terminal().run(f"cd '{path}'; git rev-parse --show-toplevel", shell="powershell").as_path; readmepath.with_name("PYTHONPATH.txt").write_text(P(savepath).collapseuser().str if savepath else "")
+    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None  # Terminal().run(f"cd '{path}'; git rev-parse --show-toplevel", shell="powershell").as_path
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
 def load_from_source_code(directory, obj=None, delete=False):
     P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
