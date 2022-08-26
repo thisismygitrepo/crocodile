@@ -53,7 +53,7 @@ setup(
         "setuptools",  # for packaging  # correct place is in .toml
         "wheel",
         "twine",  # for pushing package to pypi.org
-        "pytest",  # popular alternative to builtint unittest
+        "pytest",  # popular alternative to builtint unittest  # consider splitting requirements to development and production versions.
         # "scikit-image",  # image processing. Heavy-weight.
 
         # torch
