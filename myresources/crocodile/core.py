@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 # ============================== Accessories ============================================
-def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.() ]+', replace, str(astring))
+def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
 def timestamp(fmt=None, name=None): return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f') # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift):  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
