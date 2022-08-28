@@ -192,9 +192,9 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def print(self, dtype=True, return_str=False, justify=30, as_config=False, as_yaml=False, limit=50, **kwargs): res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"])); print(res) if not return_str else None; return str(res) if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
-    def plot(self, use_plt=True, **kwargs):
+    def plot(self, use_plt=True, title='', xlabel='', **kwargs):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
-        else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__); return artist
+        else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__, title=title, xlabel=xlabel); return artist
 
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.

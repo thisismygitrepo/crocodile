@@ -266,14 +266,15 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz=False, **kwargs):
+    def fit(self, viz=True, **kwargs):
         default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train, validation_data=(self.data.split.x_test, self.data.split.y_test),
                                      batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings.dict)
-        self.history.append(tb.Struct(copy.deepcopy(hist.history)))
-        # it is paramount to copy, cause source can change.
-        if viz: self.plot_loss()
+        self.history.append(tb.Struct(copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
+        if viz:
+            artist = self.plot_loss()
+            artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/loss_curve_{tb.randstr()}.png").create(parents_only=True))
         return self
 
     def switch_to_sgd(self, epochs=10):
@@ -309,7 +310,7 @@ class BaseModel(ABC):
     def load_weights(self, directory): self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
     def summary(self): return self.model.summary()
     def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-    def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, **kwargs)
+    def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, title="Loss Curve", xlabel="epochs", **kwargs)
 
     def infer(self, x):
         """ This method assumes numpy input, datatype-wise and is also preprocessed.

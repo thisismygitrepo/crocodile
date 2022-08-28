@@ -1,4 +1,3 @@
-import sys
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, get_env, install_n_import
 from datetime import datetime
