@@ -16,7 +16,7 @@ class HParams(dl.HyperParam):
             # ===================== Data ==============================
             seed=234,
             shuffle=True,
-            precision='float32',
+            precision='float64',
             # ===================== Model =============================
             # ===================== Training ==========================
             test_split=0.2,

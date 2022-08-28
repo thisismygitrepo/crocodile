@@ -55,7 +55,7 @@ class HyperParam(tb.Struct):
     def save(self, **kwargs):
         self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
         if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.dat.pkl"), add_suffix=False, data_only=True, desc="")
-        if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
+        # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
 
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(HyperParam, cls).from_saved_data(tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
@@ -160,7 +160,7 @@ class DataReader(tb.Base):
     def save(self, path=None, *args, **kwargs):
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
         if self.hp.save_type in {"data", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
-        if self.hp.save_type in {"obj", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False, data_only=False)
+        # if self.hp.save_type in {"obj", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False, data_only=False)
 
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
@@ -626,6 +626,11 @@ def batcherv2(func_type='function', order=1):
             def __int__(self, func): self.func = func
             def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
         return Batch
+
+
+def get_template():
+    tb.install_n_import("clipboard").copy(tb.P(__file__).parent.joinpath("msc/dl_template.py").read_text(encoding="utf-8"))
+    print("Copied to clipboard")
 
 
 if __name__ == '__main__':
