@@ -37,14 +37,15 @@ def pomodoro(work=25, rest=5, repeats=4):
 
 
 class Cycle:
-    def __init__(self, iterable=None): self.list = iterable; self.index = -1
-    def next(self): self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index; return self.list[self.index]
-    def previous(self): self.index -= 1; self.index = len(self.list) - 1 if self.index < 0 else self.index; return self.list[self.index]
-    def set(self, value): self.index = self.list.index(value)
-    def get(self): return self.list[self.index]
+    def __init__(self, iterable=None, max_idx=None): self.list = iterable if iterable is not None else list(range(max_idx)); self.index = -1; self.prev_index = -1
+    def next(self): self.prev_index = self.index; self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index; return self.list[self.index]
+    def previous(self): self.prev_index = self.index; self.index -= 1; self.index = len(self.list) - 1 if self.index < 0 else self.index; return self.list[self.index]
+    def set_value(self, value): self.prev_index = self.index; self.index = self.list.index(value)
+    def get_value(self): return self.list[self.index]
     def get_index(self): return self.index
-    def set_index(self, index): self.index = index
+    def set_index(self, index): self.prev_index = self.index; self.index = index
     def __add__(self, other): pass  # see behviour of matplotlib cyclers.
+    def __repr__(self): return f"Cycler @ {self.index}: {self.list[self.index]}"
 class DictCycle(Cycle):
     def __init__(self, strct): super(DictCycle, self).__init__(iterable=strct.items()); self.keys = strct.keys()
     def set_key(self, key): self.index = list(self.keys).index(key)

@@ -1,4 +1,4 @@
-
+import platform
 
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name, randstr
 from crocodile.file_management import P
@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from crocodile.msc.odds import Cycle
 from matplotlib import widgets
 import matplotlib.colors as mcolors
+from matplotlib import animation
 import enum
 import subprocess
 import pandas as pd
@@ -55,6 +56,7 @@ def try_figsave():
         ax.cla()  # clear axis
     saver.finish()
 
+    # Trying out GIF
     dat = np.random.random((10, 100))
     fig, ax = plt.subplots(figsize=(12, 8))
     saver = FigureSave.GIF(watch_figs=[fig], save_dir=P.tmpdir())
@@ -64,6 +66,7 @@ def try_figsave():
         # ax.cla()  # clear axis
     saver.finish()
 
+    # trying out MPEG
     dat = np.random.random((10, 100))
     fig, ax = plt.subplots(figsize=(12, 8))
     saver = FigureSave.MPEGPipeBased(watch_figs=[fig], save_dir=P.tmpdir())
@@ -72,6 +75,45 @@ def try_figsave():
         saver.add(names=[randstr()])
         ax.cla()  # clear axis
     saver.finish()
+
+    # trying out auto savers
+    dat = np.random.random((10, 100)).T
+
+    class MyArtist:
+        def __init__(self):
+            self.fig, self.ax = plt.subplots()
+        def animate(self, *datum):
+            self.ax.cla()
+            self.ax.plot(*datum)
+
+    _ = FigureSave.PDFAuto(data=dat, plotter_class=MyArtist)
+
+    # trying out FigureManger
+
+    class ArtistWithManager(FigureManager):
+        def __init__(self):
+            super(ArtistWithManager, self).__init__()
+            self.fig, self.ax = plt.subplots()
+            self.data = np.random.random((10, 100))
+            self.idx_cycle = Cycle(max_idx=len(self.data))
+            self.animate()
+
+        def animate(self):
+            self.ax.cla()
+            self.ax.plot(self.data[self.idx_cycle.get_index()])
+
+    q = ArtistWithManager().connect()
+
+
+def assert_requirements():
+    try: subprocess.check_output(['where.exe' if platform.system() == 'Windows' else 'which', 'magick'])
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        # P(r"https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z").download().unzip().search()[0].rename("ffmpeg").move(r"C://")  # P("C:\\ffmpeg\\bin")  # add to PATH
+        print("Installinng image magick")
+        if __import__("platform").system() == "Windows":
+            Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
+            print("You might need to restart your machine before PATH change impact takes place.")
+        else: raise NotImplementedError
 
 
 class FigureSave:
@@ -119,31 +161,22 @@ class FigureSave:
             fig_list.append(subcontainer)  # if you want the method coupled with cla being used in main, then it add_line is required for axes.
         def finish(self):
             print("Saving the GIF ....")
-            import matplotlib.animation as animation
-            from matplotlib.animation import PillowWriter  # PillowWriter
             for idx, a_fig in enumerate(self.watch_figs):
                 if ims := self.container[a_fig.get_label()]:
-                    ani = animation.ArtistAnimation(a_fig, ims, interval=self.interval, blit=True, repeat_delay=1000)
                     self.fname = self.save_dir.joinpath(f'{a_fig.get_label()}_{self.save_name}.gif')
-                    ani.save(self.fname, writer=PillowWriter(fps=4))  # if you don't specify the writer, it goes to ffmpeg by default then try others if that is not available, resulting in behaviours that is not consistent across machines.
+                    ani = animation.ArtistAnimation(a_fig, ims, interval=self.interval, blit=True, repeat_delay=1000)
+                    # noinspection PyTypeChecker
+                    ani.save(self.fname, writer=animation.PillowWriter(fps=4))  # if you don't specify the writer, it goes to ffmpeg by default then try others if that is not available, resulting in behaviours that is not consistent across machines.
                     print(f"SAVED GIF @", P(self.fname).absolute().as_uri())
                 else: print(f"Nothing to be saved by GIF writer."); return self.fname
     class GIFFileBased(GenericSave):
         def __init__(self, fps=4, dpi=100, bitrate=1800, _type='GIFFileBased', **kwargs):
-            super().__init__(**kwargs)
-            extension = '.gif'
-            try: subprocess.check_output(['where.exe', 'magick'])
-            except FileNotFoundError:
-                # P(r"https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z").download().unzip().search()[0].rename("ffmpeg").move(r"C://")  # P("C:\\ffmpeg\\bin")  # add to PATH
-                if __import__("platform").system() == "Windows":
-                    Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
-                    print("You might need to restart your machine before PATH change impact takes place.")
-                else: raise NotImplementedError
-            if _type == 'GIFPipeBased': from matplotlib.animation import ImageMagickFileWriter as Writer  # internally calls: matplotlib._get_executable_info("magick")
-            elif _type == 'MPEGFileBased': from matplotlib.animation import FFMpegFileWriter as Writer; extension = '.mp4'
-            elif _type == 'MPEGPipeBased': from matplotlib.animation import FFMpegWriter as Writer; extension = '.mp4'
+            super().__init__(**kwargs); assert_requirements()
+            if _type == 'GIFPipeBased': writer, extension = animation.ImageMagickFileWriter, '.gif'  # internally calls: matplotlib._get_executable_info("magick")
+            elif _type == 'MPEGFileBased': writer, extension = animation.FFMpegFileWriter, '.mp4'
+            elif _type == 'MPEGPipeBased': writer, extension = animation.FFMpegWriter, '.mp4'
             else: raise ValueError("Unknown writer.")
-            self.writer = Writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
+            self.writer = writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
             self.fname = self.save_dir.joinpath(self.save_name + extension)
             assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
             self.writer.setup(fig=self.watch_figs[0], outfile=str(self.fname), dpi=dpi)
@@ -156,27 +189,22 @@ class FigureSave:
     class MPEGPipeBased(GIFFileBased):
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class GenericAuto(GenericSave):
-        """Parses the data internally, hence requires artist with animate method implemetend. You also need to have .fig attribute."""
+        """Parses the data internally, hence requires artist with animate method implemetend. Artist needs to have .fig attribute."""
         save_type = 'auto'
         def __init__(self, plotter_class, data, names_list=None, **kwargs):
-            super().__init__(**kwargs)
+            super().__init__(**kwargs); self.saver, self.plotter = None, None; assert_requirements()
             self.plotter_class, self.data, self.names_list, self.kwargs = plotter_class, data, names_list, kwargs
-            self.data_gen, self.saver, self.plotter = None, None, None
         def animate(self):
-            self.data_gen = lambda: (i for i in zip(*self.data))
-            self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **self.kwargs); plt.pause(0.5)  # give time for figures to show up before updating them
-            for idx, datum in __import__("tqdm").tqdm(enumerate(self.data_gen())): self.plotter.animate(datum); self.saver.add(names=[self.names_list[idx]])
+            self.plotter = self.plotter_class(**self.kwargs); plt.pause(0.5)  # give time for figures to show up before updating them
+            for idx, datum in __import__("tqdm").tqdm(enumerate(self.data)): self.plotter.animate(datum); self.saver.add(names=[self.names_list[idx] if self.names_list is not None else str(idx)])
             self.saver.finish()
     class GIFAuto(GenericAuto):
-        def __init__(self, plotter_class, data, interval=500, extension='gif', fps=4, **kwargs):
-            super().__init__(plotter_class, data, **kwargs); writer = None
-            from matplotlib import animation
-            if extension == 'gif': writer = animation.PillowWriter(fps=fps)
-            elif extension == 'mp4': writer = animation.FFMpegWriter(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=2500)
-            self.gen = (i for i in zip(*self.data))
-            self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
+        def __init__(self, plotter_class, data, interval=500, extension='gif', fps=4, metadata=None, **kwargs):
+            super().__init__(plotter_class, data, **kwargs)
+            writer = animation.PillowWriter(fps=fps) if extension == '.mp4' else animation.FFMpegWriter(fps=fps, metadata=metadata, bitrate=2500)
+            self.plotter = self.plotter_class(**kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
             # noinspection PyTypeChecker
-            self.ani = animation.FuncAnimation(self.plotter.fig, self.plotter.animate, frames=self.gen, interval=interval, repeat_delay=1500, fargs=None, cache_frame_data=True, save_count=10000)
+            self.ani = animation.FuncAnimation(fig=self.plotter.fig, func=self.plotter.animate, frames=(i for i in zip(*self.data)), interval=interval, repeat_delay=1500, fargs=None, cache_frame_data=True, save_count=10000)
             self.fname = self.save_dir.joinpath(self.save_name + f".{extension}")
             self.ani.save(filename=self.fname, writer=writer); print(f"SAVED GIF @ ", P(self.fname).absolute().as_uri())
     class PDFAuto(GenericAuto):
@@ -187,12 +215,12 @@ class FigureSave:
         def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.Null(**kwargs); self.fname = self.saver.fname; self.animate()
     class GIFFileBasedAuto(GenericAuto):
         def __init__(self, plotter_class, data, fps=4, dpi=150, bitrate=2500, _type='GIFFileBasedAuto', **kwargs):
-            super().__init__(**kwargs); extension = '.gif'
-            from matplotlib.animation import ImageMagickWriter as Writer
-            if _type == 'GIFPipeBasedAuto': from matplotlib.animation import ImageMagickFileWriter as Writer
-            elif _type == 'MPEGFileBasedAuto': from matplotlib.animation import FFMpegFileWriter as Writer; extension = '.mp4'
-            elif _type == 'MPEGPipeBasedAuto': from matplotlib.animation import FFMpegWriter as Writer; extension = '.mp4'
-            self.saver = Writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
+            super().__init__(**kwargs)
+            if _type == 'GIFPipeBasedAuto': writer = animation.ImageMagickFileWriter; extension = '.gif'
+            elif _type == 'MPEGFileBasedAuto': writer = animation.FFMpegFileWriter; extension = '.mp4'
+            elif _type == 'MPEGPipeBasedAuto': writer = animation.FFMpegWriter; extension = '.mp4'
+            else: raise ValueError("Unknown writer.")
+            self.saver = writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
             self.fname = self.save_dir.joinpath(self.save_name + extension)
             self.data = lambda: (i for i in zip(*data)); self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs); plt.pause(0.5); from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
@@ -211,8 +239,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
         self.cmaps, self.colors, self.mcolors, self.facecolor = Cycle(plt.colormaps()), Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color']), list(mcolors.CSS4_COLORS.keys()), Cycle(list(mcolors.CSS4_COLORS.values()))
-        self.cmaps.set('viridis')
-        self.index = self.index_prev = self.pause = self.index_max = None  # animation
+        self.cmaps.set_value('viridis')
+        self.idx_cycle = Cycle([1, 2]); self.pause = None  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
                           "/": {'help': 'Show/Hide info text', 'func': self.text_info},
                           "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
@@ -244,7 +272,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
             print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
     # =============== EVENT METHODS ====================================
     def animate(self): pass  # a method of the artist child class that is inheriting from this class to define behaviour when user press next or previous buttons.
-    def connect(self): self.fig.canvas.mpl_connect('key_press_event', self.process_key)
+    def connect(self): self.fig.canvas.mpl_connect('key_press_event', self.process_key); return self
     def process_key(self, event):
         self.event = event  # useful for debugging.
         for key in self.help_menu.keys():
@@ -263,10 +291,10 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
         ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}'); ax.annot_obj.xy = (x, y); self.fig.canvas.draw_idle()
     def save(self, event): _ = event; Save.pickle(path=P.tmpfile(name="figure_manager"), obj=self)
-    def replay(self, event): _ = event; self.pause = False; self.index = 0; self.message = 'Replaying'; self.animate()
+    def replay(self, event): _ = event; self.pause = False; self.idx_cycle.set_index(0); self.message = 'Replaying'; self.animate()
     def pause_func(self, event): _ = event; self.pause = not self.pause; self.message = f'Pause flag is set to {self.pause}'; self.animate()
-    def previous(self, event): _ = event; self.index_prev = self.index; self.index = self.index - 1 if self.index > 0 else self.index_max - 1; self.message = f'Previous {self.index}'; self.animate()
-    def next(self, event): _ = event; self.index_prev = self.index; self.index = self.index + 1 if self.index < self.index_max - 1 else 0; self.message = f'Next {self.index}'; self.animate()
+    def previous(self, event): _ = event; self.idx_cycle.previous(); self.message = f'Previous {self.idx_cycle}'; self.animate()
+    def next(self, event): _ = event; self.idx_cycle.next(); self.message = f'Next {self.idx_cycle}'; self.animate()
     def text_info(self, event): _ = event; self.message = ''
     def change_facecolor(self, event): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
     def adjust_brightness(self, event):
@@ -464,8 +492,8 @@ class ImShow(FigureManager):
         nrows, ncols = self.get_nrows_ncols(m, nrows, ncols)
         self.img_tensor, self.sub_labels, self.sup_titles = img_tensor, sub_labels if sub_labels is not None else [[f"{i}-{j}" for j in range(m)] for i in range(n)], sup_titles if sup_titles is not None else np.arange(n)
         self.pause, self.kwargs, self.delay, self.auto_brightness = pause, kwargs, delay, auto_brightness
-        self.fname = self.event = None; self.index, self.ims = 0, []  # container for images.
-        self.cmaps = Cycle(plt.colormaps()); self.cmaps.set('viridis')
+        self.fname = self.event = None; self.ims = []  # container for images.
+        self.cmaps = Cycle(plt.colormaps()); self.cmaps.set_value('viridis')
         if ax is None:
             self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white'); self.maximize_fig() if figsize is None else None
             if gridspec is not None: gs = self.fig.add_gridspec(gridspec[0]); self.ax = [self.fig.add_subplot(gs[ags[0], ags[1]]) for ags in gs[1:]]
@@ -477,7 +505,7 @@ class ImShow(FigureManager):
         self.ax = [self.ax] if nrows == 1 and ncols == 1 else self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
         [self.toggle_ticks(an_ax, state=False) for an_ax in self.ax]; self.animate()
     def animate(self):
-        for i in range(self.index, self.n):
+        for i in range(self.idx_cycle.get_index(), self.n):
             for j, (an_image, a_label, an_ax) in enumerate(zip(self.img_tensor[i], self.sub_labels[i], self.ax)):  # with zipping, the shortest of the three, will stop the loop.
                 if i == 0 and self.ims.__len__() < self.m: self.ims.append(an_ax.imshow(an_image, animated=True, **self.kwargs))
                 else: self.ims[j].set_data(an_image)
@@ -485,8 +513,8 @@ class ImShow(FigureManager):
                 an_ax.set_xlabel(f'{a_label}')
             self.fig.suptitle(self.sup_titles[i], fontsize=8); self.saver.add(names=[self.sup_titles[i]])
             if self.pause: break
-            else: self.index = i
-        if self.index == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
+            else: self.idx_cycle.set_index(i)
+        if self.idx_cycle.get_index() == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
     @staticmethod
     def try_cmaps(im, nrows=3, ncols=7, **kwargs): _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
     def annotate(self, event, axis=None, data=None): [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
