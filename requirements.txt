@@ -4,6 +4,7 @@ numpy
 scipy
 pandas
 matplotlib
+cycler
 
 # Accessories
 joblib  # multitasking
