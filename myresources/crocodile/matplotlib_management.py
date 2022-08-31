@@ -1,6 +1,6 @@
 
 
-from crocodile.core import List, timestamp, Save, install_n_import, validate_name
+from crocodile.core import List, timestamp, Save, install_n_import, validate_name, randstr
 from crocodile.file_management import P
 import matplotlib.pyplot as plt
 from crocodile.msc.odds import Cycle
@@ -22,6 +22,38 @@ class FigurePolicy(enum.Enum):
     same = 'Grab the figure of the same path'
 
 
+def try_figsave():
+    # Slack style, doesn't specify which fig or axis to save, thus, figsave will look for all opened figures.
+    dat = np.random.random((10, 100))
+    saver = FigureSave.PDF()
+    for item in dat:
+        plt.plot(item)  # this behaviour will keep superimpsing on the same figure
+        saver.add()
+    saver.finish(open_result=True)
+
+    # Declare the figure first, clear the axis after each plot.
+    dat = np.random.random((10, 100))
+    tmp = plt.plot([1, 2])  # random figure, will be ignored by figsaver
+    fig, ax = plt.subplots(figsize=(12, 8))
+    saver = FigureSave.PNG(watch_figs=[fig], save_dir=P.tmpdir())
+    for item in dat:
+        ax.plot(item)
+        saver.add(names=[randstr()])
+        ax.cla()  # clear axis
+    saver.finish()
+
+    # PDF and PNG figsavers do not require a persistent figure. In fact, at run time, every snap captured on the fly by passing `fignames` to `add` method, which can come from anywhere.
+    # GIF figsaver on the otherhand, have stricter requirements.
+    dat = np.random.random((10, 100))
+    fig, ax = plt.subplots(figsize=(12, 8))
+    saver = FigureSave.GIF(watch_figs=[fig], save_dir=P.tmpdir())
+    for item in dat:
+        ax.plot(item)
+        saver.add(names=[randstr()])
+        ax.cla()  # clear axis
+    saver.finish()
+
+
 class FigureSave:
     class GenericSave:
         stream = ['clear', 'accumulate', 'update'][0]
@@ -30,13 +62,13 @@ class FigureSave:
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
             self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_image_save")
             self.kwargs, self.counter, self.delay, self.max = kwargs, 0, delay, max_calls
-        def add(self, fignames=None, names=None, **kwargs):
+        def add(self, fignames=None, names=None, **kwargs):  # generic method used at runtime, never changed.
             print(f"Saver added frame number {self.counter}", end='\r')
             self.counter += 1; plt.pause(self.delay * 0.001); print('Turning off IO') if self.counter > self.max else None; plt.ioff()
             self.watch_figs = [plt.figure(figname) for figname in fignames] if fignames else ([plt.figure(k) for k in plt.get_figlabels()] if self.watch_figs is None else self.watch_figs)  # path sent explicitly, # None exist ==> add all else # they exist already.
             if names is None: names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]  # individual save path, useful for PNG.
             for afig, aname in zip(self.watch_figs, names): self._save(afig, aname, **kwargs)
-        def _save(self, *args, **kwargs): pass
+        def _save(self, *args, **kwargs): pass  # called by generic method `add`, to be implemented when subclassing.
     class Null(GenericSave):  # serves as a filler.
         def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir
         def finish(self): print(f"Nothing saved by {self}"); return self.fname
@@ -44,13 +76,13 @@ class FigureSave:
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             from matplotlib.backends.backend_pdf import PdfPages
-            self.fname = self.save_dir.joinpath(self.save_name + '.pdf'); self.pp = PdfPages(self.fname)
+            self.fname = self.save_dir.joinpath(self.save_name + ('.pdf' if '.pdf' not in str(self.save_name) else '')); self.pp = PdfPages(self.fname)
         def _save(self, a_fig, a_name, bbox_inches='tight', pad_inches=0.3, **kwargs): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
-        def finish(self, open_result=True): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); self.fname() if open_result else None; return self
+        def finish(self): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); return self
     class PNG(GenericSave):
         def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
         def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
-        def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self.fname
+        def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
     class GIF(GenericSave):
         """Requirements: same axis must persist (If you clear the axis, nothing will be saved), only new objects are drawn inside it. This is not harsh as no one wants to add multiple axes on top of each other.
         Next, the objects drawn must not be removed, or updated, instead they should pile up in axis. # do not pass names in the add method. names will be extracted from figures.
@@ -88,6 +120,10 @@ class FigureSave:
             self.fname = os.path.join(self.save_dir, self.save_name + extension)
             assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
             self.writer.setup(fig=self.watch_figs[0], outfile=self.fname, dpi=dpi)
+            try: matplotlib._get_executable_info("magick")
+            except ValueError:
+                if __import__(platform).system() == "Windows": Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")
+                else: raise NotImplementedError
         def _save(self, afig, aname, **kwargs): self.writer.grab_frame(**kwargs)
         def finish(self): print('Saving results ...'); self.writer.finish(); print(f"SAVED GIF @", P(self.fname).absolute().as_uri()); return self.fname
     class GIFPipeBased(GIFFileBased):
