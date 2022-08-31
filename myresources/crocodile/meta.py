@@ -215,7 +215,7 @@ def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=Tr
     if (res := Terminal().run(f"echo '## Last Commit'; cd '{obj_path.parent}'; git log -1; echo '## Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
         text += res.op + "\nlink to files: " + res.op.split("## Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0] + "\n"
     else: text += f"Could read git repository @ `{obj_path.parent}`.\n"
-    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text); print(f"SAVED README.md @ {readmepath.absolute().as_uri()}") if verbose else None  # Terminal().run(f"cd '{path}'; git rev-parse --show-toplevel", shell="powershell").as_path
+    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None  # Terminal().run(f"cd '{path}'; git rev-parse --show-toplevel", shell="powershell").as_path
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
 def load_from_source_code(directory, obj=None, delete=False):
     P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))

@@ -383,11 +383,13 @@ class BaseModel(ABC):
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
         tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
+        try:tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
+        except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
+        return self.hp.save_dir
 
     @classmethod
     def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None, verbose=True):
