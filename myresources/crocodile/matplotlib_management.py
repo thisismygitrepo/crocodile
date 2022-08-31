@@ -2,12 +2,14 @@
 
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name, randstr
 from crocodile.file_management import P
+from crocodile.meta import Terminal
+
 import matplotlib.pyplot as plt
 from crocodile.msc.odds import Cycle
 from matplotlib import widgets
 import matplotlib.colors as mcolors
 import enum
-import os
+import subprocess
 import pandas as pd
 import numpy as np
 
@@ -29,11 +31,11 @@ def try_figsave():
     for item in dat:
         plt.plot(item)  # this behaviour will keep superimpsing on the same figure
         saver.add()
-    saver.finish(open_result=True)
+    saver.finish()
 
     # Declare the figure first, clear the axis after each plot.
     dat = np.random.random((10, 100))
-    tmp = plt.plot([1, 2])  # random figure, will be ignored by figsaver
+    _ = plt.plot([1, 2])  # random figure, will be ignored by figsaver
     fig, ax = plt.subplots(figsize=(12, 8))
     saver = FigureSave.PNG(watch_figs=[fig], save_dir=P.tmpdir())
     for item in dat:
@@ -46,7 +48,25 @@ def try_figsave():
     # GIF figsaver on the otherhand, have stricter requirements.
     dat = np.random.random((10, 100))
     fig, ax = plt.subplots(figsize=(12, 8))
+    saver = FigureSave.GIFFileBased(watch_figs=[fig], save_dir=P.tmpdir())
+    for item in dat:
+        ax.plot(item)[0].set_label("neo")
+        saver.add(names=[randstr()])
+        ax.cla()  # clear axis
+    saver.finish()
+
+    dat = np.random.random((10, 100))
+    fig, ax = plt.subplots(figsize=(12, 8))
     saver = FigureSave.GIF(watch_figs=[fig], save_dir=P.tmpdir())
+    for item in dat:
+        ax.plot(item)[0].set_label("neo")
+        saver.add(names=[randstr()])
+        # ax.cla()  # clear axis
+    saver.finish()
+
+    dat = np.random.random((10, 100))
+    fig, ax = plt.subplots(figsize=(12, 8))
+    saver = FigureSave.MPEGPipeBased(watch_figs=[fig], save_dir=P.tmpdir())
     for item in dat:
         ax.plot(item)
         saver.add(names=[randstr()])
@@ -60,7 +80,7 @@ class FigureSave:
         def __init__(self, save_dir=None, save_name=None, watch_figs: list or None = None, max_calls=2000, delay=100, **kwargs):
             """How to control what to be saved: you can either pass the figures to be tracked at init time, pass them dynamically at add time, or, add method will capture every figure and axis"""
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
-            self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_image_save")
+            self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_fig_save")
             self.kwargs, self.counter, self.delay, self.max = kwargs, 0, delay, max_calls
         def add(self, fignames=None, names=None, **kwargs):  # generic method used at runtime, never changed.
             print(f"Saver added frame number {self.counter}", end='\r')
@@ -83,13 +103,13 @@ class FigureSave:
         def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
         def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
         def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
-    class GIF(GenericSave):
-        """Requirements: same axis must persist (If you clear the axis, nothing will be saved), only new objects are drawn inside it. This is not harsh as no one wants to add multiple axes on top of each other.
-        Next, the objects drawn must not be removed, or updated, instead they should pile up in axis. # do not pass names in the add method. names will be extracted from figures.
+    class GIF(GenericSave):  # NOT RECOMMENDED, used GIFFileBased instead.
+        """This class uses ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc (limitation).
+        Requirements: same axis must persist (If you clear the axis, nothing will be saved), only new objects are drawn inside it. Additionally, the objects drawn must not be removed, or updated, instead they should pile up in axis.
         # usually it is smoother when adding animate=True to plot or imshow commands for GIF purpose
         Works for images only. Add more .imshow to the same axis, and that's it. imshow will conver up previous images. For lines, it will superimpose it and will look ugly.
         The class will automatically detect new lines by their "neo" labels and add them then hide them for the next round.
-        Limitation of ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc."""
+        """
         def __init__(self, interval=100, **kwargs):
             super().__init__(**kwargs); from collections import defaultdict
             self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time.
@@ -100,32 +120,35 @@ class FigureSave:
         def finish(self):
             print("Saving the GIF ....")
             import matplotlib.animation as animation
-            from matplotlib.animation import MovieWriter  # PillowWriter
+            from matplotlib.animation import PillowWriter  # PillowWriter
             for idx, a_fig in enumerate(self.watch_figs):
                 if ims := self.container[a_fig.get_label()]:
                     ani = animation.ArtistAnimation(a_fig, ims, interval=self.interval, blit=True, repeat_delay=1000)
-                    self.fname = os.path.join(self.save_dir, f'{a_fig.get_label()}_{self.save_name}.gif')
-                    ani.save(self.fname, writer=MovieWriter(fps=4))  # if you don't specify the writer, it goes to ffmpeg by default then try others if that is not available, resulting in behaviours that is not consistent across machines.
+                    self.fname = self.save_dir.joinpath(f'{a_fig.get_label()}_{self.save_name}.gif')
+                    ani.save(self.fname, writer=PillowWriter(fps=4))  # if you don't specify the writer, it goes to ffmpeg by default then try others if that is not available, resulting in behaviours that is not consistent across machines.
                     print(f"SAVED GIF @", P(self.fname).absolute().as_uri())
                 else: print(f"Nothing to be saved by GIF writer."); return self.fname
     class GIFFileBased(GenericSave):
         def __init__(self, fps=4, dpi=100, bitrate=1800, _type='GIFFileBased', **kwargs):
             super().__init__(**kwargs)
-            from matplotlib.animation import ImageMagickWriter as Writer
             extension = '.gif'
-            if _type == 'GIFPipeBased': from matplotlib.animation import ImageMagickFileWriter as Writer
+            try: subprocess.check_output(['where.exe', 'magick'])
+            except FileNotFoundError:
+                # P(r"https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z").download().unzip().search()[0].rename("ffmpeg").move(r"C://")  # P("C:\\ffmpeg\\bin")  # add to PATH
+                if __import__("platform").system() == "Windows":
+                    Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
+                    print("You might need to restart your machine before PATH change impact takes place.")
+                else: raise NotImplementedError
+            if _type == 'GIFPipeBased': from matplotlib.animation import ImageMagickFileWriter as Writer  # internally calls: matplotlib._get_executable_info("magick")
             elif _type == 'MPEGFileBased': from matplotlib.animation import FFMpegFileWriter as Writer; extension = '.mp4'
             elif _type == 'MPEGPipeBased': from matplotlib.animation import FFMpegWriter as Writer; extension = '.mp4'
+            else: raise ValueError("Unknown writer.")
             self.writer = Writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
-            self.fname = os.path.join(self.save_dir, self.save_name + extension)
+            self.fname = self.save_dir.joinpath(self.save_name + extension)
             assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
-            self.writer.setup(fig=self.watch_figs[0], outfile=self.fname, dpi=dpi)
-            try: matplotlib._get_executable_info("magick")
-            except ValueError:
-                if __import__(platform).system() == "Windows": Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")
-                else: raise NotImplementedError
+            self.writer.setup(fig=self.watch_figs[0], outfile=str(self.fname), dpi=dpi)
         def _save(self, afig, aname, **kwargs): self.writer.grab_frame(**kwargs)
-        def finish(self): print('Saving results ...'); self.writer.finish(); print(f"SAVED GIF @", P(self.fname).absolute().as_uri()); return self.fname
+        def finish(self): print('Saving results ...'); self.writer.finish(); print(f"SAVED GIF @", P(self.fname).absolute().as_uri()); return self
     class GIFPipeBased(GIFFileBased):
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class MPEGFileBased(GIFFileBased):
@@ -154,7 +177,7 @@ class FigureSave:
             self.plotter = self.plotter_class(*[piece[0] for piece in self.data], **kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
             # noinspection PyTypeChecker
             self.ani = animation.FuncAnimation(self.plotter.fig, self.plotter.animate, frames=self.gen, interval=interval, repeat_delay=1500, fargs=None, cache_frame_data=True, save_count=10000)
-            self.fname = f"{os.path.join(self.save_dir, self.save_name)}.{extension}"
+            self.fname = self.save_dir.joinpath(self.save_name + f".{extension}")
             self.ani.save(filename=self.fname, writer=writer); print(f"SAVED GIF @ ", P(self.fname).absolute().as_uri())
     class PDFAuto(GenericAuto):
         def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.PDF(**kwargs); self.animate()
@@ -170,7 +193,7 @@ class FigureSave:
             elif _type == 'MPEGFileBasedAuto': from matplotlib.animation import FFMpegFileWriter as Writer; extension = '.mp4'
             elif _type == 'MPEGPipeBasedAuto': from matplotlib.animation import FFMpegWriter as Writer; extension = '.mp4'
             self.saver = Writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
-            self.fname = os.path.join(self.save_dir, self.save_name + extension)
+            self.fname = self.save_dir.joinpath(self.save_name + extension)
             self.data = lambda: (i for i in zip(*data)); self.plotter = plotter_class(*[piece[0] for piece in data], **kwargs); plt.pause(0.5); from tqdm import tqdm
             with self.saver.saving(fig=self.plotter.fig, outfile=self.fname, dpi=dpi):
                 for datum in tqdm(self.data()): self.plotter.animate(datum); self.saver.grab_frame(); plt.pause(self.delay * 0.001)
@@ -324,9 +347,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         elif not nrows and ncols: nrows = int(np.ceil(num_plots / ncols))
         return nrows, ncols
     @staticmethod
-    def findobj(figname, obj_name):
-        search_results = (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
-        return search_results[0] if len(search_results) > 0 else search_results
+    def findobj(figname, obj_name): return (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
     @staticmethod
     def get_fig_static(figpolicy, figname='', suffix=None, **kwargs):
         exist = True if figname in plt.get_figlabels() else False
@@ -414,7 +435,7 @@ class VisibilityViewerAuto(VisibilityViewer):
         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
         self.data = data; self.artist = artist or Artist()
         self.legends = [f"Plot {i}" for i in range(len(self.data))] if legends is None else legends; self.titles = titles if titles is not None else np.arange(len(self.data))
-        super().__init__(fig=self.artist.fig)
+        super().__init__(fig=self.artist.fig); _ = kwargs
         self.saver = save_type(watch_figs=[self.artist.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay)
         self.index_max, self.pause, self.stream, self.lables = len(self.data), pause, stream, x_labels
     test = staticmethod(lambda: VisibilityViewerAuto(data=np.random.randn(10, 1, 10, 3)))
