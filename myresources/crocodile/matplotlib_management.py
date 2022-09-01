@@ -1,6 +1,6 @@
-import platform
 
-from crocodile.core import List, timestamp, Save, install_n_import, validate_name, randstr
+
+from crocodile.core import List, timestamp, Save, install_n_import, validate_name
 from crocodile.file_management import P
 from crocodile.meta import Terminal
 
@@ -11,6 +11,7 @@ import matplotlib.colors as mcolors
 from matplotlib import animation
 import enum
 import subprocess
+import platform
 import pandas as pd
 import numpy as np
 
@@ -23,86 +24,6 @@ class FigurePolicy(enum.Enum):
     close_create_new = 'Close the previous figure that has the same figname and create a new fresh one'
     add_new = 'Create a new figure with same path but with added suffix'
     same = 'Grab the figure of the same path'
-
-
-def try_figsave():
-    # Slack style, doesn't specify which fig or axis to save, thus, figsave will look for all opened figures.
-    dat = np.random.random((10, 100))
-    saver = FigureSave.PDF()
-    for item in dat:
-        plt.plot(item)  # this behaviour will keep superimpsing on the same figure
-        saver.add()
-    saver.finish()
-
-    # Declare the figure first, clear the axis after each plot.
-    dat = np.random.random((10, 100))
-    _ = plt.plot([1, 2])  # random figure, will be ignored by figsaver
-    fig, ax = plt.subplots(figsize=(12, 8))
-    saver = FigureSave.PNG(watch_figs=[fig], save_dir=P.tmpdir())
-    for item in dat:
-        ax.plot(item)
-        saver.add(names=[randstr()])
-        ax.cla()  # clear axis
-    saver.finish()
-
-    # PDF and PNG figsavers do not require a persistent figure. In fact, at run time, every snap captured on the fly by passing `fignames` to `add` method, which can come from anywhere.
-    # GIF figsaver on the otherhand, have stricter requirements.
-    dat = np.random.random((10, 100))
-    fig, ax = plt.subplots(figsize=(12, 8))
-    saver = FigureSave.GIFFileBased(watch_figs=[fig], save_dir=P.tmpdir())
-    for item in dat:
-        ax.plot(item)[0].set_label("neo")
-        saver.add(names=[randstr()])
-        ax.cla()  # clear axis
-    saver.finish()
-
-    # Trying out GIF
-    dat = np.random.random((10, 100))
-    fig, ax = plt.subplots(figsize=(12, 8))
-    saver = FigureSave.GIF(watch_figs=[fig], save_dir=P.tmpdir())
-    for item in dat:
-        ax.plot(item)[0].set_label("neo")
-        saver.add(names=[randstr()])
-        # ax.cla()  # clear axis
-    saver.finish()
-
-    # trying out MPEG
-    dat = np.random.random((10, 100))
-    fig, ax = plt.subplots(figsize=(12, 8))
-    saver = FigureSave.MPEGPipeBased(watch_figs=[fig], save_dir=P.tmpdir())
-    for item in dat:
-        ax.plot(item)
-        saver.add(names=[randstr()])
-        ax.cla()  # clear axis
-    saver.finish()
-
-    # trying out auto savers
-    dat = np.random.random((10, 100)).T
-
-    class MyArtist:
-        def __init__(self):
-            self.fig, self.ax = plt.subplots()
-        def animate(self, *datum):
-            self.ax.cla()
-            self.ax.plot(*datum)
-
-    _ = FigureSave.PDFAuto(data=dat, plotter_class=MyArtist)
-
-    # trying out FigureManger
-
-    class ArtistWithManager(FigureManager):
-        def __init__(self):
-            super(ArtistWithManager, self).__init__()
-            self.fig, self.ax = plt.subplots()
-            self.data = np.random.random((10, 100))
-            self.idx_cycle = Cycle(max_idx=len(self.data))
-            self.animate()
-
-        def animate(self):
-            self.ax.cla()
-            self.ax.plot(self.data[self.idx_cycle.get_index()])
-
-    q = ArtistWithManager().connect()
 
 
 def assert_requirements():
@@ -173,6 +94,7 @@ class FigureSave:
         def __init__(self, fps=4, dpi=100, bitrate=1800, _type='GIFFileBased', **kwargs):
             super().__init__(**kwargs); assert_requirements()
             if _type == 'GIFPipeBased': writer, extension = animation.ImageMagickFileWriter, '.gif'  # internally calls: matplotlib._get_executable_info("magick")
+            elif _type == "GIFFileBased": writer, extension = animation.ImageMagickWriter, '.gif'
             elif _type == 'MPEGFileBased': writer, extension = animation.FFMpegFileWriter, '.mp4'
             elif _type == 'MPEGPipeBased': writer, extension = animation.FFMpegWriter, '.mp4'
             else: raise ValueError("Unknown writer.")
@@ -240,7 +162,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.fig = self.ax = self.event = None
         self.cmaps, self.colors, self.mcolors, self.facecolor = Cycle(plt.colormaps()), Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color']), list(mcolors.CSS4_COLORS.keys()), Cycle(list(mcolors.CSS4_COLORS.values()))
         self.cmaps.set_value('viridis')
-        self.idx_cycle = Cycle([1, 2]); self.pause = None  # animation
+        self.idx_cycle = Cycle([]); self.pause = None  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
                           "/": {'help': 'Show/Hide info text', 'func': self.text_info},
                           "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
@@ -413,17 +335,11 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
     parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
     stream = ['clear', 'accumulate', 'update'][1]  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
     """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`"""
-    def __init__(self, fig):
-        super().__init__(); self.index, self.index_prev, self.index_max = -1, 0, 0; self.objs_repo = []  # list of lists of axes and texts.
-        self.fig = fig; self.connect()  # superclass methods rely on this attribute for interactive control.
-    def add(self, objs): self.index += 1; self.index_max += 1; self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.index}", end='\r')
-    def animate(self): [ax.set_visible(False) for ax in self.objs_repo[self.index_prev]]; [ax.set_visible(True) for ax in self.objs_repo[self.index]]; self.fig.canvas.draw()
-    @staticmethod
-    def test():  # Downside: if number of axes, lines, texts, etc. are too large, it will be slow. In that case, it is better to avoid this viewer and plot on the fly during animation.
-        vv = VisibilityViewer(plt.figure(figsize=(10, 10)))
-        for ix, item in enumerate(np.random.rand(5, 100, 2)):
-            with plt.style.context(style='seaborn-darkgrid'): ax = vv.fig.add_subplot(); ax.plot(item); ax.set_title(f"Curve {ix}")
-            vv.add([ax])  # use keys 1 and 2 to navigate.
+    def __init__(self, fig):  # Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
+        super().__init__(); self.objs_repo = []  # list of lists of axes and texts.
+        self.fig = fig; self.connect(); self.idx_cycle = Cycle([])
+    def add(self, objs): self.idx_cycle.expand(); self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
+    def animate(self): [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]; self.fig.canvas.draw()
 
 
 class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
@@ -473,7 +389,7 @@ class VisibilityViewerAuto(VisibilityViewer):
             super().add(self.artist.axes()) if self.stream == 'accumulate' else self.artist.clear()
             self.saver.add()
             if self.pause: break
-            else: self.index = i
+            else: self.idx_cycle.set_index(i)
         return self.saver.finish()  # arrived at last image and not in manual mode
 
 
@@ -503,7 +419,7 @@ class ImShow(FigureManager):
         self.fig.tight_layout() if tight else None; self.fig.subplots_adjust(**subplots_adjust) if subplots_adjust is not None else None
         self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
         self.ax = [self.ax] if nrows == 1 and ncols == 1 else self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
-        [self.toggle_ticks(an_ax, state=False) for an_ax in self.ax]; self.animate()
+        [self.toggle_ticks(an_ax, state=False) for an_ax in self.ax]; self.idx_cycle = Cycle(max_idx=len(self.img_tensor))  # self.animate()
     def animate(self):
         for i in range(self.idx_cycle.get_index(), self.n):
             for j, (an_image, a_label, an_ax) in enumerate(zip(self.img_tensor[i], self.sub_labels[i], self.ax)):  # with zipping, the shortest of the three, will stop the loop.

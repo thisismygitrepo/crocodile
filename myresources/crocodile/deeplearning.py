@@ -437,7 +437,9 @@ class BaseModel(ABC):
             print(f"Input shape = {ip.shape}")
             print(f"Output shape = {self.tmp.shape}")
             print("Stats on output data for random normal input:")
-            print(pd.DataFrame(np.array(self.tmp).flatten()).describe())
+            df_op = pd.DataFrame(np.array(self.tmp).flatten()).describe().rename(columns={0: "op"})
+            df_ip = pd.DataFrame(np.array(ip).flatten()).describe().rename(columns={0: "ip"})
+            print(pd.concat([df_ip, df_op], axis=1))
             print("-" * 100 + '\n' * 2)
 
 
