@@ -403,7 +403,8 @@ class ImShow(FigureManager):
         """
         :param img_tensor: size N x M x W x H [x C]  # M used spatially, N for animation.
         :param sup_titles: Titles for frames (N)
-        :param sub_labels: M x N. If shape sent is M"""
+        :param sub_labels: M x N. If shape sent is M
+        """
         n, m = len(img_tensor), len(img_tensor[0]); self.m, self.n = m, n; super(ImShow, self).__init__(info_loc=info_loc)
         nrows, ncols = self.get_nrows_ncols(m, nrows, ncols)
         self.img_tensor, self.sub_labels, self.sup_titles = img_tensor, sub_labels if sub_labels is not None else [[f"{i}-{j}" for j in range(m)] for i in range(n)], sup_titles if sup_titles is not None else np.arange(n)
