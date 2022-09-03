@@ -65,7 +65,9 @@ class DBMS:
     @staticmethod
     def make_sql_engine(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0]):
         """Establish lazy initialization with database"""
-        if path == "memory": return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True)
+        if path == "memory":
+            from sqlalchemy.pool import StaticPool  # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
+            return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
         path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else tb.P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True) # echo flag is just a short for the more formal way of logging sql commands.

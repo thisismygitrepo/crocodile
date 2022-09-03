@@ -395,7 +395,7 @@ class BaseModel(ABC):
     def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None, verbose=True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
-        else: hp_obj = (path / HyperParam.subpath + ".HyperParam.pkl").readit()
+        else: hp_obj = (path / HyperParam.subpath + "hparams.HyperParam.pkl").readit()
         if device_name: hp_obj.device_name = device_name
         if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
         else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
