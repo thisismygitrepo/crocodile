@@ -182,7 +182,7 @@ class DataReader(tb.Base):
         self.split.print()
 
     def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, dataset="test"):
-        keys = self.split.keys().filter(lambda x: f'_{dataset}' in x)
+        keys = self.split.keys().filter(lambda x: f'_{dataset}' in x)  # TODO: reconsider this logic
         selection = indices or aslice
         res1 = selection or np.random.choice(len(self.split[keys[0]]), size=self.hp.batch_size, replace=False)
         res2 = selection or slice(0, self.hp.batch_size)
@@ -320,6 +320,10 @@ class BaseModel(ABC):
         """
         return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
 
+    def predict(self, x, **kwargs):
+        """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
+        return self.postprocess(self.infer(x), **kwargs)
+
     def deduce(self, obj, viz=True, **kwargs):
         """Assumes that contents of the object are in the form of a batch."""
         preprocessed = self.preprocess(obj, **kwargs)
@@ -328,10 +332,6 @@ class BaseModel(ABC):
         result = tb.Struct(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz: self.viz(postprocessed, **kwargs)
         return result
-
-    def predict(self, x, **kwargs):
-        """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
-        return self.postprocess(self.infer(x), **kwargs)
 
     def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
         # ================= Data Procurement ===================================
