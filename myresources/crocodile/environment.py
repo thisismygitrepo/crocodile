@@ -130,7 +130,7 @@ class PathVar:
         dirs_ = []
         for path in dirs:
             if tb.P(path) in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
-            else: dirs_.append(path)
+            else: dirs_.append(str(path))
         dirs = dirs_
 
         if system == "Windows":
