@@ -126,18 +126,22 @@ class EnvVar:
 
 class PathVar:
     @staticmethod
-    def append_temporarily(path, kind="append", run=False):
+    def append_temporarily(dirs, kind="append", run=False):
+        dirs_ = []
+        for path in dirs:
+            if tb.P(path) in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+            else: dirs_.append(path)
+        dirs = dirs_
+
         if system == "Windows":
             """Source: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.2"""
-            if tb.P(path) in Path:
-                print(f"Path passed `{path}` is already in PATH, skipping the appending.")
-                return None
-            if kind == "append": command = fr'$env:Path += ";{path}"'  # Append to the Path variable in the current window:
-            elif kind == "prefix": command = fr'$env:Path = "{path};" + $env:Path'  # Prefix the Path variable in the current window:
-            elif kind == "replace": command = fr'$env:Path = "{path}"'  # Replace the Path variable in the current window (use with caution!):
+            if kind == "append": command = fr'$env:Path += ";{sep.join(dirs)}"'  # Append to the Path variable in the current window:
+            elif kind == "prefix": command = fr'$env:Path = "{sep.join(dirs)};" + $env:Path'  # Prefix the Path variable in the current window:
+            elif kind == "replace": command = fr'$env:Path = "{sep.join(dirs)}"'  # Replace the Path variable in the current window (use with caution!):
             else: raise KeyError
             return command if run is False else tm.run(command, shell="powershell")
-        else: result = f'export PATH="{path}:$PATH"'
+        elif system == "Linux": result = f'export PATH="{sep.join(dirs)}:$PATH"'
+        else: raise ValueError
         return result if run is False else tm.run(result, shell="powershell")
 
     @staticmethod
@@ -190,7 +194,7 @@ def get_shell_profiles(shell):
 
 
 def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
-def get_path_defined_files(string_="*.exe"): res = tb.P.get_env().Path.search(string_).reduce(lambda x, y: x + y); res.print(); return res
+def get_path_defined_files(string_="*.exe"): res = Path.search(string_).reduce(lambda x, y: x + y); res.print(); return res
 
 
 if __name__ == '__main__':
