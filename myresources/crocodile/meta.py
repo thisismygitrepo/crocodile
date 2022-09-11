@@ -165,7 +165,9 @@ class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source)
         print(f"RECEVING `{source}` ==> `{target}`"); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"RECEVING COMPLETED", "\n" * 2)
         if zip_first: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True); return target
-    def print_summary(self): df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode))); print(df.to_markdown()); return df  # ip=rsp.ip, op=rsp.op
+    def print_summary(self):   # ip=rsp.ip, op=rsp.op
+        install_n_import("tabulate"); df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode))); print("\nSummary of operations performed:"); print(df.to_markdown())
+        print("\nAll operations completed successfully.\n") if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))) else print("\nSome operations failed. \n"); return df
     def copy_env_var(self, name): assert self.remote_machine == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
 
 
