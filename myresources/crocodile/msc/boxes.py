@@ -11,9 +11,12 @@ class Style:
 
 
 def get_box(comment, prefix='', style=None, style_cat='scene'):
-    if style is None: style = random.choice(Style.__dict__[style_cat])
+    if style is None:
+        style = random.choice(Style.__dict__[style_cat])
+        print(f'Using style: {style}', '\n' * 3)
     res = tb.Terminal().run(f"""echo "{comment}" | boxes -d {style} """).op
-    return textwrap.indent(res, prefix=prefix)
+    res = textwrap.indent(res, prefix=prefix)
+    print(res)
 
 
 if __name__ == '__main__':
