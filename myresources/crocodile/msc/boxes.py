@@ -12,7 +12,7 @@ class Style:
 
 def get_box(comment, prefix='', style=None, style_cat='scene'):
     if style is None: style = random.choice(Style.__dict__[style_cat])
-    res = tb.Terminal().run(f"""echo "{comment}" | boxes -d {style} """)
+    res = tb.Terminal().run(f"""echo "{comment}" | boxes -d {style} """).op
     return textwrap.indent(res, prefix=prefix)
 
 
