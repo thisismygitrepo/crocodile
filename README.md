@@ -53,6 +53,12 @@ Being a thin extension on top of almost pure Python, you need to worry **not** a
 
 [comment]: # (The package is not fussy about versions either. It can though at runtime, install packages on the fly, e.g. `dill` and `tqdm` which are very lightweight libraries.)
 
+# Install Croshell Terminal
+For `Windows` machines, run the following in elevated `PowerShell`:
+```ps1
+Invoke-WebRequest https://github.com/thisismygitrepo/machineconfig/src/machineconfig/setup_windows/croshell.ps1 | Invoke-Expression
+```
+
 # Getting Started
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
 

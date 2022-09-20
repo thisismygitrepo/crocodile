@@ -125,7 +125,7 @@ class Terminal:
 
 class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
     def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        self.username, self.hostname, self.platform = username or __import__('os').getlogin(), hostname or  __import__("platform").node(), __import__("platform")  # use localhost if nothing provided.
+        self.username, self.hostname, self.platform = username or __import__('os').getlogin(), hostname or __import__("platform").node(), __import__("platform")  # use localhost if nothing provided.
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=hostname, username=username, password=pwd, port=port, key_filename=self.sshkey)
