@@ -28,11 +28,11 @@ __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
 if platform.system() == "Windows": print(__.read_text())
 else:
     try:
-        surprise = random.choice([True, False])
+        surprise = random.choice([True, True, True, False])  # classic art (True) or boxes (False)
         if surprise:
             from crocodile.msc.ascii_art import get_art
-            surprise = random.choice([True, False])
-            get_art("crocodile", calliagraphy=surprise, boxlib='boxes' if surprise else 'cowsay', file=(__ := P.tmpfile("croco_art")), verbose=False)
+            artlib = random.choice(['boxes', 'cowsay'])
+            get_art("crocodile", calliagraphy=None, artlib=artlib, file=(__ := P.tmpfile("croco_art")), verbose=False)
         os.system(f"cat {__} | lolcat")
     except: print(__.read_text())
 

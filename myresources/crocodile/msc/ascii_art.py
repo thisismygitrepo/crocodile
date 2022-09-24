@@ -22,17 +22,18 @@ COW_FIGURES = ['apt', 'bunny', 'cheese', 'cock', 'cower', 'daemon', 'default', '
 FIGLET_FONTS = ['banner', 'big', 'standard']
 
 
-def get_art(comment=None, boxlib=None, style=None, super_style='scene', calliagraphy=False, prefix='', file=None, verbose=True):
+def get_art(comment=None, artlib=None, style=None, super_style='scene', calliagraphy=False, prefix='', file=None, verbose=True):
     if comment is None: comment = subprocess.run("fortune", shell=True, capture_output=True, text=True).stdout
-    if boxlib is None: boxlib = random.choice(['boxes', 'cowsay'])
+    if artlib is None: artlib = random.choice(['boxes', 'cowsay'])
+    if calliagraphy is None: calliagraphy = True if artlib == 'boxes' else False
     if style is None:
-        pool = {'cowsay': COW_FIGURES, 'boxes': BoxStyles.__dict__[super_style or random.choice(['language', 'scene', 'character'])]}[boxlib]
+        pool = {'cowsay': COW_FIGURES, 'boxes': BoxStyles.__dict__[super_style or random.choice(['language', 'scene', 'character'])]}[artlib]
         style = random.choice(pool)
     # res = tb.Terminal().run(f"""echo "{comment}" | {boxlib} {'-d' if boxlib == 'boxes' else '-f'} {style} """).op
-    res = subprocess.run(f"""echo "{comment}" | {f'figlet -f {random.choice(FIGLET_FONTS)} | ' if calliagraphy else ''} {boxlib} {'-d' if boxlib == 'boxes' else '-f'} {style} {'' if not file else f'> {file}'}""", text=True, capture_output=True, shell=True).stdout
+    res = subprocess.run(f"""echo "{comment}" | {f'figlet -f {random.choice(FIGLET_FONTS)} | ' if calliagraphy else ''} {artlib} {'-d' if artlib == 'boxes' else '-f'} {style} {'' if not file else f'> {file}'}""", text=True, capture_output=True, shell=True).stdout
     res = textwrap.indent(res, prefix=prefix)
     if verbose:
-        print(f'Using style: {style} from {boxlib}', '\n' * 3)
+        print(f'Using style: {style} from {artlib}', '\n' * 3)
         print(res)
     return res
 
