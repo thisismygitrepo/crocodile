@@ -1,7 +1,18 @@
 
 """
-To use this use this syntax: `python -m crocodile.run filepath [options]`
-Functionality offered her is made redundant by the fire library par for importing file as a module and running it which is not offered by fire.
+Argument Parsing:
+* Script level.
+    * This is system dependent and is hard in bash.
+    * It remains a necessity because at system level one can dictate the enviroment, the interpretor, etc.
+* Python level:
+    * system agnostic.
+    * Benign syntax, but predetermines to a great extent what is being executed (which python, enviroment).
+* python library `fire`:
+    * this is good for passing arguments to specfic python functions from commandline without writing specific argparsing for those functions.
+
+The best approach is to use python and fire to pass process args of script and:
+   * return a string to the script file to execute it.
+   * or, execute it via terminal from within python.
 
 Choices made by default:
 * ipython over python
@@ -10,59 +21,60 @@ Choices made by default:
 
 """
 
-import crocodile.toolbox as tb
+# import crocodile.toolbox as tb
 import argparse
-import os
+import subprocess
+import platform
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")
+    parser = argparse.ArgumentParser(description="Generic Parser to launch crocodile shell.")
 
     # POSITIONAL ARGUMENT (UNNAMED)
-    parser.add_argument(dest="file", help="Python file path.", default="this")
     # if dest is not specified, then, it has same path as keyword, e.g. "--dest"
     # parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
 
     # A FLAG:
-    parser.add_argument("--main", help="Flag tells to run the file as main.", action="store_true")  # default is False
-    # default is running as module, unless indicated by --main flag, which runs the script as main
-    parser.add_argument("--here", "-H", help="Flag for running in this window.", action="store_true")  # default is False
-    parser.add_argument("-s", "--solitary", help="Specify a non-interactive session.", action="store_true")  # default is False
-    parser.add_argument("-p", "--python", help="Use python over IPython.", action="store_true")  # default is False
-    parser.add_argument("-e", help="Explore the file (what are its contents).", action="store_true")  # default is False
+    parser.add_argument("--module", '-m', help="Flag tells to run the file as main.", action="store_true")  # default is False # default is running as main, unless indicated by --module flag.
+    parser.add_argument("--newWindow", "-w", help="Flag for running in new window.", action="store_true")  # default is False
+    parser.add_argument("--nonInteratctive", "-N", help="Specify a non-interactive session.", action="store_true")  # default is False
+    parser.add_argument("--python", "-p", help="Use python over IPython.", action="store_true")  # default is False
 
     # OPTIONAL KEYWORD
-    parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
-    parser.add_argument("--read", "-r", dest="dat_path", help="Read file", default="")
+    parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
     parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
-    parser.add_argument("--terminal", "-t", dest="terminal",  help=f"Flag to specify which terminal to be used. Default CMD.", default="")  # can choose `wt`
+    parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
+    parser.add_argument("--read", "-r", dest="read", help="Read file", default="")
+    parser.add_argument("--terminal", "-t", dest="terminal",  help=f"Flag to specify which terminal to be used. Default console host.", default="")  # can choose `wt`
     parser.add_argument("--shell", "-S", dest="shell", help=f"Flag to specify which terminal to be used. Default CMD.", default="")
 
     args = parser.parse_args()
-    print(f"Crocodile.run: args of the firing command: ")
-    tb.Struct(args.__dict__).print(as_config=True)
+    # print(f"Crocodile.run: args of the firing command = {args.__dict__}")
 
-    # if args.cmd == "" and args.file == "": raise ValueError(f"Pass either a command (using -c) or .py file path (-f)")
     # ==================================================================================
+    # flags processing
+    interactivity = '' if args.nonInteratctive else '-i'
+    interpreter = 'python' if args.python else 'ipython'
 
-    if args.main is True and args.file != "":  # run the file, don't import it.
-        tb.Terminal().run_async(f"ipython",  "-i",  f"{args.file}", terminal=args.terminal, new_window=not args.here)
-    else:  # run as a module (i.e. import it)
-        if args.file != "":  # non empty file path:
-            path = tb.P(args.file)
-            if path.suffix == ".py":  # ==> a regular path was passed (a\b) ==> converting to: a.b format.
-                if path.is_absolute(): path = path.rel2cwd()
-                path = str((path - path.suffix)).replace(os.sep, ".")
-            else:  # It must be that user passed a.b format
-                assert path.exists() is False, f"I could not determine whether this is a.b or a/b format."
+    if args.file != "":
+        if not args.module: res = f"{interpreter} {interactivity} {args.file}"
+        else:  # run as a module (i.e. import it)
             script = fr"""
-from {path} import *
-""" + args.cmd + "\n"
-        else: script = args.cmd
-        if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
-        tb.Terminal().run_py(script=script, terminal=args.terminal, new_window=not args.here, interactive=not args.solitary, ipython=not args.python)
+from {args.path} import *
+args.cmd"""
+            if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
+            res = f"{interpreter} {interactivity} {script}"
+    elif args.cmd != "": res = f"python -c 'from crocodile.toolbox import *; import crocodile.environment as env; {args.cmd}'"
+    elif args.read != "": res = f"""ipython --no-banner -i -m crocodile.croshell -- -c "p = P(r\'{args.read}\').absolute(); dat = p.readit()" """
+    else:
+        res = f"{interpreter} {interactivity} --no-banner -m crocodile.croshell"  # --term-title croshell
+        # Clear-Host;
+        # # --autocall 1 in order to enable shell-like behaviour: e.g.: P x is interpreted as P(x)
+
+    # print(res)
+    if platform.system() == "Windows": return subprocess.run([f"powershell", "-Command", res], shell=True, capture_output=False, text=True)
+    else: return subprocess.run([res], shell=True, capture_output=False, text=True)
 
 
-# tips: to launch python in the same terminal, simply don't use crocodile.run
 if __name__ == "__main__":
     build_parser()
