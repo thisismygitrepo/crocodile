@@ -64,7 +64,11 @@ from {args.path} import *
 args.cmd"""
             if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
             res = f"{interpreter} {interactivity} {script}"
-    elif args.cmd != "": res = f"python -c 'from crocodile.toolbox import *; import crocodile.environment as env; {args.cmd}'"
+    elif args.cmd != "":
+        # res = f""" python -c "from crocodile.toolbox import *; import crocodile.environment as env; {args.cmd}" """
+        import textwrap
+        exec(f"from crocodile.toolbox import *\n{textwrap.dedent(args.cmd)}")
+        return None
     elif args.read != "": res = f"""ipython --no-banner -i -m crocodile.croshell -- -c "p = P(r\'{args.read}\').absolute(); dat = p.readit()" """
     else:
         res = f"{interpreter} {interactivity} --no-banner -m crocodile.croshell"  # --term-title croshell

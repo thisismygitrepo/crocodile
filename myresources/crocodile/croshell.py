@@ -27,13 +27,13 @@ print(f"Made with ❤️")
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
 if platform.system() == "Windows": print(__.read_text())
 else:
-    surprise = random.choice([True, False])
-    if surprise:
-        from crocodile.msc.ascii_art import get_art
+    try:
         surprise = random.choice([True, False])
-        get_art("crocodile", calliagraphy=surprise, boxlib='boxes' if surprise else 'cowsay', file=(__ := P.tmpfile("croco_art")), verbose=False)
-        # print(__.read_text())
-    try: os.system(f"cat {__} | lolcat")
+        if surprise:
+            from crocodile.msc.ascii_art import get_art
+            surprise = random.choice([True, False])
+            get_art("crocodile", calliagraphy=surprise, boxlib='boxes' if surprise else 'cowsay', file=(__ := P.tmpfile("croco_art")), verbose=False)
+        os.system(f"cat {__} | lolcat")
     except: print(__.read_text())
 
 
