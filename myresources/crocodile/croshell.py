@@ -28,7 +28,7 @@ __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
 if platform.system() == "Windows": print(__.read_text())
 else:
     try:
-        surprise = random.choice([True, True, True, False])  # classic art (True) or boxes (False)
+        surprise = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
         if surprise:
             from crocodile.msc.ascii_art import get_art
             artlib = random.choice(['boxes', 'cowsay'])
