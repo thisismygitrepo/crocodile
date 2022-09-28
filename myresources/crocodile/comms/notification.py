@@ -11,21 +11,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-"""
-https://www.youtube.com/watch?v=tbzPcKRZlHg
+st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
 
 """
 
-
-class PhoneNotification:  # security concerns: avoid using this.
-    def __init__(self, bulletpoint_token):
-        pushbullet = tb.install_n_import("pushbullet")
-        self.api = pushbullet.Pushbullet(bulletpoint_token)
-    def send_notification(self, title="Note From Python", body="A notfication"): self.api.push_note(title=title, body=body)
-    @staticmethod
-    def open_website(): tb.P(r"https://www.pushbullet.com/").readit()
-    @staticmethod
-    def try_me(bulletpoint_token): n = PhoneNotification(bulletpoint_token); n.send_notification()
+"""
 
 
 def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download(memory=True).text
@@ -91,7 +81,18 @@ class Email:
     def close(self): self.server.quit()    # Closing is vital as many servers do not allow mutiple connections.
 
     @staticmethod
-    def send_and_close(config, to, subject, msg): tmp = Email(config); tmp.send_message(to, subject, msg); tmp.close()
+    def send_and_close(config_name, to, subject, msg): tmp = Email(config=st.EMAIL[config_name]); tmp.send_message(to, subject, msg); tmp.close()
+
+
+class PhoneNotification:  # security concerns: avoid using this.
+    def __init__(self, bulletpoint_token):
+        pushbullet = tb.install_n_import("pushbullet")
+        self.api = pushbullet.Pushbullet(bulletpoint_token)
+    def send_notification(self, title="Note From Python", body="A notfication"): self.api.push_note(title=title, body=body)
+    @staticmethod
+    def open_website(): tb.P(r"https://www.pushbullet.com/").readit()
+    @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
+    def try_me(bulletpoint_token): n = PhoneNotification(bulletpoint_token); n.send_notification()
 
 
 if __name__ == '__main__':

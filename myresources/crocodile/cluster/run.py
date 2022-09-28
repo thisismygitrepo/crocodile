@@ -1,11 +1,10 @@
 
 import crocodile.toolbox as tb
 from crocodile.cluster import meta_handling as meta
-st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
 
 
 def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh: tb.SSH = None,
-                notify_upon_completion=False, to_email=None, email_config=None,
+                notify_upon_completion=False, to_email=None, config_name=None,
                 ipython=False, interactive=False, wrap_in_try_except=False, install_repo=False, update_essential_repos=False):
     job_id = tb.randstr()
     kwargs = kwargs or tb.S()
@@ -31,7 +30,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
         meta_kwargs = dict(addressee=ssh.get_repr("local", add_machine=True),
                            speaker=ssh.get_repr('remote', add_machine=True),
                            executed_obj=executed_obj, ssh_username=ssh.username, ssh_hostname=ssh.hostname, job_id=job_id,
-                           to_email=to_email, email_config=email_config)
+                           to_email=to_email, config_name=config_name)
         py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
 
     update_essential_repos_string = """
@@ -61,7 +60,7 @@ cd ~
 
 
 def run_on_cluster(func, kwargs=None, return_script=True, copy_repo=False, update_repo=False, update_essential_repos=True, data=None,
-                   notify_upon_completion=False, to_email=None, email_config=None,
+                   notify_upon_completion=False, to_email=None, config_name=None,
                    machine_specs=None,
                    ipython=False, interactive=False, wrap_in_try_except=False):
 
@@ -75,7 +74,7 @@ def run_on_cluster(func, kwargs=None, return_script=True, copy_repo=False, updat
 
     ssh = tb.SSH(**machine_specs)
     shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs, update_repo=update_repo, ssh=ssh,
-                                                                 notify_upon_completion=notify_upon_completion, to_email=to_email, email_config=email_config,
+                                                                 notify_upon_completion=notify_upon_completion, to_email=to_email, config_name=config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
                                                                  ipython=ipython, interactive=interactive, install_repo=True if "setup.py" in repo_path.listdir().apply(str) else False,
                                                                  update_essential_repos=update_essential_repos)
@@ -105,10 +104,11 @@ def run_on_cluster(func, kwargs=None, return_script=True, copy_repo=False, updat
 
 
 def try_main():
+    st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
     machine_specs = st.Machines.thinkpad
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
-                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config='enaut',
+                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], config_name='enaut',
                          copy_repo=False, update_repo=False, wrap_in_try_except=True,
                          ipython=True, interactive=True)
     return ssh

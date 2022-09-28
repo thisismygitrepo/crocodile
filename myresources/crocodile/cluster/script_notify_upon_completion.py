@@ -4,8 +4,6 @@ from crocodile.comms.notification import Email
 import crocodile.toolbox as tb
 
 print('SENDING notification email ...')
-st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
-
 
 # to be replaced
 addressee = ""
@@ -27,7 +25,7 @@ res_folder = tb.P()
 
 
 sep = "\n" * 2  # SyntaxError: f-string expression part cannot include a backslash, keep it here outside fstring.
-Email.send_and_close(config=st.EMAIL[email_config], to=to_email,
+Email.send_and_close(config_name=email_config, to=to_email,
                      subject=f"Execution Completion Notification, job_id = {job_id}",
                      msg=f'''
 
