@@ -48,6 +48,7 @@ class Log(logging.Logger):  #
         fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self): List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message")); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
+    def get_history(self, lines=200, to_html=False): logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return tb.install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
 
 class Terminal:
@@ -193,11 +194,11 @@ class Scheduler:
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
         else: self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
-    def history(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
+    def get_records_df(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
     def record_session_end(self, reason="Not passed to function."):
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((sess_stats := self.sess_stats(sched=self)).values()))
-        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.history()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n"+str(self.history())); return self
+        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df())); return self
     def _handle_exceptions(self, ex, during):
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex

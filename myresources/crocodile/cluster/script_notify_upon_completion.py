@@ -46,7 +46,8 @@ Hi `{addressee}`, I'm `{speaker}`, this is a notification that I have completed 
 `ftprx {ssh_username}@{ssh_hostname} {res_folder.collapseuser().as_posix()} -r`
 Or, using croshell,
 
-```py
+```python
+
 ssh = SSH(r'{ssh_username}', r'{ssh_hostname}')
 ssh.copy_to_here(r'{res_folder.collapseuser().as_posix()}', r=False, zip_first=False)
 ```
