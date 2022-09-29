@@ -78,6 +78,6 @@ Execution Time:
 
 print(f'''
 Pull results using croshell with this script:
-``` ftprx {os.getlogin()}@{platform.node()}v{res_folder.collapseuser()} -r``` 
+``` ftprx {os.getlogin()}@{platform.node()}v{res_folder.collapseuser()} -r ``` 
 ''')
 

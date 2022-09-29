@@ -48,7 +48,7 @@ class Log(logging.Logger):  #
         fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self): List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message")); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
-    def get_history(self, lines=200, to_html=False): logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return tb.install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
+    def get_history(self, lines=200, to_html=False): logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
 
 class Terminal:
@@ -125,11 +125,11 @@ class Terminal:
 
 class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
     def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        username, hostname = username.split("@") if "@" in username else (username, hostname); hostname, port = hostname.split(":") if ":" in hostname else (hostname, port); port = int(port)
-        self.username, self.hostname, self.platform = username or __import__('os').getlogin(), hostname or __import__("platform").node(), __import__("platform")  # use localhost if nothing provided.
+        username, hostname, self.platform = username or __import__('os').getlogin(), hostname or __import__("platform").node(), __import__("platform")    # use localhost if nothing provided.
+        self.username, self.hostname = username.split("@") if "@" in username else (username, hostname); self.hostname, self.port = hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(port)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh.connect(hostname=hostname, username=username, password=pwd, port=port, key_filename=self.sshkey)
+        self.ssh.connect(hostname=hostname, username=username, password=pwd, port=self.port, key_filename=self.sshkey)
         try: self.sftp = self.ssh.open_sftp()
         except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
         self.terminal_responses = []
