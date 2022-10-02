@@ -1,0 +1,159 @@
+
+"""
+This module uses the generic google-api-python-client, which is very low level.
+https://github.com/googleapis/google-api-python-client
+
+read: https://developers.google.com/drive/api/guides/search-files
+file specs: https://developers.google.com/drive/api/v3/reference/files
+
+# code from https://developers.google.com/drive/api/quickstart/python
+terminology: https://developers.google.com/workspace/guides/auth-overview
+
+Steps:
+* Create a project on console.developers.google.com which redirects to https://console.cloud.google.com/projectselector2/apis/dashboard
+* Enable the Drive API
+* Create credentials for a web server to access application data
+"""
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+# from googleapiclient.errors import HttpError
+
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+
+from enum import Enum
+import crocodile.toolbox as tb
+import io
+import pandas as pd
+
+
+tb.Display.set_pandas_display()
+
+
+class Scopes(Enum):  # TODO: If modifying these scopes, delete the file token.json.
+    admin =      tb.P('https://www.googleapis.com/auth/drive')  # See, edit, create, and delete all of your Google Drive files
+    settings =   tb.P('https://www.googleapis.com/auth/drive.appdata')  # View and manage its own configuration data in your Google Drive
+    manage =     tb.P('https://www.googleapis.com/auth/drive.file')  # View and manage Google Drive files and folders that you have opened or created with this app
+    managemeta = tb.P('https://www.googleapis.com/auth/drive.metadata')  # View and manage metadata of files in your Google # Drive
+    readmeta =   tb.P('https://www.googleapis.com/auth/drive.metadata.readonly')  # View metadata for files in your Google Drive
+    photo =      tb.P('https://www.googleapis.com/auth/drive.photos.readonly')  # View the photos, videos and albums in your # Google Photos
+    readonly =   tb.P('https://www.googleapis.com/auth/drive.readonly')  # See and download all your Google Drive files
+    app =        tb.P('https://www.googleapis.com/auth/drive.scripts')  # Modify your Google Apps Script scripts' behavior
+
+
+class GDriveAPI:
+    def __init__(self, account=None, project=None, scopes=None):
+        scopes = [Scopes.admin] if scopes is None else scopes
+        self.SCOPES = [scope.value.as_url_str() for scope in scopes]
+        self.creds = self.get_cred(account, project)
+        self.service = build('drive', 'v3', credentials=self.creds)
+        self.url = tb.P("https://drive.google.com/drive/u/1")
+
+    def get_cred(self, account, project):
+        creds = None  # The file token.json stores the user's access and refresh tokens, and is created automatically when the authorization flow completes for the first time.
+        config = tb.P.home().joinpath("dotfiles/google/drive/config.toml").readit()
+        if account is None: account = list(config.keys())[0]; print(f"Using deafult account `{account}`")
+        if project is None: project = list(config[account].keys())[0]; print(f"Using default project `{project}`")
+        client_id_file = tb.P.home().joinpath(f"dotfiles/google/drive/{config[account][project]['auth_client_config']}")
+        # api_key = config[account][project]['api_key']
+
+        if client_id_file.exists():
+            client_id_info = client_id_file.readit()
+            if "refresh_token" in client_id_info:  # refersh token is not available before at least the first use.
+                creds = Credentials.from_authorized_user_info(client_id_info, self.SCOPES)
+        if not creds or not creds.valid:  # If there are no (valid) credentials available, let the user log in.
+            if creds and creds.expired and creds.refresh_token: creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(client_secrets_file=client_id_file, scopes=self.SCOPES)
+                creds = flow.run_local_server(port=0)
+            client_id_file.write_text(creds.to_json())
+        return creds
+
+    def search_all(self, q='', size=1000): return pd.DataFrame(self.service.files().list(q=q, pageSize=size, fields="nextPageToken, files(id, name)", spaces="drive").execute().get('files', []), columns=['id', 'name']).set_index("name")
+    def search_folders(self): return pd.DataFrame(self.service.files().list(q="mimeType = 'application/vnd.google-apps.folder'").execute()['files'])
+    def get_fields_from_id(self, fid, fields="*") -> dict: return self.service.files().get(fileId=fid, fields=fields).execute()  # e.g: fields="id, name, mimeType, size, modifiedTime, createdTime, trashed, parents"
+    def get_path_from_id(self, fid) -> str:
+        tmp = self.get_fields_from_id(fid, 'name, parents')
+        name = tmp['name']
+        parent_id = tmp['parents'][0] if 'parents' in tmp else None
+        if parent_id is None: return name  # name will be 'My Drive'
+        else: return self.get_path_from_id(parent_id) + "/" + name
+
+    def get_id_from_path(self, path) -> str:
+        parent_id = 'root'
+        for item in tb.P(path).items:
+            tmp = self.service.files().list(q=f"(name={repr(item)}) and ({repr(parent_id)} in parents)", fields="nextPageToken, files(kind, id, name, parents)").execute()['files']
+            assert len(tmp) < 2, f"Mutiple files with same name `{item}`. Couldn't resolve ambiguity."
+            assert len(tmp) > 0, FileNotFoundError(f"FileNotFoundError `{item}`.")
+            parent_id = tmp[0]['id']
+        return parent_id
+    def update(self, remote_path=None, fid=None, local_path=None):
+        fid = fid or self.get_id_from_path(remote_path)
+        print(f"UPDATING contents of file `{fid}`")
+        return self.service.files().update(fileId=fid, media_body=MediaFileUpload(local_path)).execute()['id']
+    @staticmethod
+    def open_in_browser(fid):
+        return tb.P(rf'https://drive.google.com/file/d/{fid}')()
+        # tb.P(rf'https://drive.google.com/drive/u/1/folders/{fid}')()
+
+    def download(self, fpath=None, fid=None, local_dir=None, rel2home=False):
+        assert fpath or fid, "Either a file name or a file id must be provided."
+        if fpath is not None: fid = self.get_id_from_path(fpath)
+        else: fpath = self.get_path_from(fid)
+        if rel2home: local_dir = tb.P.home().joinpath(tb.P(fpath)[1:])
+        else: local_dir = tb.P(local_dir or f'~/Downloads').expanduser().create()
+        fields = self.get_fields_from_id(fid, fields="name, mimeType")
+        if fields['mimeType'] == 'application/vnd.google-apps.folder':
+            return tb.L(self.service.files().list(q=f"'{fid}' in parents").execute()['files']).apply(lambda x: self.download(fid=x['id'], local_dir=local_dir.joinpath(fields['name'])))
+        downloader = MediaIoBaseDownload(fh := io.BytesIO(), self.service.files().get_media(fileId=fid))
+        while True:
+            status, done = downloader.next_chunk()  # fh: file lives in the RAM now.
+            print("Download from GDrive %d%%." % int(status.progress() * 100))
+            if done: break
+        fh.seek(0); return local_dir.joinpath(fields['name']).write_bytes(fh.read())
+
+    def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False):
+        print(f"UPLOADING {repr(local_path)} to {repr(remote_dir)} ... ")
+        if rel2home: remote_dir = tb.P("home").joinpath(tb.P(local_path).rel2home())
+        else: remote_dir = tb.P(remote_dir)
+        try: self.get_id_from_path(remote_dir)
+        except AssertionError as ae:
+            if "FileNotFoundError" in str(ae): self.create_folder(remote_dir)
+            else: raise NotImplementedError(f"{ae}")
+        if (local_file_path := tb.P(local_path)).is_dir():
+            self.create_folder(path=remote_dir.joinpath(local_file_path.name))
+            for item in local_file_path.listdir(): self.upload(local_file_path.joinpath(item), remote_dir=remote_dir.joinpath(local_file_path.name))
+        else:  # upload a file.
+            try:
+                existing_fid = self.get_id_from_path(remote_dir.joinpath(local_file_path.name))
+                if overwrite: return self.update(local_path=local_path, fid=existing_fid)
+                else: raise FileExistsError(f"File `{local_file_path.name}` already exists in `{remote_dir}`.")
+            except AssertionError as ae:
+                if "FileNotFoundError" in str(ae): pass  # good, it's a new file.
+                elif "Couldn't resolve ambiguity." in str(ae): raise NotImplementedError("Please manually delete files with same name. " + str(ae))
+            file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)]}
+            file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_file_path.str), fields='id').execute()
+            print(f"UPLOADED file `{repr(local_file_path)}` to `{repr(remote_dir)}`. file id: {file.get('id')}"); return file['id']
+
+    def create_folder(self, path="") -> str:
+        path = tb.P(path)
+        file_metadata = {
+            'name': path.name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [self.get_id_from_path(path.parent)]}
+        file = self.service.files().create(body=file_metadata, fields='id').execute()
+        print(f"CREATED FOLDER `{path.name}` in `{path}`. ID = {file.get('id')}")
+        return file['id']
+
+
+"""Tip: folders and files on G drive have unique ID that is not the name. Thus, there can be multiple files with same name. 
+This can cause seemingly confusing behaviour if the user continues to rely on names rather than IDs. 
+Folders in trash bin are particularly confusing as the trash bin is nothing but another folder and thus,
+user can still access it and populate it, etc. This action taking place in rubbish bin might not be noticed when inspecting Gdrive via web."""
+
+
+if __name__ == '__main__':
+    # pass
+    api = GDriveAPI()

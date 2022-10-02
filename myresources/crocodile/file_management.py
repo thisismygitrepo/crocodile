@@ -10,12 +10,14 @@ def pwd2key(password: str, salt=None, iterations=None) -> bytes:  # Derive a sec
     if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
-def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int = None) -> bytes:
+def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int = None, gen_key=False) -> bytes:
     salt = None  # silence the linter.
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
         salt, iteration = (__import__('secrets').token_bytes(16), iteration or __import__('secrets').randbelow(1_000_000)) if salted else (None, None); key = pwd2key(pwd, salt, iteration)
-    elif key is None: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); print(f"KEY SAVED @ {repr(P.tmpdir().joinpath('key.bytes').write_bytes(key))}")  # discouraged, make your keys/pwd before invoking the func. use random bytes, more secure but no string representation
+    elif key is None:
+        if gen_key: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); print(f"KEY SAVED @ {repr(P.tmp(folder='tmp_files').joinpath('key.bytes').write_bytes(key))}")  # discouraged, make your keys/pwd before invoking the func. use random bytes, more secure but no string representation
+        else: key = P("~/dotfiles/creds/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
@@ -29,6 +31,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
         else: key = pwd2key(pwd)  # trailing `;` prevents IPython from caching the result.
     if type(key) is bytes: pass   # passsed explicitly
+    elif type(key) is None: key = P("~/dotfiles/creds/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path or bytes.")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
