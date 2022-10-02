@@ -129,7 +129,7 @@ class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as
         self.username, self.hostname = username.split("@") if "@" in username else (username, hostname); self.hostname, self.port = hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(port)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh.connect(hostname=hostname, username=username, password=pwd, port=self.port, key_filename=self.sshkey)
+        self.ssh.connect(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey)
         try: self.sftp = self.ssh.open_sftp()
         except: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible.")
         self.terminal_responses = []
