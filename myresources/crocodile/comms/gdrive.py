@@ -110,18 +110,18 @@ class GDriveAPI:
         downloader = MediaIoBaseDownload(fh := io.BytesIO(), self.service.files().get_media(fileId=fid))
         while True:
             status, done = downloader.next_chunk()  # fh: file lives in the RAM now.
-            print("Download from GDrive %d%%." % int(status.progress() * 100))
+            print(f"DOWNLOADING from GDrive {fpath} ==> {local_dir}. {int(status.progress() * 100)}%.")
             if done: break
         fh.seek(0); return local_dir.joinpath(fields['name']).write_bytes(fh.read())
 
     def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False):
-        print(f"UPLOADING {repr(local_path)} to {repr(remote_dir)} ... ")
         if rel2home: remote_dir = tb.P("myhome").joinpath(tb.P(local_path).rel2home().parent)
         else: remote_dir = tb.P(remote_dir)
         try: self.get_id_from_path(remote_dir)
         except AssertionError as ae:
             if "FileNotFoundError" in str(ae): self.create_folder(remote_dir)
             else: raise NotImplementedError(f"{ae}")
+        print(f"UPLOADING {repr(local_path)} to {repr(remote_dir)} ... ", end="")
         file = {'id': None}
         if (local_file_path := tb.P(local_path)).is_dir():
             self.create_folder(path=remote_dir.joinpath(local_file_path.name))
@@ -136,7 +136,7 @@ class GDriveAPI:
                 elif "Couldn't resolve ambiguity." in str(ae): raise NotImplementedError("Please manually delete files with same name. " + str(ae))
             file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)]}
             file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_file_path.str), fields='id').execute()
-            print(f"UPLOADED file `{repr(local_file_path)}` to `{repr(remote_dir)}`. file id: {file.get('id')}")
+            print(f"file id: {file.get('id')}")
         return {"remote_path": remote_dir.joinpath(local_file_path.name), 'fid': file['id']}
 
     def create_folder(self, path="") -> str:

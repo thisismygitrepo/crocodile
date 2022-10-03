@@ -5,7 +5,8 @@ from crocodile.cluster import meta_handling as meta
 
 def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh: tb.SSH = None,
                 notify_upon_completion=False, to_email=None, config_name=None,
-                ipython=False, interactive=False, wrap_in_try_except=False, install_repo=False, update_essential_repos=False):
+                ipython=False, interactive=False, wrap_in_try_except=False, install_repo=False,
+                update_essential_repos=False):
     job_id = tb.randstr()
     kwargs = kwargs or tb.S()
     py_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}.py").create(parents_only=True)
@@ -21,15 +22,19 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
                        kwargs_path=kwargs_path.collapseuser().as_posix(),
                        repo_path=repo_path.collapseuser().as_posix(),
                        func_name=func_name, rel_full_path=rel_full_path,
-                       job_id=job_id,)
-    py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path)
+                       job_id=job_id, )
+    py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=wrap_in_try_except, func_name=func_name,
+                                   rel_full_path=rel_full_path)
 
     if notify_upon_completion:
-        if func is not None: executed_obj = f"""**{func.__name__}** from *{tb.P(func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
-        else: executed_obj = f"""File *{tb.P(repo_path).joinpath(file).collapseuser().as_posix()}*"""  # for email.
+        if func is not None:
+            executed_obj = f"""**{func.__name__}** from *{tb.P(func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
+        else:
+            executed_obj = f"""File *{tb.P(repo_path).joinpath(file).collapseuser().as_posix()}*"""  # for email.
         meta_kwargs = dict(addressee=ssh.get_repr("local", add_machine=True),
                            speaker=ssh.get_repr('remote', add_machine=True),
-                           executed_obj=executed_obj, ssh_username=ssh.username, ssh_hostname=ssh.hostname, job_id=job_id,
+                           executed_obj=executed_obj, ssh_username=ssh.username, ssh_hostname=ssh.hostname,
+                           job_id=job_id,
                            to_email=to_email, config_name=config_name)
         py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
 
@@ -40,7 +45,9 @@ echo "Updating crocodile repo"
 cd ~/code/crocodile; git pull
 """
     shell_script = f"""
+    
 # EXTRA-PLACEHOLDER-PRE
+
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {ssh.remote_env_cmd}
 {update_essential_repos_string if update_essential_repos else ''}
@@ -48,7 +55,9 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {'git pull' if update_repo else ''}
 {'pip install -e .' if install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
+
 # EXTRA-PLACEHOLDER-POST
+
 cd ~
 {'python' if not ipython else 'ipython'} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
 """
@@ -60,18 +69,17 @@ cd ~
     tb.Save.pickle(obj=kwargs, path=kwargs_path)
 
     print("\n\n")
-    print(f"prepared shell script".center(80, "="), '\n', repr(tb.P(shell_script_path)), "\n"*2)
-    print(f"prepared python script".center(80, "="), '\n', repr(tb.P(py_script_path)), "\n"*2)
+    print(f"prepared shell script".center(80, "="), '\n', repr(tb.P(shell_script_path)), "\n" * 2)
+    print(f"prepared python script".center(80, "="), '\n', repr(tb.P(py_script_path)), "\n" * 2)
     return shell_script_path, py_script_path, kwargs_path
 
 
 def run_on_cluster(func, kwargs=None, return_script=True,
-            copy_repo=False, update_repo=False, update_essential_repos=True,
-            data=None,
-            notify_upon_completion=False, to_email=None, config_name=None,
-            machine_specs=None,
-            ipython=False, interactive=False, wrap_in_try_except=False, cloud=False):
-
+                   copy_repo=False, update_repo=False, update_essential_repos=True,
+                   data=None,
+                   notify_upon_completion=False, to_email=None, config_name=None,
+                   machine_specs=None,
+                   ipython=False, interactive=False, wrap_in_try_except=False, cloud=False):
     if type(func) is str or type(func) is tb.P: func_file, func = tb.P(func), None
     elif "<class 'module'" in str(type(func)): func_file, func = tb.P(func.__file__), None
     else: func_file = tb.P(func.__code__.co_filename)
@@ -81,11 +89,14 @@ def run_on_cluster(func, kwargs=None, return_script=True,
     else: func_relative_file = func_file.relative_to(repo_path)
 
     ssh = tb.SSH(**machine_specs)
-    shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs, update_repo=update_repo, ssh=ssh,
-                                                                 notify_upon_completion=notify_upon_completion, to_email=to_email, config_name=config_name,
+    shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs,
+                                                                 update_repo=update_repo, ssh=ssh,
+                                                                 notify_upon_completion=notify_upon_completion,
+                                                                 to_email=to_email, config_name=config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
                                                                  ipython=ipython, interactive=interactive,
-                                                                 install_repo=True if "setup.py" in repo_path.listdir().apply(str) else False,
+                                                                 install_repo=True if "setup.py" in repo_path.listdir().apply(
+                                                                     str) else False,
                                                                  update_essential_repos=update_essential_repos)
 
     if cloud:
@@ -98,7 +109,6 @@ def run_on_cluster(func, kwargs=None, return_script=True,
         if data is not None:
             tmp = tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
             paths.append(tmp['remote_path'])
-
         downloads = '\n'.join([f"api.download(fpath='{item.as_posix()}', rel2home=True)" for item in paths])
         py_download_script = f"""
 from crocodile.comms.gdrive import GDriveAPI
@@ -110,9 +120,10 @@ api = GDriveAPI()
         api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
         api.upload(local_path=py_download_script, rel2home=True, overwrite=True)
         api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
-        shell_script_path = shell_script_path.write_text(shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx {tb.P('myhome').joinpath(py_download_script.collapseuser()).as_posix()} -R; python {py_download_script.collapseuser().as_posix()}"), encoding='utf-8')
+        shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx {tb.P('myhome').joinpath(py_download_script.rel2home()).as_posix()} -R; python {py_download_script.collapseuser().as_posix()}")
+        with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
         api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
-        tb.install_n_import("clipboard").copy((f"bu_grdive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source" if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
+        tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source" if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
 
     else:
         ssh.copy_from_here(py_script_path)
@@ -129,7 +140,8 @@ api = GDriveAPI()
             # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
             # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
             # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
-        else: ssh.run(f"{shell_script_path}", desc="Executing the function")
+        else:
+            ssh.run(f"{shell_script_path}", desc="Executing the function")
         return ssh
 
 
@@ -139,12 +151,12 @@ def via_gdrive():
 
 def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
-    machine_specs = st.Machines.sah0229234
+    machine_specs = st.Machines.thinkpad
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
-                  notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], config_name='enaut',
-                  copy_repo=False, update_repo=False, wrap_in_try_except=True,
-                  ipython=True, interactive=True, cloud=True)
+                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], config_name='enaut',
+                         copy_repo=False, update_repo=False, wrap_in_try_except=True,
+                         ipython=True, interactive=True, cloud=True)
     return ssh
 
 
