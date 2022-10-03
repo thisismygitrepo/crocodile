@@ -101,8 +101,8 @@ class GDriveAPI:
     def download(self, fpath=None, fid=None, local_dir=None, rel2home=False):
         assert fpath or fid, "Either a file name or a file id must be provided."
         if fpath is not None: fid = self.get_id_from_path(fpath)
-        else: fpath = self.get_path_from(fid)
-        if rel2home: local_dir = tb.P.home().joinpath(tb.P(fpath)[1:])
+        else: fpath = self.get_path_from_id(fid)
+        if rel2home: local_dir = tb.P.home().joinpath(tb.P(fpath)[1:-1])
         else: local_dir = tb.P(local_dir or f'~/Downloads').expanduser().create()
         fields = self.get_fields_from_id(fid, fields="name, mimeType")
         if fields['mimeType'] == 'application/vnd.google-apps.folder':
@@ -116,36 +116,50 @@ class GDriveAPI:
 
     def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False):
         print(f"UPLOADING {repr(local_path)} to {repr(remote_dir)} ... ")
-        if rel2home: remote_dir = tb.P("home").joinpath(tb.P(local_path).rel2home())
+        if rel2home: remote_dir = tb.P("myhome").joinpath(tb.P(local_path).rel2home().parent)
         else: remote_dir = tb.P(remote_dir)
         try: self.get_id_from_path(remote_dir)
         except AssertionError as ae:
             if "FileNotFoundError" in str(ae): self.create_folder(remote_dir)
             else: raise NotImplementedError(f"{ae}")
+        file = {'id': None}
         if (local_file_path := tb.P(local_path)).is_dir():
             self.create_folder(path=remote_dir.joinpath(local_file_path.name))
             for item in local_file_path.listdir(): self.upload(local_file_path.joinpath(item), remote_dir=remote_dir.joinpath(local_file_path.name))
         else:  # upload a file.
             try:
                 existing_fid = self.get_id_from_path(remote_dir.joinpath(local_file_path.name))
-                if overwrite: return self.update(local_path=local_path, fid=existing_fid)
+                if overwrite: return {"remote_path": remote_dir.joinpath(local_file_path.name), 'fid': self.update(local_path=local_path, fid=existing_fid)}
                 else: raise FileExistsError(f"File `{local_file_path.name}` already exists in `{remote_dir}`.")
             except AssertionError as ae:
                 if "FileNotFoundError" in str(ae): pass  # good, it's a new file.
                 elif "Couldn't resolve ambiguity." in str(ae): raise NotImplementedError("Please manually delete files with same name. " + str(ae))
             file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)]}
             file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_file_path.str), fields='id').execute()
-            print(f"UPLOADED file `{repr(local_file_path)}` to `{repr(remote_dir)}`. file id: {file.get('id')}"); return file['id']
+            print(f"UPLOADED file `{repr(local_file_path)}` to `{repr(remote_dir)}`. file id: {file.get('id')}")
+        return {"remote_path": remote_dir.joinpath(local_file_path.name), 'fid': file['id']}
 
     def create_folder(self, path="") -> str:
         path = tb.P(path)
-        file_metadata = {
-            'name': path.name,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents': [self.get_id_from_path(path.parent)]}
-        file = self.service.files().create(body=file_metadata, fields='id').execute()
-        print(f"CREATED FOLDER `{path.name}` in `{path}`. ID = {file.get('id')}")
-        return file['id']
+        # from itertools import accumulate
+        # partials = list(accumulate(path.parts, func=lambda x, y: f"{x}/{y}"))
+        # for partial in partials:
+        #     path = tb.P(partial)
+
+        parent_id = 'root'
+        for part in path.parts:
+            try:
+                search_res = self.service.files().list(q=f"'{parent_id}' in parents and name = '{part}' and mimeType = 'application/vnd.google-apps.folder'").execute()['files']
+                parent_id = search_res[0]['id']
+            except Exception as e:  # not found ==> create it
+                file_metadata = {
+                    'name': part,
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [parent_id]}
+                file = self.service.files().create(body=file_metadata, fields='id').execute()
+                print(f"CREATED FOLDER `{part}` in `{path}`. ID = {file.get('id')}")
+                parent_id = file.get('id')
+        return parent_id
 
 
 """Tip: folders and files on G drive have unique ID that is not the name. Thus, there can be multiple files with same name. 

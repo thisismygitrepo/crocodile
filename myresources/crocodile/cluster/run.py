@@ -56,13 +56,19 @@ cd ~
     # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine])  # LF vs CRLF requires py3.10
     with open(file=shell_script_path.create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script)
     tb.Save.pickle(obj=kwargs, path=kwargs_path)
+
+    print("\n\n")
+    print(f"prepared shell script".center(80, "="), '\n', repr(tb.P(shell_script_path)), "\n"*2)
+    print(f"prepared python script".center(80, "="), '\n', repr(tb.P(py_script_path)), "\n"*2)
     return shell_script_path, py_script_path, kwargs_path
 
 
-def run_on_cluster(func, kwargs=None, return_script=True, copy_repo=False, update_repo=False, update_essential_repos=True, data=None,
-                   notify_upon_completion=False, to_email=None, config_name=None,
-                   machine_specs=None,
-                   ipython=False, interactive=False, wrap_in_try_except=False):
+def run_on_cluster(func, kwargs=None, return_script=True,
+            copy_repo=False, update_repo=False, update_essential_repos=True,
+            data=None,
+            notify_upon_completion=False, to_email=None, config_name=None,
+            machine_specs=None,
+            ipython=False, interactive=False, wrap_in_try_except=False, cloud=False):
 
     if type(func) is str or type(func) is tb.P: func_file, func = tb.P(func), None
     elif "<class 'module'" in str(type(func)): func_file, func = tb.P(func.__file__), None
@@ -76,41 +82,60 @@ def run_on_cluster(func, kwargs=None, return_script=True, copy_repo=False, updat
     shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs, update_repo=update_repo, ssh=ssh,
                                                                  notify_upon_completion=notify_upon_completion, to_email=to_email, config_name=config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
-                                                                 ipython=ipython, interactive=interactive, install_repo=True if "setup.py" in repo_path.listdir().apply(str) else False,
+                                                                 ipython=ipython, interactive=interactive,
+                                                                 install_repo=True if "setup.py" in repo_path.listdir().apply(str) else False,
                                                                  update_essential_repos=update_essential_repos)
 
-    ssh.copy_from_here(py_script_path)
-    ssh.copy_from_here(shell_script_path)
-    ssh.copy_from_here(kwargs_path)
-    if copy_repo: ssh.copy_from_here(repo_path, zip_first=True, overwrite=True)
-    if data is not None: tb.L(data).apply(lambda x: ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
+    if cloud:
+        from crocodile.comms.gdrive import GDriveAPI
+        api = GDriveAPI()
+        p1 = api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
+        p2 = api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
+        p3 = api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
+        paths = [p1, p2, p3]
+        if copy_repo: paths.append(api.upload(local_path=repo_path.zip_n_encrypt(), rel2home=True, overwrite=True))
+        if data is not None: paths + tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
+        downloads = '\n'.join([f"api.download(fpath={item['remote_path']}, rel2home=True)" for item in paths])
+        download_script = f"""
+from crocodile.comms.gdrive import GDriveAPI
+api = GDriveAPI()
+{downloads}
+"""
+        download_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/download_script_{tb.randstr()}.py").create(parents_only=True).write_text(download_script, encoding='utf-8')
+        p1 = api.upload(local_path=download_script_path, rel2home=True, overwrite=True)
+        tb.install_n_import("clipboard").copy((f"backup_grdive_rx -R {p1['remote_path']}; source " if ssh.remote_machine != "Windows" else "") + f"{download_script_path.collapseuser().as_posix()}")
 
-    print("\n\n")
-    ssh.print_summary()
+    else:
+        ssh.copy_from_here(py_script_path)
+        ssh.copy_from_here(shell_script_path)
+        ssh.copy_from_here(kwargs_path)
+        if copy_repo: ssh.copy_from_here(repo_path, zip_first=True, overwrite=True)
+        if data is not None: tb.L(data).apply(lambda x: ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
+        ssh.print_summary()
 
-    print(f"prepared shell script".center(80, "="), '\n', repr(tb.P(shell_script_path)), '\n', f"end of shell script".center(80, "="), "\n"*2)
-    print(f"prepared python script".center(80, "="), '\n', repr(tb.P(py_script_path)), '\n', f"end of python script".center(80, "="), "\n"*2)
+        if return_script:
+            tb.install_n_import("clipboard").copy((f"source " if ssh.remote_machine != "Windows" else "") + f"{shell_script_path.collapseuser().as_posix()}")
+            ssh.open_console()
+            # send email at start execution time
+            # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
+            # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
+            # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
+        else: ssh.run(f"{shell_script_path}", desc="Executing the function")
+        return ssh
 
-    if return_script:
-        tb.install_n_import("clipboard").copy((f"source " if ssh.remote_machine != "Windows" else "") + f"{shell_script_path.collapseuser().as_posix()}")
-        ssh.open_console()
-        # send email at start execution time
-        # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
-        # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
-        # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
 
-    else: ssh.run(f"{shell_script_path}", desc="Executing the function")
-    return ssh
+def via_gdrive():
+    pass
 
 
 def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
-    machine_specs = st.Machines.thinkpad
+    machine_specs = st.Machines.sah0229234
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
-                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], config_name='enaut',
-                         copy_repo=False, update_repo=False, wrap_in_try_except=True,
-                         ipython=True, interactive=True)
+                  notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], config_name='enaut',
+                  copy_repo=False, update_repo=False, wrap_in_try_except=True,
+                  ipython=True, interactive=True, cloud=True)
     return ssh
 
 
