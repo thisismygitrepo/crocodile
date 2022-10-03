@@ -12,7 +12,7 @@ executed_obj = ""
 ssh_username = ""
 ssh_hostname = ""
 job_id = ""
-email_config = ""
+email_config_name = ""
 to_email = ""
 
 
@@ -25,7 +25,7 @@ res_folder = tb.P()
 
 
 sep = "\n" * 2  # SyntaxError: f-string expression part cannot include a backslash, keep it here outside fstring.
-Email.send_and_close(config_name=email_config, to=to_email,
+Email.send_and_close(config_name=email_config_name, to=to_email,
                      subject=f"Execution Completion Notification, job_id = {job_id}",
                      msg=f'''
 

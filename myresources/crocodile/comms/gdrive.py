@@ -54,8 +54,8 @@ class GDriveAPI:
     def get_cred(self, account, project):
         creds = None  # The file token.json stores the user's access and refresh tokens, and is created automatically when the authorization flow completes for the first time.
         config = tb.P.home().joinpath("dotfiles/google/drive/config.toml").readit()
-        if account is None: account = list(config.keys())[0]; print(f"Using deafult account `{account}`")
-        if project is None: project = list(config[account].keys())[0]; print(f"Using default project `{project}`")
+        if account is None: account = list(config.keys())[0]; print(f"GDRIVE: using default account `{account}`")
+        if project is None: project = list(config[account].keys())[0]; print(f"GDRIVE: using default project `{project}`")
         client_id_file = tb.P.home().joinpath(f"dotfiles/google/drive/{config[account][project]['auth_client_config']}")
         # api_key = config[account][project]['api_key']
 

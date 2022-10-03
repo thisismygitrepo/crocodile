@@ -4,7 +4,7 @@ from crocodile.cluster import meta_handling as meta
 
 
 def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh: tb.SSH = None,
-                notify_upon_completion=False, to_email=None, config_name=None,
+                notify_upon_completion=False, to_email=None, email_config_name=None,
                 ipython=False, interactive=False, wrap_in_try_except=False, install_repo=False,
                 update_essential_repos=False):
     job_id = tb.randstr()
@@ -35,7 +35,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
                            speaker=ssh.get_repr('remote', add_machine=True),
                            executed_obj=executed_obj, ssh_username=ssh.username, ssh_hostname=ssh.hostname,
                            job_id=job_id,
-                           to_email=to_email, config_name=config_name)
+                           to_email=to_email, email_config_name=email_config_name)
         py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
 
     update_essential_repos_string = """
@@ -45,7 +45,7 @@ echo "Updating crocodile repo"
 cd ~/code/crocodile; git pull
 """
     shell_script = f"""
-    
+
 # EXTRA-PLACEHOLDER-PRE
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
@@ -77,7 +77,7 @@ cd ~
 def run_on_cluster(func, kwargs=None, return_script=True,
                    copy_repo=False, update_repo=False, update_essential_repos=True,
                    data=None,
-                   notify_upon_completion=False, to_email=None, config_name=None,
+                   notify_upon_completion=False, to_email=None, email_config_name=None,
                    machine_specs=None,
                    ipython=False, interactive=False, wrap_in_try_except=False, cloud=False):
     if type(func) is str or type(func) is tb.P: func_file, func = tb.P(func), None
@@ -92,7 +92,7 @@ def run_on_cluster(func, kwargs=None, return_script=True,
     shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs,
                                                                  update_repo=update_repo, ssh=ssh,
                                                                  notify_upon_completion=notify_upon_completion,
-                                                                 to_email=to_email, config_name=config_name,
+                                                                 to_email=to_email, email_config_name=email_config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
                                                                  ipython=ipython, interactive=interactive,
                                                                  install_repo=True if "setup.py" in repo_path.listdir().apply(
@@ -123,7 +123,7 @@ api = GDriveAPI()
         shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx {tb.P('myhome').joinpath(py_download_script.rel2home()).as_posix()} -R; python {py_download_script.collapseuser().as_posix()}")
         with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
         api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
-        tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source" if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
+        tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source " if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
 
     else:
         ssh.copy_from_here(py_script_path)
@@ -154,7 +154,7 @@ def try_main():
     machine_specs = st.Machines.thinkpad
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
-                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], config_name='enaut',
+                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                          copy_repo=False, update_repo=False, wrap_in_try_except=True,
                          ipython=True, interactive=True, cloud=True)
     return ssh

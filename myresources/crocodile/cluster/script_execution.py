@@ -67,7 +67,7 @@ exec_times.print(as_config=True, justify=25)
 print("\n" * 1)
 
 
-tb.Experimental.generate_readme(path=res_folder.joinpath("EXECUTION.md"), obj=exec_obj, meta=f'''
+tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, meta=f'''
 
 Executed via run_on_cluster with:
 {ssh_repr}
@@ -82,6 +82,6 @@ Execution Time:
 
 print(f'''
 Pull results using croshell with this script:
-``` ftprx {os.getlogin()}@{platform.node()}v{res_folder.collapseuser()} -r ``` 
+``` ftprx {os.getlogin()}@{platform.node()} {res_folder.collapseuser()} -r ``` 
 ''')
 
