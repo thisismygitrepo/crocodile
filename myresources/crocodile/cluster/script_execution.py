@@ -4,6 +4,8 @@ import platform
 import crocodile.toolbox as tb
 from importlib.machinery import SourceFileLoader
 
+# EXTRA-PLACEHOLDER-PRE
+
 _ = SourceFileLoader
 time_at_execution_start = tb.datetime.utcnow()
 
@@ -35,6 +37,8 @@ print(f"Executing {repo_path.collapseuser().as_posix()} / {rel_full_path} : {fun
 print(f"kwargs : ")
 _ = kwargs.print(as_config=True)
 print("\n" * 2)
+
+# EXTRA-PLACEHOLDER-POST
 
 # ######################### EXECUTION ####################################
 if func_name is not None:

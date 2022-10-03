@@ -24,6 +24,7 @@ D = Display; L = List; E = Experimental; S = Struct
 print(f"Crocodile Shell {__import__('crocodile').__version__}")
 # link to tutorial or github
 print(f"Made with ❤️")
+
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
 if platform.system() == "Windows": print(__.read_text())
 else:

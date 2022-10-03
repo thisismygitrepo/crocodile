@@ -40,6 +40,7 @@ echo "Updating crocodile repo"
 cd ~/code/crocodile; git pull
 """
     shell_script = f"""
+# EXTRA-PLACEHOLDER-PRE
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {ssh.remote_env_cmd}
 {update_essential_repos_string if update_essential_repos else ''}
@@ -47,6 +48,7 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {'git pull' if update_repo else ''}
 {'pip install -e .' if install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
+# EXTRA-PLACEHOLDER-POST
 cd ~
 {'python' if not ipython else 'ipython'} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
 """
@@ -89,21 +91,28 @@ def run_on_cluster(func, kwargs=None, return_script=True,
     if cloud:
         from crocodile.comms.gdrive import GDriveAPI
         api = GDriveAPI()
-        p1 = api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
-        p2 = api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
-        p3 = api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
-        paths = [p1, p2, p3]
-        if copy_repo: paths.append(api.upload(local_path=repo_path.zip_n_encrypt(), rel2home=True, overwrite=True))
-        if data is not None: paths + tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
-        downloads = '\n'.join([f"api.download(fpath={item['remote_path']}, rel2home=True)" for item in paths])
-        download_script = f"""
+        paths = [tb.P("myhome").joinpath(py_script_path.rel2home()), tb.P("myhome").joinpath(kwargs_path.rel2home())]
+        if copy_repo:
+            tmp = api.upload(local_path=repo_path.zip_n_encrypt(), rel2home=True, overwrite=True)
+            paths.append(tmp['remote_path'])
+        if data is not None:
+            tmp = tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
+            paths.append(tmp['remote_path'])
+
+        downloads = '\n'.join([f"api.download(fpath='{item.as_posix()}', rel2home=True)" for item in paths])
+        py_download_script = f"""
 from crocodile.comms.gdrive import GDriveAPI
 api = GDriveAPI()
 {downloads}
 """
-        download_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/download_script_{tb.randstr()}.py").create(parents_only=True).write_text(download_script, encoding='utf-8')
-        p1 = api.upload(local_path=download_script_path, rel2home=True, overwrite=True)
-        tb.install_n_import("clipboard").copy((f"backup_grdive_rx -R {p1['remote_path']}; source " if ssh.remote_machine != "Windows" else "") + f"{download_script_path.collapseuser().as_posix()}")
+
+        py_download_script = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__py_download_script.py").write_text(py_download_script, encoding='utf-8')
+        api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
+        api.upload(local_path=py_download_script, rel2home=True, overwrite=True)
+        api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
+        shell_script_path = shell_script_path.write_text(shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx {tb.P('myhome').joinpath(py_download_script.collapseuser()).as_posix()} -R; python {py_download_script.collapseuser().as_posix()}"), encoding='utf-8')
+        api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
+        tb.install_n_import("clipboard").copy((f"bu_grdive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source" if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
 
     else:
         ssh.copy_from_here(py_script_path)
@@ -140,5 +149,5 @@ def try_main():
 
 
 if __name__ == '__main__':
-    # try_main()
-    pass
+    try_main()
+    # pass
