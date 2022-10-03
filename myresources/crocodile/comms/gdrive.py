@@ -115,7 +115,8 @@ class GDriveAPI:
         fh.seek(0); return local_dir.joinpath(fields['name']).write_bytes(fh.read())
 
     def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False):
-        if rel2home: remote_dir = tb.P("myhome").joinpath(tb.P(local_path).rel2home().parent)
+        local_path = tb.P(local_path).expanduser().absolute()
+        if rel2home: remote_dir = tb.P("myhome").joinpath(local_path.rel2home().parent)
         else: remote_dir = tb.P(remote_dir)
         try: self.get_id_from_path(remote_dir)
         except AssertionError as ae:

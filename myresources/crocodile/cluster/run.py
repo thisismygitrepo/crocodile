@@ -23,14 +23,11 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
                        repo_path=repo_path.collapseuser().as_posix(),
                        func_name=func_name, rel_full_path=rel_full_path,
                        job_id=job_id, )
-    py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=wrap_in_try_except, func_name=func_name,
-                                   rel_full_path=rel_full_path)
+    py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path)
 
     if notify_upon_completion:
-        if func is not None:
-            executed_obj = f"""**{func.__name__}** from *{tb.P(func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
-        else:
-            executed_obj = f"""File *{tb.P(repo_path).joinpath(file).collapseuser().as_posix()}*"""  # for email.
+        if func is not None: executed_obj = f"""**{func.__name__}** from *{tb.P(func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
+        else: executed_obj = f"""File *{tb.P(repo_path).joinpath(file).collapseuser().as_posix()}*"""  # for email.
         meta_kwargs = dict(addressee=ssh.get_repr("local", add_machine=True),
                            speaker=ssh.get_repr('remote', add_machine=True),
                            executed_obj=executed_obj, ssh_username=ssh.username, ssh_hostname=ssh.hostname,
@@ -95,36 +92,34 @@ def run_on_cluster(func, kwargs=None, return_script=True,
                                                                  to_email=to_email, email_config_name=email_config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
                                                                  ipython=ipython, interactive=interactive,
-                                                                 install_repo=True if "setup.py" in repo_path.listdir().apply(
-                                                                     str) else False,
+                                                                 install_repo=True if "setup.py" in repo_path.listdir().apply(str) else False,
                                                                  update_essential_repos=update_essential_repos)
 
     if cloud:
         from crocodile.comms.gdrive import GDriveAPI
         api = GDriveAPI()
+        api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
+        api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
         paths = [tb.P("myhome").joinpath(py_script_path.rel2home()), tb.P("myhome").joinpath(kwargs_path.rel2home())]
         if copy_repo:
             tmp = api.upload(local_path=repo_path.zip_n_encrypt(), rel2home=True, overwrite=True)
             paths.append(tmp['remote_path'])
         if data is not None:
             tmp = tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
-            paths.append(tmp['remote_path'])
+            paths += tmp['remote_path'].list
         downloads = '\n'.join([f"api.download(fpath='{item.as_posix()}', rel2home=True)" for item in paths])
         py_download_script = f"""
 from crocodile.comms.gdrive import GDriveAPI
 api = GDriveAPI()
 {downloads}
 """
-
         py_download_script = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__py_download_script.py").write_text(py_download_script, encoding='utf-8')
-        api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
         api.upload(local_path=py_download_script, rel2home=True, overwrite=True)
-        api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
         shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx {tb.P('myhome').joinpath(py_download_script.rel2home()).as_posix()} -R; python {py_download_script.collapseuser().as_posix()}")
         with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
         api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
         tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source " if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
-
+        print("Finished uploading to cloud. Please run the clipboard command on the remote machine:")
     else:
         ssh.copy_from_here(py_script_path)
         ssh.copy_from_here(shell_script_path)
@@ -140,8 +135,7 @@ api = GDriveAPI()
             # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
             # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
             # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
-        else:
-            ssh.run(f"{shell_script_path}", desc="Executing the function")
+        else: ssh.run(f"{shell_script_path}", desc="Executing the function")
         return ssh
 
 
@@ -156,7 +150,7 @@ def try_main():
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
                          notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                          copy_repo=False, update_repo=False, wrap_in_try_except=True,
-                         ipython=True, interactive=True, cloud=True)
+                         ipython=True, interactive=True, cloud=True, data=["~/RNN_GP.pptx"])
     return ssh
 
 

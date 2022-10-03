@@ -3,10 +3,10 @@ import crocodile.toolbox as tb
 
 
 def get_script(name: str, kwargs: dict):
+    """Reads a python script from the scripts folder and replaces the placeholders with the kwargs."""
     tmp = tb.P(__file__).parent.joinpath(f"{name}.py").read_text()
     for key, value in kwargs.items():
         tmp = tmp.replace(f'''{key} = ""''', f'''{key} = {value if type(value) is not str else repr(value)}''')
-
     # deletion
     to_be_deleted_lines = tb.L(tmp.split("\n")).filter(lambda x: "to_be_deleted" in x)
     if len(to_be_deleted_lines):
