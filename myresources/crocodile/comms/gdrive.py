@@ -130,7 +130,7 @@ class GDriveAPI:
         else:  # upload a file.
             try:
                 existing_fid = self.get_id_from_path(remote_dir.joinpath(local_file_path.name))
-                if overwrite: return {"remote_path": remote_dir.joinpath(local_file_path.name), 'fid': self.update(local_path=local_path, fid=existing_fid)}
+                if overwrite: return {"remote_path": remote_dir.joinpath(local_file_path.name), 'local_path': local_path, 'fid': self.update(local_path=local_path, fid=existing_fid)}
                 else: raise FileExistsError(f"File `{local_file_path.name}` already exists in `{remote_dir}`.")
             except AssertionError as ae:
                 if "FileNotFoundError" in str(ae): pass  # good, it's a new file.
@@ -138,7 +138,7 @@ class GDriveAPI:
             file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)]}
             file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_file_path.str), fields='id').execute()
             print(f"file id: {file.get('id')}")
-        return {"remote_path": remote_dir.joinpath(local_file_path.name), 'fid': file['id']}
+        return {"remote_path": remote_dir.joinpath(local_file_path.name), 'local_path': local_path, 'fid': file['id']}
 
     def create_folder(self, path="") -> str:
         path = tb.P(path)

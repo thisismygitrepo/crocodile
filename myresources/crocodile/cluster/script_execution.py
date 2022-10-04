@@ -41,6 +41,7 @@ print("\n" * 2)
 # EXTRA-PLACEHOLDER-POST
 
 # ######################### EXECUTION ####################################
+
 if func_name is not None:
     module = SourceFileLoader("mymod", tb.P.home().joinpath(rel_full_path).as_posix()).load_module()  # loading the module assumes its not a script, there should be at least if __name__ == __main__ wrapping any script.
     exec_obj = getattr(module, func_name)  # for README.md generation.

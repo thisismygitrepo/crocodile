@@ -98,15 +98,15 @@ def run_on_cluster(func, kwargs=None, return_script=True,
     if cloud:
         from crocodile.comms.gdrive import GDriveAPI
         api = GDriveAPI()
-        api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
-        api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
         paths = [tb.P("myhome").joinpath(py_script_path.rel2home()), tb.P("myhome").joinpath(kwargs_path.rel2home())]
+        repo_path_ze = {'': tb.P()}
         if copy_repo:
-            tmp = api.upload(local_path=repo_path.zip_n_encrypt(), rel2home=True, overwrite=True)
-            paths.append(tmp['remote_path'])
+            repo_path_ze = api.upload(local_path=repo_path.zip_n_encrypt(), rel2home=True, overwrite=True)
+            paths.append(repo_path_ze['remote_path'])
         if data is not None:
             tmp = tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
             paths += tmp['remote_path'].list
+
         downloads = '\n'.join([f"api.download(fpath='{item.as_posix()}', rel2home=True)" for item in paths])
         py_download_script = f"""
 from crocodile.comms.gdrive import GDriveAPI
@@ -115,9 +115,16 @@ api = GDriveAPI()
 """
         py_download_script = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__py_download_script.py").write_text(py_download_script, encoding='utf-8')
         api.upload(local_path=py_download_script, rel2home=True, overwrite=True)
+
         shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx {tb.P('myhome').joinpath(py_download_script.rel2home()).as_posix()} -R; python {py_download_script.collapseuser().as_posix()}")
         with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
         api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
+
+        py_script_modified = py_script_path.read_text().replace("# EXTRA-PLACEHOLDER-PRE", f"tb.P(r'{repo_path_ze['local_path'].collapseuser().as_posix()}').decrypt_n_unzip()")
+        with open(file=py_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(py_script_modified)
+        api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
+        api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
+
         tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {tb.P('myhome').joinpath(shell_script_path.rel2home()).as_posix()}; " + ("source " if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
         print("Finished uploading to cloud. Please run the clipboard command on the remote machine:")
     else:
@@ -139,18 +146,14 @@ api = GDriveAPI()
         return ssh
 
 
-def via_gdrive():
-    pass
-
-
 def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
     machine_specs = st.Machines.thinkpad
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
                          notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
-                         copy_repo=False, update_repo=False, wrap_in_try_except=True,
-                         ipython=True, interactive=True, cloud=True, data=["~/RNN_GP.pptx"])
+                         copy_repo=True, update_repo=False, wrap_in_try_except=True,
+                         ipython=True, interactive=True, cloud=True)
     return ssh
 
 
