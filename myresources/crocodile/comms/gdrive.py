@@ -49,7 +49,7 @@ class GDriveAPI:
         self.SCOPES = [scope.value.as_url_str() for scope in scopes]
         self.creds = self.get_cred(account, project)
         self.service = build('drive', 'v3', credentials=self.creds)
-        self.url = tb.P("https://drive.google.com/drive/u/1")
+        self.drive_url = tb.P("https://drive.google.com/drive/u/1")
 
     def get_cred(self, account, project):
         creds = None  # The file token.json stores the user's access and refresh tokens, and is created automatically when the authorization flow completes for the first time.
@@ -93,13 +93,17 @@ class GDriveAPI:
         fid = fid or self.get_id_from_path(remote_path)
         print(f"UPDATING contents of file `{fid}`")
         return self.service.files().update(fileId=fid, media_body=MediaFileUpload(local_path)).execute()['id']
+
     @staticmethod
-    def open_in_browser(fid):
+    def get_link_from_id(fid):
         return tb.P(rf'https://drive.google.com/file/d/{fid}')()
         # tb.P(rf'https://drive.google.com/drive/u/1/folders/{fid}')()
+    @staticmethod
+    def get_id_from_link(link): return str(link).split(r"https://drive.google.com/file/d/")[1]
 
-    def download(self, fpath=None, fid=None, local_dir=None, rel2home=False):
-        assert fpath or fid, "Either a file name or a file id must be provided."
+    def download(self, fpath=None, fid=None, furl=None, local_dir=None, rel2home=False):
+        assert fpath or fid or furl, "Either a file name or a file id must be provided."
+        if furl is not None: fid = self.get_id_from_link(furl)
         if fpath is not None: fid = self.get_id_from_path(fpath)
         else: fpath = self.get_path_from_id(fid)
         if rel2home: local_dir = tb.P.home().joinpath(tb.P(fpath)[1:-1])
@@ -114,7 +118,7 @@ class GDriveAPI:
             if done: break
         fh.seek(0); return local_dir.joinpath(fields['name']).write_bytes(fh.read())
 
-    def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False):
+    def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False, share=False):
         local_path = tb.P(local_path).expanduser().absolute()
         if rel2home: remote_dir = tb.P("myhome").joinpath(local_path.rel2home().parent)
         else: remote_dir = tb.P(remote_dir)
@@ -135,18 +139,20 @@ class GDriveAPI:
             except AssertionError as ae:
                 if "FileNotFoundError" in str(ae): pass  # good, it's a new file.
                 elif "Couldn't resolve ambiguity." in str(ae): raise NotImplementedError("Please manually delete files with same name. " + str(ae))
-            file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)]}
+            # share_permissions = [{'type': 'anyone', 'role': 'reader', 'id': 'anyoneWithLink'}]  # https://developers.google.com/drive/api/guides/manage-sharing
+            file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)], 'role': 'reader', 'type': 'anyone'}
             file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_file_path.str), fields='id').execute()
             print(f"file id: {file.get('id')}")
         return {"remote_path": remote_dir.joinpath(local_file_path.name), 'local_path': local_path, 'fid': file['id']}
 
+    def upload_and_share(self, local_path, role='writer'):
+        # https://developers.google.com/drive/api/guides/manage-sharing
+        res = self.upload(local_path=local_path, remote_dir="myshare", share=True)
+        self.service.permissions().create(fileId=res["fid"], body=dict(type='anyone', role=role)).execute()
+        return tb.P(rf'https://drive.google.com/file/d/{res["fid"]}')
+
     def create_folder(self, path="") -> str:
         path = tb.P(path)
-        # from itertools import accumulate
-        # partials = list(accumulate(path.parts, func=lambda x, y: f"{x}/{y}"))
-        # for partial in partials:
-        #     path = tb.P(partial)
-
         parent_id = 'root'
         for part in path.parts:
             try:

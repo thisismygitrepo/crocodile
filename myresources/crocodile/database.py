@@ -26,7 +26,7 @@ class DBMS:
         self.ses = None
         self.insp = None
         self.meta = None
-        self.path = tb.P(self.eng.url.database)
+        self.path = tb.P(self.eng.drive_url.database)
 
         self.db = db
         self.sch = sch

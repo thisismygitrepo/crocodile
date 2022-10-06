@@ -33,7 +33,7 @@ else:
         if surprise:
             from crocodile.msc.ascii_art import get_art
             artlib = random.choice(['boxes', 'cowsay'])
-            get_art("crocodile", calliagraphy=None, artlib=artlib, file=(__ := P.tmpfile("croco_art")), verbose=False)
+            get_art("crocodile", calliagraphy=None, artlib=artlib, file=(__ := P.tmpfile("croco_art", folder="tmp_arts")), verbose=False)
         os.system(f"cat {__} | lolcat")
     except: print(__.read_text())
 
