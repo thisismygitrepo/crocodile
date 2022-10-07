@@ -95,9 +95,8 @@ class GDriveAPI:
         return self.service.files().update(fileId=fid, media_body=MediaFileUpload(local_path)).execute()['id']
 
     @staticmethod
-    def get_link_from_id(fid):
-        return tb.P(rf'https://drive.google.com/file/d/{fid}')()
-        # tb.P(rf'https://drive.google.com/drive/u/1/folders/{fid}')()
+    def get_link_from_id(fid, folder=False):
+        return tb.P(rf'https://drive.google.com/file/d/{fid}') if not folder else tb.P(rf'https://drive.google.com/drive/u/1/folders/{fid}')
     @staticmethod
     def get_id_from_link(link): return str(link).split(r"https://drive.google.com/file/d/")[1]
 
