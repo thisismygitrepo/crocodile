@@ -99,11 +99,7 @@ def run_on_cluster(func, kwargs=None, return_script=True,
         from crocodile.comms.gdrive import GDriveAPI
         api = GDriveAPI()
         paths = [kwargs_path]
-        repo_path_uploaded = ''
-        if copy_repo:
-            repo_path_uploaded = repo_path.zip_n_encrypt()
-            api.upload(local_path=repo_path_uploaded, rel2home=True, overwrite=True)
-            paths.append(repo_path)
+        if copy_repo: api.upload(local_path=repo_path, rel2home=True, overwrite=True, zip_first=True, encrypt_first=True)
         if data is not None:
             tb.L(data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
             paths += list(data)
@@ -113,10 +109,8 @@ from crocodile.comms.gdrive import GDriveAPI
 from crocodile.file_management import P
 api = GDriveAPI()
 {downloads}
-{'' if not copy_repo else f'P(r"{repo_path_uploaded.collapseuser().as_posix()}").expanduser().unzip_n_decrypt()'}
+{'' if not copy_repo else f'api.download(fpath=r"{repo_path.collapseuser().as_posix()}", unzip=True, decrypt=True)'}
 """
-        # py_download_script = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__py_download_script.py").write_text(py_download_script, encoding='utf-8')
-        # api.upload(local_path=py_download_script, rel2home=True, overwrite=True)
         shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"bu_gdrive_rx -R {py_script_path.collapseuser().as_posix()}")
         with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
         py_script_modified = py_script_path.read_text().replace("# EXTRA-PLACEHOLDER-PRE", py_download_script)
@@ -148,7 +142,7 @@ api = GDriveAPI()
 
 def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
-    machine_specs = st.Machines.thinkpad
+    machine_specs = st.Machines.sah0229234
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
                          notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',

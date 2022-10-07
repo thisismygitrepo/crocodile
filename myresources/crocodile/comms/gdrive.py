@@ -92,7 +92,7 @@ class GDriveAPI:
     def update(self, remote_path=None, fid=None, local_path=None):
         fid = fid or self.get_id_from_path(remote_path)
         print(f"UPDATING contents of file `{fid}`")
-        return self.service.files().update(fileId=fid, media_body=MediaFileUpload(local_path)).execute()['id']
+        return self.service.files().update(fileId=fid, media_body=MediaFileUpload(local_path)).execute()
 
     @staticmethod
     def get_link_from_id(fid, folder=False):
@@ -100,7 +100,7 @@ class GDriveAPI:
     @staticmethod
     def get_id_from_link(link): return str(link).split(r"https://drive.google.com/file/d/")[1]
 
-    def download(self, fpath=None, fid=None, furl=None, local_dir=None, rel2home=False):
+    def download(self, fpath=None, fid=None, furl=None, local_dir=None, rel2home=False, decrypt=False, unzip=False, key=None, pwd=None):
         assert fpath or fid or furl, "Either a file name or a file id must be provided."
         if furl is not None: fid = self.get_id_from_link(furl)
         if fpath is not None:
@@ -108,6 +108,8 @@ class GDriveAPI:
                 fpath = tb.P(fpath).expanduser().absolute()
                 local_dir = fpath.parent
                 fpath = tb.P("myhome") / fpath.rel2home()
+            if unzip: fpath = (fpath + ".zip") if ".zip" not in str(fpath) else fpath
+            if decrypt: fpath = (fpath + ".enc") if ".enc" not in str(fpath) else fpath
             fid = self.get_id_from_path(fpath)
         else: fpath = self.get_path_from_id(fid)
         local_dir = tb.P(local_dir or f'~/Downloads').expanduser().create()
@@ -119,10 +121,13 @@ class GDriveAPI:
             status, done = downloader.next_chunk()  # fh: file lives in the RAM now.
             print(f"DOWNLOADING from GDrive {fpath} ==> {local_dir}. {int(status.progress() * 100)}%.")
             if done: break
-        fh.seek(0); return local_dir.joinpath(fields['name']).write_bytes(fh.read())
+        fh.seek(0);
+        path = local_dir.joinpath(fields['name']).write_bytes(fh.read())
+        process_retrieved_file(path, decrypt=decrypt, unzip=unzip, key=key, pwd=pwd)
+        return path
 
-    def upload(self, local_path, remote_dir="", overwrite=True, rel2home=False, share=False):
-        local_path = tb.P(local_path).expanduser().absolute()
+    def upload(self, local_path, remote_dir="", overwrite=True, share=False, rel2home=False, zip_first=False, encrypt_first=False, key=None, pwd=None):
+        local_path = process_sent_file(file=local_path, zip_first=zip_first, encrypt_first=encrypt_first, key=key, pwd=pwd)
         if rel2home: remote_dir = tb.P("myhome").joinpath(local_path.rel2home().parent)
         else: remote_dir = tb.P(remote_dir)
         try: self.get_id_from_path(remote_dir)
@@ -131,22 +136,22 @@ class GDriveAPI:
             else: raise NotImplementedError(f"{ae}")
         print(f"UPLOADING {repr(local_path)} to {repr(remote_dir)} ... ", end="")
         file = {'id': None}
-        if (local_file_path := tb.P(local_path)).is_dir():
-            self.create_folder(path=remote_dir.joinpath(local_file_path.name))
-            for item in local_file_path.listdir(): self.upload(local_file_path.joinpath(item), remote_dir=remote_dir.joinpath(local_file_path.name))
+        if local_path.is_dir():
+            self.create_folder(path=remote_dir.joinpath(local_path.name))
+            for item in local_path.listdir(): self.upload(local_path.joinpath(item), remote_dir=remote_dir.joinpath(local_path.name), zip_first=zip_first, encrypt_first=encrypt_first, key=key, pwd=pwd)
         else:  # upload a file.
             try:
-                existing_fid = self.get_id_from_path(remote_dir.joinpath(local_file_path.name))
-                if overwrite: return {"remote_path": remote_dir.joinpath(local_file_path.name), 'local_path': local_path, 'fid': self.update(local_path=local_path, fid=existing_fid)}
-                else: raise FileExistsError(f"File `{local_file_path.name}` already exists in `{remote_dir}`.")
+                existing_fid = self.get_id_from_path(remote_dir.joinpath(local_path.name))
+                if overwrite: file = self.update(local_path=local_path, fid=existing_fid)
+                else: raise FileExistsError(f"File `{local_path.name}` already exists in `{remote_dir}`.")
             except AssertionError as ae:
                 if "FileNotFoundError" in str(ae): pass  # good, it's a new file.
                 elif "Couldn't resolve ambiguity." in str(ae): raise NotImplementedError("Please manually delete files with same name. " + str(ae))
-            # share_permissions = [{'type': 'anyone', 'role': 'reader', 'id': 'anyoneWithLink'}]  # https://developers.google.com/drive/api/guides/manage-sharing
-            file_metadata = {'name': local_file_path.name, 'parents': [self.get_id_from_path(remote_dir)], 'role': 'reader', 'type': 'anyone'}
-            file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_file_path.str), fields='id').execute()
-            print(f"file id: {file.get('id')}")
-        return {"remote_path": remote_dir.joinpath(local_file_path.name), 'local_path': local_path, 'fid': file['id']}
+                file_metadata = {'name': local_path.name, 'parents': [self.get_id_from_path(remote_dir)], 'role': 'reader', 'type': 'anyone'}
+                file = self.service.files().create(body=file_metadata, media_body=MediaFileUpload(local_path.str), fields='id').execute()
+                print(f"file id: {file.get('id')}")
+        if zip_first or encrypt_first: tb.P(local_path).delete(sure=True)
+        return {"remote_path": remote_dir.joinpath(local_path.name), 'local_path': local_path, 'fid': file['id']}
 
     def upload_and_share(self, local_path, role='writer'):
         # https://developers.google.com/drive/api/guides/manage-sharing
@@ -176,6 +181,22 @@ class GDriveAPI:
 This can cause seemingly confusing behaviour if the user continues to rely on names rather than IDs. 
 Folders in trash bin are particularly confusing as the trash bin is nothing but another folder and thus,
 user can still access it and populate it, etc. This action taking place in rubbish bin might not be noticed when inspecting Gdrive via web."""
+
+
+def process_retrieved_file(path, decrypt=False, unzip=False, key=None, pwd=None):
+    if decrypt: path = path.decrypt(key=key, pwd=pwd, inplace=True)
+    if unzip: path = path.unzip(inplace=True, verbose=True, overwrite=True, content=True)
+    return path
+
+
+def process_sent_file(file, zip_first=False, encrypt_first=False, key=None, pwd=None):
+    file = tb.P(file).expanduser().absolute()
+    if zip_first: file = tb.P(file).zip()
+    if encrypt_first:
+        res = tb.P(file).encrypt(key=key, pwd=pwd)
+        if zip_first: file.delete(sure=True)
+        file = res
+    return file
 
 
 if __name__ == '__main__':
