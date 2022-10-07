@@ -103,10 +103,13 @@ class GDriveAPI:
     def download(self, fpath=None, fid=None, furl=None, local_dir=None, rel2home=False):
         assert fpath or fid or furl, "Either a file name or a file id must be provided."
         if furl is not None: fid = self.get_id_from_link(furl)
-        if fpath is not None: fid = self.get_id_from_path(fpath)
+        if fpath is not None:
+            if rel2home:
+                local_dir = tb.P.home().joinpath(tb.P(fpath)[1:-1])
+                fpath = tb.P("myhome") / tb.P(fpath).expanduser().absolute().rel2home()
+            fid = self.get_id_from_path(fpath)
         else: fpath = self.get_path_from_id(fid)
-        if rel2home: local_dir = tb.P.home().joinpath(tb.P(fpath)[1:-1])
-        else: local_dir = tb.P(local_dir or f'~/Downloads').expanduser().create()
+        local_dir = tb.P(local_dir or f'~/Downloads').expanduser().create()
         fields = self.get_fields_from_id(fid, fields="name, mimeType")
         if fields['mimeType'] == 'application/vnd.google-apps.folder':
             return tb.L(self.service.files().list(q=f"'{fid}' in parents").execute()['files']).apply(lambda x: self.download(fid=x['id'], local_dir=local_dir.joinpath(fields['name'])))
