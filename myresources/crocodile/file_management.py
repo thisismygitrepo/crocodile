@@ -287,12 +287,12 @@ class P(type(Path()), Path):
         folder = folder or P(self.parent) / P(self.stem)
         intrem = self.ungz(path=folder, verbose=verbose); intrem.untar(path=folder, verbose=verbose); intrem.delete(sure=True, verbose=verbose)
         return self._return(intrem, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(intrem)}")
-    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, append="_encrypted", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.append(name=append).name)
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name+suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
-    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, append="_encrypted", **kwargs):
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(append, "") if "_encrypted" in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
+    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, suffix=".enc", **kwargs):
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(suffix, "") if suffix in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False, content=False): return self.zip(inplace=inplace, verbose=verbose, content=content).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
     def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
