@@ -116,7 +116,7 @@ api = GDriveAPI()
         # py_download_script = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__py_download_script.py").write_text(py_download_script, encoding='utf-8')
         # api.upload(local_path=py_download_script, rel2home=True, overwrite=True)
 
-        shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"python -m machineconfig.scripts.python.bu_gdrive_rx -R {py_script_path.collapseuser()}")
+        shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"bu_gdrive_rx -R {py_script_path.collapseuser()}")
         with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
 
         py_script_modified = py_script_path.read_text().replace("# EXTRA-PLACEHOLDER-PRE", py_download_script)

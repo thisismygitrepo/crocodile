@@ -105,8 +105,9 @@ class GDriveAPI:
         if furl is not None: fid = self.get_id_from_link(furl)
         if fpath is not None:
             if rel2home:
-                local_dir = tb.P.home().joinpath(tb.P(fpath)[1:-1])
-                fpath = tb.P("myhome") / tb.P(fpath).expanduser().absolute().rel2home()
+                fpath = tb.P(fpath).expanduser().absolute()
+                local_dir = fpath.parent
+                fpath = tb.P("myhome") / fpath.rel2home()
             fid = self.get_id_from_path(fpath)
         else: fpath = self.get_path_from_id(fid)
         local_dir = tb.P(local_dir or f'~/Downloads').expanduser().create()
