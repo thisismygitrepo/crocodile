@@ -214,13 +214,15 @@ def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__"
 def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
 def generate_readme(path, obj=None, desc=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-    text, obj_path = "# Meta\n" + (desc if desc is not None else '') + (separator := "\n" + "-----" + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None
+    text, obj_path = "# Description\n" + (desc if desc is not None else '') + (separator := "\n" + "-----" + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None
     text += (f"# Source code file generated me was located here: \n`{obj_path.collapseuser()}`\n" + separator) if obj is not None else ""
     if (res := Terminal().run(f"echo '# Last Commit'; cd '{obj_path.parent}'; git log -1; echo ''; echo ''; echo '# Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
-        text += res.op + "\n# link to files: " + res.op.split("# Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0] + "\n"
+        git_url_root = res.op.split("# Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0]
+        repo_root = Terminal().run(f"cd '{obj_path}'; git rev-parse --show-toplevel", shell="powershell").as_path
+        text += res.op + "\n\n# link to files: \n" + git_url_root + f"/{obj_path.relative_to(repo_root).as_posix()}" + "\n"
     else: text += f"Could read git repository @ `{obj_path.parent}`.\n"
-    text += (f"# Code to generate the result\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
-    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None  # Terminal().run(f"cd '{path}'; git rev-parse --show-toplevel", shell="powershell").as_path
+    text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
+    readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
 def load_from_source_code(directory, obj=None, delete=False):
     P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
