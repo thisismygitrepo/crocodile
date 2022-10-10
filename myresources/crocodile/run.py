@@ -25,6 +25,7 @@ Choices made by default:
 import argparse
 import subprocess
 import platform
+from pathlib import Path
 
 
 def build_parser():
@@ -57,10 +58,11 @@ def build_parser():
     interpreter = 'python' if args.python else 'ipython'
 
     if args.file != "":
-        if not args.module: res = f"{interpreter} {interactivity} {args.file}"
+        file = Path(args.file).expanduser().absolute()
+        if not args.module: res = f"{interpreter} {interactivity} {file}"
         else:  # run as a module (i.e. import it)
             script = fr"""
-from {args.path} import *
+from {file} import *
 args.cmd"""
             if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
             res = f"{interpreter} {interactivity} {script}"

@@ -275,18 +275,19 @@ class P(type(Path()), Path):
         else:
             if overwrite:
                 if not content: P(folder).joinpath(fname or "").delete(sure=True, verbose=True)  # deletes a specific file / folder
-                else: List([x for x in __import__("zipfile").ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(fname or "", item.replace("/", "")).delete(sure=True, verbose=True) )
+                else: List([x for x in __import__("zipfile").ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(fname or "", item.replace("/", "")).delete(sure=True, verbose=True))
             result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
-    def tar(self, path=None): return Compression.untar(self, op_path=path or (self + '.gz'))
-    def untar(self, folder=None, path=None, name=None, verbose=True): slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, self.name).expanduser().resolve()
-    def gz(self, path=None, folder=None, verbose=True): _ = self, path, verbose, folder; return P()
-    def ungz(self, path, verbose=True): _ = self, path, verbose; return P()
-    def tar_gz(self): pass
-    def untar_ungz(self, folder=None, inplace=False, verbose=True, orig=False):
-        folder = folder or P(self.parent) / P(self.stem)
-        intrem = self.ungz(path=folder, verbose=verbose); intrem.untar(path=folder, verbose=verbose); intrem.delete(sure=True, verbose=verbose)
-        return self._return(intrem, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARED-UNGZED {repr(self)} ==>  {repr(intrem)}")
+    def tar(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True): Compression.tar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
+    def untar(self, folder=None, path=None, name=None, inplace=False, orig=False, verbose=True): Compression.untar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".tar", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
+    def gz(self, path=None, folder=None, name=None, inplace=False, orig=False, verbose=True): Compression.gz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".gz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
+    def ungz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True): Compression.ungz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".gz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
+    def xz(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True): Compression.xz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
+    def unxz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True): Compression.unxz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
+    def tar_gz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True): return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False): return self.ungz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False): return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False): return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name+suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
@@ -305,7 +306,7 @@ class P(type(Path()), Path):
         name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
         return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
     def checksum(self, kind=["md5", "sha256"][1]): import hashlib; myhash = {"md5": hashlib.md5, "sha256": hashlib.sha256}[kind](); myhash.update(self.read_bytes()); return myhash.hexdigest()
-    get_env = staticmethod(lambda :get_env())
+    get_env = staticmethod(lambda: get_env())
 
 
 def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
@@ -338,13 +339,17 @@ def un_seven_zip(path, op_dir, overwrite=False, pwd=None):  # TODO: use py7zr in
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.is_successful, res.print(); return op_dir
     else: raise NotImplementedError("7z not implemented for Linux")
-def gz(file, op_file):  # see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
+def gz(file, op_path):  # see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
     with open(file, 'rb') as f_in:
-        with __import__("gzip").open(op_file, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
-    return P(op_file)
+        with __import__("gzip").open(op_path, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
+    return P(op_path)
 def ungz(self, op_path=None):
     with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
+def xz(self, op_path):
+    with __import__("lzma").open(op_path, "w") as f: f.write(self)
+def unxz(file, op_path):
+    with __import__("lzma").open(file, mode='rb') as file: P(op_path).write_bytes(file.read())
 def tar(self, op_path):
     with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(self), arcname=__import__("os").path.basename(str(self)))
     return P(op_path)
@@ -353,7 +358,7 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
         if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
         else: file.extract(fname, **kwargs)
     return P(op_path)
-class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; targ = tar; untar = untar  # Provides consistent behaviour across all methods
+class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; tar = tar; untar = untar; xz = xz; unxz = unxz  # Provides consistent behaviour across all methods
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
