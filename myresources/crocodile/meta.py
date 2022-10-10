@@ -213,11 +213,11 @@ def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
 def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
-def generate_readme(path, obj=None, meta=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-    text, obj_path = "# Meta\n" + (meta if meta is not None else '') + (separator := "\n" + "-----" + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None
+def generate_readme(path, obj=None, desc=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
+    text, obj_path = "# Meta\n" + (desc if desc is not None else '') + (separator := "\n" + "-----" + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None
     text += (f"# Source code file generated me was located here: \n`{obj_path.collapseuser()}`\n" + separator) if obj is not None else ""
-    if (res := Terminal().run(f"echo '# Last Commit'; cd '{obj_path.parent}'; git log -1; echo '# Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
-        text += res.op + "\n# link to files: " + res.op.split("## Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0] + "\n"
+    if (res := Terminal().run(f"echo '# Last Commit'; cd '{obj_path.parent}'; git log -1; echo ''; echo ''; echo '# Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
+        text += res.op + "\n# link to files: " + res.op.split("# Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0] + "\n"
     else: text += f"Could read git repository @ `{obj_path.parent}`.\n"
     text += (f"# Code to generate the result\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     readmepath = (P(path) / f"README.md" if P(path).is_dir() else P(path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None  # Terminal().run(f"cd '{path}'; git rev-parse --show-toplevel", shell="powershell").as_path
