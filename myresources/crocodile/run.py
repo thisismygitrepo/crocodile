@@ -73,7 +73,7 @@ args.cmd"""
         # print(code)
         exec(code)
         return None
-    elif args.read != "": res = f"""ipython --no-banner -i -m crocodile.croshell -- -c "p = P(r\'{args.read}\').absolute(); dat = p.readit()" """
+    elif args.read != "": res = f"""ipython --no-banner -i -m crocodile.croshell -- -c "p = P(r\'{str(args.read).lstrip()}\').absolute(); dat = p.readit()" """
     else:
         res = f"{interpreter} {interactivity} --no-banner -m crocodile.croshell"  # --term-title croshell
         # Clear-Host;
