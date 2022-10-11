@@ -222,8 +222,8 @@ def generate_readme(path, obj=None, desc=None, save_source_code=True, verbose=Tr
         text += res.op + "\n\n# link to files: \n" + git_url_root + f"/{Experimental.try_this(lambda : obj_path.relative_to(repo_root).as_posix(), return_='')}" + "\n"
     else: text += f"Could read git repository @ `{obj_path.parent}`.\n"
     text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
-    readmepath = (path / f"README.md" if path.is_dir() else (path.parent.joinpath(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
-    if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name("source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
+    readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
+    if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
 def load_from_source_code(directory, obj=None, delete=False):
     P(directory).find("source_code*", r=True).unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
     sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)

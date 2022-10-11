@@ -212,7 +212,10 @@ class P(type(Path()), Path):
     # ========================== override =======================================
     def write_text(self, data: str, **kwargs) -> 'Path': super(P, self).write_text(data, **kwargs); return self
     def read_text(self, encoding=None, lines=False, printit=False): res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
-    def write_bytes(self, data: bytes): res = super(P, self).write_bytes(data); print(f"Could not save file on disk.") if res == 0 else None; return self
+    def write_bytes(self, data: bytes):
+        res = super(P, self).write_bytes(data)
+        if res == 0: raise RuntimeError(f"Could not save file on disk.")
+        return self
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."

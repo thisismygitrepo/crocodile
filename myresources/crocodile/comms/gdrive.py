@@ -153,11 +153,12 @@ class GDriveAPI:
         if zip_first or encrypt_first: tb.P(local_path).delete(sure=True)
         return {"remote_path": remote_dir.joinpath(local_path.name), 'local_path': local_path, 'fid': file['id']}
 
-    def upload_and_share(self, local_path, role='writer'):
+    def upload_and_share(self, local_path, overwrite=True, role='writer', zip_first=False, encrypt_first=False, key=None, pwd=None, rel2home=False):
         # https://developers.google.com/drive/api/guides/manage-sharing
-        res = self.upload(local_path=local_path, remote_dir="myshare", share=True)
+        res = self.upload(local_path=local_path, remote_dir="myshare", overwrite=overwrite, share=True, zip_first=zip_first, encrypt_first=encrypt_first, key=key, pwd=pwd, rel2home=rel2home)
         self.service.permissions().create(fileId=res["fid"], body=dict(type='anyone', role=role)).execute()
-        return tb.P(rf'https://drive.google.com/file/d/{res["fid"]}')
+        res['url'] = tb.P(rf'https://drive.google.com/file/d/{res["fid"]}')
+        return res
 
     def create_folder(self, path="") -> str:
         path = tb.P(path)
