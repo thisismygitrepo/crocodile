@@ -40,7 +40,7 @@ def npy(obj, path, **kwargs): return __import__('numpy').save(path, obj, **kwarg
 @save_decorator(".mat")
 def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
 @save_decorator(".json")
-def json(obj, path=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, default=lambda x: x.__dict__, **kwargs))
+def json(obj, path=None, indent=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs))
 @save_decorator(".yml")
 def yaml(obj, path, **kwargs):
     with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)
@@ -149,7 +149,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def recursive_struct(mydict) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     @staticmethod
     def recursive_dict(struct) -> 'Struct': [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
-    def save_json(self, path=None): return Save.json(obj=self.__dict__, path=path)
+    def save_json(self, path=None, indent=None): return Save.json(obj=self.__dict__, path=path, indent=indent)
     from_keys_values = classmethod(lambda cls, k, v: cls(dict(zip(k, v))))
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod

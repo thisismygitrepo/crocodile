@@ -36,10 +36,10 @@ def build_parser():
     # parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
 
     # A FLAG:
-    parser.add_argument("--module", '-m', help="Flag tells to run the file as main.", action="store_true")  # default is False # default is running as main, unless indicated by --module flag.
-    parser.add_argument("--newWindow", "-w", help="Flag for running in new window.", action="store_true")  # default is False
-    parser.add_argument("--nonInteratctive", "-N", help="Specify a non-interactive session.", action="store_true")  # default is False
-    parser.add_argument("--python", "-p", help="Use python over IPython.", action="store_true")  # default is False
+    parser.add_argument("--module", '-m', help="Flag tells to run the file as main.", action="store_true", default=False)  # default is running as main, unless indicated by --module flag.
+    parser.add_argument("--newWindow", "-w", help="Flag for running in new window.", action="store_true", default=False)
+    parser.add_argument("--nonInteratctive", "-N", help="Specify a non-interactive session.", action="store_true", default=False)
+    parser.add_argument("--python", "-p", help="Use python over IPython.", action="store_true", default=False)
 
     # OPTIONAL KEYWORD
     parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
