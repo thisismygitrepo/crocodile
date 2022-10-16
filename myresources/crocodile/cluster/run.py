@@ -142,7 +142,7 @@ api = GDriveAPI()
 
 def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/source_of_truth.py").readit()
-    machine_specs = st.Machines.sah0002590_wsl
+    machine_specs = st.Machines.thinkpad
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=machine_specs, update_essential_repos=True,
                          notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',

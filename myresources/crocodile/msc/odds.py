@@ -10,9 +10,9 @@ def share(path):
                                                  description="its a file, init?", ), files={'file': path.read_bytes()})
     return response.json()['link'] if ['link'] in response.json() else response.json()
 def edit_video(path, t_start=0, t_end=None, speed=1, suffix=None, rotate=0, volume=1.0, fps=25):
-    from moviepy.editor import VideoFileClip, vfx
-    clip = VideoFileClip(path); print(f"{clip.size=}, {clip.duration=}, {clip.fps=}")
-    clip.subclip(t_start=t_start, t_end=t_end).rotate(rotate).volumex(volume).fx(vfx.speedx, speed).write_videofile(path.append("_modified").with_suffix(path.suffix if suffix is None else suffix), fps=fps)
+    ed = install_n_import("moviepy").editor
+    clip = ed.VideoFileClip(path); print(f"{clip.size=}, {clip.duration=}, {clip.fps=}")
+    clip.subclip(t_start=t_start, t_end=t_end).rotate(rotate).volumex(volume).fx(ed.vfx.speedx, speed).write_videofile(path.append("_modified").with_suffix(path.suffix if suffix is None else suffix), fps=fps)
 
 def capture_from_webcam(show=True, wait=True, save=False):
     cv2 = install_n_import("cv2", "opencv-python")
