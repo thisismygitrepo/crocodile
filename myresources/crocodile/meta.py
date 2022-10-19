@@ -64,7 +64,7 @@ class Terminal:
         as_path = property(lambda self: P(self.op.rstrip()) if self.is_successful(strict_returcode=True, strict_err=False) else None)
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print(self, desc="", capture=True): self.capture() if capture else None; print((desc or self.desc).center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + ('COMPLETED '+(desc or self.desc)).center(80, "="), "\n\n"); return self
+        def print(self, desc="TERMINAL CMD", capture=True): self.capture() if capture else None; print((desc or self.desc).center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + ('COMPLETED '+(desc or self.desc)).center(80, "="), "\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         self.available_consoles, self.machine = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"], __import__("platform").system()
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
@@ -214,13 +214,13 @@ def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__"
 def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
 def generate_readme(path, obj=None, desc=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-    text, obj_path, path = "# Description\n" + (desc if desc is not None else '') + (separator := "\n" + "-----" + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None, P(path)
-    text += (f"# Source code file generated me was located here: \n`{obj_path.collapseuser()}`\n" + separator) if obj is not None else ""
-    if (res := Terminal().run(f"echo '# Last Commit'; cd '{obj_path.parent}'; git log -1; echo ''; echo ''; echo '# Remote Repo:'; git remote -v", shell="pwsh")).is_successful(strict_err=True, strict_returcode=True):
-        git_url_root = res.op.split("# Remote Re")[1].split("\n")[1].split("\t")[1].split(" ")[0].replace(".git", "") + f"/tree/" + res.op.split('commit ')[1].split('\n')[0]
-        repo_root = Terminal().run(f"cd '{obj_path}'; git rev-parse --show-toplevel", shell="powershell").as_path
-        text += res.op + "\n\n# link to files: \n" + git_url_root + f"/{Experimental.try_this(lambda : obj_path.relative_to(repo_root).as_posix(), return_='')}" + "\n"
-    else: text += f"Could read git repository @ `{obj_path.parent}`.\n"
+    text, obj_path, path = "# Description\n" + (desc if desc is not None else '') + (separator := "\n" + "-" * 50 + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None, P(path)
+    text += (f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator) if obj is not None else ""
+    try:
+        repo = install_n_import("git", "gitpython").Repo(obj_path.parent, search_parent_directories=True)
+        text += f"# Last Commit\n{repo.git.execute('git log -1')}{separator}# Remote Repo\n{repo.git.execute('git remote -v')}{separator}"
+        text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{Experimental.try_this(lambda: obj_path.relative_to(repo.working_dir).as_posix(), return_='')}{separator}"
+    except: text += f"Could not read git repository @ `{obj_path.parent}`.\n"
     text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
