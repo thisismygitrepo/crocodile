@@ -6,13 +6,13 @@ import time
 
 
 def share(path):
-    response = install_n_import("requests").post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False,
-                                                 description="its a file, init?", ), files={'file': path.read_bytes()})
+    response = install_n_import("requests").post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False, description="its a file, init?", ), files={'file': path.read_bytes()})
     return response.json()['link'] if ['link'] in response.json() else response.json()
 def edit_video(path, t_start=0, t_end=None, speed=1, suffix=None, rotate=0, volume=1.0, fps=25):
     ed = install_n_import("moviepy").editor
     clip = ed.VideoFileClip(path); print(f"{clip.size=}, {clip.duration=}, {clip.fps=}")
     clip.subclip(t_start=t_start, t_end=t_end).rotate(rotate).volumex(volume).fx(ed.vfx.speedx, speed).write_videofile(path.append("_modified").with_suffix(path.suffix if suffix is None else suffix), fps=fps)
+
 
 def capture_from_webcam(show=True, wait=True, save=False):
     cv2 = install_n_import("cv2", "opencv-python")
@@ -36,21 +36,6 @@ def capture_from_webcam(show=True, wait=True, save=False):
 def qr(txt): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
 def count_number_of_lines_of_code_in_repo(path=P.cwd(), extension=".py", r=True, **kwargs): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
 def profile_memory(command): psutil = install_n_import("psutil"); before = psutil.virtual_memory(); exec(command); after = psutil.virtual_memory(); print(f"Memory used = {(after.used - before.used) / 1e6}")
-def pomodoro(work=25, rest=5, repeats=4):
-    logger = Log(name="pomodoro", file=False, stream=True)
-    def loop(sched):
-        speak("Alright, time to start working..."); start = datetime.now(); _ = sched
-        while (diff := work - ((datetime.now() - start).seconds / 60)) > 0: logger.debug(f"Keep working. Time Left: {round(diff)} minutes"); time.sleep(60 * 1)
-        speak("Now, its time to take a break."); start = datetime.now()
-        while (diff := rest - ((datetime.now() - start).seconds / 60)) > 0: logger.critical(f"Keep Resting. Time Left: {round(diff)} minutes"); time.sleep(60 * 1)
-    def speak(txt):
-        install_n_import("gtts").gTTS(txt, lang='en', tld='com.au').save(tmp := P.tmpfile(suffix=".mp3")); time.sleep(0.5)
-        pyglet = install_n_import("pyglet"); pyglet.resource.path = [tmp.parent.str]; pyglet.resource.reindex(); pyglet.resource.media(tmp.name).play()
-    def beep(duration=1, frequency=3000):
-        try: import winsound
-        except ImportError: __import__("os").system('beep -f %s -l %s' % (frequency, 1000 * duration))
-        else: winsound.Beep(frequency, 1000 * duration)
-    return Scheduler(routine=loop, max_cycles=repeats, logger=logger, wait="0.1m").run()
 
 
 class Cycle:

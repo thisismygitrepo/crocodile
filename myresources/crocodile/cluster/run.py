@@ -81,9 +81,10 @@ def run_on_cluster(func, kwargs=None, return_script=True,
     elif "<class 'module'" in str(type(func)): func_file, func = tb.P(func.__file__), None
     else: func_file = tb.P(func.__code__.co_filename)
 
-    repo_path = tb.Terminal().run(f"cd '{func_file}'; git rev-parse --show-toplevel", shell="powershell").as_path
-    if repo_path is None: repo_path, func_relative_file = func_file.parent, func_file.name
-    else: func_relative_file = func_file.relative_to(repo_path)
+    try:
+        repo_path = tb.P(tb.install_n_import("git", "gitpython").Repo(func_file, search_parent_directories=True).working_dir)
+        func_relative_file = func_file.relative_to(repo_path)
+    except: repo_path, func_relative_file = func_file.parent, func_file.name
 
     ssh = tb.SSH(**machine_specs)
     shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs,

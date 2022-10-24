@@ -132,6 +132,7 @@ class PathVar:
             if tb.P(path) in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
             else: dirs_.append(str(path))
         dirs = dirs_
+        if len(dirs) == 0: return ""
 
         if system == "Windows":
             """Source: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.2"""

@@ -10,6 +10,7 @@ The core rationale is:
 * The library, if used in coding, will fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
 
 The name `crocodile` signifies the use of brute force in its implementation. The focus is on ease of use, as oppoesd to beating the existing shells in speed.
+Mind you, speed is not an issue in 99% of everyday chores.
 `Crocodile` designed carefully to be loved, learning curve cound't be flattened further.
 
 This package extends many native Python classes to equip you with an uneasy-to-tame power. The major classes extended are:

@@ -6,6 +6,7 @@ import logging
 import subprocess
 import sys
 
+# comment
 
 class Null:
     def __init__(self, return_='self'): self.return_ = return_
@@ -123,7 +124,7 @@ class Terminal:
     def get_header(wdir=None): return f"""\n# {'Code prepended'.center(50, '=')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(50, '=')}\n"""
 
 
-class SSH:  # if remote is Windows, this class assumed default shell in pwsh, as opposed to cmd
+class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         username, hostname, self.platform = username or __import__('os').getlogin(), hostname or __import__("platform").node(), __import__("platform")    # use localhost if nothing provided.
         self.username, self.hostname = username.split("@") if "@" in username else (username, hostname); self.hostname, self.port = hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(port)
