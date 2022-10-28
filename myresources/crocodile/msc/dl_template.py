@@ -40,6 +40,7 @@ class Model(dl.BaseModel):
         self.compile()  # add optimizer and loss and metrics.
         self.build()  # build the model (shape will be extracted from data supplied) if not passed.
         self.summary()  # print the model.
+        self.plot_model()
 
     def get_model(self):
         _ = self  # your crazy model goes here:
