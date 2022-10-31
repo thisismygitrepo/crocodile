@@ -57,6 +57,9 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 
 cd ~
 {'python' if not ipython else 'ipython'} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
+
+deactivate
+
 """
 
     py_script_path.write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]

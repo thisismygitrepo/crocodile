@@ -21,7 +21,7 @@ import random
 D = Display; L = List; E = Experimental; S = Struct
 
 
-print(f"Crocodile Shell {__import__('crocodile').__version__}")
+print(f"Crocodile Shell {__import__('crocodile').__version__}. Python {platform.python_version()} On {platform.system()}.")
 # link to tutorial or github
 print(f"Made with ❤️")
 

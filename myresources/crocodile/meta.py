@@ -127,7 +127,8 @@ class Terminal:
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         username, hostname, self.platform = username or __import__('os').getlogin(), hostname or __import__("platform").node(), __import__("platform")    # use localhost if nothing provided.
-        self.username, self.hostname = username.split("@") if "@" in username else (username, hostname); self.hostname, self.port = hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(port)
+        self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
+        self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey)

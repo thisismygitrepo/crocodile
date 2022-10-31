@@ -109,7 +109,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def reduce(self, func=lambda x, y: x+y, default=None) -> 'List': args = (self.eval(func, func=True, other=True), self.list) + ((default,) if default is not None else ()); return __import__("functools").reduce(*args)
     def append(self, item) -> 'List': self.list.append(item); return self
     def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
-    def __radd__(self, other) -> 'List': return List(self.list + list(other))
+    def __radd__(self, other) -> 'List': return List(list(other) + self.list)
     def __iadd__(self, other) -> 'List': self.list = self.list + list(other); return self  # inplace add.
     def sort(self, key=None, reverse=False) -> 'List': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args, **kwargs) -> 'List': return List(sorted(self.list, *args, **kwargs))
