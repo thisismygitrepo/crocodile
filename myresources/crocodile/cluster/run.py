@@ -5,7 +5,7 @@ from crocodile.cluster import meta_handling as meta
 
 def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh: tb.SSH = None,
                 notify_upon_completion=False, to_email=None, email_config_name=None,
-                ipython=False, interactive=False, wrap_in_try_except=False, install_repo=False,
+                ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, install_repo=False,
                 update_essential_repos=False):
     job_id = tb.randstr()
     kwargs = kwargs or tb.S()
@@ -56,7 +56,7 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if not ipython else 'ipython'} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
+{'python' if (not ipython or pdb) else 'ipython'} {'--pdb' if pdb else ''} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
 
 deactivate
 
@@ -79,7 +79,7 @@ def run_on_cluster(func, kwargs=None, return_script=True,
                    data=None,
                    notify_upon_completion=False, to_email=None, email_config_name=None,
                    machine_specs=None,
-                   ipython=False, interactive=False, wrap_in_try_except=False, cloud=False):
+                   ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, cloud=False):
     if type(func) is str or type(func) is tb.P: func_file, func = tb.P(func), None
     elif "<class 'module'" in str(type(func)): func_file, func = tb.P(func.__file__), None
     else: func_file = tb.P(func.__code__.co_filename)
@@ -95,7 +95,7 @@ def run_on_cluster(func, kwargs=None, return_script=True,
                                                                  notify_upon_completion=notify_upon_completion,
                                                                  to_email=to_email, email_config_name=email_config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
-                                                                 ipython=ipython, interactive=interactive,
+                                                                 ipython=ipython, interactive=interactive, pdb=pdb,
                                                                  install_repo=True if "setup.py" in repo_path.listdir().apply(str) else False,
                                                                  update_essential_repos=update_essential_repos)
 

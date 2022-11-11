@@ -155,7 +155,7 @@ class P(type(Path()), Path):
     trunk = property(lambda self: self.name.split('.')[0])  # """ useful if you have multiple dots in file path where `.stem` fails."""
     len = property(lambda self: self.__len__()); items = property(lambda self: List(self.parts)); str = property(lambda self: str(self))  # or self._str
     def __len__(self): return len(self.parts)
-    def __contains__(self, item): return item in str(self)
+    def __contains__(self, item): return P(item).as_posix() in self.as_posix()
     def __iter__(self): return self.parts.__iter__()
     def __deepcopy__(self): return P(str(self))
     def __getstate__(self): return str(self)
