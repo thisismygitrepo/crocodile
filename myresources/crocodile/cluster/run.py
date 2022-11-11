@@ -56,7 +56,7 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if (not ipython or pdb) else 'ipython'} {'--pdb' if pdb else ''} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
+{'python' if (not ipython and not pdb) else 'ipython'} {'--pdb' if pdb else ''} {'-i' if interactive else ''} ./{py_script_path.rel2home().as_posix()}
 
 deactivate
 
