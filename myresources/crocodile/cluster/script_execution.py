@@ -17,6 +17,7 @@ exec_obj = ""  # to be overridden by execution line.
 rel_full_path = ""
 repo_path = ""
 func_name = ""
+func_module = ""
 kwargs_path = ""
 job_id = ""
 ssh_repr = ""
@@ -42,7 +43,12 @@ print("\n" * 2)
 
 # ######################### EXECUTION ####################################
 
-if func_name is not None:
+if func_module is not None:
+    # noinspection PyTypeChecker
+    module = __import__(func_module, fromlist=[None])
+    exec_obj = module.__dict__[func_name]
+elif func_name is not None:
+    # This approach is not conducive to parallelization since "mymod" is not pickleable.
     module = SourceFileLoader("mymod", tb.P.home().joinpath(rel_full_path).as_posix()).load_module()  # loading the module assumes its not a script, there should be at least if __name__ == __main__ wrapping any script.
     exec_obj = getattr(module, func_name)  # for README.md generation.
 else:
@@ -68,7 +74,7 @@ exec_times.print(as_config=True, justify=25)
 print("\n" * 1)
 
 
-tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, meta=f'''
+tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
 Executed via run_on_cluster with:
 {ssh_repr}

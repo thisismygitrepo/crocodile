@@ -14,6 +14,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
     kwargs_path = tb.P.tmp().joinpath(f"tmp_files/kwargs__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}.Struct.pkl").create(parents_only=True)
 
     func_name = func.__name__ if func is not None else None
+    func_module = func.__module__ if func is not None else None
     rel_full_path = repo_path.rel2home().joinpath(file).as_posix()
 
     meta_kwargs = dict(ssh_repr=repr(ssh),
@@ -21,7 +22,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
                        shell_script_path=shell_script_path.collapseuser().as_posix(),
                        kwargs_path=kwargs_path.collapseuser().as_posix(),
                        repo_path=repo_path.collapseuser().as_posix(),
-                       func_name=func_name, rel_full_path=rel_full_path,
+                       func_name=func_name, func_module=func_module, rel_full_path=rel_full_path,
                        job_id=job_id, )
     py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path)
 
