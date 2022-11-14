@@ -197,6 +197,13 @@ class DataReader(tb.Base):
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
 
+    def profile_dataframe(self, df, file=None, silent=False):
+        profile_report = tb.install_n_import("pandas_profiling").ProfileReport
+        # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
+        file = file or self.hp.save_dir.joinpath(self.subpath, "pandas_profile_report.html").create(parents_only=True)
+        profile_report(df, title="Pandas Profiling Report", explorative=True).to_file(file, silent=silent)
+        return file
+
     def preprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity.
     def postprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity
 

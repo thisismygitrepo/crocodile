@@ -33,23 +33,29 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
     return decorator
 
 
+@save_decorator(".json")
+def json(obj, path=None, indent=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs))
+@save_decorator(".yml")
+def yaml(obj, path, **kwargs):
+    with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)
+@save_decorator(".toml")
+def toml(obj: dict, path): return Path(path).write_text(install_n_import("toml").dumps(obj))
+@save_decorator(".ini")
+def ini(obj: dict, path, **kwargs):
+    conf = install_n_import("configparser").ConfigParser(); conf.read_dict(obj)
+    with open(path, 'w') as configfile: conf.write(configfile, **kwargs)
 @save_decorator(".csv")
 def csv(obj, path=None): return obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
 @save_decorator(".npy")
 def npy(obj, path, **kwargs): return __import__('numpy').save(path, obj, **kwargs)
 @save_decorator(".mat")
 def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
-@save_decorator(".json")
-def json(obj, path=None, indent=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs))
-@save_decorator(".yml")
-def yaml(obj, path, **kwargs):
-    with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)
 @save_decorator(".pkl")
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
 def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
-def pickles(obj, r=False, **kwargs): return __import__("dill").dumps(obj, r=False, **kwargs)
-class Save: csv = csv; npy = npy; mat = mat; json = json; yaml = yaml; vanilla_pickle = vanilla_pickle; pickle = pickle; pickles = pickles
+def pickles(obj, r=False, **kwargs): return __import__("dill").dumps(obj, r=r, **kwargs)
+class Save: json = json; yaml = yaml; toml = toml; ini = ini; csv = csv; npy = npy; mat = mat; vanilla_pickle = vanilla_pickle; pickle = pickle; pickles = pickles
 
 
 # ====================================== Object Management ====================================
