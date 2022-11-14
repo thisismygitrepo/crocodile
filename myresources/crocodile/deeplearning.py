@@ -155,7 +155,15 @@ class DataReader(tb.Base):
         self.plotter = None
         # attributes to be saved.
         self.specs = specs if specs else tb.Struct()
+
+        # dataframes
         self.scaler = None
+        self.imputer = None
+        self.cols_ordinal = None
+        self.cols_onehot = None
+        self.cols_numerical = None
+        self.encoder_onehot = None
+        self.encoder_ordinal = None
 
     def save(self, path=None, *args, **kwargs):
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
@@ -197,12 +205,29 @@ class DataReader(tb.Base):
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
 
-    def profile_dataframe(self, df, file=None, silent=False):
+    def profile_dataframe(self, df, file=None, silent=False, suffix=""):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
-        file = file or self.hp.save_dir.joinpath(self.subpath, "pandas_profile_report.html").create(parents_only=True)
+        file = file or self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
         profile_report(df, title="Pandas Profiling Report", explorative=True).to_file(file, silent=silent)
         return file
+    def open_dataframe_profile(self): self.hp.save_dir.joinpath(self.subpath, "pandas_profile_report.html")()
+
+    def encode(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
+        df[self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
+        tmp = self.encoder_onehot.transform(df[self.cols_onehot])
+        df.drop(columns=self.cols_onehot, inplace=True)
+        df[self.encoder_onehot.get_feature_names_out()] = tmp
+        df[self.cols_numerical] = df[self.cols_numerical].to_numpy().astype(self.hp.precision)
+        return df
+
+    def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
+        df.fillna(np.nan, inplace=True)  # SKlearn Imputer only works with Numpy's np.nan, as opposed to Pandas' pd.NA
+        columns = df.columns
+        df = self.imputer.transform(df)
+        df = self.scaler.transform(pd.DataFrame(df, columns=columns))
+        return pd.DataFrame(df, columns=columns)
 
     def preprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity.
     def postprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity
