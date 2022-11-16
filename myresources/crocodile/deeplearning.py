@@ -455,17 +455,20 @@ class BaseModel(ABC):
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
-    def build(self, ip_shape=None, ip=None, verbose=True):
+    def build(self, sample_dataset=False, ip_shape=None, ip=None, verbose=True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
+        :param sample_dataset:
         :param ip_shape:
         :param ip:
         :param verbose:
         :return:
         """
-        if ip is None: ip, _ = self.data.get_random_input_output(ip_shape=ip_shape)
+        if ip is None:
+            if sample_dataset: ip, _ = self.data.sample_dataset()
+            else: ip, _ = self.data.get_random_input_output(ip_shape=ip_shape)
         self.tmp = self.model(ip)  # op
         if verbose:
             print("Build Test".center(50, '-'))
