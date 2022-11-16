@@ -183,9 +183,9 @@ class DataReader(tb.Base):
         if strings is None: strings = ["x", "y"]
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        x = self.split.x_train
+        x, y = self.split.x_train, self.split.y_train
         self.specs.ip_shape = x.iloc[0].shape if type(x) is pd.DataFrame else x[0].shape  # useful info for instantiating models.
-        self.specs.op_shape = self.split.y_train[0].shape  # useful info for instantiating models.
+        self.specs.op_shape = y.iloc[0].shape if type(y) is pd.DataFrame else y[0].shape  # useful info for instantiating models.
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
@@ -205,11 +205,11 @@ class DataReader(tb.Base):
         op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
         return ip, op
 
-    def profile_dataframe(self, df, file=None, silent=False, suffix=""):
+    def profile_dataframe(self, df, file=None, silent=False, suffix="", explorative=True):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
         file = file or self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
-        profile_report(df, title="Pandas Profiling Report", explorative=True).to_file(file, silent=silent)
+        profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(file, silent=silent)
         return file
     def open_dataframe_profile(self): self.hp.save_dir.joinpath(self.subpath, "pandas_profile_report.html")()
 
