@@ -340,7 +340,12 @@ class BaseModel(ABC):
     @staticmethod
     def load_model(directory): __import__("tensorflow").keras.models.load_model(directory)  # path to directory. file saved_model.pb is read auto.
     def load_weights(self, directory): self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
-    def summary(self): return self.model.summary()
+    def summary(self):
+        from contextlib import redirect_stdout
+        path = self.hp.save_dir.joinpath("metadata/model_summary.txt").create(parents_only=True)
+        with open(str(path), 'w') as f:
+            with redirect_stdout(f): self.model.summary()
+        return self.model.summary()
     def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
     def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, title="Loss Curve", xlabel="epochs", **kwargs)
 

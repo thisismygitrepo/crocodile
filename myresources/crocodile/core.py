@@ -7,7 +7,7 @@ from pathlib import Path
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
-def timestamp(fmt=None, name=None): return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f') # isoformat is not compatible with file naming convention, fmt here is.
+def timestamp(fmt=None, name=None): return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift):  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
@@ -82,7 +82,8 @@ class Base(object):
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     @staticmethod
     def print(self, dtype=False, attrs=False, **kwargs): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
-    def get_state(obj, repr_func=lambda x: x, exclude=None) -> dict: return repr_func(obj) if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]) else (tmp if type(tmp:=obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).dict)
+    @staticmethod
+    def get_state(obj, repr_func=lambda x: x, exclude=None) -> dict: return repr_func(obj) if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]) else (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).dict)
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename := Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr() + ".png")), filter=filt)
         __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename

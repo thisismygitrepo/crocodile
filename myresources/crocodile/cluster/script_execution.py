@@ -34,7 +34,7 @@ tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()
 print("\n" * 2)
 print("PYTHON EXECUTION SCRIPT".center(75, "*"), "\n" * 2)
-print(f"Executing {repo_path.collapseuser().as_posix()} / {rel_full_path} : {func_name}")
+print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}")
 print(f"kwargs : ")
 _ = kwargs.print(as_config=True)
 print("\n" * 2)
@@ -60,7 +60,9 @@ else:
 
 print("\n" * 2)
 print("FINISHED PYTHON EXECUTION SCRIPT".center(75, "*"), "\n" * 2)
-if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()): res_folder = tb.P(res).expanduser()
+
+if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
+    res_folder = tb.P(res).expanduser()
 else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
     tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))

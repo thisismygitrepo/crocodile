@@ -36,6 +36,7 @@ class DataReader(dl.DataReader):
 class Model(dl.BaseModel):
     def __init__(self, *args, **kwargs):
         super(Model, self).__init__(*args, **kwargs)
+        tf.keras.backend.set_floatx(self.hp.precision)
         self.model = self.get_model()
         self.compile()  # add optimizer and loss and metrics.
         self.build()  # build the model (shape will be extracted from data supplied) if not passed.
