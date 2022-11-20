@@ -1,5 +1,6 @@
 
-import os
+# import os
+import getpass
 import platform
 import crocodile.toolbox as tb
 from importlib.machinery import SourceFileLoader
@@ -21,6 +22,7 @@ func_module = ""
 kwargs_path = ""
 job_id = ""
 ssh_repr = ""
+ssh_repr_remote = ""
 py_script_path = ""
 shell_script_path = ""
 error_message = "No error message."
@@ -89,8 +91,8 @@ Execution Time:
 {exec_times.print(as_config=True, return_str=True)}
 ''')
 
+ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
 print(f'''
 Pull results using croshell with this script:
-``` ftprx {os.getlogin()}@{platform.node()} {res_folder.collapseuser()} -r ``` 
+``` ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r ``` 
 ''')
-

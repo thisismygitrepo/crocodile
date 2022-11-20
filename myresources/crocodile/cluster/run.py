@@ -10,7 +10,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
     job_id = tb.randstr()
     kwargs = kwargs or tb.S()
     py_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}.py").create(parents_only=True)
-    shell_script_path = tb.P.tmp().joinpath(f"tmp_scripts/shell/cluster_script__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}" + {"Windows": ".ps1", "Linux": ".sh"}[ssh.remote_machine]).create(parents_only=True)
+    shell_script_path = tb.P.tmp().joinpath(f"tmp_scripts/shell/cluster_script__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}" + {"Windows": ".ps1", "Linux": ".sh"}[ssh.get_remote_machine()]).create(parents_only=True)
     kwargs_path = tb.P.tmp().joinpath(f"tmp_files/kwargs__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}.Struct.pkl").create(parents_only=True)
 
     func_name = func.__name__ if func is not None else None
@@ -18,6 +18,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
     rel_full_path = repo_path.rel2home().joinpath(file).as_posix()
 
     meta_kwargs = dict(ssh_repr=repr(ssh),
+                       ssh_repr_remote=ssh.get_repr("remote"),
                        py_script_path=py_script_path.collapseuser().as_posix(),
                        shell_script_path=shell_script_path.collapseuser().as_posix(),
                        kwargs_path=kwargs_path.collapseuser().as_posix(),
@@ -65,8 +66,8 @@ deactivate
 
     py_script_path.write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
     # only available in py 3.10:
-    # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine])  # LF vs CRLF requires py3.10
-    with open(file=shell_script_path.create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script)
+    # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
+    with open(file=shell_script_path.create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()]) as file: file.write(shell_script)
     tb.Save.pickle(obj=kwargs, path=kwargs_path)
 
     print("\n\n")
@@ -117,14 +118,14 @@ api = GDriveAPI()
 {'' if not copy_repo else f'api.download(fpath=r"{repo_path.collapseuser().as_posix()}", unzip=True, decrypt=True)'}
 """
         shell_script_modified = shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"bu_gdrive_rx -R {py_script_path.collapseuser().as_posix()}")
-        with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(shell_script_modified)
+        with open(file=shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()]) as file: file.write(shell_script_modified)
         py_script_modified = py_script_path.read_text().replace("# EXTRA-PLACEHOLDER-PRE", py_download_script)
-        with open(file=py_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.remote_machine]) as file: file.write(py_script_modified)
+        with open(file=py_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()]) as file: file.write(py_script_modified)
 
         api.upload(local_path=shell_script_path, rel2home=True, overwrite=True)
         api.upload(local_path=py_script_path, rel2home=True, overwrite=True)
         api.upload(local_path=kwargs_path, rel2home=True, overwrite=True)
-        tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {shell_script_path.collapseuser().as_posix()}; " + ("source " if ssh.remote_machine != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
+        tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {shell_script_path.collapseuser().as_posix()}; " + ("source " if ssh.get_remote_machine() != "Windows" else "")) + f"{shell_script_path.collapseuser().as_posix()}")
         print("Finished uploading to cloud. Please run the clipboard command on the remote machine:")
     else:
         ssh.copy_from_here(py_script_path)
@@ -135,7 +136,7 @@ api = GDriveAPI()
         ssh.print_summary()
 
         if return_script:
-            tb.install_n_import("clipboard").copy((f"source " if ssh.remote_machine != "Windows" else "") + f"{shell_script_path.collapseuser().as_posix()}")
+            tb.install_n_import("clipboard").copy((f"source " if ssh.get_remote_machine() != "Windows" else "") + f"{shell_script_path.collapseuser().as_posix()}")
             ssh.open_console()
             # send email at start execution time
             # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
