@@ -134,6 +134,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.ssh.connect(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey)
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. {err}")
+        def view_bar(slf, a, b): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
+        self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
         self._local_distro, self._remote_distro, self._remote_machine, self.terminal_responses, self.platform = None, None, None, [], __import__("platform")
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
@@ -160,7 +162,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if zip_first: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}").op or ''; remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
-        print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`"); self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix()); print(f"SENDING COMPLETED", "\n" * 2)
+        print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)
         if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False) -> P:
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
@@ -168,8 +171,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", strict_returncode=True, strict_err=True).as_path
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).as_path; assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''
-        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source)
-        print(f"RECEVING `{source}` ==> `{target}`"); self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix()); print(f"RECEVING COMPLETED", "\n" * 2)
+        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)
         if zip_first: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True)
         return target
     def print_summary(self):   # ip=rsp.ip, op=rsp.op

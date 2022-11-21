@@ -1,10 +1,11 @@
 
 """
 This module uses the generic google-api-python-client, which is very low level.
-https://github.com/googleapis/google-api-python-client
 
 read: https://developers.google.com/drive/api/guides/search-files
 file specs: https://developers.google.com/drive/api/v3/reference/files
+# https://github.com/eduardogr/google-drive-python
+# google: python gdrive api expiry date
 
 # code from https://developers.google.com/drive/api/quickstart/python
 terminology: https://developers.google.com/workspace/guides/auth-overview
@@ -53,23 +54,31 @@ class GDriveAPI:
         self.drive_url = tb.P("https://drive.google.com/drive/u/1")
 
     def get_cred(self, account, project):
-        creds = None  # The file token.json stores the user's access and refresh tokens, and is created automatically when the authorization flow completes for the first time.
         config = tb.P.home().joinpath("dotfiles/google/drive/config.toml").readit()
         if account is None: account = list(config.keys())[0]; print(f"GDRIVE: using default account `{account}`")
         if project is None: project = list(config[account].keys())[0]; print(f"GDRIVE: using default project `{project}`")
+        api_key = config[account][project]['api_key']
         client_id_file = tb.P.home().joinpath(f"dotfiles/google/drive/{config[account][project]['auth_client_config']}")
-        # api_key = config[account][project]['api_key']
+        creds = None  # The file token.json stores the user's access and refresh tokens, and is created automatically when the authorization flow completes for the first time.
 
         if client_id_file.exists():
-            client_id_info = client_id_file.readit()
-            if "refresh_token" in client_id_info:  # refersh token is not available before at least the first use.
-                creds = Credentials.from_authorized_user_info(client_id_info, self.SCOPES)
+            # client_id_info = client_id_file.readit()
+            # if "refresh_token" in client_id_info:  # refersh token is not available before at least the first use.
+            creds = Credentials.from_authorized_user_file(filename=client_id_file, scopes=self.SCOPES)
+
+        # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:  # If there are no (valid) credentials available, let the user log in.
-            if creds and creds.expired and creds.refresh_token: creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(client_secrets_file=client_id_file, scopes=self.SCOPES)
-                creds = flow.run_local_server(port=0)
+            if creds and creds.expired and creds.refresh_token:
+                try: creds.refresh(Request())
+                except Exception: creds = self.authorize_screen()
+            else: creds = self.authorize_screen()
             client_id_file.write_text(creds.to_json())
+        return creds
+
+    def authorize_screen(self):
+        auth_secret = tb.P.home().joinpath(f"dotfiles/google/drive/Oauth_client_secret.json")
+        flow = InstalledAppFlow.from_client_secrets_file(client_secrets_file=auth_secret, scopes=self.SCOPES)
+        creds = flow.run_local_server(port=0)
         return creds
 
     def search_all(self, q='', size=1000): return pd.DataFrame(self.service.files().list(q=q, pageSize=size, fields="nextPageToken, files(id, name)", spaces="drive").execute().get('files', []), columns=['id', 'name']).set_index("name")

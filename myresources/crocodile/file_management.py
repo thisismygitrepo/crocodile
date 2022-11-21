@@ -17,7 +17,7 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         salt, iteration = (__import__('secrets').token_bytes(16), iteration or __import__('secrets').randbelow(1_000_000)) if salted else (None, None); key = pwd2key(pwd, salt, iteration)
     elif key is None:
         if gen_key: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); print(f"KEY SAVED @ {repr(P.tmp(folder='tmp_files').joinpath('key.bytes').write_bytes(key))}")  # discouraged, make your keys/pwd before invoking the func. use random bytes, more secure but no string representation
-        else: key = P("~/dotfiles/creds/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
+        else: key = P("~/dotfiles/creds/data/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
@@ -31,12 +31,12 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
         else: key = pwd2key(pwd)  # trailing `;` prevents IPython from caching the result.
     if type(key) is bytes: pass  # passsed explicitly
-    elif key is None: key = P("~/dotfiles/creds/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
+    elif key is None: key = P("~/dotfiles/creds/data/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 def unlock(drive="D:", pwd=None, auto_unlock=False):
-    return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="pwsh")
+    return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="pwsh")
 
 # %% =================================== File ============================================
 def read(path, **kwargs):
