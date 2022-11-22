@@ -34,8 +34,8 @@ class DataReader(dl.DataReader):
 
 
 class Model(dl.BaseModel):
-    def __init__(self, *args, **kwargs):
-        super(Model, self).__init__(*args, **kwargs)
+    def __init__(self, hp: HParams, data: DataReader, **kwargs):
+        super(Model, self).__init__(hp=hp, data=data, **kwargs)
         tf.keras.backend.set_floatx(self.hp.precision)
         self.model = self.get_model()
         self.compile()  # add optimizer and loss and metrics.

@@ -265,7 +265,7 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp=None, data=None, model=None, compiler=None, history=None):
+    def __init__(self, hp: HParams=None, data: DataReader=None, model=None, compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
         self.model = model  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
