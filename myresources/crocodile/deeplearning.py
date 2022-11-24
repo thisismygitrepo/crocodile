@@ -185,10 +185,14 @@ class DataReader(tb.Base):
             if len(ip_strings) == 1: ip_strings = ["x"]
         if op_strings is None: op_strings = ["y"]
         strings = ip_strings + op_strings
+        self.specs.ip_shapes = []  # useful info for instantiating models.
+        self.specs.op_shapes = []
+        for an_arg, key in zip(args, strings):
+            a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else an_arg.shape
+            if key in ip_strings: self.specs.ip_shapes.append(a_shape)
+            else: self.specs.op_shapes.append(a_shape)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        self.specs.ip_shapes = [self.split[ip_key].iloc[0].shape if type(self.split[ip_key]) is pd.DataFrame else self.split[ip_key][0].shape for ip_key in ip_strings]  # useful info for instantiating models.
-        self.specs.op_shapes = [self.split[op_key].iloc[0].shape if type(self.split[op_key]) is pd.DataFrame else self.split[op_key][0].shape for op_key in op_strings]
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
