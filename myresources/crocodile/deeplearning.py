@@ -176,16 +176,19 @@ class DataReader(tb.Base):
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
-    def split_the_data(self, *args, strings=None, **kwargs):
+    def split_the_data(self, *args, ip_strings=None, op_strings=None, **kwargs):
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = tb.Struct(train_loader=None, test_loader=None)
-        if strings is None: strings = ["x", "y"]
+        if ip_strings is None:
+            ip_strings = [f"x_{i}" for i in range(len(args)-1)]
+            if len(ip_strings) == 1: ip_strings = ["x"]
+        if op_strings is None: op_strings = ["y"]
+        strings = ip_strings + op_strings
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        x, y = self.split.x_train, self.split.y_train
-        self.specs.ip_shape = x.iloc[0].shape if type(x) is pd.DataFrame else x[0].shape  # useful info for instantiating models.
-        self.specs.op_shape = y.iloc[0].shape if type(y) is pd.DataFrame else y[0].shape  # useful info for instantiating models.
+        self.specs.ip_shapes = [self.split[ip_key].iloc[0].shape if type(self.split[ip_key]) is pd.DataFrame else self.split[ip_key][0].shape for ip_key in ip_strings]  # useful info for instantiating models.
+        self.specs.op_shapes = [self.split[op_key].iloc[0].shape if type(self.split[op_key]) is pd.DataFrame else self.split[op_key][0].shape for op_key in op_strings]
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
@@ -197,13 +200,13 @@ class DataReader(tb.Base):
         selection = res1 if use_default_slice is False and (indices or aslice) is None else (res1 if indices is not None else res2)
         return tuple([tmp.iloc[selection] if type(tmp := self.split[key]) is pd.DataFrame else tmp[selection] for key in keys])
 
-    def get_random_input_output(self, ip_shape=None, op_shape=None):
-        if ip_shape is None: ip_shape = self.specs.ip_shape
-        if op_shape is None: op_shape = self.specs.op_shape
+    def get_random_inputs_outputs(self, ip_shapes=None, op_shapes=None):
+        if ip_shapes is None: ip_shapes = self.specs.ip_shapes
+        if op_shapes is None: op_shapes = self.specs.op_shapes
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
-        ip = np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype)
-        op = np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype)
-        return ip, op
+        ips = [np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype) for ip_shape in ip_shapes]
+        ops = [np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype) for op_shape in op_shapes]
+        return ips, ops
 
     def profile_dataframe(self, df, file=None, silent=False, suffix="", explorative=True):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
@@ -265,7 +268,7 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: HParams=None, data: DataReader=None, model=None, compiler=None, history=None):
+    def __init__(self, hp: HyperParam = None, data: DataReader = None, model=None, compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
         self.model = model  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
@@ -375,7 +378,7 @@ class BaseModel(ABC):
         x_test, y_test = x_test if x_test is not None else self.data.split.x_test, y_test if y_test is not None else self.data.split.y_test
         names_test = names_test if names_test is not None else (self.data.split.names_test if hasattr(self.data.split, "names_test") else np.arange(len(x_test)))
         idx = np.random.choice(len(x_test) - 1, size=sample, replace=False) if idx is None else (slice(idx, idx + 1, 1) if isinstance(idx, int) else idx)
-        x_test, y_test, names_test = x_test[idx] if "DataFrame" not in str(type(x_test)) else x_test.iloc[idx], y_test[idx] , names_test[idx]
+        x_test, y_test, names_test = x_test[idx] if "DataFrame" not in str(type(x_test)) else x_test.iloc[idx], y_test[idx], names_test[idx]
         # ==========================================================================
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
@@ -420,7 +423,7 @@ class BaseModel(ABC):
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
         tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try:tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
+        try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
@@ -460,20 +463,20 @@ class BaseModel(ABC):
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
-    def build(self, sample_dataset=False, ip_shape=None, ip=None, verbose=True):
+    def build(self, sample_dataset=False, ip_shapes=None, ip=None, verbose=True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
         * Sanity check about values and ranges when random normal input is fed.
         :param sample_dataset:
-        :param ip_shape:
+        :param ip_shapes:
         :param ip:
         :param verbose:
         :return:
         """
         if ip is None:
             if sample_dataset: ip, _ = self.data.sample_dataset()
-            else: ip, _ = self.data.get_random_input_output(ip_shape=ip_shape)
+            else: ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
         self.tmp = self.model(ip)  # op
         if verbose:
             print("Build Test".center(50, '-'))

@@ -35,3 +35,4 @@ pyyaml  # storing yaml files.
 # scikit-image  # image processing.  heavy weight library.
 # torch  # for deep learning
 # tensorflow  # for deep learning
+# tensorboard

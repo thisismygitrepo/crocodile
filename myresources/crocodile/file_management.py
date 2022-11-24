@@ -109,7 +109,7 @@ class P(type(Path()), Path):
     def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs):
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
-            else: return notfound
+            else: (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return notfound
         if verbose: print(f"Reading {slf.name} ({slf.size()} MB) ...")
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
@@ -386,4 +386,5 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
 
 
 if __name__ == '__main__':
-    print('hi from file_managements')
+    # print('hi from file_managements')
+    pass
