@@ -493,29 +493,30 @@ class BaseModel(ABC):
         :param verbose:
         :return:
         """
+        keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
+        keys_op = self.data.get_data_strings(which_data="op", which_split="test")
+
         if ip is None:
             if sample_dataset: ip, _ = self.data.sample_dataset()
             else: ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
-        self.tmp = self.model(inputs=ip[0] if len(ip) == 1 else ip)  # op
+        op = self.model(inputs=ip[0] if len(ip) == 1 else ip)  # op
+        op = list(op) if len(keys_op) > 1 else [op]
         if verbose:
             print("Build Test".center(50, '-'))
-            print(f"Input shapes =")
-            tb.L(ip).apply(lambda x: x.shape).print()
-            print(f"Output shape =")
-            if type(self.tmp) == list: tb.L(self.tmp).apply(lambda x: x.shape).print()
-            else: print(self.tmp.shape)
-            print("Stats on output data for random normal input:")
+            print(f"Input shapes:")
+            tb.Struct.from_keys_values(keys_ip, tb.L(ip).apply(lambda x: x.shape)).print(as_config=True)
+            print(f"Output shape:")
+            tb.Struct.from_keys_values(keys_op, tb.L(op).apply(lambda x: x.shape)).print(as_config=True)
+            print("\n\nStats on output data for random normal input:")
             try:
                 res = []
-                keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
-                keys_op = self.data.get_data_strings(which_data="op", which_split="test")
-                for item_str, item_val in zip(keys_ip + keys_op, list(ip) + list(self.tmp if len(keys_op) > 1 else [self.tmp])):
+                for item_str, item_val in zip(keys_ip + keys_op, list(ip) + list(op)):
                     a_df = pd.DataFrame(np.array(item_val).flatten()).describe().rename(columns={0: item_str})
                     res.append(a_df)
                 print(pd.concat(res, axis=1))
-                print("-" * 100 + '\n' * 2)
             except Exception as ex:
                 print(f"Could not do stats on outputs and inputs. Error: {ex}")
+            print("Build Test Finished".center(50, '-'))
 
 
 class Ensemble(tb.Base):
