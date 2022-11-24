@@ -200,9 +200,14 @@ class DataReader(tb.Base):
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
-    def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, dataset="test"):
-        keys_ip = [item + f"_{dataset}" for item in self.ip_strings]
-        keys_op = [item + f"_{dataset}" for item in self.op_strings]
+    def get_data_strings(self, which_data="ip", which_split="train"):
+        strings = self.op_strings if which_data == "op" else self.ip_strings
+        keys_ip = [item + f"_{which_split}" for item in strings]
+        return keys_ip
+
+    def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, split="test"):
+        keys_ip = self.get_data_strings(which_data="ip", which_split=split)
+        keys_op = self.get_data_strings(which_data="op", which_split=split)
         selection = indices or aslice
         res1 = selection or np.random.choice(len(self.split[keys_ip[0]]), size=self.hp.batch_size, replace=False)
         res2 = selection or slice(0, self.hp.batch_size)
@@ -501,9 +506,13 @@ class BaseModel(ABC):
             else: print(self.tmp.shape)
             print("Stats on output data for random normal input:")
             try:
-                df_op = pd.DataFrame(np.array(self.tmp).flatten()).describe().rename(columns={0: "op"})
-                df_ip = pd.DataFrame(np.array(ip).flatten()).describe().rename(columns={0: "ip"})
-                print(pd.concat([df_ip, df_op], axis=1))
+                res = []
+                keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
+                keys_op = self.data.get_data_strings(which_data="op", which_split="test")
+                for item_str, item_val in zip(keys_ip + keys_op, list(ip) + list(self.tmp if len(keys_op) > 1 else [self.tmp])):
+                    a_df = pd.DataFrame(np.array(item_val).flatten()).describe().rename(columns={0: item_str})
+                    res.append(a_df)
+                print(pd.concat(res, axis=1))
                 print("-" * 100 + '\n' * 2)
             except Exception as ex:
                 print(f"Could not do stats on outputs and inputs. Error: {ex}")
