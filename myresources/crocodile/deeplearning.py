@@ -188,7 +188,7 @@ class DataReader(tb.Base):
         self.specs.ip_shapes = []  # useful info for instantiating models.
         self.specs.op_shapes = []
         for an_arg, key in zip(args, strings):
-            a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else an_arg.shape
+            a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else an_arg[0].shape
             if key in ip_strings: self.specs.ip_shapes.append(a_shape)
             else: self.specs.op_shapes.append(a_shape)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
@@ -481,16 +481,22 @@ class BaseModel(ABC):
         if ip is None:
             if sample_dataset: ip, _ = self.data.sample_dataset()
             else: ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
-        self.tmp = self.model(ip)  # op
+        self.tmp = self.model(inputs=ip[0] if len(ip) == 1 else ip)  # op
         if verbose:
             print("Build Test".center(50, '-'))
-            print(f"Input shape = {ip.shape}")
-            print(f"Output shape = {self.tmp.shape}")
+            print(f"Input shapes =")
+            tb.L(ip).apply(lambda x: x.shape).print()
+            print(f"Output shape =")
+            if type(self.tmp) == list: tb.L(self.tmp).apply(lambda x: x.shape).print()
+            else: print(self.tmp.shape)
             print("Stats on output data for random normal input:")
-            df_op = pd.DataFrame(np.array(self.tmp).flatten()).describe().rename(columns={0: "op"})
-            df_ip = pd.DataFrame(np.array(ip).flatten()).describe().rename(columns={0: "ip"})
-            print(pd.concat([df_ip, df_op], axis=1))
-            print("-" * 100 + '\n' * 2)
+            try:
+                df_op = pd.DataFrame(np.array(self.tmp).flatten()).describe().rename(columns={0: "op"})
+                df_ip = pd.DataFrame(np.array(ip).flatten()).describe().rename(columns={0: "ip"})
+                print(pd.concat([df_ip, df_op], axis=1))
+                print("-" * 100 + '\n' * 2)
+            except Exception as ex:
+                print(f"Could not do stats on outputs and inputs. Error: {ex}")
 
 
 class Ensemble(tb.Base):
