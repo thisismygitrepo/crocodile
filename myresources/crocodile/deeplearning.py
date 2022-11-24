@@ -155,6 +155,8 @@ class DataReader(tb.Base):
         self.plotter = None
         # attributes to be saved.
         self.specs = specs if specs else tb.Struct()
+        self.ip_strings = None  # e.g.: ["x1", "x2"]
+        self.op_strings = None  # e.g.: ["y1", "y2"]
 
         # dataframes
         self.scaler = None
@@ -183,7 +185,9 @@ class DataReader(tb.Base):
         if ip_strings is None:
             ip_strings = [f"x_{i}" for i in range(len(args)-1)]
             if len(ip_strings) == 1: ip_strings = ["x"]
+        self.ip_strings = ip_strings
         if op_strings is None: op_strings = ["y"]
+        self.op_strings = op_strings
         strings = ip_strings + op_strings
         self.specs.ip_shapes = []  # useful info for instantiating models.
         self.specs.op_shapes = []
@@ -197,12 +201,18 @@ class DataReader(tb.Base):
         self.split.print()
 
     def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, dataset="test"):
-        keys = self.split.keys().filter(lambda x: f'_{dataset}' in x)  # TODO: reconsider this logic
+        keys_ip = [item + f"_{dataset}" for item in self.ip_strings]
+        keys_op = [item + f"_{dataset}" for item in self.op_strings]
         selection = indices or aslice
-        res1 = selection or np.random.choice(len(self.split[keys[0]]), size=self.hp.batch_size, replace=False)
+        res1 = selection or np.random.choice(len(self.split[keys_ip[0]]), size=self.hp.batch_size, replace=False)
         res2 = selection or slice(0, self.hp.batch_size)
         selection = res1 if use_default_slice is False and (indices or aslice) is None else (res1 if indices is not None else res2)
-        return tuple([tmp.iloc[selection] if type(tmp := self.split[key]) is pd.DataFrame else tmp[selection] for key in keys])
+        x, y = [], []
+        for idx, key in enumerate(keys_ip + keys_op):
+            tmp = self.split[key]
+            item = tmp.iloc[selection] if type(tmp) is pd.DataFrame else tmp[selection]
+            x.append(item) if idx < len(keys_ip) else y.append(item)
+        return x, y
 
     def get_random_inputs_outputs(self, ip_shapes=None, op_shapes=None):
         if ip_shapes is None: ip_shapes = self.specs.ip_shapes
