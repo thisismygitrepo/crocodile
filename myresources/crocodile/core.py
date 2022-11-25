@@ -187,14 +187,14 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def keys(self, verbose=False) -> 'List': return List(list(self.dict.keys())) if not verbose else install_n_import("tqdm").tqdm(self.dict.keys())
     def values(self, verbose=False) -> 'List': return List(list(self.dict.values())) if not verbose else install_n_import("tqdm").tqdm(self.dict.values())
     def items(self, verbose=False, desc="") -> 'List': return List(self.dict.items()) if not verbose else install_n_import("tqdm").tqdm(self.dict.items(), desc=desc)
-    def get(self, key=None, default=None, strict=False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys or [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
+    def get(self, key=None, default=None, strict=False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
     def apply2keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
     def apply2values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def apply(self, kv_func) -> 'List': return self.items().apply(lambda item: kv_func(item[0], item[1]))
     def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.dict.items()})
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
-    def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + keys or [])]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
+    def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + (keys if keys is not None else []))]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, justify, return_str=False, limit=30): res = __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"]); return res if not return_str else str(res)
     def print(self, dtype=True, return_str=False, justify=30, as_config=False, as_yaml=False, limit=50, **kwargs):
         res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"]))
