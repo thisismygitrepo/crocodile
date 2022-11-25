@@ -425,7 +425,7 @@ class BaseModel(ABC):
     def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, idx=None, split="test", viz=True, **kwargs):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size, idx=idx)
-        if names_test is None: names_test = np.arange(x_test[0])
+        if names_test is None: names_test = np.arange(len(x_test[0]))
         # ==========================================================================
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
