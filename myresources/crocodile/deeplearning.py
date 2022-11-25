@@ -321,7 +321,15 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
     def fit(self, viz=True, **kwargs):
-        default_settings = tb.Struct(x=self.data.split.x_train, y=self.data.split.y_train, validation_data=(self.data.split.x_test, self.data.split.y_test),
+        x_train = self.data.split.get(keys=self.data.get_data_strings(which_data="ip", which_split="train")).list
+        y_train = self.data.split.get(keys=self.data.get_data_strings(which_data="op", which_split="train")).list
+        x_test = self.data.split.get(keys=self.data.get_data_strings(which_data="ip", which_split="test")).list
+        y_test = self.data.split.get(keys=self.data.get_data_strings(which_data="op", which_split="test")).list
+        x_test = x_test[0] if len(x_test) == 1 else x_test
+        y_test = y_test[0] if len(y_test) == 1 else y_test
+        default_settings = tb.Struct(x=x_train[0] if len(x_train) == 1 else x_train,
+                                     y=y_train[0] if len(y_train) == 1 else y_train,
+                                     validation_data=(x_test, y_test),
                                      batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings.dict)
@@ -502,6 +510,7 @@ class BaseModel(ABC):
         op = self.model(inputs=ip[0] if len(ip) == 1 else ip)  # op
         op = list(op) if len(keys_op) > 1 else [op]
         if verbose:
+            print("\n")
             print("Build Test".center(50, '-'))
             print(f"Input shapes:")
             tb.Struct.from_keys_values(keys_ip, tb.L(ip).apply(lambda x: x.shape)).print(as_config=True)
@@ -517,6 +526,7 @@ class BaseModel(ABC):
             except Exception as ex:
                 print(f"Could not do stats on outputs and inputs. Error: {ex}")
             print("Build Test Finished".center(50, '-'))
+            print("\n")
 
 
 class Ensemble(tb.Base):
