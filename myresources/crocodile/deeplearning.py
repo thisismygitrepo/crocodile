@@ -4,12 +4,17 @@ from crocodile.matplotlib_management import ImShow, FigureSave
 import numpy as np
 import pandas as pd
 from abc import ABC
+from typing import Generic, TypeVar
 import enum
 from tqdm import tqdm
 import copy
 
 
 # %% ========================== DeepLearning Accessories =================================
+
+BM = TypeVar("BM", bound="BaseModel")
+DR = TypeVar("DR", bound="DataReader")
+HPM = TypeVar("HPM", bound="HyperParam")
 
 
 class Device(enum.Enum):
@@ -148,7 +153,7 @@ class DataReader(tb.Base):
     implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the 
     need to reference `.dataspects`.
     """
-    def __init__(self, hp: HyperParam = None, specs=None, split=None, *args, **kwargs):
+    def __init__(self, hp: Generic[HPM] = None, specs=None, split=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hp = hp
         self.split = split
@@ -274,10 +279,6 @@ class DataReader(tb.Base):
         return None
 
 
-from typing import Generic, TypeVar
-T = TypeVar("T", bound="BaseModel")
-
-
 class BaseModel(ABC):
     """My basic model. It implements the following methods:
 
@@ -291,7 +292,7 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: HyperParam = None, data: Generic[T]=None, model=None, compiler=None, history=None):
+    def __init__(self, hp: Generic[HPM] = None, data: Generic[BM] = None, model=None, compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
         self.model = model  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
