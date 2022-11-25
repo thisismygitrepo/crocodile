@@ -29,8 +29,8 @@ class HParams(dl.HyperParam):
 class DataReader(dl.DataReader):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dataset = tb.Struct(x=np.random.randn(1000, 10), y=np.random.randn(1000, 1))
-        self.split_the_data(self.dataset.x, self.dataset.y)
+        self.dataset = tb.Struct(x=np.random.randn(1000, 10), y=np.random.randn(1000, 1), names=np.arange(1000))
+        self.split_the_data(self.dataset.x, self.dataset.y, self.dataset.names, ip_strings=['x'], op_strings=["y"], others_string=["names"])
 
 
 class Model(dl.BaseModel):
@@ -58,4 +58,7 @@ def main():
 
 
 if __name__ == '__main__':
-    pass
+    hp = HParams()
+    d = DataReader(hp)
+    m = Model(hp, d)
+    m.evaluate()

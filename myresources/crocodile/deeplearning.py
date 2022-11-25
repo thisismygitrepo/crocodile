@@ -162,6 +162,7 @@ class DataReader(tb.Base):
         self.specs = specs if specs else tb.Struct()
         self.ip_strings = None  # e.g.: ["x1", "x2"]
         self.op_strings = None  # e.g.: ["y1", "y2"]
+        self.other_strings = None  # e.g.: indices or names
 
         # dataframes
         self.scaler = None
@@ -183,7 +184,7 @@ class DataReader(tb.Base):
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
-    def split_the_data(self, *args, ip_strings=None, op_strings=None, **kwargs):
+    def split_the_data(self, *args, ip_strings=None, op_strings=None, others_string=None, **kwargs):
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = tb.Struct(train_loader=None, test_loader=None)
@@ -193,7 +194,9 @@ class DataReader(tb.Base):
         self.ip_strings = ip_strings
         if op_strings is None: op_strings = ["y"]
         self.op_strings = op_strings
-        strings = ip_strings + op_strings
+        if others_string is None: others_string = []
+        self.other_strings = others_string
+        strings = ip_strings + op_strings + others_string
         self.specs.ip_shapes = []  # useful info for instantiating models.
         self.specs.op_shapes = []
         for an_arg, key in zip(args, strings):
@@ -206,36 +209,45 @@ class DataReader(tb.Base):
         self.split.print()
 
     def get_data_strings(self, which_data="ip", which_split="train"):
-        strings = self.op_strings if which_data == "op" else self.ip_strings
+        strings = {"op": self.op_strings, "ip": self.ip_strings, "others": self.other_strings}[which_data]
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, split="test", size=None):
+    def sample_dataset(self, aslice=None, indices=None, use_slice=False, split="test", idx=None, size=None):
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
+        keys_others = self.get_data_strings(which_data="others", which_split=split)
         ds_size = len(self.split[keys_ip[0]])
         select_size = size or self.hp.batch_size
         start_idx = np.random.choice(ds_size - select_size)
 
         if indices is not None: selection = indices
         elif aslice is not None: selection = aslice
-        elif use_default_slice: selection = slice(start_idx, start_idx + select_size)
+        elif idx is not None: selection = slice(idx, idx + 1)
+        elif use_slice: selection = slice(start_idx, start_idx + select_size)  # ragged tensors don't support indexing, this can be handy in that case.
         else: selection = np.random.choice(ds_size, size=select_size, replace=False)
 
-        x, y = [], []
-        for idx, key in enumerate(keys_ip + keys_op):
+        x, y, others = [], [], []
+        for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp = self.split[key]
             item = tmp.iloc[selection] if type(tmp) is pd.DataFrame else tmp[selection]
-            x.append(item) if idx < len(keys_ip) else y.append(item)
-        return x, y
+            if idx == 0: x.append(item)
+            elif idx == 1: y.append(item)
+            else: others.append(item)
+        x = x[0] if len(self.ip_strings) == 1 else x
+        y = y[0] if len(self.op_strings) == 1 else y
+        others = others[0] if len(self.other_strings) == 1 else others
+        return x, y, others
 
     def get_random_inputs_outputs(self, ip_shapes=None, op_shapes=None):
         if ip_shapes is None: ip_shapes = self.specs.ip_shapes
         if op_shapes is None: op_shapes = self.specs.op_shapes
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
-        ips = [np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype) for ip_shape in ip_shapes]
-        ops = [np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype) for op_shape in op_shapes]
-        return ips, ops
+        x = [np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype) for ip_shape in ip_shapes]
+        y = [np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype) for op_shape in op_shapes]
+        x = x[0] if len(self.ip_strings) == 1 else x
+        y = y[0] if len(self.op_strings) == 1 else y
+        return x, y
 
     def profile_dataframe(self, df, file=None, silent=False, suffix="", explorative=True):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
@@ -410,12 +422,10 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test=None, y_test=None, names_test=None, idx=None, viz=True, sample=5, **kwargs):
-        # ================= Data Procurement ===================================
-        x_test, y_test = x_test if x_test is not None else self.data.split.x_test, y_test if y_test is not None else self.data.split.y_test
-        names_test = names_test if names_test is not None else (self.data.split.names_test if hasattr(self.data.split, "names_test") else np.arange(len(x_test)))
-        idx = np.random.choice(len(x_test) - 1, size=sample, replace=False) if idx is None else (slice(idx, idx + 1, 1) if isinstance(idx, int) else idx)
-        x_test, y_test, names_test = x_test[idx] if "DataFrame" not in str(type(x_test)) else x_test.iloc[idx], y_test[idx], names_test[idx]
+    def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, idx=None, split="test", viz=True, **kwargs):
+        if x_test is None and y_test is None and names_test is None:
+            x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size, idx=idx)
+        if names_test is None: names_test = np.arange(x_test[0])
         # ==========================================================================
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
@@ -515,7 +525,7 @@ class BaseModel(ABC):
         keys_op = self.data.get_data_strings(which_data="op", which_split="test")
 
         if ip is None:
-            if sample_dataset: ip, _ = self.data.sample_dataset()
+            if sample_dataset: ip, _, _ = self.data.sample_dataset()
             else: ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
         op = self.model(inputs=ip[0] if len(ip) == 1 else ip)  # op
         op = list(op) if len(keys_op) > 1 else [op]
