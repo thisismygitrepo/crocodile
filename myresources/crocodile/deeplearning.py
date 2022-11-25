@@ -210,13 +210,18 @@ class DataReader(tb.Base):
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, split="test"):
+    def sample_dataset(self, aslice=None, indices=None, use_default_slice=False, split="test", size=None):
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
-        selection = indices or aslice
-        res1 = selection or np.random.choice(len(self.split[keys_ip[0]]), size=self.hp.batch_size, replace=False)
-        res2 = selection or slice(0, self.hp.batch_size)
-        selection = res1 if use_default_slice is False and (indices or aslice) is None else (res1 if indices is not None else res2)
+        ds_size = len(self.split[keys_ip[0]])
+        select_size = size or self.hp.batch_size
+        start_idx = np.random.choice(ds_size - select_size)
+
+        if indices is not None: selection = indices
+        elif aslice is not None: selection = aslice
+        elif use_default_slice: selection = slice(start_idx, start_idx + select_size)
+        else: selection = np.random.choice(ds_size, size=select_size, replace=False)
+
         x, y = [], []
         for idx, key in enumerate(keys_ip + keys_op):
             tmp = self.split[key]
