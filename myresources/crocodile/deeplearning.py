@@ -199,6 +199,8 @@ class DataReader(tb.Base):
         strings = ip_strings + op_strings + others_string
         self.specs.ip_shapes = []  # useful info for instantiating models.
         self.specs.op_shapes = []
+        self.specs.other_shapes = []
+
         for an_arg, key in zip(args, strings):
             a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else np.array(an_arg[0]).shape
             if key in ip_strings: self.specs.ip_shapes.append(a_shape)
