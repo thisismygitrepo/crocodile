@@ -237,7 +237,12 @@ class DataReader(tb.Base):
         x = x[0] if len(self.ip_strings) == 1 else x
         y = y[0] if len(self.op_strings) == 1 else y
         others = others[0] if len(self.other_strings) == 1 else others
-        if len(others) == 0: others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
+        if len(others) == 0:
+            # others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
+            if type(selection) is slice:
+                others = np.arange(*selection.indices(10000000000000))
+            else:
+                others = selection
         return x, y, others
 
     def get_random_inputs_outputs(self, ip_shapes=None, op_shapes=None):
