@@ -351,7 +351,7 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz=True, **kwargs):
+    def fit(self, viz=True, val_sample_weights=None, **kwargs):
         x_train = self.data.split.get(keys=self.data.get_data_strings(which_data="ip", which_split="train")).list
         y_train = self.data.split.get(keys=self.data.get_data_strings(which_data="op", which_split="train")).list
         x_test = self.data.split.get(keys=self.data.get_data_strings(which_data="ip", which_split="test")).list
@@ -360,7 +360,7 @@ class BaseModel(ABC):
         y_test = y_test[0] if len(y_test) == 1 else y_test
         default_settings = tb.Struct(x=x_train[0] if len(x_train) == 1 else x_train,
                                      y=y_train[0] if len(y_train) == 1 else y_train,
-                                     validation_data=(x_test, y_test),
+                                     validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
                                      batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings.dict)
