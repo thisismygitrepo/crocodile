@@ -459,7 +459,7 @@ class BaseModel(ABC):
             loss_dict[name] = []
             for a_prediction, a_y_test in zip(prediction, groun_truth):
                 if hasattr(a_metric, "reset_states"): a_metric.reset_states()
-                loss = a_metric(a_prediction[None], a_y_test[None])
+                loss = a_metric(y_pred=a_prediction[None], y_true=a_y_test[None])
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
