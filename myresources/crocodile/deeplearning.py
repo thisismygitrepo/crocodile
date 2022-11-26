@@ -200,9 +200,10 @@ class DataReader(tb.Base):
         self.specs.ip_shapes = []  # useful info for instantiating models.
         self.specs.op_shapes = []
         for an_arg, key in zip(args, strings):
-            a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else an_arg[0].shape
+            a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else np.array(an_arg[0]).shape
             if key in ip_strings: self.specs.ip_shapes.append(a_shape)
-            else: self.specs.op_shapes.append(a_shape)
+            elif key in op_strings: self.specs.op_shapes.append(a_shape)
+            elif key in others_string: self.specs.other_shapes.append(a_shape)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
@@ -434,7 +435,10 @@ class BaseModel(ABC):
         # ==========================================================================
         prediction = self.infer(x_test)
         loss_dict = self.get_metrics_evaluations(prediction, y_test)
-        if loss_dict is not None: loss_dict['names'] = names_test
+        if loss_dict is not None:
+            if len(self.data.other_strings) == 1: loss_dict[self.data.other_strings[0]] = names_test
+            else:
+                for val, name in zip(names_test, self.data.other_strings): loss_dict[name] = val
         pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test, names=names_test, loss_df=loss_dict, )
