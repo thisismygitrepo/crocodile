@@ -25,6 +25,7 @@ from googleapiclient.discovery import build
 
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
+from crocodile.comms.helper_funcs import process_sent_file, process_retrieved_file
 from enum import Enum
 import crocodile.toolbox as tb
 import io
@@ -193,21 +194,6 @@ This can cause seemingly confusing behaviour if the user continues to rely on na
 Folders in trash bin are particularly confusing as the trash bin is nothing but another folder and thus,
 user can still access it and populate it, etc. This action taking place in rubbish bin might not be noticed when inspecting Gdrive via web."""
 
-
-def process_retrieved_file(path, decrypt=False, unzip=False, key=None, pwd=None):
-    if decrypt: path = path.decrypt(key=key, pwd=pwd, inplace=True)
-    if unzip: path = path.unzip(inplace=True, verbose=True, overwrite=True, content=True)
-    return path
-
-
-def process_sent_file(file, zip_first=False, encrypt_first=False, key=None, pwd=None):
-    file = tb.P(file).expanduser().absolute()
-    if zip_first: file = tb.P(file).zip()
-    if encrypt_first:
-        res = tb.P(file).encrypt(key=key, pwd=pwd)
-        if zip_first: file.delete(sure=True)
-        file = res
-    return file
 
 
 if __name__ == '__main__':
