@@ -180,7 +180,9 @@ class DataReader(tb.Base):
 
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
-    def __getstate__(self): return dict(specs=self.specs, scaler=self.scaler)
+    def __getstate__(self):
+        items = ["specs", "scaler", "imputer", "ip_strings", "op_strings", "other_strings", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal"]
+        return dict(zip(items, [getattr(self, item) for item in items]))
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
@@ -434,31 +436,32 @@ class BaseModel(ABC):
     def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, idx=None, split="test", viz=True, **kwargs):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size, idx=idx)
+        elif names_test is None: names_test = np.arange(len(x_test))
         # ==========================================================================
-        prediction = self.infer(x_test)
-        loss_dict = self.get_metrics_evaluations(prediction, y_test)
-        if loss_dict is not None:
-            if len(self.data.other_strings) == 1: loss_dict[self.data.other_strings[0]] = names_test
+        y_pred = self.infer(x_test)
+        loss_df = self.get_metrics_evaluations(y_pred, y_test)
+        if loss_df is not None:
+            if len(self.data.other_strings) == 1: loss_df[self.data.other_strings[0]] = names_test
             else:
-                for val, name in zip(names_test, self.data.other_strings): loss_dict[name] = val
-        pred = self.postprocess(prediction, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
-        gt = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
-        results = tb.Struct(pp_prediction=pred, prediction=prediction, input=x_test, pp_gt=gt, gt=y_test, names=names_test, loss_df=loss_dict, )
+                for val, name in zip(names_test, self.data.other_strings): loss_df[name] = val
+        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
+        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
+        results = tb.Struct(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=names_test, loss_df=loss_df, )
         if viz:
             loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
             names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
-            self.viz(pred, gt, names=names, **kwargs)
+            self.viz(y_pred_pp, y_true_pp, names=names, **kwargs)
         return results
 
-    def get_metrics_evaluations(self, prediction, groun_truth):
+    def get_metrics_evaluations(self, prediction, groun_truth) -> pd.DataFrame or None:
         if self.compiler is None: return None
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
         loss_dict = dict()
         for a_metric in metrics:
-            if hasattr(a_metric, "path"): name = a_metric.name
+            if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
-            else: name = "unknown"
+            else: name = "unknown_loss_name"
             # try:  # EAFP vs LBYL: both are duck-typing styles as they ask for what object can do (whether by introspection or trial) as opposed to checking its type.
             #     path = a_metric.path  # works for subclasses Metrics
             # except AttributeError: path = a_metric.__name__  # works for functions.

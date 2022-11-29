@@ -61,4 +61,4 @@ if __name__ == '__main__':
     hp = HParams()
     d = DataReader(hp)
     m = Model(hp, d)
-    m.evaluate()
+    q = m.evaluate()
