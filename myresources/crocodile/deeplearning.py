@@ -564,7 +564,7 @@ class BaseModel(ABC):
 
 
 class Ensemble(tb.Base):
-    def __init__(self, hp_class=None, data_class=None, model_class=None, size=15, *args, **kwargs):
+    def __init__(self, hp_class: Generic[HPM] = None, data_class: Generic[DR] = None, model_class: Generic[BM] = None, size=10, *args, **kwargs):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
@@ -579,8 +579,9 @@ class Ensemble(tb.Base):
         self.hp_class = hp_class
         self.data_class = data_class
         self.model_class = model_class
+        self.models = tb.List()
+        self.data = None  # one data object for all models (so that it can fit in the memory)
         if hp_class and data_class and model_class:
-            self.models = tb.List()
             # only generate the dataset once and attach it to the ensemble to be reused by models.
             self.data = self.data_class(hp_class())
             print("Creating Models".center(100, "="))
@@ -608,12 +609,14 @@ class Ensemble(tb.Base):
         self.performance = tb.L()
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
-            if shuffle_train_test: self.data.split_my_data_now(seed=np.random.randint(0, 1000))  # shuffle data (shared among models)
+            if shuffle_train_test:
+                self.models[i].hp.seed = np.random.randint(0, 1000)
+                self.data.split_the_data()  # shuffle data (shared among models)
             self.models[i].fit(**kwargs)
             self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
             if save:
                 self.models[i].save_class()
-                self.performance.save_pickle(self.hp_class.save_dir / "performance.pkl")
+                self.performance.save(self.hp_class.save_dir / "performance.List.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
