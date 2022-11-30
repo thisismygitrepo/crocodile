@@ -583,7 +583,7 @@ class Ensemble(tb.Base):
         self.data = None  # one data object for all models (so that it can fit in the memory)
         if hp_class and data_class and model_class:
             # only generate the dataset once and attach it to the ensemble to be reused by models.
-            self.data = self.data_class(hp_class())
+            self.data = self.data_class(hp_class(), load_trianing_data=True)
             print("Creating Models".center(100, "="))
             for i in tqdm(range(size)):
                 hp = self.hp_class()
