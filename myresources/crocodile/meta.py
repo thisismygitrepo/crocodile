@@ -132,7 +132,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             try:
                 config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str).lookup(host or self.username)
                 self.hostname, self.username, port, sshkey = config["hostname"], config["user"], config.get("port", port), tmp[0] if type(tmp := config.get("identityfile", sshkey)) is list else tmp
-            except KeyError: self.hostname = __import__("platform").node()
+            except (FileNotFoundError, KeyError): self.hostname = __import__("platform").node()
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
