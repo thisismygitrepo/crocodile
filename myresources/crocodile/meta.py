@@ -130,11 +130,13 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
         if self.hostname is None and "@" not in self.username:  # then, self.username is probably a Host profile
             try:
-                config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str).lookup(host or self.username)
-                self.hostname, self.username, port, sshkey = config["hostname"], config["user"], config.get("port", port), tmp[0] if type(tmp := config.get("identityfile", sshkey)) is list else tmp
+                config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str); config_dict = config.lookup(host or self.username)
+                self.hostname, self.username, port = config_dict["hostname"], config_dict["user"], config_dict.get("port", port)
+                if sshkey is not None: sshkey = tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
+                if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("*", sshkey)) is list else tmp
             except (FileNotFoundError, KeyError): self.hostname = __import__("platform").node()
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
-        self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
+        self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         print(f"Connecting to: "); Struct(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey).print(as_config=True)
         self.ssh.connect(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey)
