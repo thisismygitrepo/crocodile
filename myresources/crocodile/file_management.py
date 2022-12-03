@@ -16,8 +16,10 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
         assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
         salt, iteration = (__import__('secrets').token_bytes(16), iteration or __import__('secrets').randbelow(1_000_000)) if salted else (None, None); key = pwd2key(pwd, salt, iteration)
     elif key is None:
-        if gen_key: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); print(f"KEY SAVED @ {repr(P.tmp(folder='tmp_files').joinpath('key.bytes').write_bytes(key))}")  # discouraged, make your keys/pwd before invoking the func. use random bytes, more secure but no string representation
-        else: key = P("~/dotfiles/creds/data/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
+        if gen_key: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes').write_bytes(key)
+        else:
+            try: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
+            except FileNotFoundError as err: print("\n"*3, "~"*50, f"""Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~"*50, "\n"*3); raise FileNotFoundError(err)
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
@@ -65,11 +67,11 @@ def pkl(*args, **kwargs): return pickle(*args, **kwargs)
 class Read: read = read; mat = mat; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; toml = toml; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 
 
-def modify_text(raw, txt, alt, newline=True, notfound_append=False):
+def modify_text(raw, txt, alt, newline=True, notfound_append=False, prepend=False):
     lines, bingo = raw.split("\n"), False
     for idx, line in enumerate(lines):
         if txt in line: lines[idx], bingo = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line)), True
-    if bingo is False and notfound_append is True: lines.append(alt)  # txt not found, add it anyway.
+    if bingo is False and notfound_append is True: (lines.insert(0, alt) if prepend else lines.append(alt))  # txt not found, add it anyway.
     return "\n".join(lines)
 
 
@@ -123,9 +125,9 @@ class P(type(Path()), Path):
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
     def cache_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
-    def modify_text(self, txt, alt, newline=False, notfound_append=False, encoding=None):
+    def modify_text(self, txt, alt, newline=False, notfound_append=False, prepend=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt)
-        return self.write_text(modify_text(raw=self.read_text(encoding=encoding), txt=txt, alt=alt, newline=newline, notfound_append=notfound_append), encoding=encoding)
+        return self.write_text(modify_text(raw=self.read_text(encoding=encoding), txt=txt, alt=alt, newline=newline, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.

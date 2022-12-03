@@ -8,7 +8,7 @@ import sys
 P = tb.P
 L = tb.L
 
-system = platform.system()
+system = platform.system()  # Linux or Windows
 OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # PATH separator, this is special for PATH object, not to be confused with P.sep (normal paths), usually / or \
 env = tb.Struct(dict(os.environ)).clean_view
@@ -53,7 +53,12 @@ WIN_FROM_WSL = P(rf"/mnt/c/Users")
 OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
 OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
 OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
-OneDriveExe = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe") if LocalAppData else None
+if system == "Windows":
+    tmp1 = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe")
+    tmp2 = P(r"C:/Program Files/Microsoft OneDrive/OneDrive.exe")
+    OneDriveExe = tmp1 if tmp1.exists() else tmp2
+else: OneDriveExe = None
+
 
 DotFiles = P.home().joinpath("dotfiles")
 

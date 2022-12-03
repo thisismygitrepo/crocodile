@@ -219,6 +219,7 @@ class DataReader(tb.Base):
         return keys_ip
 
     def sample_dataset(self, aslice=None, indices=None, use_slice=False, split="test", idx=None, size=None):
+        assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
         keys_others = self.get_data_strings(which_data="others", which_split=split)
