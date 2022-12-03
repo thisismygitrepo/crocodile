@@ -125,12 +125,18 @@ class Terminal:
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
-    def __init__(self, username=None, hostname=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        username, hostname = username or __import__('os').getlogin(), hostname or __import__("platform").node()    # use localhost if nothing provided.
+    def __init__(self, username=None, hostname=None, host=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
+        username = username or __import__("getpass").getuser()  # Defaults: (1) use localhost if nothing provided.
         self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
+        if self.hostname is None and "@" not in self.username:  # then, self.username is probably a Host profile
+            try:
+                config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str).lookup(host or self.username)
+                self.hostname, self.username, port, sshkey = config["hostname"], config["user"], config.get("port", port), tmp[0] if type(tmp := config.get("identityfile", sshkey)) is list else tmp
+            except KeyError: self.hostname = __import__("platform").node()
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(sshkey) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        print(f"Connecting to: "); Struct(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey).print(as_config=True)
         self.ssh.connect(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey)
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. {err}")
@@ -145,7 +151,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
     def copy_env_var(self, name): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
-    def get_repr(self, which="remote", add_machine=False): return (f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")) if which == "remote" else f"{__import__('os').getlogin()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
+    def get_repr(self, which="remote", add_machine=False): return (f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")) if which == "remote" else f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def open_console(self, cmd='', new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", '-t' if cmd != '' else '', *f""" {self.get_repr('remote').replace(':', ' -p ')}""".split(" "), cmd, new_window=new_window, terminal=terminal)
