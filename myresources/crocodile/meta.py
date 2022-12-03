@@ -127,14 +127,13 @@ class Terminal:
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __init__(self, username=None, hostname=None, host=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         username = username or __import__("getpass").getuser()  # Defaults: (1) use localhost if nothing provided.
-        self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
-        if self.hostname is None and "@" not in self.username:  # then, self.username is probably a Host profile
+        if "@" not in username and hostname is None:  # then, username is probably a Host profile
             try:
-                config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str); config_dict = config.lookup(host or self.username)
-                self.hostname, self.username, port = config_dict["hostname"], config_dict["user"], config_dict.get("port", port)
-                if sshkey is not None: sshkey = tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
+                config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str); config_dict = config.lookup(host or username)
+                self.hostname, self.username, port, sshkey = config_dict["hostname"], config_dict["user"], config_dict.get("port", port), tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
                 if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("identityfile", sshkey)) is list else tmp
-            except (FileNotFoundError, KeyError): self.hostname = __import__("platform").node()
+            except (FileNotFoundError, KeyError): self.hostname, self.username = __import__("platform").node(), username
+        else: self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
