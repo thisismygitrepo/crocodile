@@ -2,9 +2,9 @@
 import crocodile.toolbox as tb
 
 
-def process_retrieved_file(path, decrypt=False, unzip=False, key=None, pwd=None):
+def process_retrieved_file(path: tb.P, decrypt=False, unzip=False, key=None, pwd=None, overwrite=True, merge=False):
     if decrypt: path = path.decrypt(key=key, pwd=pwd, inplace=True)
-    if unzip: path = path.unzip(inplace=True, verbose=True, overwrite=True, content=True)
+    if unzip: path = path.unzip(inplace=True, verbose=True, overwrite=True, content=True, merge=merge)
     return path
 
 
