@@ -67,11 +67,15 @@ def pkl(*args, **kwargs): return pickle(*args, **kwargs)
 class Read: read = read; mat = mat; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; toml = toml; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 
 
-def modify_text(raw, txt, alt, newline=True, notfound_append=False, prepend=False):
-    lines, bingo = raw.split("\n"), False
+def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append=False, prepend=False):
+    lines, bingo = txt_raw.split("\n"), False
+    if not replace_line:  # no need for line splitting
+        if txt_search in txt_raw: return txt_raw.replace(txt_search, txt_alt)
+        return txt_raw + "\n" +  txt_alt if notfound_append else txt_raw
     for idx, line in enumerate(lines):
-        if txt in line: lines[idx], bingo = (alt if type(alt) is str else alt(line)) if newline is True else line.replace(txt, alt if type(alt) is str else alt(line)), True
-    if bingo is False and notfound_append is True: (lines.insert(0, alt) if prepend else lines.append(alt))  # txt not found, add it anyway.
+        if txt_search in line:
+            lines[idx], bingo = txt_alt if type(txt_alt) is str else txt_alt(line), True
+    if bingo is False and notfound_append is True: (lines.insert(0, txt_alt) if prepend else lines.append(txt_alt))  # txt not found, add it anyway.
     return "\n".join(lines)
 
 
@@ -125,9 +129,9 @@ class P(type(Path()), Path):
     def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
     def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
     def cache_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
-    def modify_text(self, txt, alt, newline=False, notfound_append=False, prepend=False, encoding=None):
-        if not self.exists(): self.create(parents_only=True).write_text(txt)
-        return self.write_text(modify_text(raw=self.read_text(encoding=encoding), txt=txt, alt=alt, newline=newline, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
+    def modify_text(self, txt_search, txt_alt, replace_line=False, notfound_append=False, prepend=False, encoding=None):
+        if not self.exists(): self.create(parents_only=True).write_text(txt_search)
+        return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
     def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.

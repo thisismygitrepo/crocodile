@@ -60,7 +60,7 @@ class Save: json = json; yaml = yaml; toml = toml; ini = ini; csv = csv; npy = n
 
 # ====================================== Object Management ====================================
 class Base(object):
-    def __init__(self, *args, **kwargs): pass
+    def __init__(self, *args, **kwargs): _ = args, kwargs
     def __getstate__(self): return self.__dict__.copy()
     def __setstate__(self, state): self.__dict__.update(state)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
