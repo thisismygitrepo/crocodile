@@ -204,7 +204,7 @@ class DataReader(tb.Base):
         self.specs.other_shapes = []
 
         for an_arg, key in zip(args, strings):
-            a_shape = an_arg.iloc[0].shape if type(an_arg) is pd.DataFrame else np.array(an_arg[0]).shape
+            a_shape = an_arg.iloc[0].shape if type(an_arg) in {pd.DataFrame, pd.Series} else np.array(an_arg[0]).shape
             if key in ip_strings: self.specs.ip_shapes.append(a_shape)
             elif key in op_strings: self.specs.op_shapes.append(a_shape)
             elif key in others_string: self.specs.other_shapes.append(a_shape)
@@ -236,7 +236,7 @@ class DataReader(tb.Base):
         x, y, others = [], [], []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp = self.split[key]
-            item = tmp.iloc[selection] if type(tmp) is pd.DataFrame else tmp[selection]
+            item = tmp.iloc[selection] if type(tmp) in {pd.DataFrame, pd.Series} else tmp[selection]
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
@@ -542,19 +542,20 @@ class BaseModel(ABC):
         if ip is None:
             if sample_dataset: ip, _, _ = self.data.sample_dataset()
             else: ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
-        op = self.model(inputs=ip[0] if len(ip) == 1 else ip)  # op
-        op = list(op) if len(keys_op) > 1 else [op]
+        op = self.model(inputs=ip)
+        ops = [op] if len(keys_op) == 1 else op
+        ips = [ip] if len(keys_ip) == 1 else ip
         if verbose:
             print("\n")
             print("Build Test".center(50, '-'))
             print(f"Input shapes:")
-            tb.Struct.from_keys_values(keys_ip, tb.L(ip).apply(lambda x: x.shape)).print(as_config=True)
+            tb.Struct.from_keys_values(keys_ip, tb.L(ips).apply(lambda x: x.shape)).print(as_config=True)
             print(f"Output shape:")
-            tb.Struct.from_keys_values(keys_op, tb.L(op).apply(lambda x: x.shape)).print(as_config=True)
+            tb.Struct.from_keys_values(keys_op, tb.L(ops).apply(lambda x: x.shape)).print(as_config=True)
             print("\n\nStats on output data for random normal input:")
             try:
                 res = []
-                for item_str, item_val in zip(keys_ip + keys_op, list(ip) + list(op)):
+                for item_str, item_val in zip(keys_ip + keys_op, list(ips) + list(ops)):
                     a_df = pd.DataFrame(np.array(item_val).flatten()).describe().rename(columns={0: item_str})
                     res.append(a_df)
                 print(pd.concat(res, axis=1))
