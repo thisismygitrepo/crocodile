@@ -219,7 +219,7 @@ def get_repr(data, justify=15, limit=float('inf'), direc="<") -> str:
     return f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
 def print_string_list(mylist, char_per_row=125, sep=" ", style=str, _counter=0):
     for item in mylist: print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
-class Display: set_pandas_display = set_pandas_display; set_pandas_auto_width = set_pandas_auto_width; config = config; f = f; eng = eng; outline = outline; get_repr = get_repr; print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
+class Display: set_pandas_display = set_pandas_display; set_pandas_auto_width = set_pandas_auto_width; set_numpy_display = set_numpy_display; config = config; f = f; eng = eng; outline = outline; get_repr = get_repr; print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
 
 
 if __name__ == '__main__':
