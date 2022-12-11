@@ -218,7 +218,7 @@ class DataReader(tb.Base):
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice=None, indices=None, use_slice=False, split="test", idx=None, size=None):
+    def sample_dataset(self, aslice=None, indices=None, use_slice=False, split="test", size=None):
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
@@ -229,7 +229,6 @@ class DataReader(tb.Base):
 
         if indices is not None: selection = indices
         elif aslice is not None: selection = aslice
-        elif idx is not None: selection = slice(idx, idx + 1)
         elif use_slice: selection = slice(start_idx, start_idx + select_size)  # ragged tensors don't support indexing, this can be handy in that case.
         else: selection = np.random.choice(ds_size, size=select_size, replace=False)
 
@@ -328,6 +327,7 @@ class BaseModel(ABC):
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = tb.List() if history is None else history  # should be populated in fit method, or loaded up.
         self.plotter = FigureSave.NullAuto
+        self.fig = None
         self.kwargs = None
         self.tmp = None
 
@@ -398,7 +398,7 @@ class BaseModel(ABC):
 
     def postprocess(self, *args, **kwargs): return self.data.postprocess(*args, **kwargs)
     def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
-    def viz(self, *args, **kwargs): self.data.viz(*args, **kwargs)
+    def viz(self, *args, **kwargs): return self.data.viz(*args, **kwargs)
     def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
     @staticmethod
@@ -434,9 +434,9 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, idx=None, split="test", viz=True, **kwargs):
+    def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, split="test", viz=True, **kwargs):
         if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size, idx=idx)
+            x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None: names_test = np.arange(len(x_test))
         # ==========================================================================
         y_pred = self.infer(x_test)
@@ -452,7 +452,7 @@ class BaseModel(ABC):
             loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
             names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
-            self.viz(y_pred_pp, y_true_pp, names=names, **kwargs)
+            self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **kwargs)
         return results
 
     def get_metrics_evaluations(self, prediction, groun_truth) -> pd.DataFrame or None:
