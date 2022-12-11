@@ -56,7 +56,7 @@ class DataReader(dl.DataReader):
         if profile_df: self.profile_dataframe(df=self.dataset.x)
         self.split_the_data(self.dataset.x, self.dataset.y, self.dataset.names, ip_strings=['x'], op_strings=["y"], others_string=["idx"])
 
-    def viz(self, y_true, y_pred, names):
+    def viz(self, y_pred, y_true, names):
         import matplotlib.pyplot as plt
         from crocodile.matplotlib_management import FigureManager
         fig, ax = plt.subplots(figsize=(14, 10))

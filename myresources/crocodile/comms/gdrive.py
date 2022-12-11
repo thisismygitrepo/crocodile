@@ -189,10 +189,12 @@ class GDriveAPI:
         return parent_id
 
 
-"""Tip: folders and files on G drive have unique ID that is not the name. Thus, there can be multiple files with same name. 
+"""
+Tip: folders and files on G drive have unique ID that is not the name. Thus, there can be multiple files with same name. 
 This can cause seemingly confusing behaviour if the user continues to rely on names rather than IDs. 
 Folders in trash bin are particularly confusing as the trash bin is nothing but another folder and thus,
-user can still access it and populate it, etc. This action taking place in rubbish bin might not be noticed when inspecting Gdrive via web."""
+user can still access it and populate it, etc. This action taking place in rubbish bin might not be noticed when inspecting Gdrive via web.
+"""
 
 
 

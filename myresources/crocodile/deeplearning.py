@@ -370,7 +370,7 @@ class BaseModel(ABC):
         self.history.append(tb.Struct(copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
-            artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/loss_curve_{tb.randstr()}.png").create(parents_only=True))
+            artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/loss_curve.png").append(index=True).create(parents_only=True))
         return self
 
     def switch_to_sgd(self, epochs=10):
@@ -411,7 +411,10 @@ class BaseModel(ABC):
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
     def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-    def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, title="Loss Curve", xlabel="epochs", **kwargs)
+    def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, title="Loss Curve",
+                                                                                             xlabel="epochs",
+                                                                                             ylabel=self.compiler.loss.name if hasattr(self.compiler.loss, "name") else self.compiler.loss.__name__,
+                                                                                             **kwargs)
 
     def infer(self, x):
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
