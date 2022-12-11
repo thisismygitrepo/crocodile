@@ -118,7 +118,7 @@ class GDriveAPI:
             if rel2home:
                 fpath = tb.P(fpath).expanduser().absolute()
                 local_dir = fpath.parent
-                fpath = tb.P("myhome") / fpath.rel2home()
+                fpath = tb.get_env().myhome / fpath.rel2home()
             if unzip: fpath = (fpath + ".zip") if ".zip" not in str(fpath) else fpath
             if decrypt: fpath = (fpath + ".enc") if ".enc" not in str(fpath) else fpath
             fid = self.get_id_from_path(fpath)
@@ -139,7 +139,7 @@ class GDriveAPI:
 
     def upload(self, local_path, remote_dir="", overwrite=True, share=False, rel2home=False, zip_first=False, encrypt_first=False, key=None, pwd=None):
         local_path = process_sent_file(file=local_path, zip_first=zip_first, encrypt_first=encrypt_first, key=key, pwd=pwd)
-        if rel2home: remote_dir = tb.P("myhome").joinpath(local_path.rel2home().parent)
+        if rel2home: remote_dir = tb.get_env().myhome.joinpath(local_path.rel2home().parent)
         else: remote_dir = tb.P(remote_dir)
         try: self.get_id_from_path(remote_dir)
         except AssertionError as ae:

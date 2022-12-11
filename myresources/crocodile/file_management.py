@@ -224,10 +224,10 @@ class P(type(Path()), Path):
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self
     def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
-    def symlink_from(self, folder=None, file=None, verbose=False, overwrite=False):
+    def symlink_from(self, src_folder=None, src_file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
-        if file is not None: assert folder is None, "You can only pass source or source_dir, not both."; result = P(file).expanduser().absolute()
-        else: result = P(folder or P.cwd()).expanduser().absolute() / self.name
+        if src_file is not None: assert src_folder is None, "You can only pass source or source_dir, not both."; result = P(src_file).expanduser().absolute()
+        else: result = P(src_folder or P.cwd()).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
     def symlink_to(self, target=None, verbose=True, overwrite=False, orig=False):
         self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."

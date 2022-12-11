@@ -9,6 +9,8 @@ P = tb.P
 L = tb.L
 
 system = platform.system()  # Linux or Windows
+myhome = tb.P(f"myhome/{platform.system().lower()}")
+
 OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # PATH separator, this is special for PATH object, not to be confused with P.sep (normal paths), usually / or \
 env = tb.Struct(dict(os.environ)).clean_view
