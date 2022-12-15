@@ -172,7 +172,9 @@ class P(type(Path()), Path):
     def __sub__(self, other): res = P(str(self).replace(str(other), "")); return res[1:] if str(res[0]) in {"\\", "/"} else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
-    def collapseuser(self, strict=True): assert str(P.home()).lower() in str(self.expanduser().absolute()).lower(), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}") if strict else None; return self if "~" in self else self._return("~" / (self.expanduser().absolute() - P.home()))    # opposite of `expanduser`
+    def collapseuser(self, strict=True):
+        if strict: assert str(P.home()).lower() in str(self.expanduser().absolute()).lower(), ValueError(f"{str(P.home())} is not in the subpath of {str(self)}")
+        return self if "~" in self else self._return("~" / (self.expanduser().absolute() - P.home()))    # opposite of `expanduser`
     def __getitem__(self, slici): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
     def __setitem__(self, key: str or int or slice, value: str or Path):
         fullparts, new = list(self.parts), list(P(value).parts)
@@ -298,6 +300,7 @@ class P(type(Path()), Path):
     def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False): return self.ungz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False): return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False): return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False): raise NotImplementedError("Not implemented yet.")
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name+suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))

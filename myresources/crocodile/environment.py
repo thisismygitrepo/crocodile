@@ -136,8 +136,10 @@ class PathVar:
     def append_temporarily(dirs, kind="append", run=False):
         dirs_ = []
         for path in dirs:
-            if tb.P(path) in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
-            else: dirs_.append(str(path))
+            path = tb.P(path).collapseuser(strict=False)
+            path = path.as_posix() if system == "Linux" else str(path)
+            if path in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+            else: dirs_.append(path)
         dirs = dirs_
         if len(dirs) == 0: return ""
 

@@ -83,7 +83,7 @@ class Terminal:
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return self.Response.from_completed_process(resp)
     @staticmethod
-    def is_user_admin():  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
+    def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name == 'nt':
             try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
             except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
