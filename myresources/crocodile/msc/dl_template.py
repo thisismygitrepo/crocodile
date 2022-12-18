@@ -52,7 +52,9 @@ class DataReader(dl.DataReader):
         return dict(zip(items, [getattr(self, item) for item in items]))
 
     def load_trianing_data(self, profile_df=False):
-        self.dataset = tb.Struct(x=np.random.randn(1000, 10), y=np.random.randn(1000, 1), names=np.arange(1000))
+        self.dataset = tb.Struct(x=np.random.randn(1000, 10).astype(self.hp.precision),
+                                 y=np.random.randn(1000, 1).astype(self.hp.precision),
+                                 names=np.arange(1000))
         if profile_df: self.profile_dataframe(df=self.dataset.x)
         self.split_the_data(self.dataset.x, self.dataset.y, self.dataset.names, ip_strings=['x'], op_strings=["y"], others_string=["idx"])
 
