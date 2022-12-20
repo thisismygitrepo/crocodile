@@ -8,3 +8,5 @@ pypi = r"https://pypi.org/project/crocodile"
 release_notes = """
 Minor fixes
 """
+
+# github workflow, push latest changes, make new tag, push tag, and github action will automatically push new release to pypi.
