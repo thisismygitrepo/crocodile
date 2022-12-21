@@ -173,10 +173,8 @@ class P(type(Path()), Path):
     def rel2cwd(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
     def collapseuser(self, strict=True):
-        home_str, slf_str = str(P.home()), str(self.expanduser().absolute())
-        if __import__("platform").system() == "Windows": home_str, slf_str = home_str.lower(), slf_str.lower()
         if strict: assert home_str in slf_str, ValueError(f"`{home_str}` is not in the subpath of `{slf_str}`")
-        return self if "~" in self else self._return("~" / (P(slf_str) - P(home_str)))    # opposite of `expanduser`
+        return self if "~" in self else self._return("~" / (self.expanduser().absolute().resolve(strict=strict) - P.home()))    # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
     def __getitem__(self, slici): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
     def __setitem__(self, key: str or int or slice, value: str or Path):
         fullparts, new = list(self.parts), list(P(value).parts)

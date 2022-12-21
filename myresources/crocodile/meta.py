@@ -121,7 +121,7 @@ class Terminal:
     @staticmethod
     def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}""")
     @staticmethod
-    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(50, '=')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(50, '=')}\n"""
+    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(50, '-')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(50, '-')}\n"""
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric

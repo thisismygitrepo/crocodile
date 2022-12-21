@@ -82,6 +82,7 @@ def run_on_cluster(func, kwargs=None, return_script=True,
                    notify_upon_completion=False, to_email=None, email_config_name=None,
                    machine_specs=None,
                    ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, cloud=False):
+
     if type(func) is str or type(func) is tb.P: func_file, func = tb.P(func), None
     elif "<class 'module'" in str(type(func)): func_file, func = tb.P(func.__file__), None
     else: func_file = tb.P(func.__code__.co_filename)
