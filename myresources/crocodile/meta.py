@@ -65,7 +65,12 @@ class Terminal:
         def op_if_successfull_or_default(self, strict_returcode=True, strict_err=False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print(self, desc="TERMINAL CMD", capture=True): self.capture() if capture else None; print((desc or self.desc).center(80, "=")); print(f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]) + "\n" + ('COMPLETED '+(desc or self.desc)).center(80, "="), "\n\n"); return self
+        def print(self, desc="TERMINAL CMD", capture=True):
+            self.capture() if capture else None
+            # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
+            txt = f"Input Command:\n{'~'*40}\n" + f"{self.input}" + f"\n{'~'*40}\nTerminal Response:\n" + "\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())])
+            con = install_n_import("rich").console.Console(); from rich.panel import Panel; con.print(Panel(txt, title=(desc or self.desc)), style="bold cyan on black")
+            print("\n\n"); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         self.available_consoles, self.machine = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"], __import__("platform").system()
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
@@ -121,7 +126,7 @@ class Terminal:
     @staticmethod
     def replicate_session(cmd=""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}""")
     @staticmethod
-    def get_header(wdir=None): return f"""\n# {'Code prepended'.center(50, '-')}\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# {'End of header, start of script passed'.center(50, '-')}\n"""
+    def get_header(wdir=None): return f"""\n# >> Code prepended\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# >> End of header, start of script passed\n"""
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
@@ -137,7 +142,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        print(f"Connecting to: "); Struct(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey).print(as_config=True)
+        install_n_import("rich").inspect(Struct(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey), value=False, title="SSHing To", docs=False, sort=False)
         self.ssh.connect(hostname=self.hostname, username=self.username, password=pwd, port=self.port, key_filename=self.sshkey)
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. {err}")

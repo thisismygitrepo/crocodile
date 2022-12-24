@@ -16,7 +16,9 @@ import numpy as np
 import pandas as pd
 import platform
 import random
+from rich import pretty, inspect  # , Console, progress, traceback, print
 
+pretty.install()
 
 D = Display; L = List; E = Experimental; S = Struct
 
