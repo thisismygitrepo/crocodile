@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-st = tb.P.home().joinpath("dotfiles/msc/source_of_truth.py").readit()
+st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
 
 """
 
