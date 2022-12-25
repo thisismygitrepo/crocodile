@@ -16,16 +16,21 @@ import numpy as np
 import pandas as pd
 import platform
 import random
-from rich import pretty, inspect  # , Console, progress, traceback, print
+from rich import pretty, inspect, progress, traceback, print
+from rich.text import Text
+from rich.console import Console
 
+console = Console()
 pretty.install()
 
-D = Display; L = List; E = Experimental; S = Struct
-
-
-print(f"Crocodile Shell {__import__('crocodile').__version__}. Python {platform.python_version()} On {platform.system()}.")
+_ = f"Crocodile Shell {__import__('crocodile').__version__} with Python {platform.python_version()} On {platform.system()}."
+_ = Text(_); _.stylize("bold blue")
+console.rule(_, style="bold red", align="center")
 # link to tutorial or github
 print(f"Made with ❤️")
+
+
+D = Display; L = List; E = Experimental; S = Struct
 
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
 if platform.system() == "Windows": print(__.read_text())
