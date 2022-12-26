@@ -46,7 +46,7 @@ console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
 
 console.print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}", style="bold blue")
-inspect(kwargs, value=False, title="kwargs", docs=False, sort=False)
+inspect(kwargs, value=False, title=f"kwargs from `{kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
 # EXTRA-PLACEHOLDER-POST
@@ -88,7 +88,7 @@ print("\n" * 1)
 
 tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
-Executed via run_on_cluster with:
+Job executed via run_on_cluster with:
 {ssh_repr}
 
 py_script_path @ `{py_script_path.collapseuser()}`

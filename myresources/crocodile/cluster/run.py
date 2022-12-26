@@ -1,6 +1,10 @@
 
 import crocodile.toolbox as tb
 from crocodile.cluster import meta_handling as meta
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich import inspect
+from rich.console import Console
 
 
 def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh: tb.SSH = None,
@@ -32,7 +36,8 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
         else: executed_obj = f"""File *{tb.P(repo_path).joinpath(file).collapseuser().as_posix()}*"""  # for email.
         meta_kwargs = dict(addressee=ssh.get_repr("local", add_machine=True),
                            speaker=ssh.get_repr('remote', add_machine=True),
-                           executed_obj=executed_obj, ssh_username=ssh.username, ssh_hostname=ssh.hostname,
+                           ssh_conn_string=ssh.get_repr('remote', add_machine=False),
+                           executed_obj=executed_obj,
                            job_id=job_id,
                            to_email=to_email, email_config_name=email_config_name)
         py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
@@ -62,11 +67,10 @@ deactivate
     # only available in py 3.10:
     # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
     with open(file=shell_script_path.create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()]) as file: file.write(shell_script)
-    tb.Save.pickle(obj=kwargs, path=kwargs_path)
+    tb.Save.pickle(obj=kwargs, path=kwargs_path, verbose=False)
 
-    print("\n\n")
-    print(f"prepared shell script".center(80, "="), '\n', repr(tb.P(shell_script_path)), "\n" * 2)
-    print(f"prepared python script".center(80, "="), '\n', repr(tb.P(py_script_path)), "\n" * 2)
+    Console().print(Panel(Syntax(shell_script, lexer="ps1" if ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
+    Console().print(inspect(tb.Struct(shell_script=repr(tb.P(shell_script_path)), python_script=repr(tb.P(py_script_path)), kwargs_file=repr(tb.P(kwargs_path))), title="Prepared scripts and files.", value=False, docs=False, sort=False))
     return shell_script_path, py_script_path, kwargs_path
 
 
@@ -145,7 +149,7 @@ def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=dict(host="p51s"), update_essential_repos=True,
-                         notify_upon_completion=False, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
+                         notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                          copy_repo=True, update_repo=False, wrap_in_try_except=True,
                          ipython=True, interactive=True, cloud=False)
     return ssh
