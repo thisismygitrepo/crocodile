@@ -37,19 +37,13 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
                            to_email=to_email, email_config_name=email_config_name)
         py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
 
-    update_essential_repos_string = """
-echo "Updating machineconfig repo"
-cd ~/code/machineconfig; git pull
-echo "Updating crocodile repo"
-cd ~/code/crocodile; git pull
-"""
     shell_script = f"""
 
 # EXTRA-PLACEHOLDER-PRE
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {ssh.remote_env_cmd}
-{update_essential_repos_string if update_essential_repos else ''}
+{ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; print(x.main())").op if update_essential_repos else ''}
 {f'cd {tb.P(repo_path).collapseuser().as_posix()}'}
 {'git pull' if update_repo else ''}
 {'pip install -e .' if install_repo else ''}
