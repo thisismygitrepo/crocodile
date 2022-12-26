@@ -39,7 +39,7 @@ except Exception as e:
 
 def get_execution_line(func_name, rel_full_path):
     if func_name is not None: return f"""
-res = module.{func_name}(**kwargs.dict)
+res = module.{func_name}(**kwargs.__dict__)
 """
     return f"""
 res = None  # in case the file did not define it.

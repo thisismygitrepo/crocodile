@@ -4,6 +4,12 @@ import getpass
 import platform
 import crocodile.toolbox as tb
 from importlib.machinery import SourceFileLoader
+from rich.console import Console
+from rich.panel import Panel
+from rich import inspect
+from rich.text import Text
+
+console = Console()
 
 # EXTRA-PLACEHOLDER-PRE
 
@@ -34,11 +40,13 @@ shell_script_path = tb.P(rf'{shell_script_path}').expanduser().absolute()
 
 tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()
+
 print("\n" * 2)
-print("PYTHON EXECUTION SCRIPT".center(75, "*"), "\n" * 2)
-print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}")
-print(f"kwargs : ")
-_ = kwargs.print(as_config=True)
+console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
+print("\n" * 2)
+
+console.print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}", style="bold blue")
+inspect(kwargs, value=False, title="kwargs", docs=False, sort=False)
 print("\n" * 2)
 
 # EXTRA-PLACEHOLDER-POST
@@ -61,7 +69,8 @@ else:
 # ######################### END OF EXECUTION #############################
 
 print("\n" * 2)
-print("FINISHED PYTHON EXECUTION SCRIPT".center(75, "*"), "\n" * 2)
+console.rule(title="FINISHED PYTHON EXECUTION SCRIPT", characters="-", style="bold red")
+print("\n" * 2)
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
@@ -73,8 +82,7 @@ time_at_execution_end = tb.datetime.utcnow()
 delta = time_at_execution_end - time_at_execution_start
 exec_times = tb.S(start=time_at_execution_start, end=time_at_execution_end, delta=delta)
 
-print('Execution Times:')
-exec_times.print(as_config=True, justify=25)
+inspect(exec_times, value=False, title="Execution Times", docs=False, sort=False)
 print("\n" * 1)
 
 
@@ -92,7 +100,6 @@ Execution Time:
 ''')
 
 ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
-print(f'''
-Pull results using croshell with this script:
-``` ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r ``` 
-''')
+console.print(Panel(Text(f'''
+ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 
+''', style="bold blue on white"), title="Pull results using croshell with this script:", border_style="bold red"))
