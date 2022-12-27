@@ -150,7 +150,7 @@ def try_main():
     from crocodile.cluster import trial_file
     ssh = run_on_cluster(trial_file.expensive_function, machine_specs=dict(host="p51s"), update_essential_repos=True,
                          notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
-                         copy_repo=True, update_repo=False, wrap_in_try_except=True,
+                         copy_repo=False, update_repo=False, wrap_in_try_except=True,
                          ipython=True, interactive=True, cloud=False)
     return ssh
 
