@@ -361,8 +361,8 @@ def ungz(self, op_path=None):
     return P(op_path)
 def xz(self, op_path):
     with __import__("lzma").open(op_path, "w") as f: f.write(self)
-def unxz(file, op_path):
-    with __import__("lzma").open(file, mode='rb') as file: P(op_path).write_bytes(file.read())
+def unxz(ip_path, op_path):
+    with __import__("lzma").open(ip_path) as file: P(op_path).write_bytes(file.read())
 def tar(self, op_path):
     with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(self), arcname=__import__("os").path.basename(str(self)))
     return P(op_path)

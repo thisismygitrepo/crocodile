@@ -1,6 +1,6 @@
 
 
-"""
+"""Crocodile Shell
 """
 
 import argparse
@@ -41,7 +41,7 @@ else:
             from crocodile.msc.ascii_art import get_art
             artlib = random.choice(['boxes', 'cowsay'])
             get_art("crocodile", calliagraphy=None, artlib=artlib, file=(__ := P.tmpfile("croco_art", folder="tmp_arts")), verbose=False)
-        os.system(f"cat {__} | /usr/games/lolcat")
+        os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
     except: print(__.read_text())
 
 
