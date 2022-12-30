@@ -23,11 +23,11 @@ from rich.console import Console
 console = Console()
 pretty.install()
 
-_ = f"Crocodile Shell {__import__('crocodile').__version__} with Python {platform.python_version()} On {platform.system()}."
+_ = f"Python {platform.python_version()} in VE `{os.getenv('VIRTUAL_ENV')}` On {platform.system()}."
 _ = Text(_); _.stylize("bold blue")
 console.rule(_, style="bold red", align="center")
 # link to tutorial or github
-print(f"Made with ❤️")
+print(f"Crocodile Shell {__import__('crocodile').__version__}\nMade with ❤️")
 
 
 D = Display; L = List; E = Experimental; S = Struct

@@ -90,6 +90,10 @@ class DBMS:
         with self.eng.begin() as conn: result = conn.execute(text(command))
         return result if not df else pd.DataFrame(result)
 
+    def execute_script(self, command, df=False):
+        with self.eng.begin() as conn: result = conn.executescript(text(command))
+        return result if not df else pd.DataFrame(result)
+
     # ========================== TABLES =====================================
     def read_table(self, table, sch=None, size=100):
         res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
