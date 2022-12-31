@@ -5,6 +5,10 @@
 
 import argparse
 import os
+import random
+from rich import pretty, inspect, progress, traceback, print
+from rich.text import Text
+from rich.console import Console
 
 from crocodile.core import *
 from crocodile.file_management import *
@@ -15,10 +19,7 @@ import crocodile.toolbox as tb
 import numpy as np
 import pandas as pd
 import platform
-import random
-from rich import pretty, inspect, progress, traceback, print
-from rich.text import Text
-from rich.console import Console
+
 
 console = Console()
 pretty.install()
@@ -27,9 +28,13 @@ _ = f"Python {platform.python_version()} in VE `{os.getenv('VIRTUAL_ENV')}` On {
 _ = Text(_); _.stylize("bold blue")
 console.rule(_, style="bold red", align="center")
 # link to tutorial or github
-print(f"Crocodile Shell {__import__('crocodile').__version__}\nMade with ❤️")
+_ = Text(f"Crocodile Shell")
+_.stylize("#93e6c7 on #093006")
+print(_, __import__('crocodile').__version__)
+print("Made with ❤️")
 
-
+tb.D.set_numpy_display()
+tb.D.set_pandas_display()
 D = Display; L = List; E = Experimental; S = Struct
 
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
