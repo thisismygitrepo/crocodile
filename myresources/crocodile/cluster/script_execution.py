@@ -31,6 +31,7 @@ ssh_repr = ""
 ssh_repr_remote = ""
 py_script_path = ""
 shell_script_path = ""
+description = ""
 error_message = "No error message."
 
 repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
@@ -97,6 +98,9 @@ kwargs_path @ `{kwargs_path.collapseuser()}`
 
 Execution Time:
 {exec_times.print(as_config=True, return_str=True)}
+
+{description}
+
 ''')
 
 ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.

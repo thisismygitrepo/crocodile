@@ -46,7 +46,7 @@ def read(path, **kwargs):
     except AttributeError as err:
         if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err)
         if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-        raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`")
+        raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}")
 def json(path, r=False, **kwargs):
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.

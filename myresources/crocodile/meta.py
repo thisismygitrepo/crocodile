@@ -129,9 +129,10 @@ class Terminal:
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
-    def __init__(self, username=None, hostname=None, host=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
+    def __init__(self, username=None, hostname=None, host=None, tmate_sess=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         username = username or __import__("getpass").getuser()  # Defaults: (1) use localhost if nothing provided.
-        if "@" not in username and hostname is None:  # then, username is probably a Host profile
+        if tmate_sess is not None: pass
+        elif "@" not in username and hostname is None:  # then, username is probably a Host profile
             try:
                 config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str); config_dict = config.lookup(host or username)
                 self.hostname, self.username, port, sshkey = config_dict["hostname"], config_dict["user"], config_dict.get("port", port), tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp

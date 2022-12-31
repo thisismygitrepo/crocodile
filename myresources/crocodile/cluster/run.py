@@ -10,7 +10,7 @@ from rich.console import Console
 def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh: tb.SSH = None,
                 notify_upon_completion=False, to_email=None, email_config_name=None,
                 ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, install_repo=False,
-                update_essential_repos=False):
+                update_essential_repos=False, description=""):
     job_id = tb.randstr()
     kwargs = kwargs or tb.S()
     py_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__{tb.P(file).stem}__{func.__name__ if func is not None else ''}__{job_id}.py").create(parents_only=True)
@@ -28,7 +28,7 @@ def get_scripts(repo_path, file, func=None, kwargs=None, update_repo=False, ssh:
                        kwargs_path=kwargs_path.collapseuser().as_posix(),
                        repo_path=repo_path.collapseuser().as_posix(),
                        func_name=func_name, func_module=func_module, rel_full_path=rel_full_path,
-                       job_id=job_id, )
+                       job_id=job_id, description=description)
     py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path)
 
     if notify_upon_completion:
@@ -74,11 +74,13 @@ deactivate
     return shell_script_path, py_script_path, kwargs_path
 
 
+# class Cluster:
+
 def run_on_cluster(func, kwargs=None, return_script=True,
                    copy_repo=False, update_repo=False, update_essential_repos=True,
                    data=None,
                    notify_upon_completion=False, to_email=None, email_config_name=None,
-                   machine_specs=None,
+                   machine_specs=None, ssh=None, description="",
                    ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, cloud=False):
 
     if type(func) is str or type(func) is tb.P: func_file, func = tb.P(func), None
@@ -90,9 +92,9 @@ def run_on_cluster(func, kwargs=None, return_script=True,
         func_relative_file = func_file.relative_to(repo_path)
     except: repo_path, func_relative_file = func_file.parent, func_file.name
 
-    ssh = tb.SSH(**machine_specs)
+    ssh = ssh or tb.SSH(**machine_specs)
     shell_script_path, py_script_path, kwargs_path = get_scripts(repo_path, func_relative_file, func, kwargs=kwargs,
-                                                                 update_repo=update_repo, ssh=ssh,
+                                                                 update_repo=update_repo, ssh=ssh, description=description,
                                                                  notify_upon_completion=notify_upon_completion,
                                                                  to_email=to_email, email_config_name=email_config_name,
                                                                  wrap_in_try_except=wrap_in_try_except,
@@ -130,6 +132,7 @@ api = GDriveAPI()
         ssh.copy_from_here(py_script_path)
         ssh.copy_from_here(shell_script_path)
         ssh.copy_from_here(kwargs_path)
+        ssh.run(f"echo '{shell_script_path}' > ~/cluster_script.ps1" if ssh.get_remote_machine() == "Windows" else f"echo '{shell_script_path}' > ~/cluster_script.sh")
         if copy_repo: ssh.copy_from_here(repo_path, zip_first=True, overwrite=True)
         if data is not None: tb.L(data).apply(lambda x: ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
         ssh.print_summary()
