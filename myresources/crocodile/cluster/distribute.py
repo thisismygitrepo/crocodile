@@ -4,6 +4,10 @@ import numpy as np
 import crocodile.toolbox as tb
 from math import ceil
 from crocodile.cluster.remote_machine import Machine, Definition
+from rich.console import Console
+
+
+console = Console()
 
 
 class Cluster:
@@ -31,27 +35,8 @@ class Cluster:
             self.generate_standard_kwargs()
             self.viz_load_ratios()
         else: self.func_kwargs_list = func_kwargs_list
+
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in self.machines])
-    def submit(self):
-        for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
-            m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id, **self.kwargs)
-            m.run()
-            self.machines.append(m)
-
-    def mux_consoles(self):
-        cmd = ""
-        for idx, m in enumerate(self.machines):
-            if idx == 0: cmd += f""" wt pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
-            else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
-        tb.Terminal().run_async(*cmd.split(" "))
-
-    def check_submissions(self):
-        res = tb.L(self.machines).apply(lambda machine: machine.check_submission())
-        for results_folder, a_m in zip(res, self.machines):
-            if results_folder is not None:
-                target = results_folder.parent.append(f"_cluster_{self.job_id}").joinpath(results_folder.append(f"_cluster_{tb.randstr()}").name)
-                a_m.ssh.copy_to_here(results_folder, target=target, r=True, zip_first=False)
-                a_m.results_downloaded = True
 
     def generate_standard_kwargs(self):
         cpus = []
@@ -85,9 +70,36 @@ class Cluster:
         plt.simple_bar(names, self.load_ratios, width=100, title=f"Load distribution for machines using criterion `{self.criterion_name}`")
         plt.show()
 
-        load_ratios_repr = tb.S(dict(zip(names, tb.L((self.load_ratios * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
-        print(load_ratios_repr)
-        return load_ratios_repr
+        self.load_ratios_repr = tb.S(dict(zip(names, tb.L((self.load_ratios * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
+        print(self.load_ratios_repr)
+
+    def submit(self):
+        for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
+            m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id, **self.kwargs)
+            m.run()
+            self.machines.append(m)
+
+    def mux_consoles(self):
+        cmd = ""
+        for idx, m in enumerate(self.machines):
+            if idx == 0: cmd += f""" wt pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
+            else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
+        tb.Terminal().run_async(*cmd.split(" "))
+
+    def check_submissions(self):
+        tb.L(self.machines).apply(lambda machine: machine.check_submission())
+
+    def download_results(self, delete_remote=True):
+        for idx, a_m in enumerate(self.machines):
+            results_folder = a_m.results_path
+            if results_folder is not None:
+                target = results_folder.append(f"_cluster_job_id__{self.job_id}").joinpath(results_folder.append(f"_cluster_{idx}__{tb.randstr()}").name)
+                print("\n")
+                console.rule(f"Downloading results from {a_m}")
+                print("\n")
+                a_m.ssh.copy_to_here(results_folder.as_posix(), target=target, r=True, zip_first=False)
+                a_m.results_downloaded = True
+                if delete_remote: a_m.ssh.run_py(f"tb.P(r'{results_folder.as_posix()}').delete(sure=True)", verbose=False)
 
     def save(self, name=None):
         tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
@@ -97,8 +109,17 @@ class Cluster:
 
 def try_it():
     machine_specs_list = [dict(host="p51s"), dict(host="thinkpad"), dict(port=2224), dict(host="surface_wsl")]
-    sc = Cluster(machine_specs_list=machine_specs_list, max_num=1532)
-    return sc
+    c = Cluster(machine_specs_list=machine_specs_list, max_num=1532)
+    print(c)
+    c.generate_standard_kwargs()
+    c.submit()
+    c.save("name")
+
+    # later ...
+    c = Cluster.load("name")
+    c.check_submissions()
+    c.download_results(delete_remote=True)
+    return c
 
 
 if __name__ == '__main__':

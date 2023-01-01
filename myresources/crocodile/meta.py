@@ -62,7 +62,7 @@ class Terminal:
         err = property(lambda self: self.output["stderr"])
         returncode = property(lambda self: self.output["returncode"])
         def op2path(self, strict_returcode=True, strict_err=False) -> P or None:
-            return (self.op.rstrip()) if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else None
+            return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else None
         def op_if_successfull_or_default(self, strict_returcode=True, strict_err=False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
@@ -70,7 +70,7 @@ class Terminal:
             self.capture() if capture else None; con = install_n_import("rich").console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
             tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
             txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]), style="white")
-            con.print(Panel(txt, title=(desc or self.desc)), style="bold cyan on black"); return self
+            con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black")); return self
     def __init__(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, elevated=False):
         self.available_consoles, self.machine = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"], __import__("platform").system()
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
@@ -182,7 +182,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if zip_first: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}"); source.delete(sure=True); return resp
     def copy_to_here(self, source, target=None, zip_first=False, r=False) -> P:
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
-            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True)", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", strict_returncode=True, strict_err=True).op2path()
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''

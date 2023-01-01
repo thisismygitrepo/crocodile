@@ -72,6 +72,8 @@ class Machine:
         # flags
         self.submitted = False
         self.results_downloaded = False
+        self.results_path = None
+
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
     def execute_script(self): self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
@@ -80,6 +82,7 @@ class Machine:
         op = self.ssh.run(f"cat {results_data_path_log}", verbose=False).capture().op2path(strict_err=True)  # generate an error if the file does not exist
         if op is None: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
         else: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁")
+        self.results_path = op
         return op
 
     def run(self):
