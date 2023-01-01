@@ -11,12 +11,12 @@ class Definition:
     @staticmethod
     def get_results_data_path_log(job_id):
         """A text file that cluster deletes at the begining then write to at the end of each job."""
-        return tb.P.home().joinpath(f"tmp_results/cluster/result_folders/job_id__{job_id}.txt")
+        return f"~/tmp_results/cluster/result_folders/job_id__{job_id}.txt"
 
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
 
 
-class Cluster:
+class Machine:
     def __init__(self, func, kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
                  data: list or None = None, return_script: bool = True, cloud=False, job_id=None,
@@ -64,18 +64,25 @@ class Cluster:
         self.cloud = cloud
         self.ssh = ssh or tb.SSH(**machine_specs)
 
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        del state['ssh']
-        return state
+        # flags
+        self.submitted = False
+        self.results_downloaded = False
 
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.ssh = tb.SSH(**self.machine_specs)
+    # def __getstate__(self):
+    #     state = self.__dict__.copy()
+    #     del state['ssh']
+    #     return state
+    #
+    # def __setstate__(self, state):
+    #     self.__dict__.update(state)
+    #     self.ssh = tb.SSH(**self.machine_specs)
 
-    def check_submission(self):
+    def check_submission(self) -> tb.P or None:
         results_data_path_log = Definition.get_results_data_path_log(self.job_id)
-        self.ssh.run(f"cat {results_data_path_log}")
+        op = self.ssh.run(f"cat {results_data_path_log}", verbose=False).capture().op2path(strict_err=True)  # generate an error if the file does not exist
+        if op is None: print(f"Machine {self.ssh.get_remote_machine()} has not yet finished job `{self.job_id}`. 😟")
+        else: print(f"Machine {self.ssh.get_remote_machine()} has finished job `{self.job_id}`. 😁")
+        return op
 
     def run(self):
         self.generate_scripts()
@@ -126,6 +133,7 @@ api = GDriveAPI()
                 # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
                 # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
             else: self.ssh.run(f"{self.shell_script_path}", desc="Executing the function")
+        self.submitted = True
 
     def generate_scripts(self):
         py_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__{tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}__{self.job_id}.py").create(parents_only=True)
@@ -193,13 +201,14 @@ deactivate
 def try_main():
     st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
     from crocodile.cluster import trial_file
-    c = Cluster(func=trial_file.expensive_function, machine_specs=dict(host="229234wsl"), update_essential_repos=True,
+    c = Machine(func=trial_file.expensive_function, machine_specs=dict(host="229234wsl"), update_essential_repos=True,
                 notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
                 ipython=True, interactive=True, cloud=False)
     c.generate_scripts()
     c.show_scripts()
     c.submit()
+    c.check_submission()
     return c
 
 

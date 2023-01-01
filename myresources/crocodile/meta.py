@@ -61,7 +61,8 @@ class Terminal:
         ip = property(lambda self: self.output["stdin"])
         err = property(lambda self: self.output["stderr"])
         returncode = property(lambda self: self.output["returncode"])
-        as_path = property(lambda self: P(self.op.rstrip()) if self.is_successful(strict_returcode=True, strict_err=False) else None)
+        def op2path(self, strict_returcode=True, strict_err=False) -> P or None:
+            return (self.op.rstrip()) if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else None
         def op_if_successfull_or_default(self, strict_returcode=True, strict_err=False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
@@ -130,12 +131,11 @@ class Terminal:
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __init__(self, username=None, hostname=None, host=None, tmate_sess=None, sshkey=None, pwd=None, port=22, env="ve"):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        username = username or __import__("getpass").getuser()  # Defaults: (1) use localhost if nothing provided.
-        if tmate_sess is not None: pass
-        elif "@" not in username and hostname is None:  # then, username is probably a Host profile
+        username, self.host, self.tmate_sess = username or __import__("getpass").getuser(), None, tmate_sess  # Defaults: (1) use localhost if nothing provided.
+        if "@" not in username and hostname is None:  # then, username is probably a Host profile
             try:
                 config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str); config_dict = config.lookup(host or username)
-                self.hostname, self.username, port, sshkey = config_dict["hostname"], config_dict["user"], config_dict.get("port", port), tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
+                self.hostname, self.username, self.host, port, sshkey = config_dict["hostname"], config_dict["user"], host or username, config_dict.get("port", port), tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
                 if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("identityfile", sshkey)) is list else tmp
             except (FileNotFoundError, KeyError): self.hostname, self.username = __import__("platform").node(), username
         else: self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
@@ -151,6 +151,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self._local_distro, self._remote_distro, self._remote_machine, self.terminal_responses, self.platform = None, None, None, [], __import__("platform")
         self.remote_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{env}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{env}/bin/activate"""  # works for both cmd and pwsh
+    def __getstate__(self): return dict(hostname=self.hostname, username=self.username, port=self.port, sshkey=self.sshkey, host=self.host, tmate_sess=self.tmate_sess)
+    def __setstate__(self, state): self.__init__(**state)
     def get_remote_machine(self): self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing OS").capture().op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing OS").capture().op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
     def get_remote_distro(self): self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).capture().op_if_successfull_or_default(default="") if self._remote_distro is None else self._remote_distro; return self._remote_distro
@@ -180,10 +182,10 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def copy_to_here(self, source, target=None, zip_first=False, r=False) -> P:
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True)", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file, target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", strict_returncode=True, strict_err=True).as_path
-        if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).as_path; assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", strict_returncode=True, strict_err=True).op2path()
+        if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''
-        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).as_path if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
+        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)
         if zip_first: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", strict_returncode=True, strict_err=True)
         return target

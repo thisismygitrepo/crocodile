@@ -3,7 +3,7 @@
 import getpass
 import platform
 import crocodile.toolbox as tb
-from crocodile.cluster.run import Definition
+from crocodile.cluster.remote_machine import Definition
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
@@ -40,7 +40,7 @@ repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 kwargs_path = tb.P(rf'{kwargs_path}').expanduser().absolute()
 py_script_path = tb.P(rf'{py_script_path}').expanduser().absolute()
 shell_script_path = tb.P(rf'{shell_script_path}').expanduser().absolute()
-results_data_path_log = Definition.get_results_data_path_log(job_id).delete(sure=True).create(parents_only=True)
+results_data_path_log = tb.P(Definition.get_results_data_path_log(job_id)).expanduser().delete(sure=True).create(parents_only=True)
 
 tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()

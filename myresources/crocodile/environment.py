@@ -196,10 +196,10 @@ def get_shell_profiles(shell):
     # https://devblogs.microsoft.com/scripting/understanding-the-six-powershell-profiles/
     # Dynmaically obtained:
     return tb.Struct(
-        CurrentUserCurrentHost=tm.run("$PROFILE.CurrentUserCurrentHost", shell=shell).as_path,
-        CurrentUserAllHosts=tm.run("$PROFILE.CurrentUserAllHosts", shell=shell).as_path,
-        AllUsersCurrentHost=tm.run("$PROFILE.AllUsersCurrentHost", shell=shell).as_path,
-        AllUsersAllHosts=tm.run("$PROFILE.AllUsersAllHosts", shell=shell).as_path,
+        CurrentUserCurrentHost=tm.run("$PROFILE.CurrentUserCurrentHost", shell=shell).op2path(),
+        CurrentUserAllHosts=tm.run("$PROFILE.CurrentUserAllHosts", shell=shell).op2path(),
+        AllUsersCurrentHost=tm.run("$PROFILE.AllUsersCurrentHost", shell=shell).op2path(),
+        AllUsersAllHosts=tm.run("$PROFILE.AllUsersAllHosts", shell=shell).op2path(),
     )
 
 
