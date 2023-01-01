@@ -3,7 +3,7 @@ import numpy as np
 # import psutil
 import crocodile.toolbox as tb
 from math import ceil
-from crocodile.cluster.remote_machine import Machine
+from crocodile.cluster.remote_machine import Machine, Definition
 
 
 class Cluster:
@@ -31,7 +31,7 @@ class Cluster:
             self.generate_standard_kwargs()
             self.viz_load_ratios()
         else: self.func_kwargs_list = func_kwargs_list
-
+    def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in self.machines])
     def submit(self):
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
             m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id, **self.kwargs)
@@ -88,6 +88,11 @@ class Cluster:
         load_ratios_repr = tb.S(dict(zip(names, tb.L((self.load_ratios * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
         print(load_ratios_repr)
         return load_ratios_repr
+
+    def save(self, name=None):
+        tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
+    @staticmethod
+    def load(name): return Definition.get_cluster_pickle(name).readit()
 
 
 def try_it():

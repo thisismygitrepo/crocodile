@@ -13,6 +13,10 @@ class Definition:
         """A text file that cluster deletes at the begining then write to at the end of each job."""
         return f"~/tmp_results/cluster/result_folders/job_id__{job_id}.txt"
 
+    @staticmethod
+    def get_cluster_pickle(name):
+        return tb.P(f"~/tmp_results/cluster/pickled/{name}.pkl").expanduser().create(parents_only=True)
+
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
 
 
@@ -68,14 +72,14 @@ class Machine:
         # flags
         self.submitted = False
         self.results_downloaded = False
-
+    def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
     def execute_script(self): self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
     def check_submission(self) -> tb.P or None:
         results_data_path_log = Definition.get_results_data_path_log(self.job_id)
         op = self.ssh.run(f"cat {results_data_path_log}", verbose=False).capture().op2path(strict_err=True)  # generate an error if the file does not exist
-        if op is None: print(f"Machine {self.ssh.get_remote_machine()} has not yet finished job `{self.job_id}`. 😟")
-        else: print(f"Machine {self.ssh.get_remote_machine()} has finished job `{self.job_id}`. 😁")
+        if op is None: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
+        else: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁")
         return op
 
     def run(self):
