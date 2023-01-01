@@ -162,7 +162,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def get_repr(self, which="remote", add_machine=False): return (f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")) if which == "remote" else f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
-    def open_console(self, cmd='', new_window=True, terminal=None): Terminal().run_async("ssh", f"-i {self.sshkey}" if self.sshkey else "", '-t' if cmd != '' else '', *f""" {self.get_repr('remote').replace(':', ' -p ')}""".split(" "), cmd, new_window=new_window, terminal=terminal)
+    def get_ssh_conn_str(self, cmd=""): return f"ssh" + (f" -i {self.sshkey}" if self.sshkey else "") + (f' -t {cmd} ' if cmd != '' else ' ') + self.get_repr('remote').replace(':', ' -p ')
+    def open_console(self, cmd='', new_window=True, terminal=None): Terminal().run_async(*self.get_ssh_conn_str().split(" "), cmd, new_window=new_window, terminal=terminal)
     def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False, env_prefix=False) -> Terminal.Response:  # most central method.
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)
         if strict_err or strict_returncode: assert res.is_successful(strict_err=strict_err, strict_returcode=strict_returncode), res.print()

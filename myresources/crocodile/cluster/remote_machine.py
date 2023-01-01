@@ -19,7 +19,7 @@ class Definition:
 class Machine:
     def __init__(self, func, kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
-                 data: list or None = None, return_script: bool = True, cloud=False, job_id=None,
+                 data: list or None = None, open_console: bool = True, cloud=False, job_id=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
                  ipython=False, interactive=False, pdb=False, wrap_in_try_except=False):
@@ -48,7 +48,7 @@ class Machine:
         self.pdb = pdb
 
         # cluster behaviour
-        self.return_script = return_script
+        self.open_console = open_console
         self.notify_upon_completion = notify_upon_completion
         self.to_email = to_email
         self.email_config_name = email_config_name
@@ -58,6 +58,7 @@ class Machine:
         self.py_download_script = None
         self.py_script_modified = None
         self.shell_script_modified = None
+        self.execution_command = None
 
         # conn
         self.machine_specs = machine_specs
@@ -68,15 +69,8 @@ class Machine:
         self.submitted = False
         self.results_downloaded = False
 
-    # def __getstate__(self):
-    #     state = self.__dict__.copy()
-    #     del state['ssh']
-    #     return state
-    #
-    # def __setstate__(self, state):
-    #     self.__dict__.update(state)
-    #     self.ssh = tb.SSH(**self.machine_specs)
-
+    def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
+    def execute_script(self): self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
     def check_submission(self) -> tb.P or None:
         results_data_path_log = Definition.get_results_data_path_log(self.job_id)
         op = self.ssh.run(f"cat {results_data_path_log}", verbose=False).capture().op2path(strict_err=True)  # generate an error if the file does not exist
@@ -120,19 +114,22 @@ api = GDriveAPI()
             self.ssh.copy_from_here(self.py_script_path)
             self.ssh.copy_from_here(self.shell_script_path)
             self.ssh.copy_from_here(self.kwargs_path)
-            self.ssh.run(f"echo '{self.shell_script_path}' > {Definition.shell_script_path_log}")
+            self.ssh.run_py(f"tb.P(r'{Definition.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.shell_script_path.collapseuser().as_posix()}')")
             if self.copy_repo: self.ssh.copy_from_here(self.repo_path, zip_first=True, overwrite=True)
             if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
             self.ssh.print_summary()
 
-            if self.return_script:
-                tb.install_n_import("clipboard").copy((f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.shell_script_path.collapseuser().as_posix()}")
+            self.execution_command = (f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.shell_script_path.collapseuser().as_posix()}"
+            self.execution_command_to_clip_memory()
+            # self.ssh.run(f". {self.shell_script_path.collapseuser().as_posix()}", desc="Executing the function")
+
+            if self.open_console:
                 self.ssh.open_console()
                 # send email at start execution time
                 # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
                 # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
                 # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
-            else: self.ssh.run(f"{self.shell_script_path}", desc="Executing the function")
+            else:  pass
         self.submitted = True
 
     def generate_scripts(self):
