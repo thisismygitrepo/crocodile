@@ -38,9 +38,9 @@ class Cluster:
             m.run()
             self.machines.append(m)
 
-    def open_console(self):
+    def mux_consoles(self):
         cmd = ""
-        for idx, n in enumerate(self.func_kwargs_list):
+        for idx, m in enumerate(self.machines):
             if idx == 0: cmd += f""" wt pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
             else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
