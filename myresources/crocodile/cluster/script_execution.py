@@ -3,19 +3,21 @@
 import getpass
 import platform
 import crocodile.toolbox as tb
+from crocodile.cluster.run import Definition
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
 from rich import inspect
 from rich.text import Text
+import pandas as pd
 
 console = Console()
 
 # EXTRA-PLACEHOLDER-PRE
 
 _ = SourceFileLoader
-time_at_execution_start = tb.datetime.utcnow()
-
+time_at_execution_start_utc = pd.Timestamp.utcnow()
+time_at_execution_start_local = pd.Timestamp.now()
 
 to_be_deleted = ['res = ""  # to be overridden by execution line.', 'exec_obj = ""  # to be overridden by execution line.']
 res = ""  # to be overridden by execution line.
@@ -38,6 +40,7 @@ repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 kwargs_path = tb.P(rf'{kwargs_path}').expanduser().absolute()
 py_script_path = tb.P(rf'{py_script_path}').expanduser().absolute()
 shell_script_path = tb.P(rf'{shell_script_path}').expanduser().absolute()
+results_data_path_log = Definition.get_results_data_path_log(job_id).delete(sure=True).create(parents_only=True)
 
 tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()
@@ -78,10 +81,15 @@ if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
 else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
     tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
+results_data_path_log.write_text(res_folder.collapseuser().as_posix())
 
-time_at_execution_end = tb.datetime.utcnow()
-delta = time_at_execution_end - time_at_execution_start
-exec_times = tb.S(start=time_at_execution_start, end=time_at_execution_end, delta=delta)
+
+time_at_execution_end_utc = pd.Timestamp.utcnow()
+time_at_execution_end_local = pd.Timestamp.now()
+
+delta = time_at_execution_end_utc - time_at_execution_start_utc
+exec_times = tb.S(start_utc=time_at_execution_start_utc, end_utc=time_at_execution_end_utc, start_local=time_at_execution_start_local, end_local=time_at_execution_end_local, delta=delta)
+
 
 inspect(exec_times, value=False, title="Execution Times", docs=False, sort=False)
 print("\n" * 1)

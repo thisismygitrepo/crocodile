@@ -12,8 +12,9 @@ def run_on_clusters(machine_specs_list: list[dict], kwargs_list=None, load_ratio
         assert "max_num" in kwargs, "If `kwargs_list` is not provided, `max_num` must be provided."
         kwargs_list, load_ratios, load_ratios_repr = get_standard_kwargs(sshz=sshz, max_num=kwargs["max_num"], load_ratios=load_ratios)
     results = []
+    job_id = tb.randstr(length=10)
     for a_kwargs, an_ssh in zip(kwargs_list, sshz):
-        results.append(run_on_cluster(kwargs=a_kwargs, ssh=an_ssh, return_script=return_script, description=description + f"\nLoad Ratios on machines:\n{load_ratios_repr}", **kwargs))
+        results.append(run_on_cluster(kwargs=a_kwargs, ssh=an_ssh, return_script=return_script, description=description + f"\nLoad Ratios on machines:\n{load_ratios_repr}", job_id=job_id, **kwargs))
     return results
 
 

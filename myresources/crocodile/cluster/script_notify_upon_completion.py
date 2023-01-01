@@ -23,9 +23,7 @@ res_folder = tb.P()
 print(f'SENDING notification email using `{email_config_name}` email configuration ...')
 
 sep = "\n" * 2  # SyntaxError: f-string expression part cannot include a backslash, keep it here outside fstring.
-Email.send_and_close(config_name=email_config_name, to=to_email,
-                     subject=f"Execution Completion Notification, job_id = {job_id}",
-                     msg=f'''
+msg = f'''
 
 Hi `{addressee}`, I'm `{speaker}`, this is a notification that I have completed running the script you sent to me.
 
@@ -60,7 +58,10 @@ ssh.copy_to_here(r'{res_folder.collapseuser().as_posix()}', r=False, zip_first=F
 ```
 
 '''
-                     )
 
-print(f'FINISHED sending notification email to `{to_email}`')
+try:
+    Email.send_and_close(config_name=email_config_name, to=to_email,
+                         subject=f"Execution Completion Notification, job_id = {job_id}", msg=msg)
+    print(f'FINISHED sending notification email to `{to_email}`')
+except Exception as e: print(f"Error sending email: {e}")
 
