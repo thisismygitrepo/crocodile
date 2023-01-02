@@ -36,7 +36,7 @@ class Cluster:
             self.viz_load_ratios()
         else: self.func_kwargs_list = func_kwargs_list
 
-    def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in self.machines])
+    def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
 
     def generate_standard_kwargs(self):
         cpus = []
@@ -51,7 +51,7 @@ class Cluster:
         ram_ratios = self.rams / self.rams.sum()
 
         both_ratios = (cpus * self.rams) / (cpus * self.rams).sum()
-        self.load_ratios = self.load_ratios or {"cpu": cpu_ratios, "ram": ram_ratios, "both": both_ratios}[self.criterion_name]
+        self.load_ratios = self.load_ratios if self.load_ratios is not None else {"cpu": cpu_ratios, "ram": ram_ratios, "both": both_ratios}[self.criterion_name]
 
         func_kwargs_list = []
         for a_ratio, a_cpu, a_ram in zip(self.load_ratios, cpus, self.rams):
@@ -89,7 +89,7 @@ class Cluster:
     def check_submissions(self):
         tb.L(self.machines).apply(lambda machine: machine.check_submission())
 
-    def download_results(self, delete_remote=True):
+    def download_results(self):
         for idx, a_m in enumerate(self.machines):
             results_folder = a_m.results_path
             if results_folder is not None:
@@ -99,26 +99,28 @@ class Cluster:
                 print("\n")
                 a_m.ssh.copy_to_here(results_folder.as_posix(), target=target, r=True, zip_first=False)
                 a_m.results_downloaded = True
-                if delete_remote: a_m.ssh.run_py(f"tb.P(r'{results_folder.as_posix()}').delete(sure=True)", verbose=False)
 
     def save(self, name=None):
         tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
     @staticmethod
-    def load(name): return Definition.get_cluster_pickle(name).readit()
+    def load(name) -> 'Cluster': return Definition.get_cluster_pickle(name).readit()
 
 
 def try_it():
-    machine_specs_list = [dict(host="p51s"), dict(host="thinkpad"), dict(port=2224), dict(host="surface_wsl")]
-    c = Cluster(machine_specs_list=machine_specs_list, max_num=1532)
+    from crocodile.cluster.trial_file import expensive_function_parallel
+    machine_specs_list = [dict(host="p51s"), dict(host="thinkpad")]  # , dict(host="surface_wsl"), dict(port=2224)
+    c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, max_num=1000, install_repo=False)
     print(c)
     c.generate_standard_kwargs()
     c.submit()
+    c.mux_consoles()
     c.save("name")
 
     # later ...
     c = Cluster.load("name")
     c.check_submissions()
-    c.download_results(delete_remote=True)
+    c.download_results()
+    tb.L(c.machines).delete_remote_results()
     return c
 
 

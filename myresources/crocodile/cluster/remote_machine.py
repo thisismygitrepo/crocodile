@@ -84,6 +84,7 @@ class Machine:
         else: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁")
         self.results_path = op
         return op
+    def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
 
     def run(self):
         self.generate_scripts()

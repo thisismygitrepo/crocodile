@@ -45,17 +45,18 @@ results_data_path_log = tb.P(Definition.get_results_data_path_log(job_id)).expan
 tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()
 
+# EXTRA-PLACEHOLDER-POST
+
+
+# ######################### EXECUTION ####################################
+
 print("\n" * 2)
 console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
-
 console.print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}", style="bold blue")
 inspect(kwargs, value=False, title=f"kwargs from `{kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
-# EXTRA-PLACEHOLDER-POST
-
-# ######################### EXECUTION ####################################
 
 if func_module is not None:
     # noinspection PyTypeChecker
@@ -70,11 +71,13 @@ else:
     exec_obj = module  # for README.md generation.
 
 # execution_line
-# ######################### END OF EXECUTION #############################
 
 print("\n" * 2)
 console.rule(title="FINISHED PYTHON EXECUTION SCRIPT", characters="-", style="bold red")
 print("\n" * 2)
+
+# ######################### END OF EXECUTION #############################
+
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
