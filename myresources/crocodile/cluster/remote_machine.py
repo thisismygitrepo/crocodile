@@ -198,7 +198,7 @@ deactivate
         tb.Save.pickle(obj=self.kwargs, path=kwargs_path, verbose=False)
         self.shell_script_path, self.py_script_path, self.kwargs_path = shell_script_path, py_script_path, kwargs_path
 
-    def show_scripts(self):
+    def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.shell_script_path.read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
         Console().print(inspect(tb.Struct(shell_script=repr(tb.P(self.shell_script_path)), python_script=repr(tb.P(self.py_script_path)), kwargs_file=repr(tb.P(self.kwargs_path))), title="Prepared scripts and files.", value=False, docs=False, sort=False))
 

@@ -85,14 +85,14 @@ class P(type(Path()), Path):
     Additionally, the fate of the original object can be decided by a flag `inplace` which means `replace` it defaults to False and in essence, it deletes the original underlying object.
     This can be seen in `zip` and `encrypt` but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
     Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
-    def delete(self, sure=False, verbose=True):  # slf = self.expanduser().resolve() don't resolve symlinks.
+    def delete(self, sure=False, verbose=True) -> 'P':  # slf = self.expanduser().resolve() don't resolve symlinks.
         if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
         if not self.exists(): self.unlink(missing_ok=True); print(f"Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
         self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); print(f"DELETED {repr(self)}.") if verbose else None; return self
-    def send2trash(self, verbose=True):
+    def send2trash(self, verbose=True) -> 'P':
         if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
-    def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False):
+    def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False) -> 'P':
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
         path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
@@ -101,7 +101,7 @@ class P(type(Path()), Path):
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
         else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
         print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
-    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=None, overwrite=False, orig=False):  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
+    def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=None, overwrite=False, orig=False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
         dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
         dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
@@ -112,7 +112,7 @@ class P(type(Path()), Path):
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs):
+    def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs) -> 'P':
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else: (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return notfound
@@ -126,16 +126,16 @@ class P(type(Path()), Path):
             __import__("subprocess").Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
         elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
         else:  __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
-    def __call__(self, *args, **kwargs): self.start(*args, **kwargs); return self
-    def append_text(self, appendix): self.write_text(self.read_text() + appendix); return self
+    def __call__(self, *args, **kwargs) -> 'P': self.start(*args, **kwargs); return self
+    def append_text(self, appendix) -> 'P': self.write_text(self.read_text() + appendix); return self
     def cache_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt_search, txt_alt, replace_line=False, notfound_append=False, prepend=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
-    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None):
+    def download(self, directory=None, name=None, memory=False, allow_redirects=True, params=None) -> 'P':
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if directory is None else P(directory)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
-    def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg="", __delayed_msg__=""):
+    def _return(self, res, inlieu=False, inplace=False, operation=None, overwrite=False, orig=False, verbose=False, strict=True, msg="", __delayed_msg__="") -> 'P':
         if inlieu: self._str = str(res)
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
@@ -164,14 +164,14 @@ class P(type(Path()), Path):
     def __len__(self): return len(self.parts)
     def __contains__(self, item): return P(item).as_posix() in self.as_posix()
     def __iter__(self): return self.parts.__iter__()
-    def __deepcopy__(self): return P(str(self))
-    def __getstate__(self): return str(self)
+    def __deepcopy__(self) -> 'P': return P(str(self))
+    def __getstate__(self) -> str: return str(self)
     def __setstate__(self, state): self._str = str(state)
-    def __add__(self, other): return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
-    def __radd__(self, other): return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
-    def __sub__(self, other): res = P(str(self).replace(str(other), "")); return (res[1:] if str(res[0]) in {"\\", "/"} else res) if len(res) else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
-    def rel2cwd(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
-    def rel2home(self, inlieu=False): return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
+    def __add__(self, other) -> 'P': return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
+    def __radd__(self, other) -> 'P': return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
+    def __sub__(self, other) -> 'P': res = P(str(self).replace(str(other), "")); return (res[1:] if str(res[0]) in {"\\", "/"} else res) if len(res) else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
+    def rel2cwd(self, inlieu=False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
+    def rel2home(self, inlieu=False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
     def collapseuser(self, strict=True):
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
         return self if "~" in self else self._return("~" / (self.expanduser().absolute().resolve(strict=strict) - P.home()))    # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
@@ -219,13 +219,13 @@ class P(type(Path()), Path):
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
-    def write_text(self, data: str, **kwargs) -> 'Path': super(P, self).write_text(data, **kwargs); return self
-    def read_text(self, encoding=None, lines=False, printit=False): res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
-    def write_bytes(self, data: bytes):
+    def write_text(self, data: str, **kwargs) -> 'P': super(P, self).write_text(data, **kwargs); return self
+    def read_text(self, encoding=None, lines=False, printit=False) -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
+    def write_bytes(self, data: bytes) -> 'P':
         res = super(P, self).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self
-    def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...): self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
+    def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...) -> 'P': self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, src_folder=None, src_file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
         if src_file is not None: assert src_folder is None, "You can only pass source or source_dir, not both."; result = P(src_file).expanduser().absolute()
@@ -242,7 +242,7 @@ class P(type(Path()), Path):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
     # ======================================== Folder management =======================================
-    def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False):
+    def search(self, pattern='*', r=False, files=True, folders=True, compressed=False, dotfiles=False, filters: list = None, not_in: list = None, exts=None, win_order=False) -> List:
         filters = (filters or []) + ([lambda x: all([str(notin) not in str(x) for notin in not_in])] if not_in is not None else []) + ([lambda x: any([ext in x.name for ext in exts])] if exts is not None else [])
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
             root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(lambda x: root.joinpath(x))
@@ -253,20 +253,20 @@ class P(type(Path()), Path):
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
     def tree(self, *args, **kwargs): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
-    def find(self, *args, r=True, compressed=True, **kwargs):  # short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
+    def find(self, *args, r=True, compressed=True, **kwargs) -> 'P':  # short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
         if compressed is False and self.is_file(): return self
         if len(results := self.search(*args, r=r, compressed=compressed, **kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
-    def create(self, parents=True, exist_ok=True, parents_only=False): self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
-    def chdir(self): __import__("os").chdir(str(self.expanduser())); return self
-    def listdir(self): return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
+    def create(self, parents=True, exist_ok=True, parents_only=False) -> 'P': self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
+    def chdir(self) -> 'P': __import__("os").chdir(str(self.expanduser())); return self
+    def listdir(self) -> List: return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
     tempdir = staticmethod(lambda: P(__import__("tempfile").mktemp()))
     temp = staticmethod(lambda: P(__import__("tempfile").gettempdir()))
     tmpdir = staticmethod(lambda prefix="": P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}"))
     tmpfile = staticmethod(lambda name=None, suffix="", folder=None, tstamp=False: P.tmp(file=(name or randstr()) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files"))
     tmp = staticmethod(lambda folder=None, file=None, root="~/tmp_results": P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False))
     # ====================================== Compression & Encryption ===========================================
-    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, **kwargs):
+    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, **kwargs) -> 'P':
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         if use_7z: path = seven_zip(path=slf, op_path=path, pwd=pwd)
         else:
@@ -276,7 +276,7 @@ class P(type(Path()), Path):
                 root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
                 path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, merge=True, orig=False, pwd=None, **kwargs):
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, merge=True, orig=False, pwd=None, **kwargs) -> 'P':
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
             if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
@@ -290,22 +290,22 @@ class P(type(Path()), Path):
                 else: List([x for x in __import__("zipfile").ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(fname or "", item.replace("/", "")).delete(sure=True, verbose=True))
             result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
-    def tar(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True): Compression.tar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
-    def untar(self, folder=None, path=None, name=None, inplace=False, orig=False, verbose=True): Compression.untar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".tar", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
-    def gz(self, path=None, folder=None, name=None, inplace=False, orig=False, verbose=True): Compression.gz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".gz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
-    def ungz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True): Compression.ungz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".gz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
-    def xz(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True): Compression.xz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
-    def unxz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True): Compression.unxz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
-    def tar_gz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True): return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False): return self.ungz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False): return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False): return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False): raise NotImplementedError("Not implemented yet.")
-    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False):  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
+    def tar(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.tar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
+    def untar(self, folder=None, path=None, name=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.untar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".tar", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
+    def gz(self, path=None, folder=None, name=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.gz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".gz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
+    def ungz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.ungz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".gz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
+    def xz(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.xz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
+    def unxz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.unxz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
+    def tar_gz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True) -> 'P': return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.ungz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': raise NotImplementedError("Not implemented yet.")
+    def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False) -> 'P':  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name+suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
-    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, suffix=".enc", **kwargs):
+    def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, suffix=".enc", **kwargs) -> 'P':
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(suffix, "") if suffix in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
     def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False, content=False): return self.zip(inplace=inplace, verbose=verbose, content=content).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self

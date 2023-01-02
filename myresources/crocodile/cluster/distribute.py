@@ -11,7 +11,7 @@ console = Console()
 
 
 class Cluster:
-    def __init__(self, machine_specs_list: list[dict], max_num: int = 100, criterion_name: str = ["cpu", "ram", "both"][-1], func_kwargs_list=None, load_ratios=None, load_ratios_repr="", open_console=False, description="", **kwargs, ):
+    def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False, max_num: int = 100, criterion_name: str = ["cpu", "ram", "both"][-1], func_kwargs_list=None, load_ratios=None, load_ratios_repr="", open_console=False, description="", **kwargs, ):
         self.job_id = tb.randstr(length=10)
         self.load_ratios = load_ratios
         self.load_ratios_repr = load_ratios_repr
@@ -20,9 +20,13 @@ class Cluster:
 
         sshz = []
         for machine_specs in machine_specs_list:
-            try: tmp = tb.SSH(**machine_specs)
-            except Exception: print(f"Couldn't connect to {machine_specs}"); tmp = None
-            sshz.append(tmp)
+            try:
+                tmp = tb.SSH(**machine_specs)
+                sshz.append(tmp)
+            except Exception:
+                print(f"Couldn't connect to {machine_specs}")
+                if ditch_unavailable_machines: continue
+                else: raise Exception(f"Couldn't connect to {machine_specs}")
 
         self.sshz: list[tb.SSH] = sshz
         self.machines: list[Machine] = []
@@ -86,9 +90,7 @@ class Cluster:
             else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
 
-    def check_submissions(self):
-        tb.L(self.machines).apply(lambda machine: machine.check_submission())
-
+    def check_submissions(self): tb.L(self.machines).apply(lambda machine: machine.check_submission())
     def download_results(self):
         for idx, a_m in enumerate(self.machines):
             results_folder = a_m.results_path
@@ -100,10 +102,15 @@ class Cluster:
                 a_m.ssh.copy_to_here(results_folder.as_posix(), target=target, r=True, zip_first=False)
                 a_m.results_downloaded = True
 
-    def save(self, name=None):
-        tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
+    def save(self, name=None): tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
     @staticmethod
     def load(name) -> 'Cluster': return Definition.get_cluster_pickle(name).readit()
+    def run(self, name="cluster"):
+        self.generate_standard_kwargs()
+        self.submit()
+        self.mux_consoles()
+        self.save(name)
+        return self
 
 
 def try_it():
@@ -114,10 +121,10 @@ def try_it():
     c.generate_standard_kwargs()
     c.submit()
     c.mux_consoles()
-    c.save("name")
+    c.save("cluster")
 
     # later ...
-    c = Cluster.load("name")
+    c = Cluster.load("cluster")
     c.check_submissions()
     c.download_results()
     tb.L(c.machines).delete_remote_results()
