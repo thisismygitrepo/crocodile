@@ -2,7 +2,7 @@
 import crocodile.toolbox as tb
 
 
-def get_script(name: str, kwargs: dict):
+def get_script(name: str, kwargs: dict) -> str:
     """Reads a python script from the scripts folder and replaces the placeholders with the kwargs."""
     tmp = tb.P(__file__).parent.joinpath(f"{name}.py").read_text()
     for key, value in kwargs.items():
@@ -37,7 +37,7 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, rel_full_path):
+def get_execution_line(func_name, rel_full_path) -> str:
     if func_name is not None: return f"""
 res = module.{func_name}(**kwargs.__dict__)
 """

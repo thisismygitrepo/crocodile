@@ -366,7 +366,7 @@ class BaseModel(ABC):
                                      validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
                                      batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
-        hist = self.model.fit(**default_settings.dict)
+        hist = self.model.fit(**default_settings.__dict__)
         self.history.append(tb.Struct(copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()

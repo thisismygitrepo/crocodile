@@ -9,9 +9,9 @@ import sys
 
 class Null:
     def __init__(self, return_='self'): self.return_ = return_
-    def __getattr__(self, item): _ = item; return self if self.return_ == 'self' else self.return_
-    def __getitem__(self, item): _ = item; return self if self.return_ == 'self' else self.return_
-    def __call__(self, *args, **kwargs): return self if self.return_ == 'self' else self.return_
+    def __getattr__(self, item) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
+    def __getitem__(self, item) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
+    def __call__(self, *args, **kwargs) -> 'Null': return self if self.return_ == 'self' else self.return_
     def __len__(self): return 0
     def __bool__(self): return False
     def __contains__(self, item): _ = self, item; return False
@@ -172,7 +172,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
         else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
-    def copy_from_here(self, source, target=None, zip_first=False, r=False, overwrite=False) -> P:
+    def copy_from_here(self, source, target=None, zip_first=False, r=False, overwrite=False) -> P or List[P]:
         if not zip_first and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if zip_first: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."

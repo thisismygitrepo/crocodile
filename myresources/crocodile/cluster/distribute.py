@@ -39,6 +39,12 @@ class Cluster:
             self.generate_standard_kwargs()
             self.viz_load_ratios()
         else: self.func_kwargs_list = func_kwargs_list
+        self._results_dir = None
+
+    @property
+    def results_dir(self):
+        if self._results_dir is None: raise Exception(f"Results dir not set yet. Wait until its set by `{self.download_results}` function.")
+        return self._results_dir
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
 
@@ -94,13 +100,17 @@ class Cluster:
     def download_results(self):
         for idx, a_m in enumerate(self.machines):
             results_folder = a_m.results_path
-            if results_folder is not None:
-                target = results_folder.append(f"_cluster_job_id__{self.job_id}").joinpath(results_folder.append(f"_cluster_{idx}__{tb.randstr()}").name)
+            if results_folder is not None and a_m.results_downloaded is False:
+                if self._results_dir is None: self._results_dir = results_folder.append(f"_cluster_job_id__{self.job_id}")
+                target = self.results_dir.joinpath(results_folder.append(f"_cluster_{idx}__{tb.randstr()}").name)
                 print("\n")
                 console.rule(f"Downloading results from {a_m}")
                 print("\n")
                 a_m.ssh.copy_to_here(results_folder.as_posix(), target=target, r=True, zip_first=False)
                 a_m.results_downloaded = True
+        if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
+            print(f"All results downloaded to {self.results_dir}")
+            tb.Save.pickle(obj=self, path=self.results_dir.joinpath("cluster.Cluster.pkl"))
 
     def save(self, name=None): tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
     @staticmethod
@@ -115,7 +125,7 @@ class Cluster:
 
 def try_it():
     from crocodile.cluster.trial_file import expensive_function_parallel
-    machine_specs_list = [dict(host="p51s"), dict(host="thinkpad")]  # , dict(host="surface_wsl"), dict(port=2224)
+    machine_specs_list = [dict(port=2224), dict(host="surface")]  # , dict(host="surface_wsl"), dict(port=2224)
     c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, max_num=1000, install_repo=False)
     print(c)
     c.generate_standard_kwargs()

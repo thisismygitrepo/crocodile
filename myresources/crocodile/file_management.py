@@ -174,7 +174,7 @@ class P(type(Path()), Path):
     def rel2home(self, inlieu=False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
     def collapseuser(self, strict=True):
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
-        return self if "~" in self else self._return("~" / (self.expanduser().absolute().resolve(strict=strict) - P.home()))    # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
+        return self if "~" in self else self._return(P("~") / (self.expanduser().absolute().resolve(strict=strict) - P.home()))    # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
     def __getitem__(self, slici): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
     def __setitem__(self, key: str or int or slice, value: str or Path):
         fullparts, new = list(self.parts), list(P(value).parts)
@@ -211,10 +211,10 @@ class P(type(Path()), Path):
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
-    def clickable(self, inlieu=False): return self._return(self.expanduser().resolve().as_uri(), inlieu)
-    def as_url_str(self, inlieu=False): return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
-    def as_url_obj(self, inlieu=False): return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
-    def as_unix(self, inlieu=False): return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
+    def clickable(self, inlieu=False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
+    def as_url_str(self, inlieu=False) -> 'P': return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
+    def as_url_obj(self, inlieu=False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
+    def as_unix(self, inlieu=False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
@@ -308,9 +308,9 @@ class P(type(Path()), Path):
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, suffix=".enc", **kwargs) -> 'P':
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name.replace(suffix, "") if suffix in slf.name else "decrypted_" + slf.name).write_bytes(decrypt(slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, operation="delete", verbose=verbose, msg=f"DECRYPTED: {repr(slf)} ==> {repr(path)}.", **kwargs)
-    def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False, content=False): return self.zip(inplace=inplace, verbose=verbose, content=content).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
-    def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False): return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
-    def _resolve_path(self, folder, name, path, default_name, rel2it=False):  # From all arguments, figure out what is the final path.
+    def zip_n_encrypt(self, key=None, pwd=None, inplace=False, verbose=True, orig=False, content=False) -> 'P': return self.zip(inplace=inplace, verbose=verbose, content=content).encrypt(key=key, pwd=pwd, verbose=verbose, inplace=True) if not orig else self
+    def decrypt_n_unzip(self, key=None, pwd=None, inplace=False, verbose=True, orig=False) -> 'P': return self.decrypt(key=key, pwd=pwd, verbose=verbose, inplace=inplace).unzip(folder=None, inplace=True, content=False) if not orig else self
+    def _resolve_path(self, folder, name, path, default_name, rel2it=False) -> 'P':  # From all arguments, figure out what is the final path.
         """:param rel2it: `folder` or `path` are relative to `self` as opposed to cwd. This is used when resolving '../dir'"""
         if path is not None:
             path = P(self.joinpath(path).resolve() if rel2it else path).expanduser().resolve()
