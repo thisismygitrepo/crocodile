@@ -102,7 +102,7 @@ class Machine:
 
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
 📁 results_folder_path: {results_folder_check} 
-{inspect(self.ssh.copy_to_here(base_dir.joinpath("execution_times.pkl")).readit(), value=False, title="Execution Times", docs=False, sort=False)}
+{inspect(self.ssh.copy_to_here(base_dir.joinpath("execution_times.Struct.pkl")).readit(), value=False, title="Execution Times", docs=False, sort=False)}
 """)
 
             self.results_path = results_folder_check

@@ -100,7 +100,7 @@ execution_log_dir.joinpath("end_time.txt").write_text(str(time_at_execution_end_
 execution_log_dir.joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
 execution_log_dir.joinpath("error_message.txt").write_text(error_message)
 tb.P(machine_obj_path).move(folder=res_folder)
-exec_times.save(path=res_folder.joinpath("execution_times.pkl"))
+exec_times.save(path=res_folder.joinpath("execution_times.Struct.pkl"))
 tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
 Job executed via tb.cluster.Machine

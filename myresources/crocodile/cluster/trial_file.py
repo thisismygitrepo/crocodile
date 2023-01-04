@@ -9,7 +9,9 @@ def expensive_function() -> tb.P:
     a = 1 + 1
     time.sleep(length)
     print("I'm done, I crunched a lot of numbers. Next I'll save my results to a file and passing its directory back to the main process on the machine running me.")
-    return tb.S(a=a).save(path=tb.P.tmpdir().joinpath("result.Struct.pkl")).parent
+    path = tb.P.tmpdir().joinpath("result.Struct.pkl")
+    tb.S(a=a).save(path=path)
+    return path.parent
 
 
 def expensive_function_parallel(start_idx: int, end_idx: int, num_threads: int, ram_gb: int) -> tb.P:
