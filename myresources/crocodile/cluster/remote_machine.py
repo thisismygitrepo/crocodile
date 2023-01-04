@@ -11,7 +11,7 @@ class Definition:
     @staticmethod
     def get_execution_log_dir(job_id):
         """A text file that cluster deletes at the begining then write to at the end of each job."""
-        return f"~/tmp_results/cluster/result_folders/job_id__{job_id}"
+        return f"~/tmp_results/cluster/g/job_id__{job_id}"
 
     @staticmethod
     def get_cluster_pickle(name):

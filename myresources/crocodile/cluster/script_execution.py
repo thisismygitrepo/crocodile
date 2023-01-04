@@ -41,7 +41,7 @@ repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 kwargs_path = tb.P(rf'{kwargs_path}').expanduser().absolute()
 py_script_path = tb.P(rf'{py_script_path}').expanduser().absolute()
 shell_script_path = tb.P(rf'{shell_script_path}').expanduser().absolute()
-execution_log_dir = tb.P(Definition.get_execution_log_dir(job_id)).expanduser().delete(sure=True).create(parents_only=True)
+execution_log_dir = tb.P(Definition.get_execution_log_dir(job_id)).expanduser().delete(sure=True).create()
 
 tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()
@@ -85,7 +85,7 @@ if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
 else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
-    print(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}.")
+    console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
     tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
 
 time_at_execution_end_utc = pd.Timestamp.utcnow()
