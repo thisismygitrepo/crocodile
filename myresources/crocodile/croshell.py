@@ -48,7 +48,7 @@ else:
             get_art("crocodile", calliagraphy=None, artlib=artlib, file=(__ := P.tmpfile("croco_art", folder="tmp_arts")), verbose=False)
         os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
     except: print(__.read_text())
-
+print("\n\n")
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")

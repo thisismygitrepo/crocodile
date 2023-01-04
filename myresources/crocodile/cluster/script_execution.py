@@ -33,6 +33,7 @@ ssh_repr = ""
 ssh_repr_remote = ""
 py_script_path = ""
 shell_script_path = ""
+machine_obj_path = ""
 description = ""
 error_message = "No error message."
 
@@ -40,10 +41,11 @@ repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 kwargs_path = tb.P(rf'{kwargs_path}').expanduser().absolute()
 py_script_path = tb.P(rf'{py_script_path}').expanduser().absolute()
 shell_script_path = tb.P(rf'{shell_script_path}').expanduser().absolute()
-results_data_path_log = tb.P(Definition.get_results_data_path_log(job_id)).expanduser().delete(sure=True).create(parents_only=True)
+execution_log_dir = tb.P(Definition.get_execution_log_dir(job_id)).expanduser().delete(sure=True).create(parents_only=True)
 
 tb.sys.path.insert(0, repo_path.str)
 kwargs = kwargs_path.readit()
+execution_log_dir.joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -83,37 +85,43 @@ if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
 else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
+    print(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}.")
     tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
-results_data_path_log.write_text(res_folder.collapseuser().as_posix())
-
 
 time_at_execution_end_utc = pd.Timestamp.utcnow()
 time_at_execution_end_local = pd.Timestamp.now()
-
 delta = time_at_execution_end_utc - time_at_execution_start_utc
-exec_times = tb.S(start_utc=time_at_execution_start_utc, end_utc=time_at_execution_end_utc, start_local=time_at_execution_start_local, end_local=time_at_execution_end_local, delta=delta)
+exec_times = tb.S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc 🌍⏰": time_at_execution_end_utc,
+                   "start_local ⏲️": time_at_execution_start_local, "end_local ⏰": time_at_execution_end_local, "delta ⏳": delta})
 
-
-inspect(exec_times, value=False, title="Execution Times", docs=False, sort=False)
-print("\n" * 1)
-
-
+# save the following in results folder and execution log folder.:
+execution_log_dir.joinpath("end_time.txt").write_text(str(time_at_execution_end_local))
+execution_log_dir.joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
+execution_log_dir.joinpath("error_message.txt").write_text(error_message)
+tb.P(machine_obj_path).move(folder=res_folder)
+exec_times.save(path=res_folder.joinpath("execution_times.pkl"))
 tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
-Job executed via run_on_cluster with:
-{ssh_repr}
+Job executed via tb.cluster.Machine
+remote: {ssh_repr}
+job_id: {job_id}
 
 py_script_path @ `{py_script_path.collapseuser()}`
 shell_script_path @ `{shell_script_path.collapseuser()}`
 kwargs_path @ `{kwargs_path.collapseuser()}`
 
-Execution Time:
+### Execution Time:
 {exec_times.print(as_config=True, return_str=True)}
 
+### Job description
 {description}
 
 ''')
 
+
+# print to execution console:
+inspect(exec_times, value=False, title="Execution Times", docs=False, sort=False)
+print("\n" * 1)
 ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
 console.print(Panel(Text(f'''
 ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 

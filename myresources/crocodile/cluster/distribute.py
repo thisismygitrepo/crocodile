@@ -96,7 +96,7 @@ class Cluster:
             else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
 
-    def check_submissions(self): tb.L(self.machines).apply(lambda machine: machine.check_submission())
+    def check_submissions(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
         for idx, a_m in enumerate(self.machines):
             results_folder = a_m.results_path

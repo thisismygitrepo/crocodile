@@ -9,9 +9,9 @@ from rich.console import Console
 
 class Definition:
     @staticmethod
-    def get_results_data_path_log(job_id):
+    def get_execution_log_dir(job_id):
         """A text file that cluster deletes at the begining then write to at the end of each job."""
-        return f"~/tmp_results/cluster/result_folders/job_id__{job_id}.txt"
+        return f"~/tmp_results/cluster/result_folders/job_id__{job_id}"
 
     @staticmethod
     def get_cluster_pickle(name):
@@ -58,7 +58,7 @@ class Machine:
         self.email_config_name = email_config_name
 
         # scripts
-        self.shell_script_path, self.py_script_path, self.kwargs_path = None, None, None
+        self.shell_script_path = self.py_script_path = self.kwargs_path = self.machine_obj_path = None
         self.py_download_script = None
         self.py_script_modified = None
         self.shell_script_modified = None
@@ -77,13 +77,36 @@ class Machine:
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
     def execute_script(self): self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
-    def check_submission(self) -> tb.P or None:
-        results_data_path_log = Definition.get_results_data_path_log(self.job_id)
-        op = self.ssh.run(f"cat {results_data_path_log}", verbose=False).capture().op2path(strict_err=True)  # generate an error if the file does not exist
-        if op is None: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
-        else: print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁")
-        self.results_path = op
-        return op
+    def check_job_status(self) -> tb.P or None:
+        if not self.submitted:
+            print("Job even not submitted yet. 🤔")
+            return None
+        base_dir = tb.P(Definition.get_execution_log_dir(self.job_id))
+
+        trace_file = base_dir.joinpath("end_time.txt")
+        end_time_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op_if_successfull_or_default(strict_returcode=True, strict_err=True, default=None)  # cat generates an error if the file does not exist which is captured by strict and results in None.
+
+        if end_time_check is None:
+
+            trace_file = base_dir.joinpath("start_time.txt")
+            start_time_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op_if_successfull_or_default(strict_returcode=True, strict_err=True, default=None)  # cat generates an error if the file does not exist which is captured by strict and results in None.
+
+            if start_time_check is None:
+                print(f"Job {self.job_id} is still in the queue. 🤯")
+            else:
+                print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
+        else:
+
+            trace_file = base_dir.joinpath("results_folder_path.txt")
+            results_folder_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op2path(strict_err=True)  # cat generates an error if the file does not exist which is captured by strict and results in None.
+
+            print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
+📁 results_folder_path: {results_folder_check} 
+{inspect(self.ssh.copy_to_here(results_folder_check).readit(), value=False, title="Execution Times", docs=False, sort=False)}
+""")
+
+            self.results_path = results_folder_check
+
     def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
 
     def run(self):
@@ -122,6 +145,8 @@ api = GDriveAPI()
             self.ssh.copy_from_here(self.py_script_path)
             self.ssh.copy_from_here(self.shell_script_path)
             self.ssh.copy_from_here(self.kwargs_path)
+            tb.Save.pickle(obj=self, path=self.machine_obj_path)
+            self.ssh.copy_from_here(self.machine_obj_path)
             self.ssh.run_py(f"tb.P(r'{Definition.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.shell_script_path.collapseuser().as_posix()}')")
             if self.copy_repo: self.ssh.copy_from_here(self.repo_path, zip_first=True, overwrite=True)
             if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
@@ -137,13 +162,14 @@ api = GDriveAPI()
                 # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
                 # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
                 # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
-            else:  pass
+            else: pass
         self.submitted = True
 
     def generate_scripts(self):
         py_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__{tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}__{self.job_id}.py").create(parents_only=True)
         shell_script_path = tb.P.tmp().joinpath(f"tmp_scripts/shell/cluster_script__{tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}__{self.job_id}" + {"Windows": ".ps1", "Linux": ".sh"}[self.ssh.get_remote_machine()]).create(parents_only=True)
         kwargs_path = tb.P.tmp().joinpath(f"tmp_files/kwargs__{tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}__{self.job_id}.Struct.pkl").create(parents_only=True)
+        machine_obj_path = tb.P.tmpdir().joinpath(f"machine.Machine.pkl")
 
         func_name = self.func.__name__ if self.func is not None else None
         func_module = self.func.__module__ if self.func is not None else None
@@ -154,6 +180,7 @@ api = GDriveAPI()
                            py_script_path=py_script_path.collapseuser().as_posix(),
                            shell_script_path=shell_script_path.collapseuser().as_posix(),
                            kwargs_path=kwargs_path.collapseuser().as_posix(),
+                           machine_obj_path=machine_obj_path.collapseuser().as_posix(),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, rel_full_path=rel_full_path,
                            job_id=self.job_id, description=self.description)
@@ -196,7 +223,7 @@ deactivate
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
         with open(file=shell_script_path.create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         tb.Save.pickle(obj=self.kwargs, path=kwargs_path, verbose=False)
-        self.shell_script_path, self.py_script_path, self.kwargs_path = shell_script_path, py_script_path, kwargs_path
+        self.shell_script_path, self.py_script_path, self.kwargs_path, self.machine_obj_path = shell_script_path, py_script_path, kwargs_path, machine_obj_path
 
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.shell_script_path.read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
@@ -204,6 +231,8 @@ deactivate
 
 
 def try_main():
+    # noinspection PyUnresolvedReferences
+    from crocodile.cluster.remote_machine import Machine  # importing the function is critical for the pickle to work.
     st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
     from crocodile.cluster import trial_file
     c = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
@@ -213,7 +242,7 @@ def try_main():
     c.generate_scripts()
     c.show_scripts()
     c.submit()
-    c.check_submission()
+    c.check_job_status()
     return c
 
 
