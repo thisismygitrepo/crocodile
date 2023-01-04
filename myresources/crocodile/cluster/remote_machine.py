@@ -102,10 +102,11 @@ class Machine:
 
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
 📁 results_folder_path: {results_folder_check} 
-{inspect(self.ssh.copy_to_here(results_folder_check).readit(), value=False, title="Execution Times", docs=False, sort=False)}
+{inspect(self.ssh.copy_to_here(base_dir.joinpath("execution_times.pkl")).readit(), value=False, title="Execution Times", docs=False, sort=False)}
 """)
 
             self.results_path = results_folder_check
+            return results_folder_check
 
     def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
 
@@ -145,11 +146,13 @@ api = GDriveAPI()
             self.ssh.copy_from_here(self.py_script_path)
             self.ssh.copy_from_here(self.shell_script_path)
             self.ssh.copy_from_here(self.kwargs_path)
-            tb.Save.pickle(obj=self, path=self.machine_obj_path)
-            self.ssh.copy_from_here(self.machine_obj_path)
             self.ssh.run_py(f"tb.P(r'{Definition.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.shell_script_path.collapseuser().as_posix()}')")
             if self.copy_repo: self.ssh.copy_from_here(self.repo_path, zip_first=True, overwrite=True)
             if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
+
+            self.submitted = True
+            tb.Save.pickle(obj=self, path=self.machine_obj_path)
+            self.ssh.copy_from_here(self.machine_obj_path)
             self.ssh.print_summary()
 
             self.execution_command = (f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.shell_script_path.collapseuser().as_posix()}"
@@ -163,7 +166,6 @@ api = GDriveAPI()
                 # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
                 # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
             else: pass
-        self.submitted = True
 
     def generate_scripts(self):
         py_script_path = tb.P.tmp().joinpath(f"tmp_scripts/python/cluster_wrap__{tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}__{self.job_id}.py").create(parents_only=True)

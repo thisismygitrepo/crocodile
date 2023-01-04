@@ -86,6 +86,7 @@ if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
 else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
     console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
+    print("\n\n")
     tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
 
 time_at_execution_end_utc = pd.Timestamp.utcnow()
