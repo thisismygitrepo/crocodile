@@ -95,15 +95,19 @@ class Machine:
                 print(f"Job {self.job_id} is still in the queue. 🤯")
             else:
                 print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
+                print(f"It started at {start_time_check}. 🕒, and is still running. 🏃‍♂️")
+                import pandas as pd
+                print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time_check)}. 🕒")
         else:
 
-            trace_file = base_dir.joinpath("results_folder_path.txt")
+            trace_file = base_dir.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
             results_folder_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op2path(strict_err=True)  # cat generates an error if the file does not exist which is captured by strict and results in None.
 
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
-📁 results_folder_path: {results_folder_check} 
-{inspect(self.ssh.copy_to_here(base_dir.joinpath("execution_times.Struct.pkl")).readit(), value=False, title="Execution Times", docs=False, sort=False)}
-""")
+📁 results_folder_path: {results_folder_check} """)
+            try:
+                print(inspect(self.ssh.copy_to_here(tb.P(results_folder_check).joinpath("execution_times.Struct.pkl")).readit(), value=False, title="Execution Times", docs=False, sort=False))
+            except Exception as err: print(f"Could not read execution times files. 🤷‍♂, here is the error:\n {err}️")
 
             self.results_path = results_folder_check
             return results_folder_check
