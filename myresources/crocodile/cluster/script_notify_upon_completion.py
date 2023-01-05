@@ -2,6 +2,8 @@
 
 from crocodile.comms.notification import Email
 import crocodile.toolbox as tb
+from crocodile.cluster.remote_machine import MachinePathDict
+import platform
 
 # to be replaced
 addressee = ""
@@ -16,9 +18,8 @@ to_email = ""
 to_be_deleted = ["exec_times = tb.S()", "shell_script_path = tb.P()", "py_script_path = tb.P()", "res_folder = tb.P()", "error_message = ''"]
 error_message = ''
 exec_times = tb.S()
-shell_script_path = tb.P()
-py_script_path = tb.P()
 res_folder = tb.P()
+path_dict = MachinePathDict(job_id, platform.system())
 
 print(f'SENDING notification email using `{email_config_name}` email configuration ...')
 
@@ -35,9 +36,9 @@ Hi `{addressee}`, I'm `{speaker}`, this is a notification that I have completed 
 #### Execution Times
 {exec_times.print(as_config=True, return_str=True)}
 #### Executed Shell Script: 
-`{shell_script_path}`
+`{path_dict.shell_script_path}`
 #### Executed Python Script: 
-`{py_script_path}`
+`{path_dict.py_script_path}`
 
 #### Pull results using this script:
 `ftprx {ssh_conn_str} {res_folder.collapseuser().as_posix()} -r`

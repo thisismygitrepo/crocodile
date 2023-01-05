@@ -182,10 +182,6 @@ api = GDriveAPI()
 
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
-                           py_script_path=self.path_dict.py_script_path.collapseuser().as_posix(),
-                           shell_script_path=self.path_dict.shell_script_path.collapseuser().as_posix(),
-                           kwargs_path=self.path_dict.kwargs_path.collapseuser().as_posix(),
-                           machine_obj_path=self.path_dict.machine_obj_path.collapseuser().as_posix(),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, rel_full_path=rel_full_path,
                            job_id=self.job_id, description=self.description)
@@ -223,15 +219,15 @@ deactivate
 
 """
 
-        self.path_dict.py_script_path.write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
-        with open(file=self.path_dict.shell_script_path.create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
-        tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path, verbose=False)
+        with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
+        tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
+        self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
 
     def show_scripts(self) -> None:
-        Console().print(Panel(Syntax(self.path_dict.shell_script_path.read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
-        Console().print(inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path)), python_script=repr(tb.P(self.path_dict.py_script_path)), kwargs_file=repr(tb.P(self.path_dict.kwargs_path))), title="Prepared scripts and files.", value=False, docs=False, sort=False))
+        Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
+        Console().print(inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False))
 
 
 def try_main():
@@ -239,15 +235,15 @@ def try_main():
     from crocodile.cluster.remote_machine import Machine  # importing the function is critical for the pickle to work.
     st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
     from crocodile.cluster import trial_file
-    c = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
+    m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
                 notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
                 ipython=True, interactive=True, cloud=False)
-    c.generate_scripts()
-    c.show_scripts()
-    c.submit()
-    c.check_job_status()
-    return c
+    m.generate_scripts()
+    m.show_scripts()
+    m.submit()
+    m.check_job_status()
+    return m
 
 
 if __name__ == '__main__':
