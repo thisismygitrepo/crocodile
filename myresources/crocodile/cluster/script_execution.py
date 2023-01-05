@@ -10,6 +10,8 @@ from rich.panel import Panel
 from rich import inspect
 from rich.text import Text
 import pandas as pd
+import time
+
 
 console = Console()
 
@@ -31,9 +33,25 @@ func_module = ""
 description = ""
 ssh_repr = ""
 ssh_repr_remote = ""
-error_message = "No error message."
+error_message = "No error message."  # to be updated by try-except block inside execution line.
 
 job_id = ""
+lock_resources = ""
+
+
+if lock_resources:
+    lock_path = MachinePathDict.lock_path.expanduser()
+    if lock_path.exists():
+        lock_status = lock_path.readit()['status']
+        if lock_status == 'locked':
+            while lock_status == 'locked':
+                print(f"Resources are locked by another job. Sleeping for 10 minutes.")
+                time.sleep(60 * 10)
+                lock_status = lock_path.readit()['status']
+        else: tb.Struct(status="locked").save(path=lock_path)
+    else:
+        tb.Struct(status="locked").save(path=lock_path)
+
 
 path_dict = MachinePathDict(job_id, platform.system())
 repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
@@ -74,6 +92,8 @@ print("\n" * 2)
 
 # ######################### END OF EXECUTION #############################
 
+
+if lock_resources: tb.Struct(status="unlocked").save(path=MachinePathDict.lock_path.expanduser())
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()

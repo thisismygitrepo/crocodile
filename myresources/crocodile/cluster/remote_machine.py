@@ -8,6 +8,8 @@ from rich.console import Console
 
 
 class MachinePathDict:
+    lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
+
     def __init__(self, job_id, remote_machine_type):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
@@ -32,7 +34,8 @@ class Machine:
                  data: list or None = None, open_console: bool = True, cloud=False, job_id=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
-                 ipython=False, interactive=False, pdb=False, wrap_in_try_except=False):
+                 ipython=False, interactive=False, pdb=False, wrap_in_try_except=False,
+                 lock_resources=False):
 
         # function and its data
         if type(func) is str or type(func) is tb.P: self.func_file, self.func = tb.P(func), None
@@ -61,6 +64,7 @@ class Machine:
         self.notify_upon_completion = notify_upon_completion
         self.to_email = to_email
         self.email_config_name = email_config_name
+        self.lock_resources = lock_resources
 
         self.py_download_script = None
         self.py_script_modified = None
@@ -194,8 +198,8 @@ api = GDriveAPI()
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
-                           func_name=func_name, func_module=func_module, rel_full_path=rel_full_path,
-                           job_id=self.job_id, description=self.description)
+                           func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.description,
+                           job_id=self.job_id, lock_resources=self.lock_resources)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path)
 
         if self.notify_upon_completion:
@@ -249,7 +253,7 @@ def try_main():
     m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
                 notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
-                ipython=True, interactive=True, cloud=False)
+                ipython=True, interactive=True, cloud=False, lock_resources=True)
     m.generate_scripts()
     m.show_scripts()
     m.submit()
