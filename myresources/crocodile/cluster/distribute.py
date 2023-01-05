@@ -3,16 +3,22 @@ import numpy as np
 # import psutil
 import crocodile.toolbox as tb
 from math import ceil
-from crocodile.cluster.remote_machine import Machine, MachinePathDict
+from crocodile.cluster.remote_machine import Machine
 from rich.console import Console
+# from platform import system
 
 
 console = Console()
 
 
 class Cluster:
+    @staticmethod
+    def get_cluster_path(job_id): return tb.P.home().joinpath(rf"tmp_results/remote_machines/job_id__{job_id}")
+
     def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False, max_num: int = 100, criterion_name: str = ["cpu", "ram", "both"][-1], func_kwargs_list=None, load_ratios=None, load_ratios_repr="", open_console=False, description="", **kwargs, ):
         self.job_id = tb.randstr(length=10)
+        self.results_path = self.get_cluster_path(self.job_id)
+        self.results_downloaded = False
         self.load_ratios = load_ratios
         self.load_ratios_repr = load_ratios_repr
         self.max_num = max_num
@@ -39,12 +45,6 @@ class Cluster:
             self.generate_standard_kwargs()
             self.viz_load_ratios()
         else: self.func_kwargs_list = func_kwargs_list
-        self._results_dir = None
-
-    @property
-    def results_dir(self):
-        if self._results_dir is None: raise Exception(f"Results dir not set yet. Wait until its set by `{self.download_results}` function.")
-        return self._results_dir
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
 
@@ -85,9 +85,10 @@ class Cluster:
 
     def submit(self):
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
-            m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id, **self.kwargs)
+            m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id + f"_{idx}", **self.kwargs)
             m.run()
             self.machines.append(m)
+        tb.Save.pickle(obj=self, path=self.results_path.joinpath("cluster.Cluster.pkl"))
 
     def mux_consoles(self):
         cmd = ""
@@ -98,28 +99,26 @@ class Cluster:
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
+        if self.results_downloaded:
+            print(f"All results downloaded to {self.results_path} 🤗")
+            return True
         for idx, a_m in enumerate(self.machines):
-            results_folder = a_m.results_path
+            results_folder = tb.P(a_m.results_path).expanduser()
             if results_folder is not None and a_m.results_downloaded is False:
-                if self._results_dir is None: self._results_dir = results_folder.append(f"_cluster_job_id__{self.job_id}")
-                target = self.results_dir.joinpath(results_folder.append(f"_cluster_{idx}__{tb.randstr()}").name)
                 print("\n")
                 console.rule(f"Downloading results from {a_m}")
                 print("\n")
-                a_m.ssh.copy_to_here(results_folder.as_posix(), target=target, r=True, zip_first=False)
-                a_m.results_downloaded = True
+                a_m.download_results(target=self.results_path.joinpath(results_folder.name), r=True, zip_first=False)
         if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
-            print(f"All results downloaded to {self.results_dir}")
-            tb.Save.pickle(obj=self, path=self.results_dir.joinpath("cluster.Cluster.pkl"))
+            print(f"All results downloaded to {self.results_path} 🤗")
+            self.results_downloaded = True
 
-    def save(self, name=None): tb.Save.pickle(obj=self, path=Definition.get_cluster_pickle(name or self.job_id))
     @staticmethod
-    def load(name) -> 'Cluster': return Definition.get_cluster_pickle(name).readit()
-    def run(self, name="cluster"):
+    def load(job_id) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id).joinpath("cluster.Cluster.pkl").readit()
+    def run(self):
         self.generate_standard_kwargs()
         self.submit()
         self.mux_consoles()
-        self.save(name)
         return self
 
 
@@ -131,7 +130,6 @@ def try_it():
     c.generate_standard_kwargs()
     c.submit()
     c.mux_consoles()
-    c.save("cluster")
 
     # later ...
     c = Cluster.load("cluster")

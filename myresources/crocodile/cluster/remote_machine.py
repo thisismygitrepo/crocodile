@@ -14,7 +14,7 @@ class MachinePathDict:
         * pickle of Machine and clusters objects.
         """
         # EVERYTHING MUST REMAIN IN RELATIVE PATHS
-        self.root_dir = tb.P(f"~/tmp_results/cluster/job_id__{job_id}")
+        self.root_dir = tb.P(f"~/tmp_results/remote_machines/job_id__{job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py").create(parents_only=True)
@@ -88,37 +88,48 @@ class Machine:
         if not self.submitted:
             print("Job even not submitted yet. 🤔")
             return None
+        elif self.results_downloaded:
+            print("Job already completed. 🤔")
+            return None
 
-        trace_file = self.path_dict.execution_log_dir.joinpath("end_time.txt")
-        end_time_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op_if_successfull_or_default(strict_returcode=True, strict_err=True, default=None)  # cat generates an error if the file does not exist which is captured by strict and results in None.
+        base = self.path_dict.execution_log_dir.expanduser().create()
+        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir, zip_first=True)
+        except: pass  # the directory doesn't exist yet at the remote.
+        end_time_file = base.joinpath("end_time.txt")
 
-        if end_time_check is None:
+        if not end_time_file.exists():
 
-            trace_file = self.path_dict.execution_log_dir.joinpath("start_time.txt")
-            start_time_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op_if_successfull_or_default(strict_returcode=True, strict_err=True, default=None)  # cat generates an error if the file does not exist which is captured by strict and results in None.
+            start_time_file = base.joinpath("start_time.txt")
 
-            if start_time_check is None:
+            if not start_time_file.exists():
                 print(f"Job {self.job_id} is still in the queue. 🤯")
             else:
+                start_time = start_time_file.read_text()
                 print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
-                print(f"It started at {start_time_check}. 🕒, and is still running. 🏃‍♂️")
+                print(f"It started at {start_time}. 🕒, and is still running. 🏃‍♂️")
                 import pandas as pd
-                print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time_check)}. 🕒")
+                print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒")
         else:
 
-            trace_file = self.path_dict.execution_log_dir.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
-            results_folder_check = self.ssh.run(f"cat {trace_file.as_posix()}", verbose=False).capture().op2path(strict_err=True)  # cat generates an error if the file does not exist which is captured by strict and results in None.
-
+            results_folder_file = base.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
+            results_folder = results_folder_file.read_text()
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
-📁 results_folder_path: {results_folder_check} """)
+📁 results_folder_path: {results_folder} """)
             try:
-                print(inspect(self.ssh.copy_to_here(tb.P(results_folder_check).joinpath("execution_times.Struct.pkl")).readit(), value=False, title="Execution Times", docs=False, sort=False))
-            except Exception as err: print(f"Could not read execution times files. 🤷‍♂, here is the error:\n {err}️")
+                print(inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False))
+            except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
 
-            self.results_path = results_folder_check
-            return results_folder_check
+            self.results_path = results_folder
+            return results_folder
 
-    def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
+    def download_results(self, target=None, r=True, zip_first=False):
+        if self.results_path is not None:
+            self.ssh.copy_to_here(source=self.results_path, target=target, r=r, zip_first=zip_first)
+            self.results_downloaded = True
+        else:
+            print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
+        return self
+    def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False); return self
 
     def run(self):
         self.generate_scripts()
@@ -159,7 +170,7 @@ api = GDriveAPI()
 
             self.submitted = True
             tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
-            self.ssh.copy_from_here(self.path_dict.root_dir, r=True)
+            self.ssh.copy_from_here(self.path_dict.root_dir, zip_first=True)
             self.ssh.print_summary()
 
             self.execution_command = (f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"
@@ -243,6 +254,9 @@ def try_main():
     m.show_scripts()
     m.submit()
     m.check_job_status()
+
+    m.download_results(r=True)
+    m.delete_remote_results()
     return m
 
 

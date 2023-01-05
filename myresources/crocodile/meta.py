@@ -61,8 +61,8 @@ class Terminal:
         ip = property(lambda self: self.output["stdin"])
         err = property(lambda self: self.output["stderr"])
         returncode = property(lambda self: self.output["returncode"])
-        def op2path(self, strict_returcode=True, strict_err=False) -> P or None:
-            return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else None
+        def op2path(self, strict_returncode=True, strict_err=False) -> P or None:
+            return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
         def op_if_successfull_or_default(self, strict_returcode=True, strict_err=False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
@@ -183,7 +183,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def copy_to_here(self, source, target=None, zip_first=False, r=False) -> P:
         if not zip_first and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", strict_returncode=True, strict_err=True).op2path()
+        if zip_first: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file").op2path(strict_returncode=True, strict_err=True)
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if zip_first and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
