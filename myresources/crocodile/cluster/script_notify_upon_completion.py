@@ -15,10 +15,11 @@ email_config_name = ""
 to_email = ""
 
 
-to_be_deleted = ["exec_times = tb.S()", "shell_script_path = tb.P()", "py_script_path = tb.P()", "res_folder = tb.P()", "error_message = ''"]
+to_be_deleted = ["exec_times = tb.S()", "res_folder = tb.P()", "error_message = ''"]
 error_message = ''
 exec_times = tb.S()
 res_folder = tb.P()
+
 path_dict = MachinePathDict(job_id, platform.system())
 
 print(f'SENDING notification email using `{email_config_name}` email configuration ...')

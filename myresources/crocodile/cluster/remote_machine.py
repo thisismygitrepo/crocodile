@@ -158,7 +158,7 @@ api = GDriveAPI()
             if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
 
             self.submitted = True
-            tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path)
+            tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
             self.ssh.copy_from_here(self.path_dict.root_dir, r=True)
             self.ssh.print_summary()
 

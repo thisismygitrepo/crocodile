@@ -39,7 +39,7 @@ path_dict = MachinePathDict(job_id, platform.system())
 repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 tb.sys.path.insert(0, repo_path.str)
 kwargs = path_dict.kwargs_path.readit()
-path_dict.execution_log_dir.create(parents_only=True).joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
+path_dict.execution_log_dir.create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -93,7 +93,7 @@ exec_times = tb.S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc
 path_dict.execution_log_dir.joinpath("end_time.txt").write_text(str(time_at_execution_end_local))
 path_dict.execution_log_dir.joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
 path_dict.execution_log_dir.joinpath("error_message.txt").write_text(error_message)
-tb.P(path_dict.machine_obj_path).move(folder=res_folder)
+path_dict.machine_obj_path.move(folder=res_folder)
 exec_times.save(path=res_folder.joinpath("execution_times.Struct.pkl"))
 tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
