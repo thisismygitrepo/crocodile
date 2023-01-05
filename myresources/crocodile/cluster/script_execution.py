@@ -51,6 +51,7 @@ if lock_resources:
         else: tb.Struct(status="locked").save(path=lock_path)
     else:
         tb.Struct(status="locked").save(path=lock_path)
+    console.print(f"Resources are locked by this job `{job_id}`.", highlight=True)
 
 
 path_dict = MachinePathDict(job_id, platform.system())
@@ -93,7 +94,10 @@ print("\n" * 2)
 # ######################### END OF EXECUTION #############################
 
 
-if lock_resources: tb.Struct(status="unlocked").save(path=MachinePathDict.lock_path.expanduser())
+if lock_resources:
+    tb.Struct(status="unlocked").save(path=MachinePathDict.lock_path.expanduser())
+    console.print(f"Resources have been released by this job `{job_id}`.")
+
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
