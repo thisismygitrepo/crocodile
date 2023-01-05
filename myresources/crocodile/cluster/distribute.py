@@ -3,7 +3,7 @@ import numpy as np
 # import psutil
 import crocodile.toolbox as tb
 from math import ceil
-from crocodile.cluster.remote_machine import Machine, Definition
+from crocodile.cluster.remote_machine import Machine, MachinePathDict
 from rich.console import Console
 
 

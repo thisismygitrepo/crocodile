@@ -68,7 +68,7 @@ class HyperParam(tb.Struct):
     @property
     def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
     @property
-    def save_dir(self): return (tb.P(self.root) / self.name).create()
+    def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
 
     @property
     def device(self):

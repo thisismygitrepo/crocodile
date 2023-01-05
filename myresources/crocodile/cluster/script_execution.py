@@ -3,7 +3,7 @@
 import getpass
 import platform
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import Definition
+from crocodile.cluster.remote_machine import MachinePathDict
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
@@ -27,25 +27,19 @@ rel_full_path = ""
 repo_path = ""
 func_name = ""
 func_module = ""
-kwargs_path = ""
-job_id = ""
+
+description = ""
 ssh_repr = ""
 ssh_repr_remote = ""
-py_script_path = ""
-shell_script_path = ""
-machine_obj_path = ""
-description = ""
 error_message = "No error message."
 
-repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
-kwargs_path = tb.P(rf'{kwargs_path}').expanduser().absolute()
-py_script_path = tb.P(rf'{py_script_path}').expanduser().absolute()
-shell_script_path = tb.P(rf'{shell_script_path}').expanduser().absolute()
-execution_log_dir = tb.P(Definition.get_execution_log_dir(job_id)).expanduser().delete(sure=True).create()
+job_id = ""
 
+path_dict = MachinePathDict(job_id, platform.system())
+repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 tb.sys.path.insert(0, repo_path.str)
-kwargs = kwargs_path.readit()
-execution_log_dir.joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
+kwargs = path_dict.kwargs_path.readit()
+path_dict.execution_log_dir.create(parents_only=True).joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -56,7 +50,7 @@ print("\n" * 2)
 console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
 console.print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}", style="bold blue")
-inspect(kwargs, value=False, title=f"kwargs from `{kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
+inspect(kwargs, value=False, title=f"kwargs from `{path_dict.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
 
@@ -96,10 +90,10 @@ exec_times = tb.S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc
                    "start_local ⏲️": time_at_execution_start_local, "end_local ⏰": time_at_execution_end_local, "delta ⏳": delta})
 
 # save the following in results folder and execution log folder.:
-execution_log_dir.joinpath("end_time.txt").write_text(str(time_at_execution_end_local))
-execution_log_dir.joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
-execution_log_dir.joinpath("error_message.txt").write_text(error_message)
-tb.P(machine_obj_path).move(folder=res_folder)
+path_dict.execution_log_dir.joinpath("end_time.txt").write_text(str(time_at_execution_end_local))
+path_dict.execution_log_dir.joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
+path_dict.execution_log_dir.joinpath("error_message.txt").write_text(error_message)
+tb.P(path_dict.machine_obj_path).move(folder=res_folder)
 exec_times.save(path=res_folder.joinpath("execution_times.Struct.pkl"))
 tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
@@ -107,9 +101,9 @@ Job executed via tb.cluster.Machine
 remote: {ssh_repr}
 job_id: {job_id}
 
-py_script_path @ `{py_script_path.collapseuser()}`
-shell_script_path @ `{shell_script_path.collapseuser()}`
-kwargs_path @ `{kwargs_path.collapseuser()}`
+py_script_path @ `{path_dict.py_script_path.collapseuser()}`
+shell_script_path @ `{path_dict.shell_script_path.collapseuser()}`
+kwargs_path @ `{path_dict.kwargs_path.collapseuser()}`
 
 ### Execution Time:
 {exec_times.print(as_config=True, return_str=True)}
