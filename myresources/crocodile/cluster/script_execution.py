@@ -22,9 +22,11 @@ time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
 
 to_be_deleted = ['res = ""  # to be overridden by execution line.', 'exec_obj = ""  # to be overridden by execution line.']
+# items below are defined to silence IDE warnings. They will be deleted by script preparer, then later defined by function to be executed.
 res = ""  # to be overridden by execution line.
 exec_obj = ""  # to be overridden by execution line.
 
+# items below in form of `key = ""` will be replaced by script preparer with values from calling function.
 rel_full_path = ""
 repo_path = ""
 func_name = ""

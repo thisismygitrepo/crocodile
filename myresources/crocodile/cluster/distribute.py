@@ -88,17 +88,26 @@ class Cluster:
             m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id + f"_{idx}", **self.kwargs)
             m.run()
             self.machines.append(m)
-        tb.Save.pickle(obj=self, path=self.results_path.joinpath("cluster.Cluster.pkl"))
+        try:
+            tb.Save.pickle(obj=self, path=self.results_path.joinpath("cluster.Cluster.pkl"))
+        except TypeError:
+            print("Couldn't pickle cluster object")
 
     def mux_consoles(self):
         cmd = ""
         for idx, m in enumerate(self.machines):
             if idx == 0: cmd += f""" wt pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
             else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
+            sep = "\n"
+            m.ssh.run(f"zellij --session {m.ssh.run('zellij ls').op.split(sep)[0]} action write-chars '{m.execution_command}'")
+            # m.ssh.run(f"zellij --session {m.ssh.run('zellij ls').op.split(sep)[0]} run -- '{m.execution_command}'")
+
         tb.Terminal().run_async(*cmd.split(" "))
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
+        if self.results_path is None: self.check_job_status()
+        if self.results_path is None: print(f"Results are not ready yet. Try later"); return None
         if self.results_downloaded:
             print(f"All results downloaded to {self.results_path} 🤗")
             return True
@@ -124,7 +133,7 @@ class Cluster:
 
 def try_it():
     from crocodile.cluster.trial_file import expensive_function_parallel
-    machine_specs_list = [dict(port=2224), dict(host="surface")]  # , dict(host="surface_wsl"), dict(port=2224)
+    machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
     c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, max_num=1000, install_repo=False)
     print(c)
     c.generate_standard_kwargs()
@@ -137,6 +146,13 @@ def try_it():
     c.download_results()
     tb.L(c.machines).delete_remote_results()
     return c
+
+
+class Zellij:
+    def __init__(self, ssh):
+        self.ssh = ssh
+    def get_session(self):
+        return self.ssh.run("zellij ls").op.split("\n")[0]
 
 
 if __name__ == '__main__':
