@@ -87,7 +87,13 @@ class Machine:
 
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
-    def fire_execution_script_on_remote(self): self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
+    def fire_execution_script_on_remote(self):
+        # self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
+        sep = "\n"
+        self.ssh.run(f"zellij --session {self.ssh.run('zellij ls').op.split(sep)[0]} action write-chars '{self.execution_command}'")
+
+    # m.ssh.run(f"zellij --session {m.ssh.run('zellij ls').op.split(sep)[0]} run -- '{m.execution_command}'")
+
     def check_job_status(self) -> tb.P or None:
         if not self.submitted:
             print("Job even not submitted yet. 🤔")

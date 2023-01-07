@@ -98,9 +98,6 @@ class Cluster:
         for idx, m in enumerate(self.machines):
             if idx == 0: cmd += f""" wt pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
             else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
-            sep = "\n"
-            m.ssh.run(f"zellij --session {m.ssh.run('zellij ls').op.split(sep)[0]} action write-chars '{m.execution_command}'")
-            # m.ssh.run(f"zellij --session {m.ssh.run('zellij ls').op.split(sep)[0]} run -- '{m.execution_command}'")
 
         tb.Terminal().run_async(*cmd.split(" "))
 
