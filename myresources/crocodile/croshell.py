@@ -31,7 +31,7 @@ console.rule(_, style="bold red", align="center")
 _ = Text(f"Crocodile Shell")
 _.stylize("#93e6c7 on #093006")
 print(_, __import__('crocodile').__version__)
-print("Made with ❤️")
+print("Made with 🐍 | Built with ❤️")
 
 tb.D.set_numpy_display()
 tb.D.set_pandas_display()
@@ -49,6 +49,7 @@ else:
         os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
     except: print(__.read_text())
 print("\n\n")
+
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")

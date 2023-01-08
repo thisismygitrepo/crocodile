@@ -31,7 +31,7 @@ class MachinePathDict:
 class Machine:
     def __init__(self, func, kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
-                 data: list or None = None, open_console: bool = True, cloud=False, job_id=None,
+                 data: list or None = None, open_console: bool = True, transfer_method="ssh", job_id=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
                  ipython=False, interactive=False, pdb=False, wrap_in_try_except=False,
@@ -58,22 +58,18 @@ class Machine:
         self.ipython = ipython
         self.interactive = interactive
         self.pdb = pdb
+        self.execution_command = None
 
-        # cluster behaviour
+        # remote machine behaviour
         self.open_console = open_console
         self.notify_upon_completion = notify_upon_completion
         self.to_email = to_email
         self.email_config_name = email_config_name
         self.lock_resources = lock_resources
 
-        self.py_download_script = None
-        self.py_script_modified = None
-        self.shell_script_modified = None
-        self.execution_command = None
-
         # conn
         self.machine_specs = machine_specs
-        self.cloud = cloud
+        self.transfer_method = transfer_method
         self.ssh = ssh or tb.SSH(**machine_specs)
 
         # scripts
@@ -147,40 +143,15 @@ class Machine:
         self.submit()
 
     def submit(self):
-        if self.cloud:
-            from crocodile.comms.gdrive import GDriveAPI
-            api = GDriveAPI()
-            paths = [self.path_dict.kwargs_path]
-            if self.copy_repo: api.upload(local_path=self.repo_path, rel2home=True, overwrite=True, zip_first=True, encrypt_first=True)
-            if self.data is not None:
-                tb.L(self.data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
-                paths += list(self.data)
-            downloads = '\n'.join([f"api.download(fpath=r'{item.collapseuser().as_posix()}', rel2home=True)" for item in paths])
-            self.py_download_script = f"""
-from crocodile.comms.gdrive import GDriveAPI
-from crocodile.file_management import P
-api = GDriveAPI()
-{downloads}
-{'' if not self.copy_repo else f'api.download(fpath=r"{self.repo_path.collapseuser().as_posix()}", unzip=True, decrypt=True)'}
-"""
-            self.shell_script_modified = self.path_dict.shell_script_path.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"bu_gdrive_rx -R {self.path_dict.py_script_path.collapseuser().as_posix()}")
-            with open(file=self.path_dict.shell_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(self.shell_script_modified)
-            self.py_script_modified = self.path_dict.py_script_path.read_text().replace("# EXTRA-PLACEHOLDER-PRE", self.py_download_script)
-            with open(file=self.path_dict.py_script_path, mode='w', newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(self.py_script_modified)
-
-            api.upload(local_path=self.path_dict.shell_script_path, rel2home=True, overwrite=True)
-            api.upload(local_path=self.path_dict.py_script_path, rel2home=True, overwrite=True)
-            api.upload(local_path=self.path_dict.kwargs_path, rel2home=True, overwrite=True)
-            tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {self.path_dict.shell_script_path.collapseuser().as_posix()}; " + ("source " if self.ssh.get_remote_machine() != "Windows" else "")) + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}")
-            print("Finished uploading to cloud. Please run the clipboard command on the remote machine:")
+        if self.transfer_method == "gdrive": pass
         else:
             self.ssh.run_py(f"tb.P(r'{MachinePathDict.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.path_dict.shell_script_path.collapseuser().as_posix()}')")
-            if self.copy_repo: self.ssh.copy_from_here(self.repo_path, zip_first=True, overwrite=True)
-            if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, zip_first=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
+            if self.copy_repo: self.ssh.copy_from_here(self.repo_path, z=True, overwrite=True)
+            if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
 
             self.submitted = True
             tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
-            self.ssh.copy_from_here(self.path_dict.root_dir, zip_first=True)
+            self.ssh.copy_from_here(self.path_dict.root_dir, z=True)
             self.ssh.print_summary()
 
             self.execution_command = (f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"
@@ -259,7 +230,7 @@ def try_main():
     m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
                 notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
-                ipython=True, interactive=True, cloud=False, lock_resources=True)
+                ipython=True, interactive=True, lock_resources=True)
     m.generate_scripts()
     m.show_scripts()
     m.submit()
