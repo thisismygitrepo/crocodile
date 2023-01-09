@@ -8,12 +8,14 @@ class Submission:
 
     @staticmethod
     def transfer_sh(machine: Machine):
+        print("Using transfer.sh to send data to remote machine.")
         cloud_download_py_script = "import crocodile.toolbox as tb\n"
 
         # downloading repo, this takes place prior to pyscript (otherwise, its tool late as the library is loaded at the top of the pyscript already)
         if machine.copy_repo:
             tmp_file = machine.repo_path.expanduser().zip_n_encrypt()
-            cloud_download_py_script = cloud_download_py_script + f"tb.P(r'{tmp_file.transfer_sh()}').download(folder=r'{machine.repo_path.parent}').decrypt_n_unzip()\n"
+            cloud_download_py_script += f"print('Downloading `{tmp_file.collapseuser()}`.')\n"
+            cloud_download_py_script += f"tb.P(r'{tmp_file.transfer_sh()}').download(folder=r'{machine.repo_path.parent}').decrypt_n_unzip()\n"
             tmp_file.delete(sure=True)
 
         # download data
@@ -25,11 +27,14 @@ class Submission:
 
         # modify and save shell_script to including running of cloud_download_py_script before job script.
         shell_file = machine.path_dict.shell_script_path.expanduser()
-        shell_file.write_text(shell_file.replace("# EXTRA-PLACEHOLDER-POST", f". activate_ve; python {machine.path_dict.cloud_download_py_script_path.expanduser()}"), encoding="utf-8")
+        shell_script = shell_file.read_text().replace("# EXTRA-PLACEHOLDER-POST", f"cd ~; python {machine.path_dict.cloud_download_py_script_path.rel2home().as_posix()}")
+        with open(file=shell_file, mode='w', newline={"Windows": None, "Linux": "\n"}[machine.ssh.get_remote_machine()]) as file: file.write(shell_script)
 
         # upload root dir and create execution command to download it and run the shell_script.
         download_url = machine.path_dict.root_dir.zip().transfer_sh()
-        machine.execution_command = f"curl -o '{machine.path_dict.root_dir.expanduser()}' '{download_url}'"
+        target = machine.path_dict.root_dir.rel2home().parent.joinpath(download_url.name).as_posix()
+        machine.execution_command = f"cd ~; curl -o '{target}' '{download_url.as_url_str()}'; unzip '{target}' -d {machine.path_dict.root_dir.rel2home().parent.as_posix()}"
+        machine.execution_command += f"\n. {machine.path_dict.shell_script_path.collapseuser().as_posix()}"
 
     @staticmethod
     def gdrive(machine: Machine):
@@ -67,8 +72,8 @@ api = GDriveAPI()
         self.ssh.copy_from_here(self.path_dict.root_dir, z=True)
         self.ssh.print_summary()
 
-        self.execution_command = (f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"
-        self.execution_command_to_clip_memory()
+        # f"source " if self.ssh.get_remote_machine() != "Windows" else "")
+        self.execution_command = ". " + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"
         # self.ssh.run(f". {self.shell_script_path.collapseuser().as_posix()}", desc="Executing the function")
 
         if self.open_console:

@@ -144,16 +144,17 @@ class Machine:
         self.submit()
 
     def submit(self):
+        from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
         tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
-        from crocodile.cluster.data_transfer import Submission
-
-        if self.transfer_method == "tansfer_sh":
+        if self.transfer_method == "transfer_sh":
             Submission.transfer_sh(machine=self)
         elif self.transfer_method == "gdrive":
             Submission.gdrive(machine=self)
         elif self.transfer_method == "sftp":
             Submission.sftp(self)
+        else: raise ValueError(f"Transfer method {self.transfer_method} not recognized. 🤷‍")
+        self.execution_command_to_clip_memory()
 
     def generate_scripts(self):
 
@@ -216,7 +217,7 @@ def try_main():
     from crocodile.cluster.remote_machine import Machine  # importing the function is critical for the pickle to work.
     st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
     from crocodile.cluster import trial_file
-    m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
+    m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="thinkpad"), update_essential_repos=True,
                 notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
                 ipython=True, interactive=True, lock_resources=True,
