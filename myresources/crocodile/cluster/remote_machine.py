@@ -20,6 +20,7 @@ class MachinePathDict:
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py").create(parents_only=True)
+        self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py").create(parents_only=True)
         self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[remote_machine_type]).create(parents_only=True)
         self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.Struct.pkl").create(parents_only=True)
         self.execution_log_dir = self.root_dir.joinpath(f"logs").create()
@@ -46,7 +47,7 @@ class Machine:
             self.func_relative_file = self.func_file.relative_to(self.repo_path)
         except: self.repo_path, self.func_relative_file = self.func_file.parent, self.func_file.name
         self.kwargs = kwargs or tb.S()
-        self.data = data
+        self.data = data if data is not None else []
         self.description = description
         self.copy_repo = copy_repo
         self.update_repo = update_repo
@@ -143,14 +144,17 @@ class Machine:
         self.submit()
 
     def submit(self):
-        if self.transfer_method == "gdrive": pass
-        else:
+        self.submitted = True  # before sending `self` to the remote.
+        tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
+        from crocodile.cluster.data_transfer import Submission
+
+        if self.transfer_method == "gdrive":
+            Submission.transfer_sh(machine=self)
+        elif self.transfer_method == "ssh":
             self.ssh.run_py(f"tb.P(r'{MachinePathDict.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.path_dict.shell_script_path.collapseuser().as_posix()}')")
             if self.copy_repo: self.ssh.copy_from_here(self.repo_path, z=True, overwrite=True)
-            if self.data is not None: tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
+            tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
 
-            self.submitted = True
-            tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
             self.ssh.copy_from_here(self.path_dict.root_dir, z=True)
             self.ssh.print_summary()
 
