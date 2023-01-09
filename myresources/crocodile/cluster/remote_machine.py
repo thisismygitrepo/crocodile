@@ -32,7 +32,7 @@ class MachinePathDict:
 class Machine:
     def __init__(self, func, kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
-                 data: list or None = None, open_console: bool = True, transfer_method="ssh", job_id=None,
+                 data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
                  ipython=False, interactive=False, pdb=False, wrap_in_try_except=False,
@@ -148,27 +148,12 @@ class Machine:
         tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
         from crocodile.cluster.data_transfer import Submission
 
-        if self.transfer_method == "gdrive":
+        if self.transfer_method == "tansfer_sh":
             Submission.transfer_sh(machine=self)
-        elif self.transfer_method == "ssh":
-            self.ssh.run_py(f"tb.P(r'{MachinePathDict.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.path_dict.shell_script_path.collapseuser().as_posix()}')")
-            if self.copy_repo: self.ssh.copy_from_here(self.repo_path, z=True, overwrite=True)
-            tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
-
-            self.ssh.copy_from_here(self.path_dict.root_dir, z=True)
-            self.ssh.print_summary()
-
-            self.execution_command = (f"source " if self.ssh.get_remote_machine() != "Windows" else "") + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"
-            self.execution_command_to_clip_memory()
-            # self.ssh.run(f". {self.shell_script_path.collapseuser().as_posix()}", desc="Executing the function")
-
-            if self.open_console:
-                self.ssh.open_console()
-                # send email at start execution time
-                # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
-                # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
-                # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
-            else: pass
+        elif self.transfer_method == "gdrive":
+            Submission.gdrive(machine=self)
+        elif self.transfer_method == "sftp":
+            Submission.sftp(self)
 
     def generate_scripts(self):
 
@@ -234,7 +219,8 @@ def try_main():
     m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="surface"), update_essential_repos=True,
                 notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
-                ipython=True, interactive=True, lock_resources=True)
+                ipython=True, interactive=True, lock_resources=True,
+                transfer_method="transfer_sh")
     m.generate_scripts()
     m.show_scripts()
     m.submit()
