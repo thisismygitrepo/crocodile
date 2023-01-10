@@ -96,9 +96,10 @@ print("\n" * 2)
 # ######################### END OF EXECUTION #############################
 
 
-if lock_resources:
-    tb.Struct(status="unlocked").save(path=MachinePathDict.lock_path.expanduser())
-    console.print(f"Resources have been released by this job `{job_id}`.")
+# if lock_resources:
+#     tb.Struct(status="unlocked").save(path=MachinePathDict.lock_path.expanduser())
+#     console.print(f"Resources have been released by this job `{job_id}`.")
+# this is better handled by the calling script in case this function failed.
 
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):

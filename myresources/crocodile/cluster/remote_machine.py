@@ -28,6 +28,12 @@ class MachinePathDict:
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
     # simple text file referring to shell script path
 
+    def get_resources_unlocking(self):
+        return f"""
+rm {self.lock_path.collapseuser()}
+echo "Unlocked resources"
+"""
+
 
 class Machine:
     def __init__(self, func, kwargs: dict or None = None, description="",
@@ -186,7 +192,7 @@ class Machine:
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
-{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; print(x.main())").op if self.update_essential_repos else ''}
+{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; print(x.main(verbose=False))").op if self.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
 {'git pull' if self.update_repo else ''}
 {'pip install -e .' if self.install_repo else ''}
@@ -197,6 +203,7 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 cd ~
 {'python' if (not self.ipython and not self.pdb) else 'ipython'} {'--pdb' if self.pdb else ''} {'-i' if self.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
 
+{self.path_dict.get_resources_unlocking() if self.lock_resources else ''}
 deactivate
 
 """
