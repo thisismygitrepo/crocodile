@@ -226,9 +226,10 @@ class Scheduler:
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
 
-def try_this(func, return_=None, raise_=None, run=None, handle=None, **kwargs):
+def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):
     try: return func()
     except BaseException as ex:  # or Exception
+        if verbose: print(ex)
         if raise_ is not None: raise raise_
         if handle is not None: return handle(ex, **kwargs)
         return run() if run is not None else return_

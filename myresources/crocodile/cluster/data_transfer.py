@@ -1,13 +1,13 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import Machine, MachinePathDict
+from crocodile.cluster.remote_machine import RemoteMachine, MachinePathDict
 
 
 class Submission:
     """Sends repo, data, root_dir and write execution command."""
 
     @staticmethod
-    def transfer_sh(machine: Machine):
+    def transfer_sh(machine: RemoteMachine):
         print("Using transfer.sh to send data to remote machine.")
         cloud_download_py_script = "import crocodile.toolbox as tb\n"
 
@@ -37,7 +37,7 @@ class Submission:
         machine.execution_command += f"\n. {machine.path_dict.shell_script_path.collapseuser().as_posix()}"
 
     @staticmethod
-    def gdrive(machine: Machine):
+    def gdrive(machine: RemoteMachine):
         from crocodile.comms.gdrive import GDriveAPI
         api = GDriveAPI()
         paths = [machine.path_dict.kwargs_path]
@@ -63,7 +63,7 @@ api = GDriveAPI()
         print("Finished uploading to cloud. Please run the clipboard command on the remote machine:")
 
     @staticmethod
-    def sftp(self: Machine):
+    def sftp(self: RemoteMachine):
         assert self.ssh.sftp is not None, f"SFTP is not available for this machine `{self}`. Consider using different `transfer_method` other than `sftp`."
         self.ssh.run_py(f"tb.P(r'{MachinePathDict.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.path_dict.shell_script_path.collapseuser().as_posix()}')")
         if self.copy_repo: self.ssh.copy_from_here(self.repo_path, z=True, overwrite=True)

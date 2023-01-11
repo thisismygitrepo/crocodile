@@ -35,7 +35,7 @@ echo "Unlocked resources"
 """
 
 
-class Machine:
+class RemoteMachine:
     def __init__(self, func, kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
                  data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
@@ -221,14 +221,14 @@ deactivate
 
 def try_main():
     # noinspection PyUnresolvedReferences
-    from crocodile.cluster.remote_machine import Machine  # importing the function is critical for the pickle to work.
+    from crocodile.cluster.remote_machine import RemoteMachine  # importing the function is critical for the pickle to work.
     st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
     from crocodile.cluster import trial_file
-    m = Machine(func=trial_file.expensive_function, machine_specs=dict(host="thinkpad"), update_essential_repos=True,
-                notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
-                copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
-                ipython=True, interactive=True, lock_resources=True,
-                transfer_method="transfer_sh")
+    m = RemoteMachine(func=trial_file.expensive_function, machine_specs=dict(host="thinkpad"), update_essential_repos=True,
+                      notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
+                      copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
+                      ipython=True, interactive=True, lock_resources=True,
+                      transfer_method="transfer_sh")
     m.generate_scripts()
     m.show_scripts()
     m.submit()

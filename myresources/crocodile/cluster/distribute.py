@@ -3,7 +3,7 @@ import numpy as np
 # import psutil
 import crocodile.toolbox as tb
 from math import ceil
-from crocodile.cluster.remote_machine import Machine
+from crocodile.cluster.remote_machine import RemoteMachine
 from rich.console import Console
 # from platform import system
 
@@ -35,7 +35,7 @@ class Cluster:
                 else: raise Exception(f"Couldn't connect to {machine_specs}")
 
         self.sshz: list[tb.SSH] = sshz
-        self.machines: list[Machine] = []
+        self.machines: list[RemoteMachine] = []
         self.rams, self.cpus = None, None
 
         self.description = description
@@ -85,7 +85,7 @@ class Cluster:
 
     def submit(self):
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
-            m = Machine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id + f"_{idx}", **self.kwargs)
+            m = RemoteMachine(kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_ratios_repr}", job_id=self.job_id + f"_{idx}", **self.kwargs)
             m.run()
             self.machines.append(m)
         try:
