@@ -4,10 +4,10 @@ import crocodile.toolbox as tb
 
 
 def expensive_function() -> tb.P:
-    length = 20
-    print(f"Hello, I am an expensive function, and I just started running ...\n It will take me {length} seconds to finish")
+    execution_time_in_seconds = 2000
+    print(f"Hello, I am an expensive function, and I just started running ...\n It will take me {execution_time_in_seconds} seconds to finish")
     a = 1 + 1
-    time.sleep(length)
+    time.sleep(execution_time_in_seconds)
     print("I'm done, I crunched a lot of numbers. Next I'll save my results to a file and passing its directory back to the main process on the machine running me.")
     path = tb.P.tmpdir().joinpath("result.Struct.pkl")
     tb.S(a=a).save(path=path)

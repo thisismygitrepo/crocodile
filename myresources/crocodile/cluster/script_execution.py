@@ -26,7 +26,7 @@ to_be_deleted = ['res = ""  # to be overridden by execution line.', 'exec_obj = 
 res = ""  # to be overridden by execution line.
 exec_obj = ""  # to be overridden by execution line.
 
-# items below in form of `key = ""` will be replaced by script preparer with values from calling function.
+# items below in form of `key = ""` will be replaced by script preparer with values related to the job. They are defined here to silence IDE warnings.
 rel_full_path = ""
 repo_path = ""
 func_name = ""
@@ -44,15 +44,27 @@ lock_resources = ""
 if lock_resources:
     lock_path = MachinePathDict.lock_path.expanduser()
     if lock_path.exists():
-        lock_status = lock_path.readit()['status']
+        lock_file = lock_path.readit()
+        lock_status = lock_file['status']
         if lock_status == 'locked':
             while lock_status == 'locked':
-                print(f"Resources are locked by another job. Sleeping for 10 minutes.")
+                import psutil
+                proc = psutil.Process(lock_file['pid'])
+                attrs_txt = ['threads', 'status', 'memory_percent', 'io_counters', 'open_files', 'connections', 'exe', 'num_ctx_switches',
+                             'ppid', 'num_handles', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
+                             'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
+                # environ, memory_maps
+                attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice']
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
+                console.rule(title=f"Resources are locked by another job. Sleeping for 10 minutes.", style="bold red", characters="-")
+                print("\n")
                 time.sleep(60 * 10)
                 lock_status = lock_path.readit()['status']
         else: tb.Struct(status="locked").save(path=lock_path)
     else:
-        tb.Struct(status="locked").save(path=lock_path)
+        import os
+        tb.Struct(status="locked", pid=os.getpid()).save(path=lock_path)
     console.print(f"Resources are locked by this job `{job_id}`.", highlight=True)
 
 
