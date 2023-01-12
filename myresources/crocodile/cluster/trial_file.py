@@ -10,7 +10,7 @@ def expensive_function() -> tb.P:
     a = 1 + 1
 
     steps = 100
-    for _ in track(range(steps), description="Processing..."):
+    for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
 
     print("I'm done, I crunched a lot of numbers. Next I'll save my results to a file and passing its directory back to the main process on the machine running me.")

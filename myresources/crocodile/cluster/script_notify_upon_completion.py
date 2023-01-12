@@ -2,7 +2,7 @@
 
 from crocodile.comms.notification import Email
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import MachinePathDict
+from crocodile.cluster.remote_machine import ResourceManager
 import platform
 
 # to be replaced
@@ -20,7 +20,7 @@ error_message = ''
 exec_times = tb.S()
 res_folder = tb.P()
 
-path_dict = MachinePathDict(job_id, platform.system())
+path_dict = ResourceManager(job_id, platform.system())
 
 print(f'SENDING notification email using `{email_config_name}` email configuration ...')
 

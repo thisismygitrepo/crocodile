@@ -3,14 +3,14 @@
 import getpass
 import platform
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import MachinePathDict
+from crocodile.cluster.remote_machine import ResourceManager
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
 from rich import inspect
 from rich.text import Text
 import pandas as pd
-import time
+# import time
 
 
 console = Console()
@@ -18,7 +18,6 @@ console = Console()
 # EXTRA-PLACEHOLDER-PRE
 
 _ = SourceFileLoader
-submission_time = pd.Timestamp.now()
 
 to_be_deleted = ['res = ""  # to be overridden by execution line.', 'exec_obj = ""  # to be overridden by execution line.']
 # items below are defined to silence IDE warnings. They will be deleted by script preparer, then later defined by function to be executed.
@@ -41,53 +40,17 @@ lock_resources = ""
 
 
 print("\n" * 2)
-if lock_resources:
-    import os
-    sleep_time_mins = 10
-    lock_path = MachinePathDict.lock_path.expanduser()
-    print(f"Inspecting Lock file @ {lock_path}")
-    if not lock_path.exists(): print(f"Lock file was not found, creating it...")
-    else:
-        lock_file = lock_path.readit()
-        lock_status = lock_file['status']
-        print(f"Found lock file with status = `{lock_status}`.")
-        if lock_status == 'locked':
-            while lock_status == 'locked':
-                import psutil
-                try: proc = psutil.Process(lock_file['pid'])
-                except psutil.NoSuchProcess:
-                    print(f"Locking process with pid {lock_file['pid']} is dead. Ignoring this lock file.")
-                    break
-                attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
-                             'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
-                             'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
-                if platform.system() == 'Windows': attrs_txt += ['num_handles']
-                # environ, memory_maps
-                attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
-
-                print(f"Submission time: {submission_time}")
-                print(f"Time now: {pd.Timestamp.now()}")
-                print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - submission_time} 🛌")
-                print(f"Time consumed by locking job (job_id = {lock_file['job_id']}) so far = {pd.Timestamp.now() - lock_file['start_time']} ⏰")
-                console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
-                print("\n")
-                time.sleep(sleep_time_mins * 60)
-                lock_status = lock_path.readit()['status']
-    tb.Struct(status="locked", pid=os.getpid(), job_id=job_id, start_time=pd.Timestamp.now(), submission_time=submission_time).save(path=lock_path)
-    console.print(f"Resources are locked by this job `{job_id}`. Process pid ={os.getpid()}.", highlight=True)
-
+manager = ResourceManager(job_id, platform.system())
+if lock_resources: manager.secure_resources()
 
 # keep those values after lock is released
 time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
 
-path_dict = MachinePathDict(job_id, platform.system())
 repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 tb.sys.path.insert(0, repo_path.str)
-kwargs = path_dict.kwargs_path.readit()
-path_dict.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
+kwargs = manager.kwargs_path.readit()
+manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -98,7 +61,7 @@ print("\n" * 2)
 console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
 console.print(f"Executing {repo_path.collapseuser().as_posix()}/{rel_full_path} : {func_name}", style="bold blue")
-inspect(kwargs, value=False, title=f"kwargs from `{path_dict.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
+inspect(kwargs, value=False, title=f"kwargs from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
 
@@ -123,11 +86,7 @@ print("\n" * 2)
 # ######################### END OF EXECUTION #############################
 
 
-# if lock_resources:
-#     tb.Struct(status="unlocked").save(path=MachinePathDict.lock_path.expanduser())
-#     console.print(f"Resources have been released by this job `{job_id}`.")
-# this is better handled by the calling script in case this function failed.
-
+if lock_resources: manager.unlock_resources()
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
@@ -142,14 +101,14 @@ time_at_execution_end_local = pd.Timestamp.now()
 delta = time_at_execution_end_utc - time_at_execution_start_utc
 exec_times = tb.S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc 🌍⏰": time_at_execution_end_utc,
                    "start_local ⏲️": time_at_execution_start_local, "end_local ⏰": time_at_execution_end_local, "delta ⏳": delta,
-                   "submission_time": submission_time, "wait_time": time_at_execution_start_local - submission_time})
+                   "submission_time": manager.submission_time, "wait_time": time_at_execution_start_local - manager.submission_time})
 
 # save the following in results folder and execution log folder.:
-path_dict.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(time_at_execution_end_local))
-path_dict.execution_log_dir.expanduser().joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
-path_dict.execution_log_dir.expanduser().joinpath("error_message.txt").write_text(error_message)
-exec_times.save(path=path_dict.execution_log_dir.expanduser().joinpath("execution_times.Struct.pkl"))
-path_dict.root_dir.expanduser().copy(folder=res_folder)
+manager.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(time_at_execution_end_local))
+manager.execution_log_dir.expanduser().joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
+manager.execution_log_dir.expanduser().joinpath("error_message.txt").write_text(error_message)
+exec_times.save(path=manager.execution_log_dir.expanduser().joinpath("execution_times.Struct.pkl"))
+manager.root_dir.expanduser().copy(folder=res_folder)
 
 tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
@@ -157,9 +116,9 @@ Job executed via tb.cluster.Machine
 remote: {ssh_repr}
 job_id: {job_id}
 
-py_script_path @ `{path_dict.py_script_path.collapseuser()}`
-shell_script_path @ `{path_dict.shell_script_path.collapseuser()}`
-kwargs_path @ `{path_dict.kwargs_path.collapseuser()}`
+py_script_path @ `{manager.py_script_path.collapseuser()}`
+shell_script_path @ `{manager.shell_script_path.collapseuser()}`
+kwargs_path @ `{manager.kwargs_path.collapseuser()}`
 
 ### Execution Time:
 {exec_times.print(as_config=True, return_str=True)}
@@ -177,3 +136,5 @@ ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  #
 console.print(Panel(Text(f'''
 ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 
 ''', style="bold blue on white"), title="Pull results using croshell with this script:", border_style="bold red"))
+
+# if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")

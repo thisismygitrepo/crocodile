@@ -5,9 +5,12 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
 from rich.console import Console
+import time
+import os
+import pandas as pd
 
 
-class MachinePathDict:
+class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
 
     def __init__(self, job_id, remote_machine_type):
@@ -16,12 +19,17 @@ class MachinePathDict:
         * pickle of Machine and clusters objects.
         """
         # EVERYTHING MUST REMAIN IN RELATIVE PATHS
-        self.root_dir = tb.P(f"~/tmp_results/remote_machines/job_id__{job_id}")
+        self.remote_machine_type = remote_machine_type
+        self.job_id = job_id
+
+        self.submission_time = pd.Timestamp.now()
+
+        self.root_dir = tb.P(f"~/tmp_results/remote_machines/job_id__{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py").create(parents_only=True)
         self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py").create(parents_only=True)
-        self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[remote_machine_type]).create(parents_only=True)
+        self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type]).create(parents_only=True)
         self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.Struct.pkl").create(parents_only=True)
         self.execution_log_dir = self.root_dir.joinpath(f"logs").create()
 
@@ -33,6 +41,52 @@ class MachinePathDict:
 rm {self.lock_path.collapseuser()}
 echo "Unlocked resources"
 """
+    def secure_resources(self):
+        console = Console()
+        sleep_time_mins = 10
+        lock_path = self.lock_path.expanduser()
+        print(f"Inspecting Lock file @ {lock_path}")
+        if not lock_path.exists(): print(f"Lock file was not found, creating it...")
+        else:
+            lock_file = lock_path.readit()
+            lock_status = lock_file['status']
+            print(f"Found lock file with status = `{lock_status}`.")
+            if lock_status == 'locked':
+                while lock_status == 'locked':
+                    import psutil
+                    try: proc = psutil.Process(lock_file['pid'])
+                    except psutil.NoSuchProcess:
+                        print(f"Locking process with pid {lock_file['pid']} is dead. Ignoring this lock file.")
+                        break
+                    attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
+                                 'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
+                                 'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
+                    if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
+                    # environ, memory_maps
+                    attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
+                    inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
+                    inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
+
+                    print(f"Submission time: {self.submission_time}")
+                    print(f"Time now: {pd.Timestamp.now()}")
+                    print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - self.submission_time} 🛌")
+                    print(f"Time consumed by locking job (job_id = {lock_file['job_id']}) so far = {pd.Timestamp.now() - lock_file['start_time']} ⏰")
+                    console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
+                    print("\n")
+                    time.sleep(sleep_time_mins * 60)
+                    lock_status = lock_path.readit()['status']
+        self.lock_resources()
+        console.print(f"Resources are locked by this job `{self.job_id}`. Process pid ={os.getpid()}.", highlight=True)
+
+    def lock_resources(self):
+        tb.Struct(status="locked", pid=os.getpid(), job_id=self.job_id, start_time=pd.Timestamp.now(), submission_time=self.submission_time).save(path=self.lock_path.expanduser())
+    def unlock_resources(self):
+        dat = self.lock_path.expanduser().readit()
+        dat['status'] = 'unlocked'
+        dat.save(path=ResourceManager.lock_path.expanduser())
+        console = Console()
+        console.print(f"Resources have been released by this job `{self.job_id}`.")
+        # this is further handled by the calling script in case this function failed.
 
 
 class RemoteMachine:
@@ -81,7 +135,7 @@ class RemoteMachine:
 
         # scripts
         self.job_id = job_id or tb.randstr(length=10)
-        self.path_dict = MachinePathDict(self.job_id, self.ssh.get_remote_machine())
+        self.path_dict = ResourceManager(self.job_id, self.ssh.get_remote_machine())
 
         # flags
         self.submitted = False
@@ -148,6 +202,8 @@ class RemoteMachine:
         self.generate_scripts()
         self.show_scripts()
         self.submit()
+        if self.interactive and self.lock_resources:
+            print(f"If interactive is on along with lock_resources, the job might never end.")
 
     def submit(self):
         from crocodile.cluster.data_transfer import Submission
