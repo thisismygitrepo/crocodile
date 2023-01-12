@@ -18,8 +18,7 @@ console = Console()
 # EXTRA-PLACEHOLDER-PRE
 
 _ = SourceFileLoader
-time_at_execution_start_utc = pd.Timestamp.utcnow()
-time_at_execution_start_local = pd.Timestamp.now()
+submission_time = pd.Timestamp.now()
 
 to_be_deleted = ['res = ""  # to be overridden by execution line.', 'exec_obj = ""  # to be overridden by execution line.']
 # items below are defined to silence IDE warnings. They will be deleted by script preparer, then later defined by function to be executed.
@@ -44,38 +43,45 @@ lock_resources = ""
 print("\n" * 2)
 if lock_resources:
     import os
-    wait_so_far_hrs = 0
     sleep_time_mins = 10
     lock_path = MachinePathDict.lock_path.expanduser()
-    if lock_path.exists():
+    print(f"Inspecting Lock file @ {lock_path}")
+    if not lock_path.exists(): print(f"Lock file was not found, creating it...")
+    else:
         lock_file = lock_path.readit()
         lock_status = lock_file['status']
+        print(f"Found lock file with status = `{lock_status}`.")
         if lock_status == 'locked':
             while lock_status == 'locked':
                 import psutil
-                proc = psutil.Process(lock_file['pid'])
+                try: proc = psutil.Process(lock_file['pid'])
+                except psutil.NoSuchProcess:
+                    print(f"Locking process with pid {lock_file['pid']} is dead. Ignoring this lock file.")
+                    break
                 attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
-                             'ppid', 'num_handles', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
+                             'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                              'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
+                if platform.system() == 'Windows': attrs_txt += ['num_handles']
                 # environ, memory_maps
                 attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
 
-                print(f"Time slept so far = {pd.Timestamp(hour=wait_so_far_hrs)} 🛌")
+                print(f"Submission time: {submission_time}")
+                print(f"Time now: {pd.Timestamp.now()}")
+                print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - submission_time} 🛌")
+                print(f"Time consumed by locking job (job_id = {lock_file['job_id']}) so far = {pd.Timestamp.now() - lock_file['start_time']} ⏰")
                 console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
                 print("\n")
                 time.sleep(sleep_time_mins * 60)
-                wait_so_far_hrs += sleep_time_mins / 60
                 lock_status = lock_path.readit()['status']
-        else:
-            print(f"Found lock file, but status is `{lock_status}`.")
-            tb.Struct(status="locked", pid=os.getpid(), job_id=job_id).save(path=lock_path)
-    else:
-        print(f"Lock file was not found, creating it...")
-        tb.Struct(status="locked", pid=os.getpid(), job_id=job_id).save(path=lock_path)
+    tb.Struct(status="locked", pid=os.getpid(), job_id=job_id, start_time=pd.Timestamp.now(), submission_time=submission_time).save(path=lock_path)
     console.print(f"Resources are locked by this job `{job_id}`. Process pid ={os.getpid()}.", highlight=True)
 
+
+# keep those values after lock is released
+time_at_execution_start_utc = pd.Timestamp.utcnow()
+time_at_execution_start_local = pd.Timestamp.now()
 
 path_dict = MachinePathDict(job_id, platform.system())
 repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
@@ -135,7 +141,8 @@ time_at_execution_end_utc = pd.Timestamp.utcnow()
 time_at_execution_end_local = pd.Timestamp.now()
 delta = time_at_execution_end_utc - time_at_execution_start_utc
 exec_times = tb.S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc 🌍⏰": time_at_execution_end_utc,
-                   "start_local ⏲️": time_at_execution_start_local, "end_local ⏰": time_at_execution_end_local, "delta ⏳": delta})
+                   "start_local ⏲️": time_at_execution_start_local, "end_local ⏰": time_at_execution_end_local, "delta ⏳": delta,
+                   "submission_time": submission_time, "wait_time": time_at_execution_start_local - submission_time})
 
 # save the following in results folder and execution log folder.:
 path_dict.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(time_at_execution_end_local))

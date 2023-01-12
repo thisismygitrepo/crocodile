@@ -1,13 +1,18 @@
 
 import time
 import crocodile.toolbox as tb
+from rich.progress import track
 
 
 def expensive_function() -> tb.P:
-    execution_time_in_seconds = 2000
+    execution_time_in_seconds = 60 * 3
     print(f"Hello, I am an expensive function, and I just started running ...\n It will take me {execution_time_in_seconds} seconds to finish")
     a = 1 + 1
-    time.sleep(execution_time_in_seconds)
+
+    steps = 100
+    for _ in track(range(steps), description="Processing..."):
+        time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
+
     print("I'm done, I crunched a lot of numbers. Next I'll save my results to a file and passing its directory back to the main process on the machine running me.")
     path = tb.P.tmpdir().joinpath("result.Struct.pkl")
     tb.S(a=a).save(path=path)
