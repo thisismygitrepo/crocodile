@@ -44,6 +44,8 @@ lock_resources = ""
 print("\n" * 2)
 if lock_resources:
     import os
+    wait_so_far_hrs = 0
+    sleep_time_mins = 10
     lock_path = MachinePathDict.lock_path.expanduser()
     if lock_path.exists():
         lock_file = lock_path.readit()
@@ -52,23 +54,26 @@ if lock_resources:
             while lock_status == 'locked':
                 import psutil
                 proc = psutil.Process(lock_file['pid'])
-                attrs_txt = ['threads', 'status', 'memory_percent', 'io_counters', 'open_files', 'connections', 'exe', 'num_ctx_switches',
+                attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
                              'ppid', 'num_handles', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                              'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
                 # environ, memory_maps
-                attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice']
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
+                attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
                 inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
-                console.rule(title=f"Resources are locked by another job. Sleeping for 10 minutes.", style="bold red", characters="-")
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process with Lock {lock_file['pid']}", docs=False, sort=False)
+
+                print(f"Time slept so far = {pd.Timestamp(hour=wait_so_far_hrs)} 🛌")
+                console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
                 print("\n")
-                time.sleep(60 * 10)
+                time.sleep(sleep_time_mins * 60)
+                wait_so_far_hrs += sleep_time_mins / 60
                 lock_status = lock_path.readit()['status']
         else:
             print(f"Found lock file, but status is `{lock_status}`.")
-            tb.Struct(status="locked", pid=os.getpid()).save(path=lock_path)
+            tb.Struct(status="locked", pid=os.getpid(), job_id=job_id).save(path=lock_path)
     else:
         print(f"Lock file was not found, creating it...")
-        tb.Struct(status="locked", pid=os.getpid()).save(path=lock_path)
+        tb.Struct(status="locked", pid=os.getpid(), job_id=job_id).save(path=lock_path)
     console.print(f"Resources are locked by this job `{job_id}`. Process pid ={os.getpid()}.", highlight=True)
 
 

@@ -70,7 +70,7 @@ def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append
     lines, bingo = txt_raw.split("\n"), False
     if not replace_line:  # no need for line splitting
         if txt_search in txt_raw: return txt_raw.replace(txt_search, txt_alt)
-        return txt_raw + "\n" +  txt_alt if notfound_append else txt_raw
+        return txt_raw + "\n" + txt_alt if notfound_append else txt_raw
     for idx, line in enumerate(lines):
         if txt_search in line:
             lines[idx], bingo = txt_alt if type(txt_alt) is str else txt_alt(line), True
