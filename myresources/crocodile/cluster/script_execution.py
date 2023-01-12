@@ -41,7 +41,9 @@ job_id = ""
 lock_resources = ""
 
 
+print("\n" * 2)
 if lock_resources:
+    import os
     lock_path = MachinePathDict.lock_path.expanduser()
     if lock_path.exists():
         lock_file = lock_path.readit()
@@ -61,11 +63,13 @@ if lock_resources:
                 print("\n")
                 time.sleep(60 * 10)
                 lock_status = lock_path.readit()['status']
-        else: tb.Struct(status="locked").save(path=lock_path)
+        else:
+            print(f"Found lock file, but status is `{lock_status}`.")
+            tb.Struct(status="locked", pid=os.getpid()).save(path=lock_path)
     else:
-        import os
+        print(f"Lock file was not found, creating it...")
         tb.Struct(status="locked", pid=os.getpid()).save(path=lock_path)
-    console.print(f"Resources are locked by this job `{job_id}`.", highlight=True)
+    console.print(f"Resources are locked by this job `{job_id}`. Process pid ={os.getpid()}.", highlight=True)
 
 
 path_dict = MachinePathDict(job_id, platform.system())
