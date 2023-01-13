@@ -1,4 +1,3 @@
-
 from setuptools import setup
 from myresources.crocodile import __version__
 import setuptools
@@ -6,6 +5,8 @@ import setuptools
 with open("README.md", "r") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
+# get python modules:
+# tb.P("./myresources").search("*.py", r=True).apply(lambda x: x.split(at="myresources", sep=-1)[1].as_posix().replace("/", ".")[:-3]).filter(lambda x: "__init__" not in x).list
 
 setup(
     name='crocodile',
@@ -13,7 +14,35 @@ setup(
     packages=['crocodile'],
     # packages=setuptools.find_packages(where="myresources"),
     package_dir={'': 'myresources'},
-    py_modules=setuptools.find_packages(where="myresources"),
+    # py_modules=setuptools.find_packages(where="myresources") + ['crocodile.msc.ascii_art'],
+    py_modules=['crocodile.core',
+                'crocodile.croshell',
+                'crocodile.database',
+                'crocodile.deeplearning',
+                'crocodile.deeplearning_torch',
+                'crocodile.environment',
+                'crocodile.file_management',
+                'crocodile.matplotlib_management',
+                'crocodile.meta',
+                'crocodile.plotly_management',
+                'crocodile.run',
+                'crocodile.toolbox',
+                'crocodile.cluster.data_transfer',
+                'crocodile.cluster.distribute',
+                'crocodile.cluster.meta_handling',
+                'crocodile.cluster.remote_machine',
+                'crocodile.cluster.script_execution',
+                'crocodile.cluster.script_notify_upon_completion',
+                'crocodile.cluster.trial_file',
+                'crocodile.comms.gdrive',
+                'crocodile.comms.helper_funcs',
+                'crocodile.comms.notification',
+                'crocodile.comms.onedrive',
+                'crocodile.msc.ascii_art',
+                'crocodile.msc.dl_template',
+                'crocodile.msc.numerical',
+                'crocodile.msc.odds']
+    ,
     url='https://github.com/thisismygitrepo/crocodile',
     project_urls={
         "Bug Tracker": "https://github.com/thisismygitrepo/crocodile/issues",
@@ -54,7 +83,8 @@ setup(
         "setuptools",  # for packaging  # correct place is in .toml
         "wheel",
         "twine",  # for pushing package to pypi.org
-        "pytest",  # popular alternative to builtint unittest  # consider splitting requirements to development and production versions.
+        "pytest",
+        # popular alternative to builtint unittest  # consider splitting requirements to development and production versions.
         # "scikit-image",  # image processing. Heavy-weight.
 
         # torch
@@ -63,9 +93,6 @@ setup(
 
 )
 
-
 with open("./myresources/crocodile/art/happy_croco", "r") as file:
     croco = file.read()  # search ascii art or characters art.
 print(croco)
-
-

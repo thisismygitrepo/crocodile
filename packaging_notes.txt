@@ -23,3 +23,5 @@
 # the package name is dictated by 'name' field in setup.py file.
 # the modules that are avilable after installation are the names under src directory, which can be different again.
 # it is however good practice to unify all of the above.
+
+# github workflow, push latest changes, make new tag, push tag, and github action will automatically push new release to pypi.
