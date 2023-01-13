@@ -160,7 +160,7 @@ class RemoteMachine:
             return None
 
         base = self.path_dict.execution_log_dir.expanduser().create()
-        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir, zip_first=True)
+        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir, z=True)
         except: pass  # the directory doesn't exist yet at the remote.
         end_time_file = base.joinpath("end_time.txt")
 
@@ -191,7 +191,7 @@ class RemoteMachine:
 
     def download_results(self, target=None, r=True, zip_first=False):
         if self.results_path is not None:
-            self.ssh.copy_to_here(source=self.results_path, target=target, r=r, zip_first=zip_first)
+            self.ssh.copy_to_here(source=self.results_path, target=target, r=r, z=zip_first)
             self.results_downloaded = True
         else:
             print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
@@ -273,26 +273,6 @@ deactivate
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
         Console().print(inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False))
-
-
-def try_main():
-    # noinspection PyUnresolvedReferences
-    from crocodile.cluster.remote_machine import RemoteMachine  # importing the function is critical for the pickle to work.
-    st = tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit()
-    from crocodile.cluster import trial_file
-    m = RemoteMachine(func=trial_file.expensive_function, machine_specs=dict(host="p51s"), update_essential_repos=True,
-                      notify_upon_completion=True, to_email=st.EMAIL['enaut']['email_add'], email_config_name='enaut',
-                      copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
-                      ipython=True, interactive=True, lock_resources=True,
-                      transfer_method="sftp")
-    m.generate_scripts()
-    m.show_scripts()
-    m.submit()
-    m.check_job_status()
-
-    m.download_results(r=True)
-    m.delete_remote_results()
-    return m
 
 
 if __name__ == '__main__':
