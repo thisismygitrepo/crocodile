@@ -194,7 +194,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def delete(self, key=None, keys=None, kv_func=None) -> 'Struct': [self.__dict__.__delitem__(key) for key in ([key] if key else [] + (keys if keys is not None else []))]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
     def _pandas_repr(self, justify, return_str=False, limit=30): res = __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"]); return res if not return_str else str(res)
     def print(self, dtype=True, return_str=False, justify=30, as_config=False, as_yaml=False, limit=50, title="", **kwargs):
-        if as_config: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
+        if as_config and not return_str: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
         res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"]))
         (install_n_import("rich").print(res.to_markdown()) if "DataFrame" in res.__class__.__name__ else print(res)) if not return_str else None; return str(res) if return_str else self
     @staticmethod

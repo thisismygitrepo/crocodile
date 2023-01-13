@@ -130,7 +130,7 @@ kwargs_path @ `{manager.kwargs_path.collapseuser()}`
 
 
 # print to execution console:
-inspect(exec_times, value=False, title="Execution Times", docs=False, sort=False)
+exec_times.print(title="Execution Times", as_config=True)
 print("\n" * 1)
 ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
 console.print(Panel(Text(f'''

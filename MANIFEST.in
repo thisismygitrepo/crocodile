@@ -1,5 +1,3 @@
 
 graft ./myresources/crocodile/art/*
-graft ./myresources/crocodile/cluster/*
-graft ./myresources/crocodile/comms/*
-graft ./myresources/crocodile/msc/*
+

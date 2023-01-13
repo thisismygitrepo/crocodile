@@ -1,6 +1,7 @@
 
 from setuptools import setup
 from myresources.crocodile import __version__
+import setuptools
 
 with open("README.md", "r") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
@@ -12,7 +13,7 @@ setup(
     packages=['crocodile'],
     # packages=setuptools.find_packages(where="myresources"),
     package_dir={'': 'myresources'},
-    py_modules=['toolbox', 'core', 'file_management', 'meta', "deeplearning", "deeplearning_torch"],
+    py_modules=setuptools.find_packages(where="myresources"),
     url='https://github.com/thisismygitrepo/crocodile',
     project_urls={
         "Bug Tracker": "https://github.com/thisismygitrepo/crocodile/issues",
