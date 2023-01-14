@@ -33,7 +33,9 @@ class InstancesCalculator:
 
     def get_instances_per_machines(self, specs: dict) -> int:
         if self.multiplier is None: return 1
-        return int(floor(self.multiplier * (specs[self.bottleneck_name] / self.bottleneck_reference_value)))
+        res = int(floor(self.multiplier * (specs[self.bottleneck_name] / self.bottleneck_reference_value)))
+        if res == 0: res = 1
+        return res
 
 
 class LoadCalculator:
@@ -194,7 +196,8 @@ class Cluster:
 def try_it():
     from crocodile.cluster.trial_file import expensive_function_parallel
     machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
-    c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, install_repo=False)
+    c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, install_repo=False,
+                instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=2))
     print(c)
     c.generate_standard_kwargs()
     c.submit()
