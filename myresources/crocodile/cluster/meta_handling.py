@@ -3,7 +3,7 @@ import crocodile.toolbox as tb
 
 
 def get_script(name: str, kwargs: dict) -> str:
-    """Reads a python script from the scripts folder and replaces the placeholders with the kwargs."""
+    """Reads a python script from the scripts folder and replaces the placeholders with the func_kwargs."""
     tmp = tb.P(__file__).parent.joinpath(f"{name}.py").read_text(encoding="utf-8")
     for key, value in kwargs.items():
         tmp = tmp.replace(f'''{key} = ""''', f'''{key} = {value if type(value) is not str else repr(value)}''')
@@ -39,7 +39,7 @@ except Exception as e:
 
 def get_execution_line(func_name, rel_full_path) -> str:
     if func_name is not None: return f"""
-res = module.{func_name}(**kwargs.__dict__)
+res = module.{func_name}(**func_kwargs.__dict__)
 """
     return f"""
 res = None  # in case the file did not define it.
@@ -49,7 +49,7 @@ res = None  # in case the file did not define it.
 """
 
 
-# kwargs_for_fire = ' '.join(tb.S(kwargs or {}).apply(lambda k, v: f"--{k}={v if type(v) is not str else repr(v)}"))
+# kwargs_for_fire = ' '.join(tb.S(func_kwargs or {}).apply(lambda k, v: f"--{k}={v if type(v) is not str else repr(v)}"))
 
 if __name__ == '__main__':
     pass

@@ -19,11 +19,19 @@ def expensive_function() -> tb.P:
     return path.parent
 
 
-def expensive_function_parallel(start_idx: int, end_idx: int, num_threads: int, ram_gb: int) -> tb.P:
-    print(f"Hello, I am an expensive function, and I just started running on {num_threads} threads, with {ram_gb} GB of RAM ...")
-    time.sleep(2)
-    print("I'm done, I crunched numbers from {} to {}.".format(start_idx, end_idx))
-    return tb.S(sum=sum(range(start_idx, end_idx))).save(path=tb.P.tmpfile(suffix=".Struct.pkl"))
+def expensive_function_parallel(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
+
+    q = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: inner_func(sub_list[0], sub_list[-1]))
+    return tb.S(sum=sum(range(idx_start, idx_end))).save(path=tb.P.tmpfile(suffix=".Struct.pkl"))
+
+
+def inner_func(idx_start, idx_end):
+    print(f"Hello, I am an expensive function, and I just started running ...")
+    execution_time_in_seconds = 60 * 3
+    steps = 100
+    for _ in track(range(steps), description="Progress bar ..."):
+        time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
+    print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
 
 
 if __name__ == '__main__':

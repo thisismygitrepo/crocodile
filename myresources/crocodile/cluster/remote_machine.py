@@ -13,7 +13,7 @@ import pandas as pd
 class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
 
-    def __init__(self, job_id, remote_machine_type):
+    def __init__(self, job_id, remote_machine_type, instance_per_machine=1):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.
@@ -21,6 +21,7 @@ class ResourceManager:
         # EVERYTHING MUST REMAIN IN RELATIVE PATHS
         self.remote_machine_type = remote_machine_type
         self.job_id = job_id
+        self.instance_per_machine = instance_per_machine
 
         self.submission_time = pd.Timestamp.now()
 
@@ -90,7 +91,7 @@ echo "Unlocked resources"
 
 
 class RemoteMachine:
-    def __init__(self, func, kwargs: dict or None = None, description="",
+    def __init__(self, func, func_kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
                  data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
@@ -106,7 +107,7 @@ class RemoteMachine:
             self.repo_path = tb.P(tb.install_n_import("git", "gitpython").Repo(self.func_file, search_parent_directories=True).working_dir)
             self.func_relative_file = self.func_file.relative_to(self.repo_path)
         except: self.repo_path, self.func_relative_file = self.func_file.parent, self.func_file.name
-        self.kwargs = kwargs or tb.S()
+        self.kwargs = func_kwargs or tb.S()
         self.data = data if data is not None else []
         self.description = description
         self.copy_repo = copy_repo

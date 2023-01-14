@@ -105,10 +105,10 @@ class SaveDecorator(object):
     @classmethod
     def init(cls, func=None, **kwargs):
         """Always use this method for construction."""
-        if func is None:  # User instantiated the class with no func argument and specified kwargs.
+        if func is None:  # User instantiated the class with no func argument and specified func_kwargs.
             def wrapper(func_): return cls(func_, **kwargs)
             return wrapper  # a function ready to be used by Python (pass func to it to instantiate it)
-        else: return cls(func)  # return instance of the class. # called by Python with func passed and user did not specify non-default kwargs:
+        else: return cls(func)  # return instance of the class. # called by Python with func passed and user did not specify non-default func_kwargs:
 
     def __call__(self, path=None, obj=None, **kwargs):
         path = Path(__import__("tempfile") .mkdtemp() + "-" + timestamp() + self.ext) if path is None else Path(path)
@@ -173,7 +173,7 @@ def run_as_admin(cmd_line=None, wait=True):
 #         return result_path
 #
 #     @classmethod
-#     def from_saved(cls, path, *args, r=False, scope=None, **kwargs):
+#     def from_saved(cls, path, *args, r=False, scope=None, **func_kwargs):
 #         """methodology: 1- load state, 2- load code. 3- initialize from __init__, 4- populate __dict__
 #         :param path: points to where the `data` of this class is saved
 #         :param r: recursive flag. If set to True, then, the directory containing the file `path` will be searched for
@@ -183,20 +183,20 @@ def run_as_admin(cmd_line=None, wait=True):
 #         """
 #         assert ".dat." in str(path), f"Are you sure the path {path} is pointing to pickeld state of {cls}?"
 #         data = dill.loads(Path(path).read_bytes())  # ============================= step 1: unpickle the data
-#         inst = cls(*args, **kwargs)  # ============================= step 2: initialize the class
+#         inst = cls(*args, **func_kwargs)  # ============================= step 2: initialize the class
 #         inst.__setstate__(dict(data))  # ===========step 3: update / populate instance attributes with data.
 #         if r:  # ============================= step 4: check for saved attributes.
 #             for key, _ in data.items():  # val is probably None (if init was written properly)
 #                 for item in Path(path).parent.glob("*.zip"):  # if key is not an attribute of the object, skip it.
-#                     setattr(inst, key, Base.from_zipped_code_state(path=Path(path).parent.joinpath(item.stem + ".zip"), r=True, scope=scope, **kwargs))
+#                     setattr(inst, key, Base.from_zipped_code_state(path=Path(path).parent.joinpath(item.stem + ".zip"), r=True, scope=scope, **func_kwargs))
 #         return inst
 #
 #     @staticmethod
-#     def from_code_and_state(code_path, data_path=None, class_name=None, r=False, *args, **kwargs):
-#         sys.path.insert(0, str(Path(code_path).parent)); return getattr(__import__("importlib").import_module(Path(code_path).stem), class_name).from_state(data_path, *args, r=r, **kwargs)
+#     def from_code_and_state(code_path, data_path=None, class_name=None, r=False, *args, **func_kwargs):
+#         sys.path.insert(0, str(Path(code_path).parent)); return getattr(__import__("importlib").import_module(Path(code_path).stem), class_name).from_state(data_path, *args, r=r, **func_kwargs)
 #
 #     @staticmethod
-#     def from_zipped_code_state(path, *args, class_name=None, r=False, scope=None, **kwargs):
+#     def from_zipped_code_state(path, *args, class_name=None, r=False, scope=None, **func_kwargs):
 #         """A simple wrapper on top of `from_code_and_state` where file passed is zip archive holding both source code and data. Additionally, the method gives the option to ignore the source code
 #         saved and instead use code passed through `scope` which is a dictionary, e.g. globals(), in which the class of interest can be found [className -> module]."""
 #         temp_path = Path.home().joinpath(f"tmp_results/tmp_unzipped/{Path(path).name.split('.zip')[1]}_{randstr()}")
@@ -204,7 +204,7 @@ def run_as_admin(cmd_line=None, wait=True):
 #         code_path, data_path = list(temp_path.glob("source_code*"))[0], list(temp_path.glob("class_data*"))[0]
 #         if ".dat." in str(data_path):  # loading the state and initializing the class
 #             class_name = class_name or str(data_path).split(".")[1]
-#             return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **kwargs) if scope is None else scope[class_name].from_saved()
+#             return Base.from_code_and_state(*args, code_path=code_path, data_path=data_path, class_name=class_name, r=r, **func_kwargs) if scope is None else scope[class_name].from_saved()
 #         if scope: print(f"Warning: global scope has been contaminated by loaded scope {code_path} !!"); scope.update(__import__("runpy").run_path(str(code_path)))  # Dill will no longer complain.
 #         return dill.loads(data_path.read_bytes())
 
