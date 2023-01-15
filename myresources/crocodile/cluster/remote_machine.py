@@ -209,7 +209,10 @@ class RemoteMachine:
     def submit(self):
         from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
-        tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
+        try:
+            tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
+        except:
+            print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
         if self.transfer_method == "transfer_sh":
             Submission.transfer_sh(machine=self)
         elif self.transfer_method == "gdrive":

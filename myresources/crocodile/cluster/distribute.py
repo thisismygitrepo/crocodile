@@ -15,8 +15,9 @@ class InstancesCalculator:
     def __init__(self, multiplier=None, bottleneck_name=["cpu", "ram"][0], bottleneck_reference_value=None, reference_machine="this_machine"):
         self.multiplier = multiplier
         self.bottleneck_name = bottleneck_name
-        self.bottleneck_reference_value = bottleneck_reference_value
         self.reference_machine = reference_machine
+        self.bottleneck_reference_value = bottleneck_reference_value
+        self.get_bottleneck_reference_value()
 
     def get_bottleneck_reference_value(self):
         if self.reference_machine == "this_machine":
@@ -49,21 +50,23 @@ class LoadCalculator:
         self.instance_counter = 0
 
     def get_func_kwargs(self, a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances):
-        idx1, idx2 = self._get_func_kwargs(a_cpu_norm, a_ram_norm, a_product_norm, total_instances)
+        idx1, idx2 = self._get_func_kwargs(a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances)
         return dict(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_instances=a_num_instances)
 
     def get_func_kwargs_list(self, a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances) -> list:
-        idx1, idx2 = self._get_func_kwargs(a_cpu_norm, a_ram_norm, a_product_norm, total_instances)
+        """Unused.
+        idea is to generate multiple scripts per machine, one for each instance. But its much easier to paralleize fromw within PYthon."""
+        idx1, idx2 = self._get_func_kwargs(a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances)
         res = tb.L(list(range(idx1, idx2))).split(to=a_num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=self.max_num, ))
         return list(res)
 
-    def _get_func_kwargs(self, a_cpu_norm, a_ram_norm, a_product_norm, total_instances):
+    def _get_func_kwargs(self, a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances):
 
         load_value = {"ram": a_ram_norm, "cpu": a_cpu_norm, "product": a_product_norm}[self.load_criterion]
         self.load_ratios.append(load_value)
-        self.instance_counter += 1
+        self.instance_counter += a_num_instances
         idx1 = self.idx_so_far
-        idx2 = self.max_num if self.instance_counter == total_instances - 1 else (ceil(load_value * self.max_num) + idx1)
+        idx2 = self.max_num if self.instance_counter == total_instances - 1 else (floor(load_value * self.max_num) + idx1)
         self.idx_so_far = idx2
         # then, we have equal distribution across instances of one machine
         return idx1, idx2
@@ -81,7 +84,7 @@ class Cluster:
         self.results_path = self.get_cluster_path(self.job_id)
         self.results_downloaded = False
 
-        self.instances_calculator = instances_calculator or InstancesCalculator().get_bottleneck_reference_value()
+        self.instances_calculator = instances_calculator or InstancesCalculator()
         self.load_calculator = load_calculator or LoadCalculator()
 
         sshz = []
@@ -110,6 +113,12 @@ class Cluster:
         else: self.func_kwargs_list = func_kwargs_list
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
+    def print_func_kwargs(self):
+        for an_ssh, a_kwarg in zip(self.sshz, self.func_kwargs_list):
+            tb.S(a_kwarg).print(as_config=True, title=an_ssh.get_repr(which="remote"))
+    def print_commands(self):
+        for machine in self.machines:
+            print(f"{repr(machine)} ==> {machine.execution_command}")
 
     def generate_standard_kwargs(self):
         cpus = []
@@ -135,6 +144,8 @@ class Cluster:
         for a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances in zip(self.resources_product_norm, self.cpus_norm, self.rams_norm, self.instances_per_machine):
             self.func_kwargs_list.append(self.load_calculator.get_func_kwargs(a_cpu_norm=a_cpu_norm, a_ram_norm=a_ram_norm, a_product_norm=a_product_norm, a_num_instances=a_num_instances, total_instances=sum(self.instances_per_machine)))
 
+        self.print_func_kwargs()
+
     def viz_load_ratios(self):
         plt = tb.install_n_import("plotext")
         names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
@@ -157,6 +168,7 @@ class Cluster:
             tb.Save.pickle(obj=self, path=self.results_path.joinpath("cluster.Cluster.pkl"))
         except TypeError:
             print("Couldn't pickle cluster object")
+        self.print_commands()
 
     def mux_consoles(self):
         cmd = ""
@@ -199,7 +211,6 @@ def try_it():
     c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, install_repo=False,
                 instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=2))
     print(c)
-    c.generate_standard_kwargs()
     c.submit()
     c.mux_consoles()
 
@@ -219,4 +230,4 @@ class Zellij:
 
 
 if __name__ == '__main__':
-    pass
+    try_it()
