@@ -137,4 +137,5 @@ console.print(Panel(Text(f'''
 ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 
 ''', style="bold blue on white"), title="Pull results using croshell with this script:", border_style="bold red"))
 
+print("All done.")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")

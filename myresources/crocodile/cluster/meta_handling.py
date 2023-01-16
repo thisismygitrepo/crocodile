@@ -18,9 +18,9 @@ def get_script(name: str, kwargs: dict) -> str:
     return tmp
 
 
-def get_py_script(kwargs, rel_full_path, func_name, wrap_in_try_except=False):
+def get_py_script(kwargs, rel_full_path, func_name, wrap_in_try_except=False, parallelize=False):
     tmp = get_script(name="script_execution", kwargs=kwargs)
-    execution_line = get_execution_line(func_name=func_name, rel_full_path=rel_full_path)
+    execution_line = get_execution_line(func_name=func_name, rel_full_path=rel_full_path, parallelize=parallelize)
     if wrap_in_try_except:
         import textwrap
         execution_line = textwrap.indent(execution_line, " " * 4)
@@ -37,7 +37,22 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, rel_full_path) -> str:
+def get_execution_line(func_name, rel_full_path, parallelize=False) -> str:
+    if parallelize: return """
+
+def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
+    print(f"Splitting the work ({idx_start=}, {idx_end=}) among {num_instances} instances ...")
+    kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
+    for idx, x in enumerate(kwargs_split):
+        tb.S(x).print(as_config=True, title=f"Instance {idx}")
+
+    res = kwargs_split.apply(lambda kwargs: inner_func(**kwargs), jobs=num_instances)
+    return res[0]
+
+res = parallelize(**func_kwargs.__dict__)
+
+""".replace("inner_func", f"module.{func_name}")
+
     if func_name is not None: return f"""
 res = module.{func_name}(**func_kwargs.__dict__)
 """

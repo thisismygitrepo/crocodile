@@ -4,10 +4,12 @@ import psutil
 import crocodile.toolbox as tb
 from math import ceil, floor
 from crocodile.cluster.remote_machine import RemoteMachine
+from crocodile.cluster.controllers import Zellij
 from rich.console import Console
 # from platform import system
 import time
 from rich.progress import track
+
 
 console = Console()
 
@@ -226,10 +228,11 @@ class Cluster:
 
 
 def try_it():
-    from crocodile.cluster.trial_file import parallelize
+    from crocodile.cluster.trial_file import inner_func
     machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
-    c = Cluster(func=parallelize, machine_specs_list=machine_specs_list, install_repo=False,
-                instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=2))
+    c = Cluster(func=inner_func, machine_specs_list=machine_specs_list, install_repo=False,
+                instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=2),
+                parallelize=True)
     print(c)
     c.submit()
     c.execute(run=True)
@@ -240,50 +243,6 @@ def try_it():
     c.download_results()
     tb.L(c.machines).delete_remote_results()
     return c
-
-
-class Zellij:
-    def __init__(self, ssh: tb.SSH):
-        """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
-        self.ssh = ssh
-        self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
-        self.new_sess_name = None
-
-    def get_new_sess_name(self):
-        # zellij kill-session {name}
-        print(f"Querying `{self.ssh.get_repr(which='remote')}` for new session name")
-        resp = self.ssh.run("zellij ls")
-        if resp.err == "No active zellij sessions found.":
-            sess_name = "ms0"
-        else:
-            sess = resp.op.split("\n")
-            sess = [s for s in sess if s.startswith("ms")]
-            if len(sess) == 0: sess_name = "ms0"
-            else: sess_name = f"ms{1+int(sess[-1][-1])}"
-        self.new_sess_name = sess_name
-        return sess_name
-
-    def setup_layout(self, sess_name, cmd="", run=False):
-        if run:
-            if cmd.startswith(". "): cmd = cmd[2:]
-            elif cmd.startswith("source "): cmd = cmd[7:]
-            exe = f"""
-zellij --session {sess_name} run -d down -- /bin/bash {cmd}
-zellij --session {sess_name} action move-focus up
-zellij --session {sess_name} action close-pane
-"""
-        else: exe = f"""
-zellij --session {sess_name} action write-chars "{cmd}" 
-"""
-        return self.ssh.run(f"""
-zellij --session {sess_name} action rename-tab t1{self.id}  # rename the focused first tab
-zellij --session {sess_name} action new-tab --name htop{self.id}
-zellij --session {sess_name} action write-chars htop
-zellij --session {sess_name} action new-tab --name exp{self.id}
-zellij --session {sess_name} action go-to-tab 1
-{exe}
-
-""")
 
 
 if __name__ == '__main__':

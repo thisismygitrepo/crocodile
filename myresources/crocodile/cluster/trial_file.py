@@ -20,13 +20,14 @@ def expensive_function() -> tb.P:
 
 
 def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
-    print(f"Splitting the work among {num_instances} instances ...")
+    print(f"This script will execute ({(idx_max - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
+    print(f"Splitting the work ({idx_start=}, {idx_end=}) among {num_instances} instances ...")
     kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
     for idx, x in enumerate(kwargs_split):
         tb.S(x).print(as_config=True, title=f"Instance {idx}")
 
     res = kwargs_split.apply(lambda kwargs: inner_func(**kwargs), jobs=num_instances)
-    return res[0]
+    return tb.P(res[0]).parent
 
 
 def inner_func(idx_start, idx_end, idx_max):
@@ -36,6 +37,9 @@ def inner_func(idx_start, idx_end, idx_max):
     for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
     print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
+    path = tb.P.tmp().joinpath(f"tmp_files/trial_func_result_{idx_start}_{idx_end}.Struct.pkl")
+    tb.S(a=1).save(path=path)
+    return path
 
 
 if __name__ == '__main__':

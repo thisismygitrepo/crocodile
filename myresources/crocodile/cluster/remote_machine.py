@@ -96,7 +96,7 @@ class RemoteMachine:
                  data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
-                 ipython=False, interactive=False, pdb=False, wrap_in_try_except=False,
+                 ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, parallelize=False,
                  lock_resources=False):
 
         # function and its data
@@ -120,6 +120,7 @@ class RemoteMachine:
         self.ipython = ipython
         self.interactive = interactive
         self.pdb = pdb
+        self.parallelize = parallelize
         self.execution_command = None
 
         # remote machine behaviour
@@ -233,7 +234,7 @@ class RemoteMachine:
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.description,
                            job_id=self.job_id, lock_resources=self.lock_resources)
-        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path)
+        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.parallelize)
 
         if self.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
