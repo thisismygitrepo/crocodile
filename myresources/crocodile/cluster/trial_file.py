@@ -38,6 +38,7 @@ def inner_func(idx_start, idx_end, idx_max):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
     print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
     path = tb.P.tmp().joinpath(f"tmp_files/trial_func_result_{idx_start}_{idx_end}.Struct.pkl")
+    path.delete(sure=True)
     tb.S(a=1).save(path=path)
     return path
 

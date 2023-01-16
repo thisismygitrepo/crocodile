@@ -10,6 +10,7 @@ class Zellij:
         self.new_sess_name = None
 
     def get_new_sess_name(self):
+        if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
         print(f"Querying `{self.ssh.get_repr(which='remote')}` for new session name")
         resp = self.ssh.run("zellij ls")

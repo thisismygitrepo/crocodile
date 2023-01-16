@@ -22,7 +22,8 @@ class InstancesCalculator:
         self.reference_machine = reference_machine
         self.bottleneck_reference_value = bottleneck_reference_value
         self.get_bottleneck_reference_value()
-
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, d): self.__dict__.update(d)
     def get_bottleneck_reference_value(self):
         if self.reference_machine == "this_machine":
             if self.bottleneck_reference_value is None:
@@ -53,6 +54,8 @@ class LoadCalculator:
         self.idx_so_far = 0
         self.instance_counter = 0
 
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, d): self.__dict__.update(d)
     def get_func_kwargs(self, a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances):
         idx1, idx2 = self._get_func_kwargs(a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances)
         return dict(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_instances=a_num_instances)
@@ -65,7 +68,6 @@ class LoadCalculator:
         return list(res)
 
     def _get_func_kwargs(self, a_cpu_norm, a_ram_norm, a_product_norm, a_num_instances, total_instances):
-
         load_value = {"ram": a_ram_norm, "cpu": a_cpu_norm, "product": a_product_norm}[self.load_criterion]
         self.load_ratios.append(load_value)
         self.instance_counter += a_num_instances
@@ -79,7 +81,8 @@ class LoadCalculator:
 class Cluster:
     @staticmethod
     def get_cluster_path(job_id): return tb.P.home().joinpath(rf"tmp_results/remote_machines/job_id__{job_id}")
-
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, d): self.__dict__.update(d)
     def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False,
                  func_kwargs_list=None,
                  instances_calculator=None, load_calculator=None,
@@ -104,18 +107,14 @@ class Cluster:
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
         self.machines: list[RemoteMachine] = []
-        self.zs: list[Zellij] = []
+        self.zs: list[Zellij] = [Zellij(ssh) for ssh in self.sshz]
         self.rams = self.rams_norm = self.cpus = self.cpus_norm = self.resources_product_norm = None
         self.instances_per_machine = []
         self.remote_machine_kwargs = remote_machine_kwargs
 
         self.description = description
         self.open_console = open_console
-
-        if func_kwargs_list is None:
-            self.generate_standard_kwargs()
-            self.viz_load_ratios()
-        else: self.func_kwargs_list = func_kwargs_list
+        self.func_kwargs_list = func_kwargs_list
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
     def print_func_kwargs(self):
@@ -130,6 +129,7 @@ class Cluster:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
     def generate_standard_kwargs(self):
+        if self.func_kwargs_list is not None: return None
         cpus = []
         for an_ssh in self.sshz:
             a_cpu = an_ssh.run_py("import psutil; print(psutil.cpu_count())", verbose=False).capture().op
@@ -152,10 +152,10 @@ class Cluster:
         self.func_kwargs_list = []
         for a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances in zip(self.resources_product_norm, self.cpus_norm, self.rams_norm, self.instances_per_machine):
             self.func_kwargs_list.append(self.load_calculator.get_func_kwargs(a_cpu_norm=a_cpu_norm, a_ram_norm=a_ram_norm, a_product_norm=a_product_norm, a_num_instances=a_num_instances, total_instances=sum(self.instances_per_machine)))
-
         self.print_func_kwargs()
 
     def viz_load_ratios(self):
+        if self.func_kwargs_list is None: raise Exception("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
         plt = tb.install_n_import("plotext")
         names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
 
@@ -169,8 +169,11 @@ class Cluster:
         print(self.load_calculator.load_ratios_repr)
 
     def submit(self):
+        if self.func_kwargs_list is None: raise Exception("You need to generate standard kwargs first.")
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
-            m = RemoteMachine(func_kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}", job_id=self.job_id + f"_{idx}", **self.remote_machine_kwargs)
+            desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}",
+            m = RemoteMachine(func_kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=desc,
+                              job_id=self.job_id + f"_{idx}", **self.remote_machine_kwargs)
             m.run()
             self.machines.append(m)
         try:
@@ -179,24 +182,23 @@ class Cluster:
             print("Couldn't pickle cluster object")
         self.print_commands()
 
-    def execute(self, machines_per_tab=1, run=False):
+    def open_mux(self, machines_per_tab=1):
         cmd = "wt "
-        for idx, m in enumerate(self.machines):
-            z = Zellij(m.ssh)
-            self.zs.append(z)
+        for idx, (z, m) in enumerate(zip(self.zs, self.machines)):
             sess_name = z.get_new_sess_name()
             sub_cmd = f"{m.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "
             if idx == 0: cmd += f""" pwsh -Command "{sub_cmd}" `; """  # avoid new tabs despite being even index
             elif idx % machines_per_tab == 0: cmd += f""" new-tab pwsh -Command "{sub_cmd}" `; """
             else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
-
         sleep_time = 5 * len(self.machines)
         print(f"Sleeping for {sleep_time} seconds to allow for zellij commands to start ... ")
         fractions = 100
         for _ in track(range(fractions), description="sleeping ..."):
             time.sleep(sleep_time / fractions)  # Simulate work being done
 
+    def fire(self, machines_per_tab=1, run=False):
+        self.open_mux(machines_per_tab=machines_per_tab)
         for z, m in zip(self.zs, self.machines):
             z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command, run=run)
 
@@ -220,29 +222,15 @@ class Cluster:
 
     @staticmethod
     def load(job_id) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id).joinpath("cluster.Cluster.pkl").readit()
+    def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.get_cluster_path(job_id=self.job_id).joinpath("cluster.Cluster.pkl"))
     def run(self):
         self.generate_standard_kwargs()
+        self.viz_load_ratios()
+        print(self)
         self.submit()
-        self.execute()
+        self.fire()
+        self.save()
         return self
-
-
-def try_it():
-    from crocodile.cluster.trial_file import inner_func
-    machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
-    c = Cluster(func=inner_func, machine_specs_list=machine_specs_list, install_repo=False,
-                instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=2),
-                parallelize=True)
-    print(c)
-    c.submit()
-    c.execute(run=True)
-
-    # later ...
-    c = Cluster.load("cluster")
-    c.check_job_status()
-    c.download_results()
-    tb.L(c.machines).delete_remote_results()
-    return c
 
 
 if __name__ == '__main__':

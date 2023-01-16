@@ -1,6 +1,7 @@
 
 import crocodile.toolbox as tb
 from crocodile.cluster import meta_handling as meta
+from crocodile.cluster.controllers import Zellij
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
@@ -134,6 +135,7 @@ class RemoteMachine:
         self.machine_specs = machine_specs
         self.transfer_method = transfer_method
         self.ssh = ssh or tb.SSH(**machine_specs)
+        self.z = Zellij(self.ssh)
 
         # scripts
         self.job_id = job_id or tb.randstr(length=10)
@@ -146,7 +148,7 @@ class RemoteMachine:
 
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
-    def fire_execution_script_on_remote(self):
+    def fire(self):
         # self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
         sep = "\n"
         self.ssh.run(f"zellij --session {self.ssh.run('zellij ls').op.split(sep)[0]} action write-chars '{self.execution_command}'")
