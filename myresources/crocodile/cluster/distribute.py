@@ -1,4 +1,3 @@
-import time
 
 import numpy as np
 import psutil
@@ -7,6 +6,8 @@ from math import ceil, floor
 from crocodile.cluster.remote_machine import RemoteMachine
 from rich.console import Console
 # from platform import system
+import time
+from rich.progress import track
 
 console = Console()
 
@@ -176,7 +177,7 @@ class Cluster:
             print("Couldn't pickle cluster object")
         self.print_commands()
 
-    def mux_consoles(self, machines_per_tab=1):
+    def execute(self, machines_per_tab=1, run=False):
         cmd = "wt "
         for idx, m in enumerate(self.machines):
             z = Zellij(m.ssh)
@@ -187,10 +188,15 @@ class Cluster:
             elif idx % machines_per_tab == 0: cmd += f""" new-tab pwsh -Command "{sub_cmd}" `; """
             else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
-        print(f"Sleeping for 10 seconds to allow for zellij commands to start ... ")
-        time.sleep(10)
+
+        sleep_time = 5 * len(self.machines)
+        print(f"Sleeping for {sleep_time} seconds to allow for zellij commands to start ... ")
+        fractions = 100
+        for _ in track(range(fractions), description="sleeping ..."):
+            time.sleep(sleep_time / fractions)  # Simulate work being done
+
         for z, m in zip(self.zs, self.machines):
-            z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command)
+            z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command, run=run)
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
@@ -215,23 +221,22 @@ class Cluster:
     def run(self):
         self.generate_standard_kwargs()
         self.submit()
-        self.mux_consoles()
+        self.execute()
         return self
 
 
 def try_it():
-    from crocodile.cluster.trial_file import expensive_function_parallel
+    from crocodile.cluster.trial_file import parallelize
     machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
-    c = Cluster(func=expensive_function_parallel, machine_specs_list=machine_specs_list, install_repo=False,
+    c = Cluster(func=parallelize, machine_specs_list=machine_specs_list, install_repo=False,
                 instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=2))
     print(c)
     c.submit()
-    c.mux_consoles()
+    c.execute(run=True)
 
     # later ...
     c = Cluster.load("cluster")
     c.check_job_status()
-    c.mux_consoles()
     c.download_results()
     tb.L(c.machines).delete_remote_results()
     return c
@@ -259,15 +264,25 @@ class Zellij:
         return sess_name
 
     def setup_layout(self, sess_name, cmd="", run=False):
-        if run: exe = f"""zellij --session {sess_name} run -d DOWN -- {cmd} """
-        else: exe = f"""zellij --session {sess_name} action write-chars "{cmd}" """
+        if run:
+            if cmd.startswith(". "): cmd = cmd[2:]
+            elif cmd.startswith("source "): cmd = cmd[7:]
+            exe = f"""
+zellij --session {sess_name} run -d down -- /bin/bash {cmd}
+zellij --session {sess_name} action move-focus up
+zellij --session {sess_name} action close-pane
+"""
+        else: exe = f"""
+zellij --session {sess_name} action write-chars "{cmd}" 
+"""
         return self.ssh.run(f"""
-zellij --session {sess_name} action new-tab --name t1{self.id}
+zellij --session {sess_name} action rename-tab t1{self.id}  # rename the focused first tab
 zellij --session {sess_name} action new-tab --name htop{self.id}
 zellij --session {sess_name} action write-chars htop
 zellij --session {sess_name} action new-tab --name exp{self.id}
 zellij --session {sess_name} action go-to-tab 1
 {exe}
+
 """)
 
 

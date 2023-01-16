@@ -19,12 +19,14 @@ def expensive_function() -> tb.P:
     return path.parent
 
 
-def expensive_function_parallel(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
+def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
     print(f"Splitting the work among {num_instances} instances ...")
-    _ = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: inner_func(sub_list[0], sub_list[-1], idx_max), jobs=num_instances)
-    path = tb.P.tmpfile(suffix=".Struct.pkl")
-    tb.S(sum=sum(range(idx_start, idx_end))).save(path=path)
-    return path
+    kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
+    for idx, x in enumerate(kwargs_split):
+        tb.S(x).print(as_config=True, title=f"Instance {idx}")
+
+    res = kwargs_split.apply(lambda kwargs: inner_func(**kwargs), jobs=num_instances)
+    return res[0]
 
 
 def inner_func(idx_start, idx_end, idx_max):
