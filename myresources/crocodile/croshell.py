@@ -46,7 +46,7 @@ else:
             from crocodile.msc.ascii_art import get_art
             artlib = random.choice(['boxes', 'cowsay'])
             __ = P.tmpfile("croco_art", folder="tmp_arts")
-            print(f"{artlib=}, file={__}")
+            # print(f"{artlib=}, file={__}")
             get_art("crocodile", calliagraphy=None, artlib=artlib, file=__, verbose=False)
         os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
     except: print(__.read_text())
