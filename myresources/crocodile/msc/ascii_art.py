@@ -31,7 +31,7 @@ def get_art(comment=None, artlib=None, style=None, super_style='scene', calliagr
         style = random.choice(pool)
     # res = tb.Terminal().run(f"""echo "{comment}" | {boxlib} {'-d' if boxlib == 'boxes' else '-f'} {style} """).op
     cmd = f"""echo "{comment}" | {f'figlet -f {random.choice(FIGLET_FONTS)} | ' if calliagraphy else ''} {artlib} {'-d' if artlib == 'boxes' else '-f'} {style} {'' if not file else f'> {file}'}"""
-    print(cmd)
+    # print(cmd)
     res = subprocess.run(cmd, text=True, capture_output=True, shell=True).stdout
     res = textwrap.indent(res, prefix=prefix)
     if verbose:

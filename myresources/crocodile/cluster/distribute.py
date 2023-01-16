@@ -1,3 +1,4 @@
+import time
 
 import numpy as np
 import psutil
@@ -100,6 +101,7 @@ class Cluster:
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
         self.machines: list[RemoteMachine] = []
+        self.zs: list[Zellij] = []
         self.rams = self.rams_norm = self.cpus = self.cpus_norm = self.resources_product_norm = None
         self.instances_per_machine = []
         self.remote_machine_kwargs = remote_machine_kwargs
@@ -114,9 +116,13 @@ class Cluster:
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
     def print_func_kwargs(self):
+        print("\n" * 2)
+        console.rule(title=f"kwargs of functions to be run on machines")
         for an_ssh, a_kwarg in zip(self.sshz, self.func_kwargs_list):
             tb.S(a_kwarg).print(as_config=True, title=an_ssh.get_repr(which="remote"))
     def print_commands(self):
+        print("\n" * 2)
+        console.rule(title="Commands to run on each machine:")
         for machine in self.machines:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
@@ -170,13 +176,21 @@ class Cluster:
             print("Couldn't pickle cluster object")
         self.print_commands()
 
-    def mux_consoles(self):
-        cmd = ""
+    def mux_consoles(self, machines_per_tab=1):
+        cmd = "wt "
         for idx, m in enumerate(self.machines):
-            if idx == 0: cmd += f""" wt pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
-            else: cmd += f""" split-pane --horizontal --size 0.8 pwsh -Command "{m.ssh.get_ssh_conn_str()}" `; """
-
+            z = Zellij(m.ssh)
+            self.zs.append(z)
+            sess_name = z.get_new_sess_name()
+            sub_cmd = f"{m.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "
+            if idx == 0: cmd += f""" pwsh -Command "{sub_cmd}" `; """  # avoid new tabs despite being even index
+            elif idx % machines_per_tab == 0: cmd += f""" new-tab pwsh -Command "{sub_cmd}" `; """
+            else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
+        print(f"Sleeping for 10 seconds to allow for zellij commands to start ... ")
+        time.sleep(10)
+        for z, m in zip(self.zs, self.machines):
+            z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command)
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
@@ -217,17 +231,45 @@ def try_it():
     # later ...
     c = Cluster.load("cluster")
     c.check_job_status()
+    c.mux_consoles()
     c.download_results()
     tb.L(c.machines).delete_remote_results()
     return c
 
 
 class Zellij:
-    def __init__(self, ssh):
+    def __init__(self, ssh: tb.SSH):
+        """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
         self.ssh = ssh
-    def get_session(self):
-        return self.ssh.run("zellij ls").op.split("\n")[0]
+        self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
+        self.new_sess_name = None
+
+    def get_new_sess_name(self):
+        # zellij kill-session {name}
+        print(f"Querying `{self.ssh.get_repr(which='remote')}` for new session name")
+        resp = self.ssh.run("zellij ls")
+        if resp.err == "No active zellij sessions found.":
+            sess_name = "ms0"
+        else:
+            sess = resp.op.split("\n")
+            sess = [s for s in sess if s.startswith("ms")]
+            if len(sess) == 0: sess_name = "ms0"
+            else: sess_name = f"ms{1+int(sess[-1][-1])}"
+        self.new_sess_name = sess_name
+        return sess_name
+
+    def setup_layout(self, sess_name, cmd="", run=False):
+        if run: exe = f"""zellij --session {sess_name} run -d DOWN -- {cmd} """
+        else: exe = f"""zellij --session {sess_name} action write-chars "{cmd}" """
+        return self.ssh.run(f"""
+zellij --session {sess_name} action new-tab --name t1{self.id}
+zellij --session {sess_name} action new-tab --name htop{self.id}
+zellij --session {sess_name} action write-chars htop
+zellij --session {sess_name} action new-tab --name exp{self.id}
+zellij --session {sess_name} action go-to-tab 1
+{exe}
+""")
 
 
 if __name__ == '__main__':
-    try_it()
+    pass

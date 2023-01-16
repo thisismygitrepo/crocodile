@@ -20,12 +20,14 @@ def expensive_function() -> tb.P:
 
 
 def expensive_function_parallel(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
+    print(f"Splitting the work among {num_instances} instances ...")
+    _ = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: inner_func(sub_list[0], sub_list[-1], idx_max), jobs=num_instances)
+    path = tb.P.tmpfile(suffix=".Struct.pkl")
+    tb.S(sum=sum(range(idx_start, idx_end))).save(path=path)
+    return path
 
-    q = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: inner_func(sub_list[0], sub_list[-1]), jobs=num_instances)
-    return tb.S(sum=sum(range(idx_start, idx_end))).save(path=tb.P.tmpfile(suffix=".Struct.pkl"))
 
-
-def inner_func(idx_start, idx_end):
+def inner_func(idx_start, idx_end, idx_max):
     print(f"Hello, I am an expensive function, and I just started running ...")
     execution_time_in_seconds = 60 * 3
     steps = 100
