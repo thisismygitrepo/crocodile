@@ -40,7 +40,11 @@ except Exception as e:
 def get_execution_line(func_name, rel_full_path, parallelize=False) -> str:
     if parallelize:
         from crocodile.cluster import trial_file
-        return tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0].replace("expensive_function_single_thread", f"module.{func_name}")
+        wrapper_func_name = trial_file.parallelize.__name__
+        base_func = tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0]
+        base_func = base_func.replace("expensive_function_single_thread", f"module.{func_name}")
+        base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
+        return base_func
 
     if func_name is not None: return f"""
 res = module.{func_name}(**func_kwargs.__dict__)

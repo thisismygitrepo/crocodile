@@ -26,7 +26,7 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) 
 
     print(f"This script will execute ({(idx_end - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
 
-    print(f"Splitting the work ({idx_start=}, {idx_end=}) among {num_instances} instances ...")
+    print(f"Splitting the work ({idx_start=}, {idx_end=}) equally among {num_instances} instances via `parallelize` of cluster.trial_file ...")
 
     kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
     for idx, x in enumerate(kwargs_split):
@@ -40,16 +40,16 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) 
 
 
 def expensive_function_single_thread(idx_start, idx_end, idx_max):
-    print(f"Hello, I am an expensive function, and I just started running ...")
-    execution_time_in_seconds = 60 * 3
+    print(f"Hello, I am one thread of an expensive function, and I just started running ...")
+    execution_time_in_seconds = 60 * 1
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
     print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
-    path = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread/trial_func_result_{idx_start}_{idx_end}.Struct.pkl")
-    path.delete(sure=True)
-    tb.S(a=1).save(path=path)
-    return path
+    res_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread")
+    res_dir.delete(sure=True)
+    tb.S(a=1).save(path=res_dir.joinpath(f"thread_{idx_start}_{idx_end}/trial_func_result.Struct.pkl"))
+    return res_dir
 
 
 if __name__ == '__main__':

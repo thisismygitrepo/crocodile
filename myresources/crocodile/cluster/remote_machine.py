@@ -261,6 +261,8 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {'pip install -e .' if self.install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 
+echo "Executing Python wrapper script: {self.path_dict.py_script_path.rel2home().as_posix()}"
+
 # EXTRA-PLACEHOLDER-POST
 
 cd ~

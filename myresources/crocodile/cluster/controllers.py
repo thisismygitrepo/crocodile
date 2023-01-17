@@ -18,12 +18,10 @@ class Zellij:
             sess_name = "ms0"
         else:
             sess = resp.op.split("\n")
-            print(sess, 1)
-            sess = [s for s in sess if s.startswith("ms")]
-            print(sess, 2)
+            sess = [int(s.replace("ms", "")) for s in sess if s.startswith("ms")]
             sess.sort()
             if len(sess) == 0: sess_name = "ms0"
-            else: sess_name = f"ms{1+int(sess[-1].replace('ms', ''))}"
+            else: sess_name = f"ms{1+sess[-1]}"
         self.new_sess_name = sess_name
         return sess_name
 
