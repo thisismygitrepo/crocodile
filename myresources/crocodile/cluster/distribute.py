@@ -193,18 +193,19 @@ class Cluster:
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
-        if self.results_path is None: self.check_job_status()
-        if self.results_path is None: print(f"Results are not ready yet. Try later"); return None
         if self.results_downloaded:
             print(f"All results downloaded to {self.results_path} 🤗")
             return True
         for idx, a_m in enumerate(self.machines):
+            if a_m.results_path is None:
+                print(f"Results are not ready for machine {a_m}.")
+                continue
             results_folder = tb.P(a_m.results_path).expanduser()
             if results_folder is not None and a_m.results_downloaded is False:
                 print("\n")
                 console.rule(f"Downloading results from {a_m}")
                 print("\n")
-                a_m.download_results(target=self.results_path.joinpath(results_folder.name), r=True, zip_first=False)
+                a_m.download_results(target=None)  # TODO another way of resolve multiple machines issue is to create a directory at downlaod_results time.
         if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
             print(f"All results downloaded to {self.results_path} 🤗")
             self.results_downloaded = True

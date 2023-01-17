@@ -42,7 +42,7 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) 
 # parallelizeEnds
 
 
-def expensive_function_single_thread(idx_start, idx_end, idx_max, save_dir_suffix):
+def expensive_function_single_thread(idx_start: int, idx_end: int, idx_max: int, save_dir_suffix: tb.P or str) -> tb.P:
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
     execution_time_in_seconds = 60 * 1
     steps = 100

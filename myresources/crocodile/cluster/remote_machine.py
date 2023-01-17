@@ -11,6 +11,9 @@ import os
 import pandas as pd
 
 
+console = Console()
+
+
 class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
 
@@ -44,7 +47,6 @@ rm {self.lock_path.collapseuser()}
 echo "Unlocked resources"
 """
     def secure_resources(self):
-        console = Console()
         sleep_time_mins = 10
         lock_path = self.lock_path.expanduser()
         print(f"Inspecting Lock file @ {lock_path}")
@@ -164,7 +166,7 @@ class RemoteMachine:
             return None
 
         base = self.path_dict.execution_log_dir.expanduser().create()
-        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir, z=True)
+        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir.as_posix(), z=True)
         except: pass  # the directory doesn't exist yet at the remote.
         end_time_file = base.joinpath("end_time.txt")
 
@@ -184,16 +186,23 @@ class RemoteMachine:
 
             results_folder_file = base.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
             results_folder = results_folder_file.read_text()
+
+            print("\n" * 2)
+            console.rule("🎉")
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
 📁 results_folder_path: {results_folder} """)
             try:
-                print(inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False))
+                inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False)
             except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
+            print("\n")
+            console.rule("🎉")
+            print("\n" * 2)
 
             self.results_path = results_folder
             return results_folder
 
     def download_results(self, target=None, r=True, zip_first=False):
+        if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{tb.P(self.results_path).expanduser().absolute()}`"); return
         if self.results_path is not None:
             self.ssh.copy_to_here(source=self.results_path, target=target, r=r, z=zip_first)
             self.results_downloaded = True
@@ -261,6 +270,8 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {'pip install -e .' if self.install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 
+echo ""
+echo "Starting job {self.job_id} 🚀"
 echo "Executing Python wrapper script: {self.path_dict.py_script_path.rel2home().as_posix()}"
 
 # EXTRA-PLACEHOLDER-POST
@@ -275,13 +286,13 @@ deactivate
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
-        with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
+        with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8",newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
         self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
 
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
-        Console().print(inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False))
+        inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
 
 
 if __name__ == '__main__':
