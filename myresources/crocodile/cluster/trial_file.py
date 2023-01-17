@@ -26,18 +26,18 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) 
     for idx, x in enumerate(kwargs_split):
         tb.S(x).print(as_config=True, title=f"Instance {idx}")
 
-    res = kwargs_split.apply(lambda kwargs: inner_func(**kwargs), jobs=num_instances)
+    res = kwargs_split.apply(lambda kwargs: expensive_function_single_thread(**kwargs), jobs=num_instances)
     return tb.P(res[0]).parent
 
 
-def inner_func(idx_start, idx_end, idx_max):
+def expensive_function_single_thread(idx_start, idx_end, idx_max):
     print(f"Hello, I am an expensive function, and I just started running ...")
     execution_time_in_seconds = 60 * 3
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
     print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
-    path = tb.P.tmp().joinpath(f"tmp_files/trial_func_result_{idx_start}_{idx_end}.Struct.pkl")
+    path = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread/trial_func_result_{idx_start}_{idx_end}.Struct.pkl")
     path.delete(sure=True)
     tb.S(a=1).save(path=path)
     return path

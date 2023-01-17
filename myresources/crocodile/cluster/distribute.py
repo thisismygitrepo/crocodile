@@ -223,12 +223,12 @@ class Cluster:
     @staticmethod
     def load(job_id) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id).joinpath("cluster.Cluster.pkl").readit()
     def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.get_cluster_path(job_id=self.job_id).joinpath("cluster.Cluster.pkl"))
-    def run(self):
+    def run(self, run=False, machines_per_tab=1):
         self.generate_standard_kwargs()
         self.viz_load_ratios()
         print(self)
         self.submit()
-        self.fire()
+        self.fire(run=run, machines_per_tab=machines_per_tab)
         self.save()
         return self
 

@@ -4,15 +4,13 @@ from crocodile.cluster.distribute import Cluster, InstancesCalculator
 
 
 def try_it():
-    from crocodile.cluster.trial_file import inner_func
+    from crocodile.cluster.trial_file import expensive_function_single_thread
     machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
-    c = Cluster(func=inner_func, machine_specs_list=machine_specs_list, install_repo=False,
+    c = Cluster(func=expensive_function_single_thread, machine_specs_list=machine_specs_list, install_repo=False,
                 instances_calculator=InstancesCalculator(multiplier=3, bottleneck_reference_value=8),
                 parallelize=True)
-    print(c)
-    c.submit()
-    c.fire(run=True)
-    job_id = c.save()
+    c.run()
+    job_id = c.job_id
 
     # later ...
     c = Cluster.load(job_id)
