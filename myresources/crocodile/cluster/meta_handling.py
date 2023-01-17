@@ -38,21 +38,9 @@ except Exception as e:
 
 
 def get_execution_line(func_name, rel_full_path, parallelize=False) -> str:
-    if parallelize: return """
-
-def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
-    print(f"This script will execute ({(idx_max - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
-    print(f"Splitting the work ({idx_start=}, {idx_end=}) among {num_instances} instances ...")
-    kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
-    for idx, x in enumerate(kwargs_split):
-        tb.S(x).print(as_config=True, title=f"Instance {idx}")
-
-    res = kwargs_split.apply(lambda kwargs: expensive_function_single_thread(**kwargs), jobs=num_instances)
-    return tb.P(res[0]).parent
-
-res = parallelize(**func_kwargs.__dict__)
-
-""".replace("expensive_function_single_thread", f"module.{func_name}")
+    if parallelize:
+        from crocodile.cluster import trial_file
+        return tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0].replace("expensive_function_single_thread", f"module.{func_name}")
 
     if func_name is not None: return f"""
 res = module.{func_name}(**func_kwargs.__dict__)

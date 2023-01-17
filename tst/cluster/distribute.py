@@ -7,7 +7,7 @@ def try_it():
     from crocodile.cluster.trial_file import expensive_function_single_thread
     machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
     c = Cluster(func=expensive_function_single_thread, machine_specs_list=machine_specs_list, install_repo=False,
-                instances_calculator=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
+                thrd_load_calc=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
                 parallelize=True)
     c.run(run=True)
     job_id = c.job_id
@@ -22,4 +22,5 @@ def try_it():
 
 
 if __name__ == '__main__':
-    try_it()
+    # try_it()
+    pass

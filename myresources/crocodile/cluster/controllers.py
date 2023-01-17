@@ -23,7 +23,7 @@ class Zellij:
             print(sess, 2)
             sess.sort()
             if len(sess) == 0: sess_name = "ms0"
-            else: sess_name = f"ms{1+int(sess[-1][-1])}"
+            else: sess_name = f"ms{1+int(sess[-1].replace('ms', ''))}"
         self.new_sess_name = sess_name
         return sess_name
 

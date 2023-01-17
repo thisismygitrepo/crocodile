@@ -19,15 +19,24 @@ def expensive_function() -> tb.P:
     return path.parent
 
 
+# parallelizeBegins
+
+
 def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
-    print(f"This script will execute ({(idx_max - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
+
+    print(f"This script will execute ({(idx_end - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
+
     print(f"Splitting the work ({idx_start=}, {idx_end=}) among {num_instances} instances ...")
+
     kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
     for idx, x in enumerate(kwargs_split):
         tb.S(x).print(as_config=True, title=f"Instance {idx}")
 
     res = kwargs_split.apply(lambda kwargs: expensive_function_single_thread(**kwargs), jobs=num_instances)
     return tb.P(res[0]).parent
+
+
+# parallelizeEnds
 
 
 def expensive_function_single_thread(idx_start, idx_end, idx_max):

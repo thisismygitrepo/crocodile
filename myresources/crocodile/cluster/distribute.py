@@ -16,7 +16,8 @@ console = Console()
 
 class ThreadsWorkloadDivider:
     """relies on relative values to a referenc machine specs.
-    Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable."""
+    Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable.
+    equal distribution across instances of one machine"""
     def __init__(self, multiplier=None, bottleneck_name=["cpu", "ram"][0], bottleneck_reference_value=None, reference_machine="this_machine"):
         self.multiplier = multiplier
         self.bottleneck_name = bottleneck_name
@@ -52,28 +53,21 @@ class MachineLoadCalculator:
         self.max_num = max_num
         self.num_machines = num_machines
         self.load_criterion = load_criterion
-        self.machine_counter = 0
-        self.idx_so_far = 0
 
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
-    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm):
+    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_instances):
         tmp = []
-        for a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances in zip(resources_product_norm, cpus_norm, rams_norm):
-            idx1, idx2 = self._get_func_kwargs(a_cpu_norm=a_cpu_norm, a_ram_norm=a_ram_norm, a_product_norm=a_product_norm)
+        idx_so_far = 0
+        for machine_index, (a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances) in enumerate(zip(resources_product_norm, cpus_norm, rams_norm, num_instances)):
+            load_value = {"ram": a_ram_norm, "cpu": a_cpu_norm, "product": a_product_norm}[self.load_criterion]
+            self.load_ratios.append(load_value)
+            idx1 = idx_so_far
+            idx2 = self.max_num if machine_index == self.num_machines - 1 else (floor(load_value * self.max_num) + idx1)
+            if idx2 > self.max_num: raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
+            idx_so_far = idx2
             tmp.append(dict(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_instances=a_num_instances))
         return tmp
-
-    def _get_func_kwargs(self, a_cpu_norm, a_ram_norm, a_product_norm):
-        load_value = {"ram": a_ram_norm, "cpu": a_cpu_norm, "product": a_product_norm}[self.load_criterion]
-        self.load_ratios.append(load_value)
-        idx1 = self.idx_so_far
-        idx2 = self.max_num if self.machine_counter == self.num_machines - 1 else (floor(load_value * self.max_num) + idx1)
-        self.machine_counter += 1
-        if idx2 > self.max_num: raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
-        self.idx_so_far = idx2
-        # then, we have equal distribution across instances of one machine
-        return idx1, idx2
 
 
 class Cluster:
@@ -83,14 +77,14 @@ class Cluster:
     def __setstate__(self, d): self.__dict__.update(d)
     def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False,
                  func_kwargs_list=None,
-                 instances_calculator=None, load_calculator=None,
+                 thrd_load_calc=None, machine_load_calc=None,
                  open_console=False, description="", **remote_machine_kwargs, ):
         self.job_id = tb.randstr(length=10)
         self.results_path = self.get_cluster_path(self.job_id)
         self.results_downloaded = False
 
-        self.instances_calculator = instances_calculator or ThreadsWorkloadDivider()
-        self.load_calculator = load_calculator or MachineLoadCalculator(num_machines=len(machine_specs_list))
+        self.instances_calculator = thrd_load_calc or ThreadsWorkloadDivider()
+        self.load_calculator = machine_load_calc or MachineLoadCalculator(num_machines=len(machine_specs_list))
 
         sshz = []
         for machine_specs in machine_specs_list:
@@ -146,7 +140,7 @@ class Cluster:
             self.instances_per_machine.append(self.instances_calculator.get_instances_per_machines({"cpu": a_cpu, "ram": a_ram}))
 
         # relies on normalized values of specs.
-        self.func_kwargs_list = self.load_calculator.get_func_kwargs(cpus_norm=self.cpus_norm, rams_norm=self.rams_norm, resources_product_norm=self.resources_product_norm)
+        self.func_kwargs_list = self.load_calculator.get_func_kwargs(cpus_norm=self.cpus_norm, rams_norm=self.rams_norm, resources_product_norm=self.resources_product_norm, num_instances=self.instances_per_machine)
         self.print_func_kwargs()
 
     def viz_load_ratios(self):
