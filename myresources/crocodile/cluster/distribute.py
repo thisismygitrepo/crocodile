@@ -189,7 +189,7 @@ class Cluster:
     def fire(self, machines_per_tab=1, run=False):
         self.open_mux(machines_per_tab=machines_per_tab)
         for z, m in zip(self.zs, self.machines):
-            z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command, run=run)
+            z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command, run=run, job_wd=m.path_dict.root_dir.as_posix())
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):

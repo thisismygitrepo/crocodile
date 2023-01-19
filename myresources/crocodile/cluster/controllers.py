@@ -25,7 +25,7 @@ class Zellij:
         self.new_sess_name = sess_name
         return sess_name
 
-    def setup_layout(self, sess_name, cmd="", run=False):
+    def setup_layout(self, sess_name, cmd="", run=False, job_wd="~/tmp_results/remote_mahcines"):
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
@@ -41,6 +41,17 @@ zellij --session {sess_name} action write-chars "{cmd}"
 zellij --session {sess_name} action rename-tab t1{self.id}  # rename the focused first tab
 zellij --session {sess_name} action new-tab --name htop{self.id}
 zellij --session {sess_name} action write-chars htop
+
+zellij --session {sess_name} action new-tab --name lf{self.id}
+zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf
+zellij --session {sess_name} action move-focus up
+zellij --session {sess_name} action close-pane
+
+zellij --session {sess_name} action new-tab --name who{self.id}
+zellij --session {sess_name} run --direction down -- neofetch
+zellij --session {sess_name} action move-focus up
+zellij --session {sess_name} action close-pane
+
 zellij --session {sess_name} action new-tab --name exp{self.id}
 zellij --session {sess_name} action go-to-tab 1
 {exe}

@@ -37,6 +37,7 @@ error_message = "No error message."  # to be updated by try-except block inside 
 
 job_id = ""
 lock_resources = ""
+zellij_session = ""
 
 
 print("\n" * 2)
@@ -136,6 +137,14 @@ ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  #
 console.print(Panel(Text(f'''
 ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 
 ''', style="bold blue on white"), title="Pull results using croshell with this script:", border_style="bold red"))
+
+
+if zellij_session != "":
+    tb.Terminal().run(f"""
+zellij --session {zellij_session} action new-tab --name results --cwd {res_folder.as_posix()}
+zellij --session {zellij_session} action write-chars lf
+""")
+
 
 print(f"job {job_id} is completed.")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")
