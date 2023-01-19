@@ -66,4 +66,3 @@ try:
                          subject=f"Execution Completion Notification, job_id = {job_id}", msg=msg)
     print(f'FINISHED sending notification email to `{to_email}`')
 except Exception as e: print(f"Error sending email: {e}")
-

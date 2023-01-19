@@ -50,7 +50,7 @@ class DBMS:
         return self
 
     def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser()).__dict__
-    def __setstate__(self, state): self.__dict__.update(state); self.eng=self.make_sql_engine(self.path); self.refresh()
+    def __setstate__(self, state): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
 
     @classmethod
     def from_local_db(cls, path=None, echo=False): return cls(engine=cls.make_sql_engine(path=path, echo=echo))
@@ -71,7 +71,7 @@ class DBMS:
             return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
         path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else tb.P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
-        return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True) # echo flag is just a short for the more formal way of logging sql commands.
+        return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True)  # echo flag is just a short for the more formal way of logging sql commands.
 
     # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands, res_func=lambda x: x.all(), df=False):
@@ -82,7 +82,7 @@ class DBMS:
 
     def execute_begin_once(self, command, res_func=lambda x: x.all(), df=False):
         with self.eng.begin() as conn:
-            result = conn.execute(text(command)) # no need for commit regardless of driver
+            result = conn.execute(text(command))  # no need for commit regardless of driver
             result = res_func(result)
         return result if not df else pd.DataFrame(result)
 
@@ -109,7 +109,7 @@ class DBMS:
         self.refresh()
         tbl = self.meta.tables[table]
         count = self.ses.query(tbl).count()
-        res = tb.Struct(name=table , count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
+        res = tb.Struct(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
         res.print(dtype=False, as_config=True)
         dat = self.read_table(table=table, sch=sch, size=2)
         cols = self.get_columns(table, sch=sch)

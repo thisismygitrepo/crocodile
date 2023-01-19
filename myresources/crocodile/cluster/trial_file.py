@@ -42,6 +42,9 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) 
 # parallelizeEnds
 
 
+# todo: consider making it a method of a class and user will subclass it and is forced to follow its interface
+
+
 def expensive_function_single_thread(idx_start: int, idx_end: int, idx_max: int, save_dir_suffix: tb.P or str) -> tb.P:
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
     execution_time_in_seconds = 60 * 1
@@ -49,6 +52,7 @@ def expensive_function_single_thread(idx_start: int, idx_end: int, idx_max: int,
     for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
     print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
+    _ = idx_max
     save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(save_dir_suffix, f"thread_{idx_start}_{idx_end}").create()
     tb.S(a=1).save(path=save_dir.joinpath(f"trial_func_result.Struct.pkl"))
     return save_dir

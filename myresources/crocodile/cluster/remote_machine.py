@@ -17,6 +17,8 @@ console = Console()
 class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
 
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, state): self.__dict__ = state
     def __init__(self, job_id, remote_machine_type, instance_per_machine=1):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
@@ -32,11 +34,11 @@ class ResourceManager:
         self.root_dir = tb.P(f"~/tmp_results/remote_machines/job_id__{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
-        self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py").create(parents_only=True)
-        self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py").create(parents_only=True)
-        self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type]).create(parents_only=True)
-        self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.Struct.pkl").create(parents_only=True)
-        self.execution_log_dir = self.root_dir.joinpath(f"logs").create()
+        self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
+        self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py")
+        self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
+        self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.Struct.pkl")
+        self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
     # simple text file referring to shell script path
@@ -88,12 +90,13 @@ echo "Unlocked resources"
         dat = self.lock_path.expanduser().readit()
         dat['status'] = 'unlocked'
         dat.save(path=ResourceManager.lock_path.expanduser())
-        console = Console()
         console.print(f"Resources have been released by this job `{self.job_id}`.")
         # this is further handled by the calling script in case this function failed.
 
 
 class RemoteMachine:
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, state): self.__dict__ = state
     def __init__(self, func, func_kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
                  data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
@@ -180,7 +183,6 @@ class RemoteMachine:
                 start_time = start_time_file.read_text()
                 print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
                 print(f"It started at {start_time}. 🕒, and is still running. 🏃‍♂️")
-                import pandas as pd
                 print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒")
         else:
 
@@ -272,7 +274,7 @@ echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 
 echo ""
 echo "Starting job {self.job_id} 🚀"
-echo "Executing Python wrapper script: {self.path_dict.py_script_path.rel2home().as_posix()}"
+echo "Executing Python wrapper script: {self.path_dict.py_script_path.as_posix()}"
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -286,7 +288,7 @@ deactivate
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
-        with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8",newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
+        with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
         self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
 
