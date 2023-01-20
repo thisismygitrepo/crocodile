@@ -4,7 +4,6 @@ import psutil
 import crocodile.toolbox as tb
 from math import ceil, floor
 from crocodile.cluster.remote_machine import RemoteMachine
-from crocodile.cluster.controllers import Zellij
 from rich.console import Console
 # from platform import system
 import time
@@ -99,7 +98,6 @@ class Cluster:
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
         self.machines: list[RemoteMachine] = []
-        self.zs: list[Zellij] = [Zellij(ssh) for ssh in self.sshz]
         self.rams = self.rams_norm = self.cpus = self.cpus_norm = self.resources_product_norm = None
         self.instances_per_machine = []
         self.remote_machine_kwargs = remote_machine_kwargs
@@ -173,9 +171,8 @@ class Cluster:
 
     def open_mux(self, machines_per_tab=1):
         cmd = "wt "
-        for idx, (z, m) in enumerate(zip(self.zs, self.machines)):
-            sess_name = z.get_new_sess_name()
-            sub_cmd = f"{m.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "
+        for idx, m in enumerate(self.machines):
+            sub_cmd = m.z.get_new_sess_string()
             if idx == 0: cmd += f""" pwsh -Command "{sub_cmd}" `; """  # avoid new tabs despite being even index
             elif idx % machines_per_tab == 0: cmd += f""" new-tab pwsh -Command "{sub_cmd}" `; """
             else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `; """
@@ -188,8 +185,16 @@ class Cluster:
 
     def fire(self, machines_per_tab=1, run=False):
         self.open_mux(machines_per_tab=machines_per_tab)
-        for z, m in zip(self.zs, self.machines):
-            z.setup_layout(sess_name=z.new_sess_name, cmd=m.execution_command, run=run, job_wd=m.path_dict.root_dir.as_posix())
+        for m in self.machines: m.fire(run=run, open_console=False)
+
+    def run(self, run=False, machines_per_tab=1):
+        self.generate_standard_kwargs()
+        self.viz_load_ratios()
+        print(self)
+        self.submit()
+        self.fire(run=run, machines_per_tab=machines_per_tab)
+        self.save()
+        return self
 
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
@@ -213,14 +218,6 @@ class Cluster:
     @staticmethod
     def load(job_id) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id).joinpath("cluster.Cluster.pkl").readit()
     def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.get_cluster_path(job_id=self.job_id).joinpath("cluster.Cluster.pkl"))
-    def run(self, run=False, machines_per_tab=1):
-        self.generate_standard_kwargs()
-        self.viz_load_ratios()
-        print(self)
-        self.submit()
-        self.fire(run=run, machines_per_tab=machines_per_tab)
-        self.save()
-        return self
 
 
 if __name__ == '__main__':

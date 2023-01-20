@@ -13,6 +13,8 @@ def main():
     m.show_scripts()
 
     m.submit()
+    m.fire(run=True, open_console=True)
+
     m.check_job_status()
 
     m.download_results(r=True)

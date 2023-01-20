@@ -97,6 +97,7 @@ echo "Unlocked resources"
 class RemoteMachine:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
+    def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def __init__(self, func, func_kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
                  data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
@@ -151,88 +152,32 @@ class RemoteMachine:
         self.results_downloaded = False
         self.results_path = None
 
-    def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
-    def fire(self):
-        # self.ssh.run(f"zellij --session cluster action new-tab; zellij --session cluster action write-chars {self.execution_command}")
-        sep = "\n"
-        self.ssh.run(f"zellij --session {self.ssh.run('zellij ls').op.split(sep)[0]} action write-chars '{self.execution_command}'")
 
-    # m.ssh.run(f"zellij --session {m.ssh.run('zellij ls').op.split(sep)[0]} run -- '{m.execution_command}'")
+    def fire(self, run=False, open_console=True):
+        if open_console and self.open_console:
+            cmd = self.z.get_new_sess_string()
+            self.ssh.open_console(cmd=cmd.split(" -t ")[1], shell="pwsh")
+            time.sleep(5)
+            # send email at start execution time
+        self.z.setup_layout(sess_name=self.z.new_sess_name, cmd=self.execution_command, run=run,
+                            job_wd=self.path_dict.root_dir.as_posix())
 
-    def check_job_status(self) -> tb.P or None:
-        if not self.submitted:
-            print("Job even not submitted yet. 🤔")
-            return None
-        elif self.results_downloaded:
-            print("Job already completed. 🤔")
-            return None
-
-        base = self.path_dict.execution_log_dir.expanduser().create()
-        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir.as_posix(), z=True)
-        except: pass  # the directory doesn't exist yet at the remote.
-        end_time_file = base.joinpath("end_time.txt")
-
-        if not end_time_file.exists():
-
-            start_time_file = base.joinpath("start_time.txt")
-
-            if not start_time_file.exists():
-                print(f"Job {self.job_id} is still in the queue. 🤯")
-            else:
-                start_time = start_time_file.read_text()
-                print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
-                print(f"It started at {start_time}. 🕒, and is still running. 🏃‍♂️")
-                print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒")
-        else:
-
-            results_folder_file = base.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
-            results_folder = results_folder_file.read_text()
-
-            print("\n" * 2)
-            console.rule("🎉")
-            print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
-📁 results_folder_path: {results_folder} """)
-            try:
-                inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False)
-            except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
-            print("\n")
-            console.rule("🎉")
-            print("\n" * 2)
-
-            self.results_path = results_folder
-            return results_folder
-
-    def download_results(self, target=None, r=True, zip_first=False):
-        if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{tb.P(self.results_path).expanduser().absolute()}`"); return
-        if self.results_path is not None:
-            self.ssh.copy_to_here(source=self.results_path, target=target, r=r, z=zip_first)
-            self.results_downloaded = True
-        else:
-            print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
-        return self
-    def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False); return self
-
-    def run(self):
+    def run(self, run=False):
         self.generate_scripts()
         self.show_scripts()
         self.submit()
-        if self.interactive and self.lock_resources:
-            print(f"If interactive is on along with lock_resources, the job might never end.")
+        self.fire(run=run)
+        if self.interactive and self.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
 
     def submit(self):
         from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
-        try:
-            tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
-        except:
-            print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
-        if self.transfer_method == "transfer_sh":
-            Submission.transfer_sh(machine=self)
-        elif self.transfer_method == "gdrive":
-            Submission.gdrive(machine=self)
-        elif self.transfer_method == "sftp":
-            Submission.sftp(self)
+        try: tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
+        except: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
+        if self.transfer_method == "transfer_sh": Submission.transfer_sh(machine=self)
+        elif self.transfer_method == "gdrive": Submission.gdrive(machine=self)
+        elif self.transfer_method == "sftp": Submission.sftp(self)
         else: raise ValueError(f"Transfer method {self.transfer_method} not recognized. 🤷‍")
         self.execution_command_to_clip_memory()
 
@@ -295,6 +240,58 @@ deactivate
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
         inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
+
+    def check_job_status(self) -> tb.P or None:
+        if not self.submitted:
+            print("Job even not submitted yet. 🤔")
+            return None
+        elif self.results_downloaded:
+            print("Job already completed. 🤔")
+            return None
+
+        base = self.path_dict.execution_log_dir.expanduser().create()
+        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir.as_posix(), z=True)
+        except: pass  # the directory doesn't exist yet at the remote.
+        end_time_file = base.joinpath("end_time.txt")
+
+        if not end_time_file.exists():
+
+            start_time_file = base.joinpath("start_time.txt")
+
+            if not start_time_file.exists():
+                print(f"Job {self.job_id} is still in the queue. 🤯")
+            else:
+                start_time = start_time_file.read_text()
+                print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
+                print(f"It started at {start_time}. 🕒, and is still running. 🏃‍♂️")
+                print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒")
+        else:
+
+            results_folder_file = base.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
+            results_folder = results_folder_file.read_text()
+
+            print("\n" * 2)
+            console.rule("🎉")
+            print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
+📁 results_folder_path: {results_folder} """)
+            try:
+                inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False)
+            except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
+            print("\n")
+            console.rule("🎉")
+            print("\n" * 2)
+
+            self.results_path = results_folder
+            return results_folder
+
+    def download_results(self, target=None, r=True, zip_first=False):
+        if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{tb.P(self.results_path).expanduser().absolute()}`"); return
+        if self.results_path is not None:
+            self.ssh.copy_to_here(source=self.results_path, target=target, r=r, z=zip_first)
+            self.results_downloaded = True
+        else: print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
+        return self
+    def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False); return self
 
 
 if __name__ == '__main__':

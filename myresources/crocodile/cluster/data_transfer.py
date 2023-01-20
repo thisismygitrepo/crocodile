@@ -76,15 +76,6 @@ api = GDriveAPI()
         self.execution_command = ". " + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"
         # self.ssh.run(f". {self.shell_script_path.collapseuser().as_posix()}", desc="Executing the function")
 
-        if self.open_console:
-            self.ssh.open_console()
-            # send email at start execution time
-            # run_script = f""" pwsh -Command "ssh -t alex@flask-server 'tmux'" """
-            # https://stackoverflow.com/questions/31902929/how-to-write-a-shell-script-that-starts-tmux-session-and-then-runs-a-ruby-scrip
-            # https://unix.stackexchange.com/questions/409861/is-it-possible-to-send-input-to-a-tmux-session-without-connecting-to-it
-        else:
-            pass
-
 
 if __name__ == '__main__':
     pass
