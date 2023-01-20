@@ -82,7 +82,7 @@ echo "Unlocked resources"
                     time.sleep(sleep_time_mins * 60)
                     lock_status = lock_path.readit()['status']
         self.lock_resources()
-        console.print(f"Resources are locked by this job `{self.job_id}`. Process pid ={os.getpid()}.", highlight=True)
+        console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
     def lock_resources(self):
         tb.Struct(status="locked", pid=os.getpid(), job_id=self.job_id, start_time=pd.Timestamp.now(), submission_time=self.submission_time).save(path=self.lock_path.expanduser())
@@ -163,12 +163,13 @@ class RemoteMachine:
         self.z.setup_layout(sess_name=self.z.new_sess_name, cmd=self.execution_command, run=run,
                             job_wd=self.path_dict.root_dir.as_posix())
 
-    def run(self, run=False):
+    def run(self, run=True, open_console=True):
         self.generate_scripts()
         self.show_scripts()
         self.submit()
-        self.fire(run=run)
+        self.fire(run=run, open_console=open_console)
         if self.interactive and self.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
+        return self
 
     def submit(self):
         from crocodile.cluster.data_transfer import Submission
@@ -191,7 +192,7 @@ class RemoteMachine:
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.description,
-                           job_id=self.job_id, lock_resources=self.lock_resources)
+                           job_id=self.job_id, lock_resources=self.lock_resources, zellij_session=self.z.get_new_sess_name())
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.parallelize)
 
         if self.notify_upon_completion:
