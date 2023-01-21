@@ -158,7 +158,7 @@ class Cluster:
     def submit(self):
         if self.func_kwargs_list is None: raise Exception("You need to generate standard kwargs first.")
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
-            desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}",
+            desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
             m = RemoteMachine(func_kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=desc,
                               job_id=self.job_id + f"_{idx}", **self.remote_machine_kwargs)
             m.run()

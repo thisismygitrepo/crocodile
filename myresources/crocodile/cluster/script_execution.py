@@ -140,10 +140,8 @@ ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
 
 
 if zellij_session != "":
-    tb.Terminal().run(f"""
-zellij --session {zellij_session} action new-tab --name results --cwd {res_folder.as_posix()}
-zellij --session {zellij_session} action write-chars lf
-""").print()
+    tb.Terminal().run(f"""zellij --session {zellij_session} action new-tab --name results --cwd {res_folder.as_posix()} --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl""").print()
+    tb.Terminal().run(f"""zellij --session {zellij_session} action write-chars lf""").print()
 
 
 print(f"job {job_id} is completed.")

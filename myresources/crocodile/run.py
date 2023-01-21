@@ -42,6 +42,7 @@ def build_parser():
     parser.add_argument("--python", "-p", help="Use python over IPython.", action="store_true", default=False)
 
     # OPTIONAL KEYWORD
+    parser.add_argument("--kill", "-k", dest="kill", help="Python file path.", default="")
     parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
     parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
     parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
@@ -76,6 +77,11 @@ args.cmd"""
     elif args.read != "":
         c = f"""p = P(r\'{str(args.read).lstrip()}\').absolute(); dat = tb.E.try_this(lambda: p.readit(), verbose=True) """
         res = f"""ipython --no-banner -i -m crocodile.croshell -- -c "{c}" """
+    elif args.kill != "":
+        res = __import__("crocodile.toolbox").toolbox.L(__import__("psutil").process_iter()).filter(lambda x: args.kill in x.name())
+        # res.print()
+        for item in res[::-1]: print(f"killing {item.name()}"); item.kill()
+        return None
     else:
         res = f"{interpreter} {interactivity} --no-banner -m crocodile.croshell"  # --term-title croshell
         # Clear-Host;
