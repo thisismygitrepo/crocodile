@@ -65,6 +65,7 @@ setup(
         # "scipy",  # heavy-weight.
         "pandas",
         "matplotlib",
+        "tabulate",  # pretty printing of tables
 
         # Accessories
         # h5py

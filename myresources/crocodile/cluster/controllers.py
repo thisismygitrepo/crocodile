@@ -1,5 +1,6 @@
 
 import crocodile.toolbox as tb
+import time
 
 
 class Zellij:
@@ -14,13 +15,19 @@ class Zellij:
         sub_cmd = f"{self.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "
         return sub_cmd
 
+    def asssert_sesion_started(self):
+        while True:
+            resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
+            if self.new_sess_name in resp: break
+            time.sleep(2)
+            print(f"Waiting for zellij session {self.new_sess_name} to start...")
+
     def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string())
 
     def get_new_sess_name(self):
         if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
-        print(f"Querying `{self.ssh.get_repr(which='remote')}` for new session name")
-        resp = self.ssh.run("zellij ls")
+        resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_repr(which='remote')}` for new session name", lnis=True)
         if resp.err == "No active zellij sessions found.":
             sess_name = "ms0"
         else:
@@ -64,4 +71,4 @@ zellij --session {sess_name} action new-tab --name exp{self.id}
 zellij --session {sess_name} action go-to-tab 1
 {exe}
 
-""")
+""", lnis=True, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`")

@@ -43,9 +43,9 @@ class ResourceManager:
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
     # simple text file referring to shell script path
 
-    def get_resources_unlocking(self):
+    def get_resources_unlocking(self):  # this one works at shell level in case python script failed.
         return f"""
-rm {self.lock_path.collapseuser()}
+rm {self.lock_path.collapseuser().as_posix()}
 echo "Unlocked resources"
 """
     def secure_resources(self):
@@ -158,7 +158,7 @@ class RemoteMachine:
         if open_console and self.open_console:
             cmd = self.z.get_new_sess_string()
             self.ssh.open_console(cmd=cmd.split(" -t ")[1], shell="pwsh")
-            time.sleep(5)
+            self.z.asssert_sesion_started()
             # send email at start execution time
         self.z.setup_layout(sess_name=self.z.new_sess_name, cmd=self.execution_command, run=run,
                             job_wd=self.path_dict.root_dir.as_posix())
@@ -212,7 +212,7 @@ class RemoteMachine:
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
-{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; print(x.main(verbose=False))").op if self.update_essential_repos else ''}
+{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; print(x.main(verbose=False))", lnis=True, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
 {'git pull' if self.update_repo else ''}
 {'pip install -e .' if self.install_repo else ''}

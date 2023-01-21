@@ -109,9 +109,7 @@ manager.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(t
 manager.execution_log_dir.expanduser().joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
 manager.execution_log_dir.expanduser().joinpath("error_message.txt").write_text(error_message)
 exec_times.save(path=manager.execution_log_dir.expanduser().joinpath("execution_times.Struct.pkl"))
-manager.root_dir.expanduser().copy(folder=res_folder)
-
-tb.Experimental.generate_readme(path=res_folder.joinpath("execution_log.md"), obj=exec_obj, desc=f'''
+tb.Experimental.generate_readme(path=manager.root_dir.expanduser().joinpath("execution_log.md"), obj=exec_obj, desc=f'''
 
 Job executed via tb.cluster.Machine
 remote: {ssh_repr}
@@ -130,6 +128,8 @@ kwargs_path @ `{manager.kwargs_path.collapseuser()}`
 ''')
 
 
+manager.root_dir.expanduser().copy(folder=res_folder)
+
 # print to execution console:
 exec_times.print(title="Execution Times", as_config=True)
 print("\n" * 1)
@@ -140,8 +140,9 @@ ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
 
 
 if zellij_session != "":
-    tb.Terminal().run(f"""zellij --session {zellij_session} action new-tab --name results --cwd {res_folder.as_posix()} --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl""").print()
-    tb.Terminal().run(f"""zellij --session {zellij_session} action write-chars lf""").print()
+    tb.Terminal().run(f"""zellij --session {zellij_session} action new-tab --name results  """)
+    # --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl --cwd {res_folder.as_posix()}
+    tb.Terminal().run(f"""zellij --session {zellij_session} action write-chars "cd {res_folder.as_posix()};lf" """)
 
 
 print(f"job {job_id} is completed.")

@@ -6,8 +6,8 @@ from math import ceil, floor
 from crocodile.cluster.remote_machine import RemoteMachine
 from rich.console import Console
 # from platform import system
-import time
-from rich.progress import track
+# import time
+# from rich.progress import track
 
 
 console = Console()
@@ -177,11 +177,7 @@ class Cluster:
             elif idx % machines_per_tab == 0: cmd += f""" new-tab pwsh -Command "{sub_cmd}" `; """
             else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `; """
         tb.Terminal().run_async(*cmd.split(" "))
-        sleep_time = 5 * len(self.machines)
-        print(f"Sleeping for {sleep_time} seconds to allow for zellij commands to start ... ")
-        fractions = 100
-        for _ in track(range(fractions), description="sleeping ..."):
-            time.sleep(sleep_time / fractions)  # Simulate work being done
+        self.machines[-1].z.asssert_sesion_started()
 
     def fire(self, machines_per_tab=1, run=False):
         self.open_mux(machines_per_tab=machines_per_tab)
