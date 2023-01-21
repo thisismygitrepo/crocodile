@@ -5,6 +5,7 @@ from crocodile.cluster.controllers import Zellij
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
+from rich.text import Text
 from rich.console import Console
 import time
 import os
@@ -80,7 +81,11 @@ echo "Unlocked resources"
                     console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
                     print("\n")
                     time.sleep(sleep_time_mins * 60)
-                    lock_status = lock_path.readit()['status']
+                    try: lock_status = lock_path.readit()['status']
+                    except FileNotFoundError:
+                        print(f"Lock file was deleted by the locking job.")
+                        break
+
         self.lock_resources()
         console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
@@ -246,7 +251,8 @@ deactivate
         print("\n")
 
     def show_scripts(self) -> None:
-        Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
+        Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
+        Console().print(Panel(Syntax(self.path_dict.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
         inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
 
     def check_job_status(self) -> tb.P or None:
@@ -273,7 +279,7 @@ deactivate
                 txt = f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟"
                 txt += f"\nIt started at {start_time}. 🕒, and is still running. 🏃‍♂️"
                 txt += f"\nExecution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒"
-                console.print(Panel(txt, title=f"Job `{self.job_id}` Status", subtitle=self.ssh.get_repr(which="remote")))
+                console.print(Panel(txt, title=f"Job `{self.job_id}` Status", subtitle=self.ssh.get_repr(which="remote"), highlight=True, border_style="bold red", style="bold"))
                 print("\n")
         else:
 
@@ -281,7 +287,7 @@ deactivate
             results_folder = results_folder_file.read_text()
 
             print("\n" * 2)
-            console.rule("🎉")
+            console.rule("🎉🥳🎆🥂🍾🎊🪅")
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
 📁 results_folder_path: {results_folder} """)
             try:

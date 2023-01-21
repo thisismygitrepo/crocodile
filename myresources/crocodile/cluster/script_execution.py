@@ -136,7 +136,7 @@ print("\n" * 1)
 ssh_repr_remote = ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
 console.print(Panel(Text(f'''
 ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 
-''', style="bold blue on white"), title="Pull results using croshell with this script:", border_style="bold red"))
+''', style="bold blue on white"), title="Pull results with this line:", border_style="bold red"))
 
 
 if zellij_session != "":
