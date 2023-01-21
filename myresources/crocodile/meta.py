@@ -182,17 +182,17 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", lnis=True, desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}").op or ''; remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)
-        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", lnis=True); source.delete(sure=True); return resp
+        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", lnis=True); source.delete(sure=True); print("\n"); return resp
     def copy_to_here(self, source, target=None, z=False, r=False) -> P:
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", lnis=True, verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", lnis=True, return_obj=True).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        if z: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file", lnis=True).op2path(strict_returncode=True, strict_err=True)
+        if z: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", lnis=True).op2path(strict_returncode=True, strict_err=True)
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, lnis=True).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, lnis=True).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)
-        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp files", lnis=True, strict_returncode=True, strict_err=True)
-        return target
+        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", lnis=True, strict_returncode=True, strict_err=True)
+        print("\n"); return target
     def print_summary(self):   # ip=rsp.ip, op=rsp.op
         install_n_import("tabulate"); df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode))); print("\nSummary of operations performed:"); print(df.to_markdown())
         print("\nAll operations completed successfully.\n") if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))) else print("\nSome operations failed. \n"); return df

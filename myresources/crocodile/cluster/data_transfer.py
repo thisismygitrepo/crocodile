@@ -70,7 +70,7 @@ api = GDriveAPI()
         tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
 
         self.ssh.copy_from_here(self.path_dict.root_dir, z=True)
-        self.ssh.print_summary()
+        # self.ssh.print_summary()
 
         # f"source " if self.ssh.get_remote_machine() != "Windows" else "")
         self.execution_command = ". " + f"{self.path_dict.shell_script_path.collapseuser().as_posix()}"

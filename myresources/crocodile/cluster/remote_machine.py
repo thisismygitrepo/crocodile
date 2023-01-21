@@ -151,10 +151,15 @@ class RemoteMachine:
         self.submitted = False
         self.results_downloaded = False
         self.results_path = None
+        if self.interactive and self.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
 
-    def execution_command_to_clip_memory(self): print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
+    def execution_command_to_clip_memory(self):
+        print("Execution command copied to clipboard 📋")
+        print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
+        print("\n")
 
     def fire(self, run=False, open_console=True):
+        console.rule("Firing job @ remote machine")
         if open_console and self.open_console:
             cmd = self.z.get_new_sess_string()
             self.ssh.open_console(cmd=cmd.split(" -t ")[1], shell="pwsh")
@@ -162,16 +167,17 @@ class RemoteMachine:
             # send email at start execution time
         self.z.setup_layout(sess_name=self.z.new_sess_name, cmd=self.execution_command, run=run,
                             job_wd=self.path_dict.root_dir.as_posix())
+        print("\n")
 
     def run(self, run=True, open_console=True):
         self.generate_scripts()
-        self.show_scripts()
+        # self.show_scripts()
         self.submit()
         self.fire(run=run, open_console=open_console)
-        if self.interactive and self.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
         return self
 
     def submit(self):
+        console.rule("Submitting job")
         from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
         try: tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
@@ -183,7 +189,7 @@ class RemoteMachine:
         self.execution_command_to_clip_memory()
 
     def generate_scripts(self):
-
+        console.rule("Generating scripts")
         func_name = self.func.__name__ if self.func is not None else None
         func_module = self.func.__module__ if self.func is not None else None
         rel_full_path = self.repo_path.rel2home().joinpath(self.func_relative_file).as_posix()
@@ -237,6 +243,7 @@ deactivate
         with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
         self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
+        print("\n")
 
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
@@ -263,9 +270,11 @@ deactivate
                 print(f"Job {self.job_id} is still in the queue. 🤯")
             else:
                 start_time = start_time_file.read_text()
-                print(f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟")
-                print(f"It started at {start_time}. 🕒, and is still running. 🏃‍♂️")
-                print(f"Execution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒")
+                txt = f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟"
+                txt += f"\nIt started at {start_time}. 🕒, and is still running. 🏃‍♂️"
+                txt += f"\nExecution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒"
+                console.print(Panel(txt, title=f"Job `{self.job_id}` Status", subtitle=self.ssh.get_repr(which="remote")))
+                print("\n")
         else:
 
             results_folder_file = base.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.

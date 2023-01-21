@@ -122,13 +122,13 @@ class Cluster:
         if self.func_kwargs_list is not None: return None
         cpus = []
         for an_ssh in self.sshz:
-            a_cpu = an_ssh.run_py("import psutil; print(psutil.cpu_count())", verbose=False).capture().op
+            a_cpu = an_ssh.run_py("import psutil; print(psutil.cpu_count())", verbose=False).op
             a_cpu = int(a_cpu)
             cpus.append(a_cpu)
         self.cpus = np.array(cpus)
         self.cpus_norm = self.cpus / self.cpus.sum()
 
-        self.rams = np.array([ceil(int(an_ssh.run_py("import psutil; print(psutil.virtual_memory().total)", verbose=False).capture().op) / 2**30) for an_ssh in self.sshz])
+        self.rams = np.array([ceil(int(an_ssh.run_py("import psutil; print(psutil.virtual_memory().total)", verbose=False).op) / 2**30) for an_ssh in self.sshz])
         self.rams_norm = self.rams / self.rams.sum()
 
         self.resources_product_norm = (cpus * self.rams) / (cpus * self.rams).sum()
@@ -154,6 +154,7 @@ class Cluster:
 
         self.load_calculator.load_ratios_repr = tb.S(dict(zip(names, tb.L((np.array(self.load_calculator.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
         print(self.load_calculator.load_ratios_repr)
+        print("\n")
 
     def submit(self):
         if self.func_kwargs_list is None: raise Exception("You need to generate standard kwargs first.")

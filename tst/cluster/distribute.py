@@ -9,7 +9,7 @@ def try_it():
     c = Cluster(func=expensive_function_single_thread, machine_specs_list=machine_specs_list, install_repo=False,
                 thrd_load_calc=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
                 parallelize=True)
-    c.run(run=True)
+    c.run(run=True, machines_per_tab=2)
     job_id = c.job_id
 
     # later ...
