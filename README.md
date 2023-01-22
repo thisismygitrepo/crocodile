@@ -3,6 +3,11 @@
 
 ## Distributed Computing
 
+<div align="center">
+  <a href="https://www.youtube.com/watch?v=-EmVrTcHNCA"><img src="https://img.youtube.com/vi/-EmVrTcHNCA/0.jpg" alt="IMAGE ALT TEXT"></a>
+</div>
+
+
 ##### Features
 * 🧑‍💻 Repository containing the executed function is automatically zipped and copied to each remote.
 * 📁 Binary data is `sftp`'d automatically to each remote.
