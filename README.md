@@ -1,6 +1,18 @@
 
 # Welcome to crocodile
 
+## Distributed Computing
+
+##### Features
+* 🧑‍💻 Repository containing the executed function is automatically zipped and copied to each remote.
+* 📁 Binary data is `sftp`'d automatically to each remote.
+* 💽💻💿 Specs of each resource is inspected and workload is distributed accordingly. Alternatively, user can customize the workload.
+* 📨📩 Email Notifications. Get **optionally** notified about start and finish of your submitted jobs.
+* 🔒🔑 Resources locking. A Job can *optionally* hold the resources to itself and other submitted jobs will have to wait. 
+  * 🙋‍♂️🙋‍♀ ️This feature enable sending aribtrary number of jobs in one go and never worry about overwhelming the remote. Then you come later and get all results.
+* Zellij session with reasonable layout is fired automatically on each remote.
+
+
 Crocodile is a library aiming at facilitating the use of Python in scripting, thus, offering an alternative to `PowerShell` & `Bash` which have absurdly complex commands that are nothing but jumble of ad-hoc developments piled over decades to save some programmers a key stroke or two. This heritage poses huge burden on the people coming into the computer science field. A full rant bashing those shells by `Brian Will` [is here](<https://www.youtube.com/watch?v=L9v4Mg8wi4U`>).
 
 The core rationale is:

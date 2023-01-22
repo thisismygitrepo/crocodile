@@ -5,7 +5,7 @@ from crocodile.cluster.controllers import Zellij
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
-from rich.text import Text
+# from rich.text import Text
 from rich.console import Console
 import time
 import os
@@ -179,6 +179,7 @@ class RemoteMachine:
         # self.show_scripts()
         self.submit()
         self.fire(run=run, open_console=open_console)
+        print(f"Saved RemoteMachine object can be found @ {self.path_dict.machine_obj_path.expanduser()}")
         return self
 
     def submit(self):
@@ -223,7 +224,7 @@ class RemoteMachine:
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
-{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; print(x.main(verbose=False))", lnis=True, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.update_essential_repos else ''}
+{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", lnis=True, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
 {'git pull' if self.update_repo else ''}
 {'pip install -e .' if self.install_repo else ''}
@@ -254,6 +255,16 @@ deactivate
         Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
         Console().print(Panel(Syntax(self.path_dict.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
         inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
+
+    def wait_for_results(self, sleep_minutes: int = 10):
+        assert self.submitted, "Job even not submitted yet. 🤔"
+        assert not self.results_downloaded, "Job already completed. 🤔"
+        while True:
+            tmp = self.check_job_status()
+            if tmp is not None: break
+            time.sleep(60 * sleep_minutes)
+        self.download_results()
+        if self.notify_upon_completion: pass
 
     def check_job_status(self) -> tb.P or None:
         if not self.submitted:
@@ -287,23 +298,21 @@ deactivate
             results_folder = results_folder_file.read_text()
 
             print("\n" * 2)
-            console.rule("🎉🥳🎆🥂🍾🎊🪅")
+            console.rule("Job Completed 🎉🥳🎆🥂🍾🎊🪅")
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
 📁 results_folder_path: {results_folder} """)
             try:
                 inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False)
             except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
             print("\n")
-            console.rule("🎉")
-            print("\n" * 2)
 
-            self.results_path = results_folder
-            return results_folder
+            self.results_path = tb.P(results_folder)
+            return self.results_path
 
     def download_results(self, target=None, r=True, zip_first=False):
-        if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{tb.P(self.results_path).expanduser().absolute()}`"); return
+        if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{self.results_path.expanduser().absolute()}`"); return
         if self.results_path is not None:
-            self.ssh.copy_to_here(source=self.results_path, target=target, r=r, z=zip_first)
+            self.ssh.copy_to_here(source=self.results_path.collapseuser().as_posix(), target=target, r=r, z=zip_first)
             self.results_downloaded = True
         else: print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
         return self
