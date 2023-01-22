@@ -5,7 +5,7 @@ from rich.progress import track
 
 
 def expensive_function() -> tb.P:
-    execution_time_in_seconds = 60 * 0.8
+    execution_time_in_seconds = 60 * 1.2
     print(f"Hello, I am an expensive function, and I just started running ...\n It will take me {execution_time_in_seconds} seconds to finish")
     a = 1 + 1
 
