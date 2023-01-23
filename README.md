@@ -7,13 +7,13 @@ Pythonically facilitate laborious `file management`, `distributed computing`, `s
 
 https://user-images.githubusercontent.com/46288868/213916407-bf6300bd-3409-4a20-b71c-00374f875c7a.mp4
 
-Intrigued? This way, old laptops and desktops are endowed second lives as workhorses to which you offset your heavy computations.
+With this cluster management tool, old laptops and desktops are endowed second lives as cluster workhorses to which you offset heavy computations.
 
 
 ##### Other Distriubted Computing Features:
 * 🧑‍💻 Repository containing the executed function is automatically zipped and copied to each remote.
 * 📁 Binary data is `sftp`'d automatically to each remote.
-* 💽💻💿 Specs of each resource is inspected and workload is distributed accordingly.
+* 💽💻💿 Specs of each resource is inspected and workload is distributed accordingly on the cluster.
 * 📨📩 Email Notifications. Get **optionally** notified about start and finish of your submitted jobs.
 * 🔒🔑 Resources locking. A Job can *optionally* hold the resources to itself and other submitted jobs will have to wait. 
   * 🙋‍♂️🙋‍♀ ️This feature enable sending aribtrary number of jobs in one go and never worry about overwhelming the remote. Then you come later and get all results.
