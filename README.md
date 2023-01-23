@@ -1,28 +1,30 @@
 
 # Welcome to crocodile
 
+Pythonically facilitate laborious `file management`, `distributed computing`, `scripting` and  `deep learning` workflows.
 
-
-## Distributed Computing
-
+### Demo for distributing jobs on local machines:
 
 https://user-images.githubusercontent.com/46288868/213916407-bf6300bd-3409-4a20-b71c-00374f875c7a.mp4
 
+Intrigued? This way, old laptops and desktops are endowed second lives as workhorses to which you offset your heavy computations.
 
-##### Features
+
+##### Other Distriubted Computing Features:
 * 🧑‍💻 Repository containing the executed function is automatically zipped and copied to each remote.
 * 📁 Binary data is `sftp`'d automatically to each remote.
-* 💽💻💿 Specs of each resource is inspected and workload is distributed accordingly. Alternatively, user can customize the workload.
+* 💽💻💿 Specs of each resource is inspected and workload is distributed accordingly.
 * 📨📩 Email Notifications. Get **optionally** notified about start and finish of your submitted jobs.
 * 🔒🔑 Resources locking. A Job can *optionally* hold the resources to itself and other submitted jobs will have to wait. 
   * 🙋‍♂️🙋‍♀ ️This feature enable sending aribtrary number of jobs in one go and never worry about overwhelming the remote. Then you come later and get all results.
 * Zellij session with reasonable layout is fired automatically on each remote.
 
 
-Crocodile is a library aiming at facilitating the use of Python in scripting, thus, offering an alternative to `PowerShell` & `Bash` which have absurdly complex commands that are nothing but jumble of ad-hoc developments piled over decades to save some programmers a key stroke or two. This heritage poses huge burden on the people coming into the computer science field. A full rant bashing those shells by `Brian Will` [is here](<https://www.youtube.com/watch?v=L9v4Mg8wi4U`>).
+#### Demo for Croshell
+Croshell aims at facilitating the use of Python in scripting, thus, offering an alternative to `PowerShell` & `Bash` which have absurdly complex commands that are nothing but jumble of ad-hoc developments piled over decades to save some programmers a key stroke or two. This heritage poses huge burden on the people coming into the computer science field. A full rant bashing those shells by `Brian Will` [is here](<https://www.youtube.com/watch?v=L9v4Mg8wi4U`>).
 
 The core rationale is:
-* No one has the time to listen to hours long tutorials on how powerful and versatile `ls` or `grep` are, let alone keeping the random syntax in mind (unless used on daily basis). 
+* No one has the time to listen to hours long tutorials on how powerful and versatile `ls` or `grep` are, let alone keeping the random syntax in mind (unless used on daily basis).
 * Python shell on the other hand, offers benign syntax and eminent readibility but it comes at the rather hefty cost of terseness, or the lack of it. For example, to make up for just `ls`, you need to import some libraries and it will eventually set you back a couple of lines of code. That's not acceptable for the simple task of listing directory contents, let alone a task of compressing a directory.
 * Crocodile comes here to make Python terser and friendlier by offering functionality for everyday use, like **file management, SSH, enviroment variables management, etc**. In essence, croshell to IPython is what IPython to Python shell is; that is, the basic Python shell that can only do arithmetic is turbo-boosted making it perfect for everyday errands.
 * The library, if used in coding, will fill your life with one-liners, take your code to artistic level of brevity and readability while simultaneously being more productive by typing less boilerplate lines of code that are needless to say.
