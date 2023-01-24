@@ -207,7 +207,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         source_full = P(source).expanduser().absolute()
         source_rel2home = source_full.collapseuser()
         exists = source_full.exists()
-        is_dir = source.is_dir() if exists else None
+        is_dir = source_full.is_dir() if exists else None
         if z and exists:
             try: source_full = source_full.zip()
             except Exception as ex: source_full = ex
