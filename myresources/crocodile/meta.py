@@ -195,7 +195,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", lnis=True, strict_returncode=True, strict_err=True)
         print("\n"); return target
     def receieve(self, source, target=None, z=False, r=False) -> P:
-        scout = self.run_py(cmd=f"obj=tb.Meta.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", lnis=True, return_obj=True)
+        scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", lnis=True, return_obj=True)
         if not z and scout["is_dir"]: return scout["files"].apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         target = P(target).expanduser().absolute().create(parents_only=True) if target else scout["source_rel2home"].expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout["source_full"]
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)
