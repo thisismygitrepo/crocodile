@@ -76,8 +76,9 @@ Being a thin extension on top of almost pure Python, you need to worry **not** a
 
 # Install Croshell Terminal
 For `Windows` machines, run the following in elevated `PowerShell`:
+`Warning: This includes dotfiles manager that you might not want.`
 ```ps1
-Invoke-WebRequest https://github.com/thisismygitrepo/machineconfig/src/machineconfig/setup_windows/croshell.ps1 | Invoke-Expression
+Invoke-WebRequest https://raw.githubusercontent.com/thisismygitrepo/machineconfig/main/src/machineconfig/setup_windows/croshell.ps1 | Invoke-Expression
 ```
 
 # Getting Started
