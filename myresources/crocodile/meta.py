@@ -192,6 +192,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, lnis=True).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, lnis=True).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", lnis=True, strict_returncode=True, strict_err=True)
         print("\n"); return target
     def receieve(self, source, target=None, z=False, r=False) -> P:
@@ -203,7 +204,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         print("\n"); return target
     @staticmethod
     def scout(source, z=False, r=False):
-        source_full = P(r'{source}').expanduser().absolute()
+        source_full = P(source).expanduser().absolute()
         source_rel2home = source_full.collapseuser()
         exists = source_full.exists()
         is_dir = source.is_dir() if exists else None
