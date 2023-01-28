@@ -36,16 +36,38 @@ Mind you, speed is not an issue in 99% of everyday chores.
 This package extends many native Python classes to equip you with an uneasy-to-tame power. The major classes extended are:
 
  * `pathlib.Path` is  extended to `P`
-      * Forget about importing all the **archaic** Python libraries `os`, `glob`, `shutil`, `sys`, `zipfile` etc. `P` makes the path an object, not a lame string. `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a squint at this:
-      ```
-   path = P("dataset/type1/meta/images/file3.ext")
-     >> path[0]  # allows indexing! makes sense, hah?
-      P("dataset")
-     >> path[-1]  # nifty!
-      P("file3.ext")
-     >> path[2:-1]  # even slicing!
-      P("meta/images/file3.ext")
-   ```
+      * Forget about importing all the **archaic** Python libraries `os`, `glob`, `shutil`, `sys`, `zipfile` etc. `P` makes the path an object, not a lame string. `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a squint at this one line file wrangler:
+        * creates a temporary file
+        * writes some text to it
+        * copies it to same location (with a suffix like `_copy1`)
+        * moves it to parent directory
+        * converts user home to `~`
+        * zips it
+        * deletes it
+        * touches it
+        * goes to its parent
+        * searches for all files in it and select the first one.
+        * uploads it to the cloud (transfer.sh)
+        * opens the browser with the url
+        * downloads it
+        * encrypts it
+        * creats a symlink to it from `~/toy`
+        * resolves the symbolic link
+        * calculates the checksum of the file
+ 
+```python
+P.tmpfile().write_text("lol").copy().move("..", rel2it=True).collapseuser().zip().delete().touch().parent.search("*", folders=False)[0].transfer_sh()().download().encrypt(pwd="haha").symlink_from("~/toy").resolve().checksum()
+```
+
+```python
+path = P("dataset/type1/meta/images/file3.ext")
+>> path[0]  # allows indexing! makes sense, hah?
+ P("dataset")
+>> path[-1]  # nifty!
+ P("file3.ext")
+>> path[2:-1]  # even slicing!
+ P("meta/images/file3.ext")
+```
  * `list` is  extended to `List`
    * Forget that `for` loops exist, because with this class, `for` loops are implicitly used to apply a function to all items.
      Inevitably while programming, one will encounter objects of the same type and you will be struggling to get a tough grab on them.  `List` is a powerful structure that put at your disposal a grip, so tough, that the objects you have at hand start behaving like one object. Behaviour is ala-JavaScript implementation of ``forEach`` method of Arrays.

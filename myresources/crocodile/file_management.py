@@ -321,25 +321,26 @@ class P(type(Path()), Path):
     def checksum(self, kind=["md5", "sha256"][1]): import hashlib; myhash = {"md5": hashlib.md5, "sha256": hashlib.sha256}[kind](); myhash.update(self.read_bytes()); return myhash.hexdigest()
     get_env = staticmethod(lambda: get_env())
     def transfer_sh(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
-    def to_cloud(self, cloud, remotepath=None, zip=False, encrypt=False, key=None, pwd=None, r2h=False, share=False):
+    def to_cloud(self, cloud, remotepath=None, zip=False, encrypt=False, key=None, pwd=None, rel2home=False, share=False):
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
-        remotepath = ((f"myhome/{__import__('platform').system().lower()}" / P(localpath.rel2home())) if r2h else localpath) if remotepath is None else P(remotepath)
+        remotepath = ((f"myhome/{__import__('platform').system().lower()}" / P(localpath.rel2home())) if rel2home else localpath) if remotepath is None else P(remotepath)
         from crocodile.meta import Terminal; print(f"UPLOADING ⬆️ {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
         res = Terminal().run(f"""rclone copyto '{localpath}' '{cloud}:{remotepath.as_posix()}'""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
         print(res.op_if_successfull_or_default(strict_returcode=True, strict_err=True))
         if share: res = Terminal().run(f"""rclone link '{cloud}:{remotepath.as_posix()}'""", shell="powershell"); return res.op2path(strict_err=True, strict_returncode=True)
-    def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, r2h=False, overwrite=True, merge=False):
+    def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, rel2home=False, overwrite=True, merge=False):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath) if localpath is not None else P.home().joinpath(remotepath.rel2home())
-        if r2h: remotepath = f"myhome/{__import__('platform').system().lower()}" / remotepath.rel2home()
+        if rel2home: remotepath = f"myhome/{__import__('platform').system().lower()}" / remotepath.rel2home()
         from crocodile.meta import Terminal; print(f"DOWNLOADING ⬇️ {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}")
         res = Terminal().run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}'""", shell="powershell")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
+        return localpath
 
 
 def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
