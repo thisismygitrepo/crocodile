@@ -66,6 +66,10 @@ class Terminal:
         def op_if_successfull_or_default(self, strict_returcode=True, strict_err=False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
         def capture(self): [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
+        def print_if_unsuccessful(self, desc="TERMINAL CMD", capture=True, strict_err=False, strict_returncode=False, assert_success=False):
+            self.capture() if capture else None; success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
+            if assert_success: assert success, self.print(capture=False, desc=desc)
+            print(desc) if success else self.print(capture=False, desc=desc); return self
         def print(self, desc="TERMINAL CMD", capture=True):
             self.capture() if capture else None; install_n_import("rich"); from rich import console; con = console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
             tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
@@ -164,43 +168,39 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def run_locally(self, command): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def get_ssh_conn_str(self, cmd=""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_repr('remote').replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd='', new_window=True, terminal=None, shell="pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
-    def run(self, cmd, verbose=True, lnis=False, desc="", strict_err=False, strict_returncode=False, env_prefix=False) -> Terminal.Response:  # most central method.
-        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc).capture()
-        success = res.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
-        if strict_err or strict_returncode: assert success, res.print(capture=False)
-        if lnis: print(desc) if success else res.print(capture=False)
-        elif verbose: res.print(capture=False)
-        self.terminal_responses.append(res); return res
-    def run_py(self, cmd, desc="", return_obj=False, verbose=True, lnis=False, strict_err=False, strict_returncode=False):
+    def run(self, cmd, verbose=True, desc="", strict_err=False, strict_returncode=False, env_prefix=False) -> Terminal.Response:  # most central method.
+        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)
+        res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
+    def run_py(self, cmd, desc="", return_obj=False, verbose=True, strict_err=False, strict_returncode=False):
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
-        if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, lnis=lnis, strict_err=strict_err, strict_returncode=strict_returncode)
-        else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, lnis=lnis, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
+        if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
+        else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source, target=None, z=False, r=False, overwrite=False, init=True) -> P or List[P]:
         if init: print(f"{'<'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         if not z and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if z: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", lnis=True, desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}").op or ''; remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
+        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''; remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)
-        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", lnis=True); source.delete(sure=True); print("\n"); return resp
+        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False); source.delete(sure=True); print("\n"); return resp
     def copy_to_here(self, source, target=None, z=False, r=False, init=True) -> P:
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
-        if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", lnis=True, verbose=True, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
-            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", lnis=True, return_obj=True).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        if z: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", lnis=True).op2path(strict_returncode=True, strict_err=True)
-        if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, lnis=True).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
+            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True, verbose=False).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+        if z: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False).op2path(strict_returncode=True, strict_err=True)
+        if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''
-        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, lnis=True).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
+        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)
-        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", lnis=True, strict_returncode=True, strict_err=True)
+        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
         print("\n"); return target
     def receieve(self, source, target=None, z=False, r=False) -> P:
-        scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", lnis=True, return_obj=True)
+        scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", return_obj=True, verbose=False)
         if not z and scout["is_dir"]: return scout["files"].apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         target = P(target).expanduser().absolute().create(parents_only=True) if target else scout["source_rel2home"].expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout["source_full"]
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)
-        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", lnis=True, strict_returncode=True, strict_err=True)
+        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
         print("\n"); return target
     @staticmethod
     def scout(source, z=False, r=False):
