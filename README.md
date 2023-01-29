@@ -37,26 +37,26 @@ This package extends many native Python classes to equip you with an uneasy-to-t
 
  * `pathlib.Path` is  extended to `P`
       * Forget about importing all the **archaic** Python libraries `os`, `glob`, `shutil`, `sys`, `zipfile` etc. `P` makes the path an object, not a lame string. `P` objects are incredibly powerful for parsing paths, *no* more than one line of code is required to do **any** operation. Take a squint at this one line file wrangler:
-        * creates a temporary file
-        * writes some text to it
-        * copies it to same location (with a suffix like `_copy1`)
+        * get a temporary file name
+        * writes `lol` text to it
+        * copy it to same location (with a suffix like `_copy1`)
         * moves it to parent directory
         * converts user home to `~`
-        * zips it
-        * deletes it
-        * touches it
-        * goes to its parent
-        * searches for all files in it and select the first one.
-        * uploads it to the cloud (transfer.sh)
-        * opens the browser with the url
-        * downloads it
-        * encrypts it
-        * creats a symlink to it from `~/toy`
-        * resolves the symbolic link
-        * calculates the checksum of the file
+        * zip it
+        * delete it
+        * touch it
+        * go to its parent
+        * search for all files in it and select the first one.
+        * upload it to the cloud (transfer.sh)
+        * open the browser with the url
+        * download it (by default it goes to `~/Downloads`)
+        * encrypt it with a password.
+        * create a symlink to it from `~/toy`
+        * resolve the symbolic link
+        * calculate the checksum of the file
  
 ```python
-P.tmpfile().write_text("lol").copy().move("..", rel2it=True).collapseuser().zip().delete().touch().parent.search("*", folders=False)[0].transfer_sh()().download().encrypt(pwd="haha").symlink_from("~/toy").resolve().checksum()
+P.tmpfile().write_text("lol").copy().move("..", rel2it=True).collapseuser().zip().delete(sure=True).touch().parent.search("*", folders=False)[0].share_on_cloud()().download().encrypt(pwd="haha").symlink_from("~/toy").resolve().checksum()
 ```
 
 ```python
@@ -114,13 +114,15 @@ import crocodile.toolbox as tb
 # A Taste of Power
 EX1: Get a list of `.exe` available in terminal.
 
-     P.env().Path.search('*.exe').reduce(lambda x, y: x+y).print()
+```python
+     P.get_env().Path.search('*.exe').reduce(lambda x, y: x+y).print()
+```
 
 EX2: Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.
 
 
 To achieve this, all you need is an eminently readable one-liner.
-```
+```python
 tb.P.cwd().search("*.py", r=True).read_text().split('\n').apply(len).to_numpy().sum()
 ```
 
