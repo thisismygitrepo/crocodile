@@ -322,7 +322,7 @@ class P(type(Path()), Path):
     get_env = staticmethod(lambda: get_env())
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username=None, password=None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
-    def to_qr(self, txt=True, path=None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(self.read_text() if txt else self.read_bytes()); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
+    def to_qr(self, txt=True, path=None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(str(self) if "http" in str(self) else (self.read_text() if txt else self.read_bytes())); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
     def to_cloud(self, cloud, remotepath=None, zip=False, encrypt=False, key=None, pwd=None, rel2home=False, share=False, verbose=True) -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)

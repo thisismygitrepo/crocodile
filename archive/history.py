@@ -2,6 +2,9 @@
 
 from crocodile.toolbox import *
 from glob import glob
+import os
+import numpy as np
+import string
 
 
 class Browse(object):
@@ -304,7 +307,6 @@ def run_as_admin(cmd_line=None, wait=True):
 
 """This is based on `dill` package. While very flexible, it comes at the cost of assuming so many packages are loaded up and it happens implicitly. It often fails at load time_produced and requires same packages to be reloaded first.
          Compared to vanilla pickle, the former always raises an error when cannot pickle an object due to dependency. Dill however, stores all the required packages for any attribute object, but not the class data_only, or the classes that it inherits (at least at with this version)."""
-
 
 
 if __name__ == '__main__':

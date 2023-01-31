@@ -86,24 +86,26 @@ def tree(self, level: int = -1, limit_to_directories: bool = False, length_limit
 
 
 def get_compressable_directories(path, max_size_mb=15_000):
-    tmp_results = path.search("*")
+    tmp_results = path.search("*", r=False)
     dirs2compress = List()
     dirs_violating = List()
     files_violating = List()
-
     for item in tmp_results:
         if item.size() > max_size_mb:  # should be parsed
             if item.is_file():
                 print(f"File `{item}` has size larger than maximum allowed, consider manual handling")
                 files_violating.append(item)
             else:
-                tmp = get_compressable_directories(item, max_size_mb=max_size_mb)
-                if len(tmp) == 0:
+                tmp_dirs2compress, tmp_dirs_violating, tmp_files_violating = get_compressable_directories(item, max_size_mb=max_size_mb)
+                if len(tmp_dirs2compress) == 0:
                     print(f"Directory `{item}` has size larger than maximum allowed, but when parsed for subdirectories to be compressed, nothing could be found. Handle manually")
                     dirs_violating.append(item)
-                else: dirs2compress += tmp
+                dirs2compress += tmp_dirs2compress
+                dirs_violating += tmp_dirs_violating
+                files_violating += tmp_files_violating
         else:
-            dirs2compress.append(item) if item.is_dir() else None
+            if item.is_dir() and len(item.search("*", folders=False, r=True)) > 10:  # too many files ==> compress
+                dirs2compress.append(item)
     return dirs2compress, dirs_violating, files_violating
 
 

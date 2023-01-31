@@ -2,7 +2,7 @@ from setuptools import setup
 from myresources.crocodile import __version__
 import setuptools
 
-with open("README.md", "r") as file:
+with open("README.md", "r", encoding="utf-8") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
 # get python modules:
