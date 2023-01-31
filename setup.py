@@ -68,7 +68,6 @@ setup(
         "tabulate",  # pretty printing of tables
 
         # Accessories
-        # h5py
         "joblib",  # multitasking
         "ipython",  # interactive python
         "fire",  # for automatic CLI interface
@@ -77,7 +76,6 @@ setup(
         "cryptography",  # for encoding
         "paramiko",  # for SSH
         "requests",  # interacting with web
-        # "pyyaml",  # storing yaml files.
         "cycler",
 
         # Developer Tools
@@ -87,7 +85,6 @@ setup(
         "pytest",
         # popular alternative to builtint unittest  # consider splitting requirements to development and production versions.
         # "scikit-image",  # image processing. Heavy-weight.
-
         # torch
         # tensorflow
     ]
