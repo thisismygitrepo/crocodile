@@ -1,5 +1,5 @@
 
-__version__ = "10.3.0"
+__version__ = "10.3.1"
 __author__ = "Alex Al-Saffar"
 __date__ = "2023-01-13"
 docs = r"https://crocodile.readthedocs.io/en/latest/"
