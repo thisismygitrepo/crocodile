@@ -59,7 +59,8 @@ setup(
     description='Making Python even more convenient by extending list and dict and pathlib and more.',
     long_description=long_desc,
     long_description_content_type="text/markdown",
-    include_package_data=True,
+    package_data={'crocodile': ['art/*']},
+    # include_package_data=True,
     install_requires=[
         # CORE:
         "numpy",
