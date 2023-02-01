@@ -36,7 +36,7 @@ CommonProgramFilesX86 = P(tmp) if (tmp := os.getenv("CommonProgramFiles(x86)")) 
 Tmp = P(tmp) if (tmp := os.getenv("TMP")) else None  # C:\Users\usernrame\AppData\Local\Temp
 Temp = Tmp
 
-Path = L(os.getenv("PATH").split(sep)).apply(P)
+PATH = Path = L(os.getenv("PATH").split(sep)).apply(P)
 PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
 
 HostName          = platform.node()  # e.g. "MY-SURFACE", os.getenv("COMPUTERNAME") only works for windows.
@@ -138,7 +138,7 @@ class PathVar:
         for path in dirs:
             path = tb.P(path).collapseuser(strict=False)
             path = path.as_posix() if system == "Linux" else str(path)
-            if path in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+            if path in Path or path.expanduser() in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
             else: dirs_.append(path)
         dirs = dirs_
         if len(dirs) == 0: return ""
