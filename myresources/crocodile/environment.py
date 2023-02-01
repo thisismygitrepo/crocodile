@@ -137,7 +137,7 @@ class PathVar:
         dirs_ = []
         for path in dirs:
             path_rel = tb.P(path).collapseuser(strict=False)
-            if path_rel.as_posix() in Path or str(path_rel) in Path or path.expanduser().str in Path or path.expanduser().as_posix() in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+            if path_rel.as_posix() in Path or str(path_rel) in Path or path_rel.expanduser().str in Path or path_rel.expanduser().as_posix() in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
             else: dirs_.append(path.as_posix())
         dirs = dirs_
         if len(dirs) == 0: return ""
