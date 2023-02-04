@@ -323,20 +323,20 @@ class P(type(Path()), Path):
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username=None, password=None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, txt=True, path=None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(str(self) if "http" in str(self) else (self.read_text() if txt else self.read_bytes())); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
-    def to_cloud(self, cloud, remotepath=None, zip=False, encrypt=False, key=None, pwd=None, rel2home=False, share=False, verbose=True) -> 'P':
+    def to_cloud(self, cloud, remotepath=None, zip=False, encrypt=False, key=None, pwd=None, rel2home=False, share=False, verbose=True, generic_os=False) -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
-        remotepath = ((f"myhome/{__import__('platform').system().lower()}" / P(localpath.rel2home())) if rel2home else localpath) if remotepath is None else P(remotepath)
+        remotepath = ((P("myhome") / (__import__('platform').system().lower() if not generic_os else 'generic_os') / P(localpath.rel2home())) if rel2home else localpath) if remotepath is None else P(remotepath)
         from crocodile.meta import Terminal; print(f"UPLOADING ⬆️ {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
         res = Terminal(stdout=None).run(f"""rclone copyto '{localpath}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print("UPLOADING COMPLETED.")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
         if share: print("SHARING FILE"); res = Terminal().run(f"""rclone link '{cloud}:{remotepath.as_posix()}'""", shell="powershell"); return res.op2path(strict_err=True, strict_returncode=True)
         return self
-    def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, rel2home=False, overwrite=True, merge=False):
+    def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, rel2home=False, overwrite=True, merge=False, generic_os=False):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath) if localpath is not None else P.home().joinpath(remotepath.rel2home())
-        if rel2home: remotepath = f"myhome/{__import__('platform').system().lower()}" / remotepath.rel2home()
+        if rel2home: remotepath = P("myhome") / (__import__('platform').system().lower() if not generic_os else 'generic_os') / remotepath.rel2home()
         from crocodile.meta import Terminal; print(f"DOWNLOADING ⬇️ {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}")
         res = Terminal().run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}'""", shell="powershell")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)

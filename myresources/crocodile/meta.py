@@ -146,7 +146,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        install_n_import("rich").inspect(Struct(hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey), value=False, title="SSHing To", docs=False, sort=False)
+        install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey), value=False, title="SSHing To", docs=False, sort=False)
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress)
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
@@ -157,7 +157,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.local_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""  # works for both cmd and pwsh
     def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "tmate_sess", "port", "sshkey", "compress", "pwd", "ve"]}
     def __setstate__(self, state): self.__init__(**state)
-    def get_remote_machine(self): self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing OS").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing OS").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
+    def get_remote_machine(self): self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing OS").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
     def get_remote_distro(self): self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default(default="") if self._remote_distro is None else self._remote_distro; return self._remote_distro
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
@@ -176,14 +176,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
         else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source, target=None, z=False, r=False, overwrite=False, init=True) -> P or List[P]:
-        if init: print(f"{'<'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
+        if init: print(f"{'>'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         if not z and (source := P(source).expanduser()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if z: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''; remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)
-        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False); source.delete(sure=True); print("\n"); return resp
+        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True); source.delete(sure=True); print("\n"); return resp
     def copy_to_here(self, source, target=None, z=False, r=False, init=True) -> P:
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
