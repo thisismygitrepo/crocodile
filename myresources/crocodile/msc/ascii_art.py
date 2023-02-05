@@ -58,7 +58,7 @@ FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic',
                'Sub-Zero', 'Swamp Land', 'Sweet', 'The Edge', 'USA Flag', 'Varsity']
 
 
-def get_art(comment=None, artlib=None, style=None, super_style='scene', calliagraphy=False, prefix='', file=None, verbose=True):
+def get_art(comment=None, artlib=None, style=None, super_style='scene', prefix='', file=None, verbose=True):
     """ takes in a comment and does the following wrangling:
     * text => figlet font => boxes => lolcat
     * text => cowsay => lolcat
@@ -68,8 +68,8 @@ def get_art(comment=None, artlib=None, style=None, super_style='scene', calliagr
     to_file = '' if not file else f'> {file}'
     if artlib == 'boxes':
         if style is None: style = random.choice(BoxStyles.__dict__[super_style or random.choice(['language', 'scene', 'character'])])
-        fonting = f'figlet -f {random.choice(FIGLET_FONTS)} | ' if calliagraphy else ''
-        cmd = f"""echo "{comment}" | {fonting} boxes -d {style} {to_file}"""
+        fonting = f'figlet -f {random.choice(FIGLET_FONTS)}'
+        cmd = f"""echo "{comment}" | {fonting} | boxes -d {style} {to_file}"""
     else:
         if style is None: style = random.choice(CowStyles.figures)
         cmd = f"""echo "{comment}" | /usr/games/cowsay -f {style} {to_file}"""

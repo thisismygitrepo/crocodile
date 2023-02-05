@@ -51,10 +51,8 @@ else:
         surprise = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
         if surprise:
             from crocodile.msc.ascii_art import get_art
-            artlib = random.choice(['boxes', '/usr/games/cowsay'])
             __ = P.tmpfile("croco_art", folder="tmp_arts")
-            # print(f"{artlib=}, file={__}")
-            get_art("crocodile", calliagraphy=None, artlib=artlib, file=__, verbose=False)
+            get_art("crocodile", artlib=None, file=__, verbose=False)
         os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
     except: print(__.read_text())
 print("\n\n")
