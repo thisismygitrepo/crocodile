@@ -38,7 +38,14 @@ tb.D.set_pandas_display()
 D = Display; L = List; E = Experimental; S = Struct
 
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
-if platform.system() == "Windows": print(__.read_text())
+if platform.system() == "Windows":
+    try:
+        from crocodile.msc.ascii_art import FIGJS_FONTS, BoxStyles
+        font = random.choice(FIGJS_FONTS)
+        print(f"{font}\n")
+        box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
+        os.system(f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs')  # | lolcat
+    except: print(__.read_text())
 else:
     try:
         surprise = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)

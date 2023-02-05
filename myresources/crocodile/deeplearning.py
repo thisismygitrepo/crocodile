@@ -36,7 +36,7 @@ class HyperParam(tb.Struct):
     def __init__(self, **kwargs):
         super().__init__(
             # ==================== Enviroment =========================
-            name='default_model_name_' + tb.randstr(),
+            name="model_" + tb.randstr(noun=True),
             root=tb.P.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=Device.gpu0,
