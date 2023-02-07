@@ -38,24 +38,36 @@ tb.D.set_pandas_display()
 D = Display; L = List; E = Experimental; S = Struct
 
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
+_dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
+
 if platform.system() == "Windows":
     try:
-        from crocodile.msc.ascii_art import FIGJS_FONTS, BoxStyles
-        font = random.choice(FIGJS_FONTS)
-        print(f"{font}\n")
-        box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
-        os.system(f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs')  # | lolcat
+        if random.choice([True, True, False]):
+            from crocodile.msc.ascii_art import FIGJS_FONTS, BoxStyles
+            font = random.choice(FIGJS_FONTS)
+            # print(f"{font}\n")
+            box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
+            os.system(f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs')  # | lolcat
+
+        else:
+            from crocodile.msc.ascii_art import ArtLib
+
+            # from rgbprint import gradient_scroll, Color
+            # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
+
+            __ = tb.P.tmpfile("croco_art", folder="tmp_arts").write_text(ArtLib.cowsay("crocodile"))
+            os.system(f'type {__} | lolcatjs')  # | lolcat
+
     except: print(__.read_text())
 else:
     try:
-        surprise = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
-        if surprise:
+        if _dynamic_art:
             from crocodile.msc.ascii_art import get_art
             __ = P.tmpfile("croco_art", folder="tmp_arts")
             get_art("crocodile", artlib=None, file=__, verbose=False)
         os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
     except: print(__.read_text())
-print("\n\n")
+print("\n")
 
 
 def build_parser():
@@ -63,7 +75,7 @@ def build_parser():
     parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
     args = parser.parse_args()
     # tb.Struct(args.__dict__).print(as_config=True)
-    print(args.cmd)
+    # print(args.cmd)
     exec(args.cmd, globals())
 
 

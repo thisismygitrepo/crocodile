@@ -4,6 +4,7 @@ import random
 # import crocodile.toolbox as tb
 import textwrap
 import subprocess
+from crocodile.core import install_n_import
 
 
 # https://github.com/VaasuDevanS/cowsay-python
@@ -18,17 +19,16 @@ import subprocess
 class ArtLib:
     @staticmethod
     def cowsay(text):
-        import cowsay
+        cowsay = install_n_import("cowsay")
         char = random.choice(cowsay.char_names)
         return cowsay.get_output_string(char_name=char, text=text)
 
     @staticmethod
-    def figlet():
-        import pyfiglet
-        from pyfiglet import Figlet
+    def figlet(text):
+        pyfiglet = install_n_import("pyfiglet")
         fs = pyfiglet.FigletFont.getFonts()
-        f = Figlet(font=random.choice(fs))
-        return f.renderText('text to render')
+        f = pyfiglet.Figlet(font=random.choice(fs))
+        return f.renderText(text)
 
 
 class BoxStyles:
@@ -48,14 +48,14 @@ class CowStyles:
 
 FIGLET_FONTS = ['banner', 'big', 'standard']
 
-FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'Alligator', 'Alligator2', 'AMC AAA01',
-               'AMC Slash', 'AMC Tubes', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner3', 'Banner4',
+FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'Alligator2', 'AMC AAA01',
+               'AMC Tubes', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner3', 'Banner4',
                'Basic', 'Big Money-ne', 'Big Money-nw', 'Big Money-se', 'Big Money-sw', 'Big', 'Bloody', 'Bolger', 'Braced', 'Bright',
-               'Caligraphy', 'Caligraphy2', 'Calvin S', 'Chiseled', 'Colossal', 'Cosmike', 'Crawford',
-               'Crawford2', 'Crazy', 'Delta Corps Priest 1', 'Doom', 'DOS Rebel',
-               'Electronic', 'Elite', 'Epic', 'Flower Power',
+               'Caligraphy', 'Caligraphy2', 'Calvin S', 'Chiseled', 'Colossal', 'Cosmike',
+               'Crawford2', 'Delta Corps Priest 1', 'Doom', 'DOS Rebel',
+               'Elite', 'Epic', 'Flower Power',
                'Fraktur', 'Isometric4', 'Star Wars',
-               'Sub-Zero', 'Swamp Land', 'Sweet', 'The Edge', 'USA Flag', 'Varsity']
+               'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity']  # too large , Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
 
 
 def get_art(comment=None, artlib=None, style=None, super_style='scene', prefix='', file=None, verbose=True):
@@ -73,11 +73,11 @@ def get_art(comment=None, artlib=None, style=None, super_style='scene', prefix='
     else:
         if style is None: style = random.choice(CowStyles.figures)
         cmd = f"""echo "{comment}" | /usr/games/cowsay -f {style} {to_file}"""
-    print(cmd)
     res = subprocess.run(cmd, text=True, capture_output=True, shell=True).stdout
     res = textwrap.indent(res, prefix=prefix)
     if verbose:
         print(f'Using style: {style} from {artlib}', '\n' * 3)
+        print(cmd)
         print(res)
     return res
 
