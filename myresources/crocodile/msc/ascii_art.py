@@ -16,6 +16,7 @@ from crocodile.core import install_n_import
 
 """
 
+
 class ArtLib:
     @staticmethod
     def cowsay(text):
@@ -48,14 +49,12 @@ class CowStyles:
 
 FIGLET_FONTS = ['banner', 'big', 'standard']
 
-FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'Alligator2', 'AMC AAA01',
-               'AMC Tubes', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner3', 'Banner4',
+FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'Alligator2',               'AMC Tubes', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner3', 'Banner4',
                'Basic', 'Big Money-ne', 'Big Money-nw', 'Big Money-se', 'Big Money-sw', 'Big', 'Bloody', 'Bolger', 'Braced', 'Bright',
-               'Caligraphy', 'Caligraphy2', 'Calvin S', 'Chiseled', 'Colossal', 'Cosmike',
-               'Crawford2', 'Delta Corps Priest 1', 'Doom', 'DOS Rebel',
+               'DOS Rebel',
                'Elite', 'Epic', 'Flower Power',
                'Fraktur', 'Isometric4', 'Star Wars',
-               'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity']  # too large , Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
+               'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity', "Doom"]  # too large  Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
 
 
 def get_art(comment=None, artlib=None, style=None, super_style='scene', prefix='', file=None, verbose=True):

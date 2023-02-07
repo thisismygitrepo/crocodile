@@ -75,8 +75,19 @@ args.cmd"""
         exec(code)
         return None
     elif args.read != "":
-        c = f"""p = P(r\'{str(args.read).lstrip()}\').absolute(); dat = tb.E.try_this(lambda: p.readit(), verbose=True) """
-        res = f"""ipython --no-banner -i -m crocodile.croshell -- -c "{c}" """
+        code_text = f"""
+# >>>>>>> Reading File <<<<<<<<<
+p = P(r\'{str(args.read).lstrip()}\').absolute()
+try:
+    dat = p.readit()
+except Exception as e:
+    print(e)
+"""
+
+        # next, write code_text to file at home directory /tmp_results/shells/python_readfile_script.py using open:
+        code_file = Path.home().joinpath("tmp_results/shells/python_readfile_script.py")
+        code_file.write_text(code_text)
+        res = f"""ipython --no-banner -i -m crocodile.croshell -- --file "{code_file}" """
     elif args.kill != "":
         res = __import__("crocodile.toolbox").toolbox.L(__import__("psutil").process_iter()).filter(lambda x: args.kill in x.name())
         # res.print()

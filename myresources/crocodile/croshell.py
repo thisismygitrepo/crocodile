@@ -45,7 +45,7 @@ if platform.system() == "Windows":
         if random.choice([True, True, False]):
             from crocodile.msc.ascii_art import FIGJS_FONTS, BoxStyles
             font = random.choice(FIGJS_FONTS)
-            # print(f"{font}\n")
+            print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
             os.system(f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs')  # | lolcat
 
@@ -73,10 +73,17 @@ print("\n")
 def build_parser():
     parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")
     parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
+    parser.add_argument("--file", "-f", dest="file", help="Python command.", default="")
+
     args = parser.parse_args()
     # tb.Struct(args.__dict__).print(as_config=True)
-    # print(args.cmd)
-    exec(args.cmd, globals())
+    if args.file:
+        code = P(args.file).read_text()
+        print(code)
+        exec(code, globals())
+    elif args.cmd:
+        print(args.cmd)
+        exec(args.cmd, globals())
 
 
 if __name__ == "__main__":
