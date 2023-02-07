@@ -224,7 +224,7 @@ class RemoteMachine:
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
-{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", lnis=True, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.update_essential_repos else ''}
+{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
 {'git pull' if self.update_repo else ''}
 {'pip install -e .' if self.install_repo else ''}

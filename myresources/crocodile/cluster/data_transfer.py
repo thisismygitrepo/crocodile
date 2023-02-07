@@ -65,7 +65,7 @@ api = GDriveAPI()
     @staticmethod
     def sftp(self: RemoteMachine):
         assert self.ssh.sftp is not None, f"SFTP is not available for this machine `{self}`. Consider using different `transfer_method` other than `sftp`."
-        self.ssh.run_py(f"tb.P(r'{ResourceManager.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.path_dict.shell_script_path.collapseuser().as_posix()}')", desc="Logging latest shell script path on remote.", lnis=True)
+        self.ssh.run_py(f"tb.P(r'{ResourceManager.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.path_dict.shell_script_path.collapseuser().as_posix()}')", desc="Logging latest shell script path on remote.", verbose=False)
         if self.copy_repo: self.ssh.copy_from_here(self.repo_path, z=True, overwrite=True)
         tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
 

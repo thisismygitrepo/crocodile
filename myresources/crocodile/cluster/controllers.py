@@ -30,7 +30,7 @@ class Zellij:
     def get_new_sess_name(self):
         if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
-        resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_repr(which='remote')}` for new session name", lnis=True)
+        resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_repr(which='remote')}` for new session name", verbose=False)
         if resp.err == "No active zellij sessions found.":
             sess_name = "ms0"
         else:
@@ -75,4 +75,4 @@ zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep 0.2
 zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
 
-""", lnis=True, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`")
+""", desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`", verbose=False)
