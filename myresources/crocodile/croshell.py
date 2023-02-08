@@ -38,35 +38,42 @@ tb.D.set_pandas_display()
 D = Display; L = List; E = Experimental; S = Struct
 
 __ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
-_dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
-
 if platform.system() == "Windows":
-    try:
+    _1x = P.home().joinpath(r"AppData/Roaming/npm/figlet").exists()
+    _2x = P.home().joinpath(r"AppData/Roaming/npm/lolcatjs").exists()
+    _3x = P.home().joinpath(r"AppData/Local/Microsoft/WindowsApps/boxes.exe").exists()
+
+    if _1x and _2x and _3x:
         if random.choice([True, True, False]):
             from crocodile.msc.ascii_art import FIGJS_FONTS, BoxStyles
             font = random.choice(FIGJS_FONTS)
             print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
             os.system(f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs')  # | lolcat
-
         else:
             from crocodile.msc.ascii_art import ArtLib
-
             # from rgbprint import gradient_scroll, Color
             # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
-
             __ = tb.P.tmpfile("croco_art", folder="tmp_arts").write_text(ArtLib.cowsay("crocodile"))
             os.system(f'type {__} | lolcatjs')  # | lolcat
-
-    except: print(__.read_text())
+    else:
+        print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
+        print(__.read_text())
 else:
-    try:
+    _x1 = P(r"/usr/games/cowsay").exists()
+    _x2 = P(r"/usr/games/lolcat").exists()
+    _x3 = P(r"/usr/bin/boxes").exists()
+    _x4 = P(r"/usr/bin/figlet").exists()
+    if _x1 and _x2 and _x3 and _x4:
+        _dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
         if _dynamic_art:
             from crocodile.msc.ascii_art import get_art
             __ = P.tmpfile("croco_art", folder="tmp_arts")
             get_art("crocodile", artlib=None, file=__, verbose=False)
-        os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
-    except: print(__.read_text())
+            os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
+        else: print(__.read_text())
+    else:
+        print(__.read_text())
 print("\n")
 
 
