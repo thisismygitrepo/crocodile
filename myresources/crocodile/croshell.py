@@ -54,7 +54,7 @@ if platform.system() == "Windows":
             from crocodile.msc.ascii_art import ArtLib
             # from rgbprint import gradient_scroll, Color
             # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
-            __ = tb.P.tmpfile("croco_art", folder="tmp_arts").write_text(ArtLib.cowsay("crocodile"))
+            __ = tb.P.tmpfile("croco_art", folder="tmp_arts").write_text(ArtLib.cowsay("crocodile"))  # utf-8 encoding?
             os.system(f'type {__} | lolcatjs')  # | lolcat
     else:
         print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
@@ -73,7 +73,7 @@ else:
             os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
         else: print(__.read_text())
     else:
-        print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | bash")
+        print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
         print(__.read_text())
 print("\n")
 

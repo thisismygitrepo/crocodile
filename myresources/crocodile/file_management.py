@@ -328,10 +328,10 @@ class P(type(Path()), Path):
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
         remotepath = ((P("myhome") / (__import__('platform').system().lower() if not generic_os else 'generic_os') / P(localpath.rel2home())) if rel2home else localpath) if remotepath is None else P(remotepath)
-        from crocodile.meta import Terminal; print(f"UPLOADING ⬆️ {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
-        res = Terminal(stdout=None).run(f"""rclone copyto '{localpath}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print("UPLOADING COMPLETED.")
+        from crocodile.meta import Terminal; print(f" {'>'*10} UPLOADING ⬆️ {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
+        res = Terminal(stdout=None).run(f"""rclone copyto '{localpath}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print(f" {'>'*10} UPLOAD COMPLETED.")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
-        if share: print("SHARING FILE"); res = Terminal().run(f"""rclone link '{cloud}:{remotepath.as_posix()}'""", shell="powershell"); return res.op2path(strict_err=True, strict_returncode=True)
+        if share: print("SHARING FILE"); res = Terminal().run(f"""rclone link '{cloud}:{remotepath.as_posix()}'""", shell="powershell").capture(); return res.op2path(strict_err=True, strict_returncode=True)
         return self
     def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, rel2home=False, overwrite=True, merge=False, generic_os=False):
         remotepath = self  # .expanduser().absolute()

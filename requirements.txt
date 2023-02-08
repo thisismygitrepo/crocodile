@@ -9,10 +9,10 @@ rich
 psutil
 
 # gdrive
-google-api-python-client  # The Google APIs Client Library for Python:  https://developers.google.com/drive/api/quickstart/python
-google-auth
-google_auth_oauthlib  # libraries for user authorization
-google-auth-httplib2  # libraries for user authorizatio (AS WELL)
+# google-api-python-client  # The Google APIs Client Library for Python:  https://developers.google.com/drive/api/quickstart/python
+# google-auth
+# google_auth_oauthlib  # libraries for user authorization
+# google-auth-httplib2  # libraries for user authorizatio (AS WELL)
 
 
 # Accessories
