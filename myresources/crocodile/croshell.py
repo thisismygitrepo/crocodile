@@ -73,6 +73,7 @@ else:
             os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
         else: print(__.read_text())
     else:
+        print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | bash")
         print(__.read_text())
 print("\n")
 
