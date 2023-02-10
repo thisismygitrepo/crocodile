@@ -66,7 +66,7 @@ def pkl(*args, **kwargs): return pickle(*args, **kwargs)
 class Read: read = read; mat = mat; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; toml = toml; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
 
 
-def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append=False, prepend=False):
+def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append=False, prepend=False, strict=False):
     lines, bingo = txt_raw.split("\n"), False
     if not replace_line:  # no need for line splitting
         if txt_search in txt_raw: return txt_raw.replace(txt_search, txt_alt)
@@ -74,6 +74,7 @@ def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append
     for idx, line in enumerate(lines):
         if txt_search in line:
             lines[idx], bingo = txt_alt if type(txt_alt) is str else txt_alt(line), True
+    if strict and not bingo: raise ValueError(f"txt_search `{txt_search}` not found in txt_raw `{txt_raw}`")
     if bingo is False and notfound_append is True: (lines.insert(0, txt_alt) if prepend else lines.append(txt_alt))  # txt not found, add it anyway.
     return "\n".join(lines)
 
