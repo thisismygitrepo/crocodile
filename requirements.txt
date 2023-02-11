@@ -1,7 +1,7 @@
 
 # CORE:  
 numpy
-scipy
+# scipy
 pandas
 matplotlib
 cycler

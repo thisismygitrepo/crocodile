@@ -53,7 +53,8 @@ FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic',
                'Basic', 'Big Money-ne', 'Big Money-nw', 'Big Money-se', 'Big Money-sw', 'Big', 'Bloody', 'Bolger', 'Braced', 'Bright',
                'DOS Rebel',
                'Elite', 'Epic', 'Flower Power',
-               'Fraktur', 'Isometric4', 'Star Wars',
+               'Fraktur', # 'Isometric4'
+               'Star Wars',
                'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity', "Doom"]  # too large  Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
 
 
