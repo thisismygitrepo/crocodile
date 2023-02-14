@@ -47,9 +47,11 @@ if platform.system() == "Windows":
         if random.choice([True, True, False]):
             from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles
             font = random.choice(FIGJS_FONTS)
-            print(f"{font}\n")
+            # print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
-            os.system(f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs')  # | lolcat
+            _cmd = f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs'
+            print(_cmd)
+            os.system(_cmd)  # | lolcat
         else:
             from crocodile.msc.ascii_art import ArtLib
             # from rgbprint import gradient_scroll, Color

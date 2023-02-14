@@ -298,7 +298,7 @@ class P(type(Path()), Path):
     def xz(self, path=None, name=None, folder=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.xz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
     def unxz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True) -> 'P': Compression.unxz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
     def tar_gz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True) -> 'P': return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.ungz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.ungz(name=f"tmp_{randstr()}.tar", inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)  # this works for .tgz suffix as well.
     def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': raise NotImplementedError("Not implemented yet.")
@@ -330,7 +330,7 @@ class P(type(Path()), Path):
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
         remotepath = ((P("myhome") / (__import__('platform').system().lower() if not generic_os else 'generic_os') / P(localpath.rel2home())) if rel2home else localpath) if remotepath is None else P(remotepath)
         from crocodile.meta import Terminal; print(f" {'>'*10} UPLOADING ⬆️ {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
-        res = Terminal(stdout=None).run(f"""rclone copyto '{localpath}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print(f" {'>'*10} UPLOAD COMPLETED.")
+        res = Terminal(stdout=None).run(f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print(f" {'>'*10} UPLOAD COMPLETED.")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
         if share: print("SHARING FILE"); res = Terminal().run(f"""rclone link '{cloud}:{remotepath.as_posix()}'""", shell="powershell").capture(); return res.op2path(strict_err=True, strict_returncode=True)
         return self
