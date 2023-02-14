@@ -37,7 +37,7 @@ tb.D.set_numpy_display()
 tb.D.set_pandas_display()
 D = Display; L = List; E = Experimental; S = Struct
 
-__ = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
+
 if platform.system() == "Windows":
     _1x = P.home().joinpath(r"AppData/Roaming/npm/figlet").exists()
     _2x = P.home().joinpath(r"AppData/Roaming/npm/lolcatjs").exists()
@@ -45,7 +45,7 @@ if platform.system() == "Windows":
 
     if _1x and _2x and _3x:
         if random.choice([True, True, False]):
-            from crocodile.msc.ascii_art import FIGJS_FONTS, BoxStyles
+            from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles
             font = random.choice(FIGJS_FONTS)
             print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
@@ -54,11 +54,13 @@ if platform.system() == "Windows":
             from crocodile.msc.ascii_art import ArtLib
             # from rgbprint import gradient_scroll, Color
             # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
-            __ = tb.P.tmpfile("croco_art", folder="tmp_arts").write_text(ArtLib.cowsay("crocodile"))  # utf-8 encoding?
-            os.system(f'type {__} | lolcatjs')  # | lolcat
+            _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
+            _new_art.write_text(ArtLib.cowsay("crocodile"))  # utf-8 encoding?
+            os.system(f'type {_new_art} | lolcatjs')  # | lolcat
     else:
         print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
-        print(__.read_text())
+        _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
+        print(_default_art.read_text())
 else:
     _x1 = P(r"/usr/games/cowsay").exists()
     _x2 = P(r"/usr/games/lolcat").exists()
@@ -68,13 +70,16 @@ else:
         _dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
         if _dynamic_art:
             from crocodile.msc.ascii_art import get_art
-            __ = P.tmpfile("croco_art", folder="tmp_arts")
-            get_art("crocodile", artlib=None, file=__, verbose=False)
-            os.system(f"cat {__} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
-        else: print(__.read_text())
+            _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
+            get_art("crocodile", artlib=None, file=_new_art, verbose=False)
+            os.system(f"cat {_new_art} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
+        else:
+            _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
+            print(_default_art.read_text())
     else:
         print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
-        print(__.read_text())
+        _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
+        print(_default_art.read_text())
 print("\n")
 
 
