@@ -49,11 +49,11 @@ class CowStyles:
 
 FIGLET_FONTS = ['banner', 'big', 'standard']
 
-FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'Alligator2', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner4',
+FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner4',
                'Basic', 'Big Money-ne', 'Big Money-nw', 'Big Money-se', 'Big Money-sw', 'Big', 'Bloody', 'Bolger', 'Braced', 'Bright',
                'DOS Rebel',
                'Elite', 'Epic', 'Flower Power',
-               'Fraktur', # 'Isometric4'. 'AMC Tubes', 'Banner3'
+               'Fraktur', # 'Isometric4'. 'AMC Tubes', 'Banner3', Alligator2
                'Star Wars',
                'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity', "Doom"]  # too large  Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
 
