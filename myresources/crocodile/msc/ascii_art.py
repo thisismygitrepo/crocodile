@@ -72,7 +72,7 @@ def get_art(comment=None, artlib=None, style=None, super_style='scene', prefix='
         cmd = f"""echo "{comment}" | {fonting} | boxes -d {style} {to_file}"""
     else:
         if style is None: style = random.choice(CowStyles.figures)
-        cmd = f"""echo "{comment}" | /usr/games/cowsay -f {style} {to_file}"""
+        cmd = f"""echo "{comment}" | cowsay -f {style} {to_file}"""
     res = subprocess.run(cmd, text=True, capture_output=True, shell=True).stdout
     res = textwrap.indent(res, prefix=prefix)
     if verbose:

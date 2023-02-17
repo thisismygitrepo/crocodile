@@ -64,17 +64,17 @@ if platform.system() == "Windows":
         _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
         print(_default_art.read_text())
 else:
-    _x1 = P(r"/usr/games/cowsay").exists()
-    _x2 = P(r"/usr/games/lolcat").exists()
-    _x3 = P(r"/usr/bin/boxes").exists()
-    _x4 = P(r"/usr/bin/figlet").exists()
+    _x1 = P.home().joinpath(".nix-profile/bin/cowsay").exists()  # P(r"/usr/games/cowsay").exists()
+    _x2 = P.home().joinpath(".nix-profile/bin/lolcat").exists()  # P(r"/usr/games/lolcat").exists()
+    _x3 = P.home().joinpath(".nix-profile/bin/boxes").exists()  # P(r"/usr/bin/boxes").exists()
+    _x4 = P.home().joinpath(".nix-profile/bin/figlet").exists()  # P(r"/usr/bin/figlet").exists()
     if _x1 and _x2 and _x3 and _x4:
         _dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
         if _dynamic_art:
             from crocodile.msc.ascii_art import get_art
             _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
             get_art("crocodile", artlib=None, file=_new_art, verbose=False)
-            os.system(f"cat {_new_art} | /usr/games/lolcat")  # full path since lolcat might not be in PATH.
+            os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
         else:
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
