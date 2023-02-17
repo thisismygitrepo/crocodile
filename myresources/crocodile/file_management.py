@@ -338,6 +338,7 @@ class P(type(Path()), Path):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath) if localpath is not None else P.home().joinpath(remotepath.rel2home())
         if rel2home: remotepath = P("myhome") / (__import__('platform').system().lower() if not generic_os else 'generic_os') / remotepath.rel2home()
+        remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""
         from crocodile.meta import Terminal; print(f"DOWNLOADING ⬇️ {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}")
         res = Terminal().run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}'""", shell="powershell")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
