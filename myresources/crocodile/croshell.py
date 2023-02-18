@@ -64,10 +64,21 @@ if platform.system() == "Windows":
         _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
         print(_default_art.read_text())
 else:
-    _x1 = P.home().joinpath(".nix-profile/bin/cowsay").exists()  # P(r"/usr/games/cowsay").exists()
-    _x2 = P.home().joinpath(".nix-profile/bin/lolcat").exists()  # P(r"/usr/games/lolcat").exists()
-    _x3 = P.home().joinpath(".nix-profile/bin/boxes").exists()  # P(r"/usr/bin/boxes").exists()
-    _x4 = P.home().joinpath(".nix-profile/bin/figlet").exists()  # P(r"/usr/bin/figlet").exists()
+    # _x1 = P.home().joinpath(".nix-profile/bin/cowsay").exists()  # P(r"/usr/games/cowsay").exists()
+    # _x2 = P.home().joinpath(".nix-profile/bin/lolcat").exists()  # P(r"/usr/games/lolcat").exists()
+    # _x3 = P.home().joinpath(".nix-profile/bin/boxes").exists()  # P(r"/usr/bin/boxes").exists()
+    # _x4 = P.home().joinpath(".nix-profile/bin/figlet").exists()  # P(r"/usr/bin/figlet").exists()
+    def is_executable_in_path(executable_name):
+        path_dirs = os.environ['PATH'].split(os.pathsep)
+        for path_dir in path_dirs:
+            path_to_executable = os.path.join(path_dir, executable_name)
+            if os.path.isfile(path_to_executable) and os.access(path_to_executable, os.X_OK): return True
+        return False
+    _x1 = is_executable_in_path("cowsay")
+    _x2 = is_executable_in_path("lolcat")
+    _x3 = is_executable_in_path("boxes")
+    _x4 = is_executable_in_path("figlet")
+
     if _x1 and _x2 and _x3 and _x4:
         _dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
         if _dynamic_art:
