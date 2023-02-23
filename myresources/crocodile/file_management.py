@@ -336,7 +336,7 @@ class P(type(Path()), Path):
         return self
     def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, rel2home=False, overwrite=True, merge=False, os_specific=False):
         remotepath = self  # .expanduser().absolute()
-        localpath = P(localpath) if localpath is not None else P.home().joinpath(remotepath.rel2home())
+        localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
         if rel2home: remotepath = P("myhome") / (__import__('platform').system().lower() if os_specific else 'generic_os') / remotepath.rel2home()
         remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""; localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
         from crocodile.meta import Terminal; print(f"DOWNLOADING ⬇️ {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}")
