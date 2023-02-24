@@ -301,6 +301,7 @@ class P(type(Path()), Path):
     def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.ungz(name=f"tmp_{randstr()}.tar", inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)  # this works for .tgz suffix as well.
     def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def unbz2(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': return Compression.unbz2(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".bz2", "")).expanduser().resolve())
     def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': raise NotImplementedError("Not implemented yet.")
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False) -> 'P':  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name+suffix)
@@ -384,6 +385,9 @@ def gz(file, op_path):  # see this on what to use: https://stackoverflow.com/que
 def ungz(self, op_path=None):
     with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
+def unbz2(self, op_path=None):
+    with __import__("bz2").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
+    return P(op_path)
 def xz(self, op_path):
     with __import__("lzma").open(op_path, "w") as f: f.write(self)
 def unxz(ip_path, op_path):
@@ -396,7 +400,7 @@ def untar(self, op_path, fname=None, mode='r', **kwargs):
         if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
         else: file.extract(fname, **kwargs)
     return P(op_path)
-class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; tar = tar; untar = untar; xz = xz; unxz = unxz  # Provides consistent behaviour across all methods
+class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip = unzip; gz = gz; ungz = ungz; tar = tar; untar = untar; xz = xz; unxz = unxz; unbz2 = unbz2  # Provides consistent behaviour across all methods
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
