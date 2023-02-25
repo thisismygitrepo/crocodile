@@ -77,11 +77,11 @@ class Obfuscator(tb.Base):
     def _add_map(self, path: tb.P, path_r_obf: str):
         if path.is_file():
             suffix = "".join(path.suffixes) if self.suffix == "same" else self.suffix
-            file_name_obf = f"_0x_{tb.randstr(noun=self.noun)}{suffix}"
+            file_name_obf = f"_0f_{tb.randstr(noun=self.noun)}{suffix}"
             path_r_obf = path_r_obf + f"/{file_name_obf}"
         elif path.is_dir():
-            if path_r_obf == "": path_r_obf = "__1x_root__" + tb.randstr(noun=self.noun)
-            else: path_r_obf = path_r_obf + f"/_1x_{tb.randstr(noun=self.noun)}"
+            if path_r_obf == "": path_r_obf = "__0d_root__" + tb.randstr(noun=self.noun)
+            else: path_r_obf = path_r_obf + f"/_0d_{tb.randstr(noun=self.noun)}"
         k, v = path.relative_to(self.directory).as_posix(), path_r_obf
         self.real_to_phony[k] = v
         self.phony_to_real[v] = k
