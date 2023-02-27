@@ -138,7 +138,8 @@ class PathVar:
         for path in dirs:
             path_rel = tb.P(path).collapseuser(strict=False)
             if path_rel.as_posix() in Path or str(path_rel) in Path or path_rel.expanduser().str in Path or path_rel.expanduser().as_posix() in Path: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
-            else: dirs_.append(path_rel.as_posix())
+            else:
+                dirs_.append(path_rel.as_posix() if system == "Linux" else str(path_rel))
         dirs = dirs_
         if len(dirs) == 0: return ""
 
