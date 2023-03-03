@@ -64,10 +64,10 @@ setup(
     install_requires=[
         # CORE:
         "numpy",
-        # "scipy",  # heavy-weight.
         "pandas",
         "matplotlib",
-        "tabulate",  # pretty printing of tables
+        # "tabulate",  # pretty printing of tables
+        # "scipy",  # heavy-weight.
 
         # Accessories
         "joblib",  # multitasking
@@ -76,15 +76,15 @@ setup(
         "tqdm",  # for progress bar
         "dill",  # extends pickle
         "cryptography",  # for encoding
-        "paramiko",  # for SSH
+        # "paramiko",  # for SSH
         "requests",  # interacting with web
-        "cycler",
+        # "cycler",
 
         # Developer Tools
-        "setuptools",  # for packaging  # correct place is in .toml
-        "wheel",
-        "twine",  # for pushing package to pypi.org
-        "pytest",
+        # "setuptools",  # for packaging  # correct place is in .toml
+        # "wheel",
+        # "twine",  # for pushing package to pypi.org
+        # "pytest",
         # popular alternative to builtint unittest  # consider splitting requirements to development and production versions.
         # "scikit-image",  # image processing. Heavy-weight.
         # torch
