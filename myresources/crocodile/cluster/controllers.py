@@ -76,3 +76,24 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
 
 """, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`", verbose=False)
+
+
+class Mprocs:
+    @staticmethod
+    def get_template():
+        import machineconfig
+        return tb.P(machineconfig.__file__).parent.joinpath(r"settings/mprocs/windows/mprocs.yaml").readit()
+
+    def __init__(self, ssh: tb.SSH):
+        self.ssh = ssh
+        self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
+        self.new_sess_name = None
+
+    def get_layout(self):
+        temp = self.get_template()
+        temp.procs['main']['shell']['windows'] = "croshell"
+        template_file = tb.Save.yaml(obj=temp, path=tb.P.tmpfile(suffix=".yaml"))
+
+    # def __getstate__(self): return self.__dict__
+    # def __setstate__(self, state): self.__dict__.update(state)
+
