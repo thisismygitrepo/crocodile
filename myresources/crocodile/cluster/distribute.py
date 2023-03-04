@@ -78,7 +78,7 @@ class Cluster:
                  func_kwargs_list=None,
                  thrd_load_calc=None, machine_load_calc=None,
                  open_console=False, description="", **remote_machine_kwargs, ):
-        self.job_id = tb.randstr(length=10)
+        self.job_id = tb.randstr(noun=True)
         self.results_path = self.get_cluster_path(self.job_id)
         self.results_downloaded = False
 
@@ -171,13 +171,15 @@ class Cluster:
         self.print_commands()
 
     def open_mux(self, machines_per_tab=1):
-        cmd = "wt "
+        cmd = f"wt "
         for idx, m in enumerate(self.machines):
             sub_cmd = m.z.get_new_sess_string()
-            if idx == 0: cmd += f""" pwsh -Command "{sub_cmd}" `; """  # avoid new tabs despite being even index
-            elif idx % machines_per_tab == 0: cmd += f""" new-tab pwsh -Command "{sub_cmd}" `; """
-            else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `; """
-        tb.Terminal().run_async(*cmd.split(" "))
+            if idx == 0: cmd += f""" --title '{m.ssh.hostname}' pwsh -Command "{sub_cmd}" `; """  # avoid new tabs despite being even index
+            elif idx % machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname} pwsh -Command "{sub_cmd}" `;"""
+            else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
+
+        print("Terminal launch command:\n", cmd)
+        tb.Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
         self.machines[-1].z.asssert_sesion_started()
 
     def fire(self, machines_per_tab=1, run=False):

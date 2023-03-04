@@ -149,7 +149,7 @@ class RemoteMachine:
         self.z = Zellij(self.ssh)
 
         # scripts
-        self.job_id = job_id or tb.randstr(length=10)
+        self.job_id = job_id or tb.randstr(noun=True)
         self.path_dict = ResourceManager(self.job_id, self.ssh.get_remote_machine())
 
         # flags
