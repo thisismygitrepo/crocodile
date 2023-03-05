@@ -55,7 +55,7 @@ def yaml(path, r=False):
     with open(str(path), "r") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
     return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 def ini(path): import configparser; res = configparser.ConfigParser(); res.read(str(path)); return res
-def toml(path): return __import__("tomli").loads(P(path).read_text())
+def toml(path): return install_n_import("tomli").loads(P(path).read_text())
 def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
 def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
