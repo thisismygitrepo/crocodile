@@ -20,7 +20,7 @@ class ResourceManager:
 
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
-    def __init__(self, job_id, remote_machine_type, instance_per_machine=1):
+    def __init__(self, job_id, remote_machine_type, instance_per_machine=1, base=None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.
@@ -32,7 +32,8 @@ class ResourceManager:
 
         self.submission_time = pd.Timestamp.now()
 
-        self.root_dir = tb.P(f"~/tmp_results/remote_machines/job_id__{self.job_id}")
+        self.base = tb.P(base).collapseuser() if base is not None else tb.P(f"~/tmp_results/remote_machines")
+        self.root_dir = self.base.joinpath(f"job_id__{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
@@ -105,7 +106,7 @@ class RemoteMachine:
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def __init__(self, func, func_kwargs: dict or None = None, description="",
                  copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
-                 data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None,
+                 data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None, base=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
                  ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, parallelize=False,
@@ -150,7 +151,7 @@ class RemoteMachine:
 
         # scripts
         self.job_id = job_id or tb.randstr(noun=True)
-        self.path_dict = ResourceManager(self.job_id, self.ssh.get_remote_machine())
+        self.path_dict = ResourceManager(self.job_id, self.ssh.get_remote_machine(), base=base)
 
         # flags
         self.submitted = False

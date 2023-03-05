@@ -79,7 +79,7 @@ class Cluster:
                  thrd_load_calc=None, machine_load_calc=None,
                  open_console=False, description="", **remote_machine_kwargs, ):
         self.job_id = tb.randstr(noun=True)
-        self.results_path = self.get_cluster_path(self.job_id)
+        self.root_dir = self.get_cluster_path(self.job_id)
         self.results_downloaded = False
 
         self.instances_calculator = thrd_load_calc or ThreadsWorkloadDivider()
@@ -161,13 +161,12 @@ class Cluster:
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
             m = RemoteMachine(func_kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=desc,
-                              job_id=self.job_id + f"_{idx}", **self.remote_machine_kwargs)
+                              job_id=self.job_id + f"_{idx}",  # base=self.root_dir
+                              **self.remote_machine_kwargs)
             m.run()
             self.machines.append(m)
-        try:
-            tb.Save.pickle(obj=self, path=self.results_path.joinpath("cluster.Cluster.pkl"))
-        except TypeError:
-            print("Couldn't pickle cluster object")
+        try: tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
+        except TypeError: print("Couldn't pickle cluster object")
         self.print_commands()
 
     def open_mux(self, machines_per_tab=1):
@@ -198,11 +197,12 @@ class Cluster:
     def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
         if self.results_downloaded:
-            print(f"All results downloaded to {self.results_path} 🤗")
+            print(f"All results downloaded to {self.root_dir} 🤗")
             return True
         for idx, a_m in enumerate(self.machines):
             if a_m.results_path is None:
                 print(f"Results are not ready for machine {a_m}.")
+                print(f"Try to run `.check_job_status()` to check if the job is done and obtain results path.")
                 continue
             results_folder = tb.P(a_m.results_path).expanduser()
             if results_folder is not None and a_m.results_downloaded is False:
@@ -211,7 +211,7 @@ class Cluster:
                 print("\n")
                 a_m.download_results(target=None)  # TODO another way of resolve multiple machines issue is to create a directory at downlaod_results time.
         if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
-            print(f"All results downloaded to {self.results_path} 🤗")
+            print(f"All results downloaded to {self.root_dir} 🤗")
             self.results_downloaded = True
 
     @staticmethod

@@ -1,6 +1,7 @@
 
 import crocodile.toolbox as tb
 from crocodile.cluster.distribute import Cluster, ThreadsWorkloadDivider
+import time
 
 
 def try_it():
@@ -13,6 +14,7 @@ def try_it():
     job_id = c.job_id
 
     # later ...
+    time.sleep(50)
     c = Cluster.load(job_id)
     c.open_mux(machines_per_tab=1)
     c.check_job_status()

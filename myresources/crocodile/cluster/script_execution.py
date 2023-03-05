@@ -41,7 +41,7 @@ zellij_session = ""
 
 
 print("\n" * 2)
-manager = ResourceManager(job_id, platform.system())
+manager = ResourceManager(job_id=job_id, remote_machine_type=platform.system(), base=None)
 if lock_resources: manager.secure_resources()
 
 # keep those values after lock is released
