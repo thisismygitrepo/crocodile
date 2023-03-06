@@ -161,7 +161,7 @@ class Cluster:
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
             m = RemoteMachine(func_kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=desc,
-                              job_id=self.job_id + f"_{idx}",  # base=self.root_dir
+                              job_id=self.job_id + f"_{idx}", base=self.root_dir,
                               **self.remote_machine_kwargs)
             m.run()
             self.machines.append(m)

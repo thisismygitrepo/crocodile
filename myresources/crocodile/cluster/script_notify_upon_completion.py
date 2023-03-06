@@ -11,6 +11,7 @@ speaker = ""
 ssh_conn_str = ""
 executed_obj = ""
 job_id = ""
+base = ""
 email_config_name = ""
 to_email = ""
 
@@ -20,7 +21,7 @@ error_message = ''
 exec_times = tb.S()
 res_folder = tb.P()
 
-path_dict = ResourceManager(job_id, platform.system())
+manager = ResourceManager(job_id=job_id, remote_machine_type=platform.system(), base=base)
 
 print(f'SENDING notification email using `{email_config_name}` email configuration ...')
 
@@ -37,9 +38,9 @@ Hi `{addressee}`, I'm `{speaker}`, this is a notification that I have completed 
 #### Execution Times
 {exec_times.print(as_config=True, return_str=True)}
 #### Executed Shell Script: 
-`{path_dict.shell_script_path}`
+`{manager.shell_script_path}`
 #### Executed Python Script: 
-`{path_dict.py_script_path}`
+`{manager.py_script_path}`
 
 #### Pull results using this script:
 `ftprx {ssh_conn_str} {res_folder.collapseuser().as_posix()} -r`

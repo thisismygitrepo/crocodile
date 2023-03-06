@@ -32,7 +32,7 @@ class ResourceManager:
 
         self.submission_time = pd.Timestamp.now()
 
-        self.base = tb.P(base).collapseuser() if base is not None else tb.P(f"~/tmp_results/remote_machines")
+        self.base = tb.P(base).collapseuser() if bool(base) else tb.P(f"~/tmp_results/remote_machines")
         self.root_dir = self.base.joinpath(f"job_id__{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
@@ -205,7 +205,7 @@ class RemoteMachine:
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.description,
-                           job_id=self.job_id, lock_resources=self.lock_resources, zellij_session=self.z.get_new_sess_name())
+                           job_id=self.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.lock_resources, zellij_session=self.z.get_new_sess_name())
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.parallelize)
 
         if self.notify_upon_completion:
@@ -215,7 +215,7 @@ class RemoteMachine:
                                speaker=self.ssh.get_repr('remote', add_machine=True),
                                ssh_conn_string=self.ssh.get_repr('remote', add_machine=False),
                                executed_obj=executed_obj,
-                               job_id=self.job_id,
+                               job_id=self.job_id, base=self.path_dict.base.as_posix(),
                                to_email=self.to_email, email_config_name=self.email_config_name)
             py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
 

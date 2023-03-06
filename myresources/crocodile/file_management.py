@@ -39,6 +39,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
 def unlock(drive="D:", pwd=None, auto_unlock=False):
     return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="pwsh")
 
+
 # %% =================================== File ============================================
 def read(path, **kwargs):
     suffix = Path(path).suffix[1:]
