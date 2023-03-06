@@ -23,7 +23,7 @@ def expensive_function(func_kwargs=None) -> tb.P:
 # parallelizeBegins
 
 
-def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) -> tb.P:
+def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int, **other_kwargs) -> tb.P:
 
     print(f"This script will execute ({(idx_end - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
 
@@ -36,7 +36,7 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int) 
 
     save_dir_suffix = f"machine_{idx_start}_{idx_end}"
 
-    res = kwargs_split.apply(lambda kwargs: expensive_function_single_thread(**kwargs, save_dir_suffix=save_dir_suffix), jobs=num_instances)
+    res = kwargs_split.apply(lambda kwargs: expensive_function_single_thread(**kwargs, **other_kwargs, save_dir_suffix=save_dir_suffix), jobs=num_instances)
     return tb.P(res[0]).parent
 
 

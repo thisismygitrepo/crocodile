@@ -182,6 +182,7 @@ class Cluster:
             else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
 
         print("Terminal launch command:\n", cmd)
+        if cmd.endswith("`;"): cmd = cmd[:-2]
         tb.Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
         self.machines[-1].z.asssert_sesion_started()
 
