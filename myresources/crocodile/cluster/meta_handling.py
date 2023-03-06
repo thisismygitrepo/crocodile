@@ -20,6 +20,7 @@ def get_script(name: str, kwargs: dict) -> str:
 
 def get_py_script(kwargs, rel_full_path, func_name, wrap_in_try_except=False, parallelize=False):
     tmp = get_script(name="script_execution", kwargs=kwargs)
+
     execution_line = get_execution_line(func_name=func_name, rel_full_path=rel_full_path, parallelize=parallelize)
     if wrap_in_try_except:
         import textwrap

@@ -4,10 +4,11 @@ import crocodile.toolbox as tb
 from rich.progress import track
 
 
-def expensive_function() -> tb.P:
+def expensive_function(func_kwargs=None) -> tb.P:
     execution_time_in_seconds = 60 * 1.2
     print(f"Hello, I am an expensive function, and I just started running ...\n It will take me {execution_time_in_seconds} seconds to finish")
     a = 1 + 1
+    print(f"Oh, I aslo recieved those arguments: {func_kwargs}")
 
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
