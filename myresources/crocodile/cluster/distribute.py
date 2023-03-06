@@ -55,7 +55,7 @@ class MachineLoadCalculator:
 
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
-    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_instances):
+    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_instances) -> list[dict]:
         tmp = []
         idx_so_far = 0
         for machine_index, (a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances) in enumerate(zip(resources_product_norm, cpus_norm, rams_norm, num_instances)):
@@ -75,7 +75,7 @@ class Cluster:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
     def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False,
-                 func_kwargs_list=None,
+                 func_kwargs_list=None, func_kwargs=None,
                  thrd_load_calc=None, machine_load_calc=None,
                  open_console=False, description="", **remote_machine_kwargs, ):
         self.job_id = tb.randstr(noun=True)
@@ -104,6 +104,7 @@ class Cluster:
 
         self.description = description
         self.open_console = open_console
+        self.func_kwargs = func_kwargs if func_kwargs is not None else {}
         self.func_kwargs_list = func_kwargs_list
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
@@ -119,7 +120,9 @@ class Cluster:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
     def generate_standard_kwargs(self):
-        if self.func_kwargs_list is not None: return None
+        if self.func_kwargs_list is not None:
+            print("func_kwargs_list is not None, so not generating standard kwargs")
+            return None
         cpus = []
         for an_ssh in self.sshz:
             a_cpu = an_ssh.run_py("import psutil; print(psutil.cpu_count())", verbose=False).op
@@ -139,6 +142,7 @@ class Cluster:
 
         # relies on normalized values of specs.
         self.func_kwargs_list = self.load_calculator.get_func_kwargs(cpus_norm=self.cpus_norm, rams_norm=self.rams_norm, resources_product_norm=self.resources_product_norm, num_instances=self.instances_per_machine)
+        self.func_kwargs_list = [tb.S(item).update(self.func_kwargs).__dict__ for item in self.func_kwargs_list]
         self.print_func_kwargs()
 
     def viz_load_ratios(self):

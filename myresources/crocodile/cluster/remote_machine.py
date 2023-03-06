@@ -317,7 +317,13 @@ deactivate
             self.results_downloaded = True
         else: print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
         return self
-    def delete_remote_results(self): self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False); return self
+    def delete_remote_results(self):
+        if self.results_path is not None:
+            self.ssh.run_py(f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
+            return self
+        else:
+            print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
+            return self
 
 
 if __name__ == '__main__':
