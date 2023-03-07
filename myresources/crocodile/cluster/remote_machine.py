@@ -110,7 +110,7 @@ class RemoteMachine:
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
                  ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, parallelize=False,
-                 lock_resources=False):
+                 lock_resources=True):
 
         # function and its data
         if type(func) is str or type(func) is tb.P: self.func_file, self.func = tb.P(func), None

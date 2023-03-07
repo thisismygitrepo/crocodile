@@ -71,15 +71,19 @@ class MachineLoadCalculator:
 
 class Cluster:
     @staticmethod
-    def get_cluster_path(job_id): return tb.P.home().joinpath(rf"tmp_results/remote_machines/job_id__{job_id}")
+    def get_cluster_path(job_id, base=None):
+        if base is None: base = tb.P.home().joinpath(rf"tmp_results/remote_machines")
+        else: base = tb.P(base)
+        return base.joinpath(f"job_id__{job_id}")
     def __getstate__(self): return self.__dict__
-    def __setstate__(self, d): self.__dict__.update(d)
+    def __setstate__(self, state): self.__dict__.update(state)
     def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False,
                  func_kwargs_list=None, func_kwargs=None,
                  thrd_load_calc=None, machine_load_calc=None,
-                 open_console=False, description="", **remote_machine_kwargs, ):
-        self.job_id = tb.randstr(noun=True)
-        self.root_dir = self.get_cluster_path(self.job_id)
+                 open_console=False, description="",
+                 job_id=None, base=None, **remote_machine_kwargs):
+        self.job_id = job_id or tb.randstr(noun=True)
+        self.root_dir = self.get_cluster_path(self.job_id, base=base)
         self.results_downloaded = False
 
         self.instances_calculator = thrd_load_calc or ThreadsWorkloadDivider()
@@ -220,8 +224,8 @@ class Cluster:
             self.results_downloaded = True
 
     @staticmethod
-    def load(job_id) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id).joinpath("cluster.Cluster.pkl").readit()
-    def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.get_cluster_path(job_id=self.job_id).joinpath("cluster.Cluster.pkl"))
+    def load(job_id, base=None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
+    def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
 
 
 if __name__ == '__main__':
