@@ -17,6 +17,7 @@ console = Console()
 
 class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
+    # TODO: add a queue of jobs to run, and a queue of jobs to run after the current one is done as opposed to having it based on conisidence (who reads first)
 
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
@@ -54,44 +55,53 @@ echo "Unlocked resources"
         sleep_time_mins = 10
         lock_path = self.lock_path.expanduser()
         print(f"Inspecting Lock file @ {lock_path}")
-        if not lock_path.exists(): print(f"Lock file was not found, creating it...")
-        else:
-            lock_file = lock_path.readit()
-            lock_status = lock_file['status']
-            print(f"Found lock file with status = `{lock_status}`.")
-            if lock_status == 'locked':
-                while lock_status == 'locked':
-                    import psutil
-                    try: proc = psutil.Process(lock_file['pid'])
-                    except psutil.NoSuchProcess:
-                        print(f"Locking process with pid {lock_file['pid']} is dead. Ignoring this lock file.")
-                        break
-                    attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
-                                 'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
-                                 'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
-                    if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
-                    # environ, memory_maps
-                    attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
-                    inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
-                    inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
+        lock_status = 'locked'
+        while lock_status == 'locked':
+            try:
+                lock_file = lock_path.readit()
+                lock_status = lock_file['status']
+            except FileNotFoundError:
+                print(f"Lock file was deleted by the locking job, taking hold of it.")
+                break
+            except KeyError:
+                print(f"Lock file was corrupted by the locking job, taking hold of it.")
+                break
+            if lock_status == 'unlocked':
+                print(f"Lock file was released by the locking job, taking hold of it.")
+                lock_file.print(as_config=True, title="Old Lock File Details")
+                break
+            import psutil
+            try: proc = psutil.Process(lock_file['pid'])
+            except psutil.NoSuchProcess:
+                print(f"Locking process with pid {lock_file['pid']} is dead. Ignoring this lock file.")
+                lock_file.print(as_config=True, title="Ignored Lock File Details")
+                break
+            attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
+                         'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
+                         'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
+            if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
+            # environ, memory_maps
+            attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
+            inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
+            inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
 
-                    print(f"Submission time: {self.submission_time}")
-                    print(f"Time now: {pd.Timestamp.now()}")
-                    print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - self.submission_time} 🛌")
-                    print(f"Time consumed by locking job (job_id = {lock_file['job_id']}) so far = {pd.Timestamp.now() - lock_file['start_time']} ⏰")
-                    console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
-                    print("\n")
-                    time.sleep(sleep_time_mins * 60)
-                    try: lock_status = lock_path.readit()['status']
-                    except FileNotFoundError:
-                        print(f"Lock file was deleted by the locking job.")
-                        break
-
+            print(f"Submission time: {self.submission_time}")
+            print(f"Time now: {pd.Timestamp.now()}")
+            print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - self.submission_time} 🛌")
+            print(f"Time consumed by locking job (job_id = {lock_file['job_id']}) so far = {pd.Timestamp.now() - lock_file['start_time']} ⏰")
+            console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
+            print("\n")
+            time.sleep(sleep_time_mins * 60)
         self.lock_resources()
         console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
     def lock_resources(self):
-        tb.Struct(status="locked", pid=os.getpid(), job_id=self.job_id, start_time=pd.Timestamp.now(), submission_time=self.submission_time).save(path=self.lock_path.expanduser())
+        tb.Struct(status="locked", pid=os.getpid(),
+                  job_id=self.job_id,
+                  start_time=pd.Timestamp.now(),
+                  queue=1,
+                  submission_time=self.submission_time).save(path=self.lock_path.expanduser())
+
     def unlock_resources(self):
         dat = self.lock_path.expanduser().readit()
         dat['status'] = 'unlocked'
@@ -240,10 +250,10 @@ echo "Executing Python wrapper script: {self.path_dict.py_script_path.as_posix()
 cd ~
 {'python' if (not self.ipython and not self.pdb) else 'ipython'} {'--pdb' if self.pdb else ''} {'-i' if self.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
 
-{self.path_dict.get_resources_unlocking() if self.lock_resources else ''}
 deactivate
 
 """
+# {self.path_dict.get_resources_unlocking() if self.lock_resources else ''}
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10

@@ -48,11 +48,11 @@ if lock_resources: manager.secure_resources()
 # keep those values after lock is released
 time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
+manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
 
 repo_path = tb.P(rf'{repo_path}').expanduser().absolute()
 tb.sys.path.insert(0, repo_path.str)
 func_kwargs = manager.kwargs_path.readit()
-manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
 
 # EXTRA-PLACEHOLDER-POST
 
