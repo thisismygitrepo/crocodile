@@ -119,6 +119,7 @@ class RemoteMachine:
                  data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None, base=None,
                  notify_upon_completion=False, to_email=None, email_config_name=None,
                  machine_specs=None, ssh=None, install_repo=None,
+                 kill_on_completion=False,
                  ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, parallelize=False,
                  lock_resources=True):
 
@@ -145,6 +146,7 @@ class RemoteMachine:
         self.pdb = pdb
         self.parallelize = parallelize
         self.execution_command = None
+        self.kill_on_completion = kill_on_completion
 
         # remote machine behaviour
         self.open_console = open_console
@@ -158,6 +160,7 @@ class RemoteMachine:
         self.transfer_method = transfer_method
         self.ssh = ssh or tb.SSH(**machine_specs)
         self.z = Zellij(self.ssh)
+        self.zellij_session = None
 
         # scripts
         self.job_id = job_id or tb.randstr(noun=True)
@@ -210,12 +213,13 @@ class RemoteMachine:
         func_name = self.func.__name__ if self.func is not None else None
         func_module = self.func.__module__ if self.func is not None else None
         rel_full_path = self.repo_path.rel2home().joinpath(self.func_relative_file).as_posix()
+        self.zellij_session = self.z.get_new_sess_name()
 
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.description,
-                           job_id=self.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.lock_resources, zellij_session=self.z.get_new_sess_name())
+                           job_id=self.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.lock_resources, zellij_session=self.zellij_session)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.parallelize)
 
         if self.notify_upon_completion:
@@ -251,6 +255,8 @@ cd ~
 {'python' if (not self.ipython and not self.pdb) else 'ipython'} {'--pdb' if self.pdb else ''} {'-i' if self.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
 
 deactivate
+
+{f'zellij kill-session {self.zellij_session}' if self.kill_on_completion else ''}
 
 """
 # {self.path_dict.get_resources_unlocking() if self.lock_resources else ''}
