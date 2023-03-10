@@ -80,8 +80,8 @@ echo "Unlocked resources"
                          'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                          'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
             if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
-            # environ, memory_maps
-            attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'io_counters', 'open_files', 'connections']
+            # environ, memory_maps, 'io_counters'
+            attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
             inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
             inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
 

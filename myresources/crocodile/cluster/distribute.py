@@ -181,7 +181,7 @@ class Cluster:
         cmd = f"wt "
         for idx, m in enumerate(self.machines):
             sub_cmd = m.z.get_new_sess_string()
-            if idx == 0: cmd += f""" --title '{m.ssh.hostname}' pwsh -Command "{sub_cmd}" `; """  # avoid new tabs despite being even index
+            if idx == 0: cmd += f""" --title '{m.ssh.hostname}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
             elif idx % machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname} pwsh -Command "{sub_cmd}" `;"""
             else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
 
