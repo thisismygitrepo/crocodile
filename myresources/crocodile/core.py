@@ -197,7 +197,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def print(self, dtype=True, return_str=False, justify=30, as_config=False, as_yaml=False, limit=50, title="", **kwargs):
         if as_config and not return_str: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
         res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"]))
-        (install_n_import("rich").print(res.to_markdown()) if "DataFrame" in res.__class__.__name__ else print(res)) if not return_str else None; return str(res) if return_str else self
+        (install_n_import("rich").print(res.to_markdown()) if ("DataFrame" in res.__class__.__name__ and install_n_import("tabulate")) else print(res)) if not return_str else None; return str(res) if return_str else self
     @staticmethod
     def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, use_plt=True, title='', xlabel='', ylabel='', **kwargs):

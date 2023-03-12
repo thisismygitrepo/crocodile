@@ -370,7 +370,7 @@ class BaseModel(ABC):
         self.history.append(tb.Struct(copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
-            artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/loss_curve.png").append(index=True).create(parents_only=True))
+            artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True))
         return self
 
     def switch_to_sgd(self, epochs=10):
@@ -406,15 +406,15 @@ class BaseModel(ABC):
     def load_weights(self, directory): self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
     def summary(self):
         from contextlib import redirect_stdout
-        path = self.hp.save_dir.joinpath("metadata/model_summary.txt").create(parents_only=True)
+        path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
         with open(str(path), 'w') as f:
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
     def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-    def plot_loss(self, *args, **kwargs): return tb.Struct.concat_values(*self.history).plot(*args, title="Loss Curve",
-                                                                                             xlabel="epochs",
-                                                                                             ylabel=self.compiler.loss.name if hasattr(self.compiler.loss, "name") else self.compiler.loss.__name__,
-                                                                                             **kwargs)
+    def plot_loss(self, *args, **kwargs):
+        res = tb.Struct.concat_values(*self.history)
+        y_label = self.compiler.loss.name if hasattr(self.compiler.loss, "name") else self.compiler.loss.__name__
+        return res.plot(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
 
     def infer(self, x):
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
@@ -437,7 +437,7 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, split="test", viz=True, **kwargs):
+    def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, split="test", viz=True, viz_kwargs=None, **kwargs):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None: names_test = np.arange(len(x_test))
@@ -455,7 +455,7 @@ class BaseModel(ABC):
             loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
             names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
-            self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **kwargs)
+            self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **(viz_kwargs or {}))
         return results
 
     def get_metrics_evaluations(self, prediction, groun_truth) -> pd.DataFrame or None:
@@ -487,12 +487,26 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
+        import importlib
+        __module = self.__class__.__module__
+        if __module.startswith('__main__'):
+            print(f"Warning: Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+        module = importlib.import_module(__module)
+        specs = {'__module__': __module,
+                 'model_class': self.__class__.__name__,
+                 'data_class': self.data.__class__.__name__,
+                 'hp_class': self.hp.__class__.__name__,
+                 # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
+                 'module_path_rh': tb.P(module.__file__).resolve().collapseuser().as_posix(),
+                 'cwd_rh': tb.P.cwd().collapseuser().as_posix(),
+                 }
+        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json'))
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
         return self.hp.save_dir
 
@@ -508,7 +522,7 @@ class BaseModel(ABC):
         d_obj.hp = hp_obj
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
-        model_obj.history = (path / "metadata/history.pkl").readit(notfound=tb.L())
+        model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L())
         print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
         return model_obj
 
@@ -521,9 +535,33 @@ class BaseModel(ABC):
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
+    @staticmethod
+    def from_path(path_model, **kwargs):
+        path_model = tb.P(path_model).expanduser().absolute()
+        specs = path_model.joinpath('metadata/code_specs.json').readit()
+        print(f"Loading up module: `{specs['__module__']}`.")
+        import importlib
+        try:
+            module = importlib.import_module(specs['__module__'])
+        except ModuleNotFoundError as ex:
+            print(ex)
+            print(f"ModuleNotFoundError: Attempting to try again after appending path with `cwd`: `{specs['cwd_rh']}`.")
+            import sys
+            sys.path.append(tb.P(specs['cwd_rh']).expanduser().absolute().str)
+            try:
+                module = importlib.import_module(specs['__module__'])
+            except ModuleNotFoundError as ex:
+                print(ex)
+                print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
+                module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute())
+        model_class = getattr(module, specs['model_class'])
+        data_class = getattr(module, specs['data_class'])
+        hp_class = getattr(module, specs['hp_class'])
+        return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
+
     def plot_model(self, dpi=150, **kwargs):  # alternative viz via tf2onnx then Netron.
         import tensorflow as tf
-        path = self.hp.save_dir / 'model_plot.png'
+        path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
         tf.keras.utils.plot_model(self.model, to_file=path, show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
@@ -539,8 +577,11 @@ class BaseModel(ABC):
         :param verbose:
         :return:
         """
-        keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
-        keys_op = self.data.get_data_strings(which_data="op", which_split="test")
+        try:
+            keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
+            keys_op = self.data.get_data_strings(which_data="op", which_split="test")
+        except TypeError:
+            raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.")
 
         if ip is None:
             if sample_dataset: ip, _, _ = self.data.sample_dataset()
@@ -551,10 +592,8 @@ class BaseModel(ABC):
         if verbose:
             print("\n")
             print("Build Test".center(50, '-'))
-            print(f"Input shapes:")
-            tb.Struct.from_keys_values(keys_ip, tb.L(ips).apply(lambda x: x.shape)).print(as_config=True)
-            print(f"Output shape:")
-            tb.Struct.from_keys_values(keys_op, tb.L(ops).apply(lambda x: x.shape)).print(as_config=True)
+            tb.Struct.from_keys_values(keys_ip, tb.L(ips).apply(lambda x: x.shape)).print(as_config=True, title="Input shapes:")
+            tb.Struct.from_keys_values(keys_op, tb.L(ops).apply(lambda x: x.shape)).print(as_config=True, title=f"Output shape:")
             print("\n\nStats on output data for random normal input:")
             try:
                 res = []
@@ -764,6 +803,15 @@ def batcherv2(func_type='function', order=1):
 def get_template():
     tb.install_n_import("clipboard").copy(tb.P(__file__).parent.joinpath("msc/dl_template.py").read_text(encoding="utf-8"))
     print("Copied to clipboard")
+
+
+def load_class(file_path):
+    import importlib.util
+    module_spec = importlib.util.spec_from_file_location(name="__temp_module__", location=file_path)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    return module
+
 
 
 if __name__ == '__main__':

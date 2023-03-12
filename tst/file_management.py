@@ -5,7 +5,6 @@ from crocodile.file_management import *
 
 
 class Test_P:
-
     @staticmethod
     def test_copy():
         folder = P.tmp(folder="__test__/test_folder").create()

@@ -9,7 +9,7 @@ class HParams(dl.HyperParam):
     def __init__(self):
         super().__init__(
             # ==================== Enviroment =========================
-            name='default_model_name_' + tb.randstr(),
+            name='default_model_name_' + tb.randstr(noun=True),
             root=tb.P.tmp(folder="tmp_models"),
             pkg_name='tensorflow',
             device_name=dl.Device.cpu,
@@ -58,14 +58,16 @@ class DataReader(dl.DataReader):
         if profile_df: self.profile_dataframe(df=self.dataset.x)
         self.split_the_data(self.dataset.x, self.dataset.y, self.dataset.names, ip_strings=['x'], op_strings=["y"], others_string=["idx"])
 
-    def viz(self, y_pred, y_true, names):
+    def viz(self, y_pred, y_true, names, ax=None, title=None):
         import matplotlib.pyplot as plt
         from crocodile.matplotlib_management import FigureManager
-        fig, ax = plt.subplots(figsize=(14, 10))
-        ax.plot(y_true, label='y_true')
-        ax.plot(y_pred, label='y_pred')
+        if ax is None: fig, ax = plt.subplots(figsize=(14, 10))
+        else: fig = ax.get_figure()
+        x = np.arange(len(y_true))
+        ax.bar(x, y_true.squeeze(), label='y_true', width=0.4)
+        ax.bar(x + 0.4, y_pred.squeeze(), label='y_pred', width=0.4)
         ax.legend()
-        ax.set_title('Predicted vs True')
+        ax.set_title(title or 'Predicted vs True')
         FigureManager.grid(ax)
         plt.show()
         return fig
@@ -88,18 +90,20 @@ class Model(dl.BaseModel):
 
 
 def main():
-    hp = HParams()
-    d = DataReader(hp)
-    m = Model(hp, d)
-    m.fit()
-    return m
-
-
-if __name__ == '__main__':
+    # noinspection PyUnresolvedReferences
+    from crocodile.msc.dl_template import HParams, DataReader, Model
     hp = HParams()
     d = DataReader(hp)
     d.load_trianing_data()
     m = Model(hp, d)
-    res_before = m.evaluate(indices=np.arange(10))
+    import matplotlib.pyplot as plt
+    fix, ax = plt.subplots(ncols=2)
+    _ = m.evaluate(indices=np.arange(10), viz_kwargs=dict(title='Before training', ax=ax[0]))
     m.fit()
-    res_after = m.evaluate(indices=np.arange(10))
+    _ = m.evaluate(indices=np.arange(10), viz_kwargs=dict(title='After training', ax=ax[1]))
+    m.save_class()
+    return m
+
+
+if __name__ == '__main__':
+    pass
