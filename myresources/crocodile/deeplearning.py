@@ -522,7 +522,7 @@ class BaseModel(ABC):
         d_obj.hp = hp_obj
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
-        model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L())
+        model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L(), strict=False)
         print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
         return model_obj
 
@@ -648,6 +648,9 @@ class Ensemble(tb.Base):
         obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
         obj.models = tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights)
         return obj
+
+    @staticmethod
+    def from_path(path) -> tb.L: return tb.P(path).expanduser().absolute().search("*").apply(lambda item: BaseModel.from_path(item))
 
     def fit(self, shuffle_train_test=True, save=True, **kwargs):
         self.performance = tb.L()
