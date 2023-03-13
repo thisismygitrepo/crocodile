@@ -74,6 +74,7 @@ args.cmd"""
         # print(code)
         exec(code)
         return None
+
     elif args.read != "":
         code_text = f"""
 # >>>>>>> Reading File <<<<<<<<<
@@ -85,7 +86,9 @@ except Exception as e:
 """
 
         # next, write code_text to file at home directory /tmp_results/shells/python_readfile_script.py using open:
-        code_file = Path.home().joinpath("tmp_results/shells/python_readfile_script.py")
+        base = Path.home().joinpath("tmp_results/shells")
+        base.mkdir(parents=True, exist_ok=True)
+        code_file = base.joinpath("python_readfile_script.py")
         code_file.write_text(code_text)
         res = f"""ipython --no-banner -i -m crocodile.croshell -- --file "{code_file}" """
     elif args.kill != "":
