@@ -96,7 +96,11 @@ else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
     console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
     print("\n\n")
-    tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
+    try:
+        tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
+    except TypeError as e:
+        print(e)
+        print(f"Could not pickle res object to path `{res_folder.joinpath('result.pkl').collapseuser().as_posix()}`.")
 
 time_at_execution_end_utc = pd.Timestamp.utcnow()
 time_at_execution_end_local = pd.Timestamp.now()

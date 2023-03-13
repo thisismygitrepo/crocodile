@@ -212,6 +212,7 @@ class RemoteMachine:
         console.rule("Generating scripts")
         func_name = self.func.__name__ if self.func is not None else None
         func_module = self.func.__module__ if self.func is not None else None
+        assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func_name}`"
         rel_full_path = self.repo_path.rel2home().joinpath(self.func_relative_file).as_posix()
         self.zellij_session = self.z.get_new_sess_name()
 
