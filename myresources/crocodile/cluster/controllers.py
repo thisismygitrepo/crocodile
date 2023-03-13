@@ -23,7 +23,7 @@ class Zellij:
             resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
             if self.new_sess_name in resp: break
             time.sleep(2)
-            print(f"Waiting for zellij session {self.new_sess_name} to start...")
+            print(f"Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
 
     def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string(), shell="pwsh")
 

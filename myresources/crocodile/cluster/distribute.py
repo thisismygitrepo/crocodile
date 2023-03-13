@@ -111,6 +111,10 @@ class Cluster:
         self.func_kwargs = func_kwargs if func_kwargs is not None else {}
         self.func_kwargs_list = func_kwargs_list
 
+        # fire options
+        self.machines_per_tab = None
+        self.window_number = None
+
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
     def print_func_kwargs(self):
         print("\n" * 2)
@@ -177,29 +181,32 @@ class Cluster:
         except TypeError: print("Couldn't pickle cluster object")
         self.print_commands()
 
-    def open_mux(self, machines_per_tab=1):
-        cmd = f"wt "
+    def open_mux(self, machines_per_tab=1, window_number=None):
+        self.machines_per_tab = machines_per_tab
+        self.window_number = window_number or tb.randstr(length=3, lower=False, upper=False)
+        cmd = f"wt -w {self.window_number} "
         for idx, m in enumerate(self.machines):
             sub_cmd = m.z.get_new_sess_string()
             if idx == 0: cmd += f""" --title '{m.ssh.hostname}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
-            elif idx % machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname} pwsh -Command "{sub_cmd}" `;"""
-            else: cmd += f""" split-pane --horizontal --size {1/machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
+            elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname} pwsh -Command "{sub_cmd}" `;"""
+            else: cmd += f""" split-pane --horizontal --size {1 / self.machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
 
         print("Terminal launch command:\n", cmd)
         if cmd.endswith("`;"): cmd = cmd[:-2]
         tb.Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
         self.machines[-1].z.asssert_sesion_started()
 
-    def fire(self, machines_per_tab=1, run=False):
-        self.open_mux(machines_per_tab=machines_per_tab)
-        for m in self.machines: m.fire(run=run, open_console=False)
+    def fire(self, machines_per_tab=1, window_number=None, run=False):
+        self.open_mux(machines_per_tab=machines_per_tab, window_number=window_number)
+        for m in self.machines:
+            m.fire(run=run, open_console=False)
 
-    def run(self, run=False, machines_per_tab=1):
+    def run(self, run=False, machines_per_tab=1, window_number=None):
         self.generate_standard_kwargs()
         self.viz_load_ratios()
         print(self)
         self.submit()
-        self.fire(run=run, machines_per_tab=machines_per_tab)
+        self.fire(run=run, machines_per_tab=machines_per_tab, window_number=window_number)
         self.save()
         return self
 
