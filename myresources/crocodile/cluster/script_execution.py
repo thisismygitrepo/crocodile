@@ -133,7 +133,7 @@ kwargs_path @ `{manager.kwargs_path.collapseuser()}`
 ''')
 
 
-manager.root_dir.expanduser().copy(folder=res_folder)
+manager.root_dir.expanduser().copy(folder=res_folder, overwrite=True)
 
 # print to execution console:
 exec_times.print(title="Execution Times", as_config=True)

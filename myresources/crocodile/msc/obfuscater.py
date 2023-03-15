@@ -15,7 +15,7 @@ class Obfuscator(tb.Base):
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        state['directory'] = self.directory.collapseuser()
+        state['directory'] = self.directory.collapseuser(strict=False)
         return state
 
     def __setstate__(self, state: dict):
@@ -34,12 +34,16 @@ class Obfuscator(tb.Base):
         root = self.directory if forward else self.obfuscate(self.directory)
         self._execute_map(root, forward=forward)
 
-    def symlink_to_phoney(self):
+    def symlink_to_phoney(self, base=None):
+        base = tb.P(base).expanduser().absolute() if base is not None else self.directory
         directory_obf = self.obfuscate(self.directory)
         for path_obf in directory_obf.search("*", r=True):
             if path_obf.is_dir(): continue
             path_real = self.deobfuscate(path_obf)
-            path_real.symlink_to(path_obf)
+            base.joinpath(path_real.relative_to(self.directory)).symlink_to(path_obf)
+
+    @staticmethod
+    def lcd(path1, path2): return tb.P("/".join([part1 for part1, part2 in zip(tb.P(path1).expanduser().absolute().parts, tb.P(path2).expanduser().absolute().parts) if part1 == part2]))
 
     def _execute_map(self, path: tb.P, forward):
         assert path.is_dir()
