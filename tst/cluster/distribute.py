@@ -10,7 +10,7 @@ def run():
     c = Cluster(func=expensive_function_single_thread,
                 func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                 machine_specs_list=machine_specs_list, install_repo=False,
-                thrd_load_calc=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
+                thread_load_calc=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
                 lock_resources=True, kill_on_completion=True,
                 parallelize=True)
     c.run(run=True, machines_per_tab=2)

@@ -116,13 +116,13 @@ class RemoteMachineConfig:
     # conn
     machine_specs: dict
     job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
-    base_dir: str = None,
-    description: str = "",
+    base_dir: str = None
+    description: str = ""
 
     copy_repo: bool = False
     update_repo: bool = False
-    install_repo: bool or None = None,
-    update_essential_repos: bool = True,
+    install_repo: bool or None = None
+    update_essential_repos: bool = True
     data: list or None = None
 
     # remote machine behaviour
@@ -138,7 +138,7 @@ class RemoteMachineConfig:
     interactive: bool = False
     pdb: bool = False
     wrap_in_try_except: bool = False
-    parallelize: bool = False,
+    parallelize: bool = False
     lock_resources: bool = True
 
 
@@ -165,7 +165,7 @@ class RemoteMachine:
         self.z = Zellij(self.ssh)
         self.zellij_session = None
         # scripts
-        self.path_dict = ResourceManager(self.config.job_id, self.ssh.get_remote_machine(), base=self.config.base_dir)
+        self.path_dict = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir)
         # flags
         self.execution_command = None
         self.submitted = False
@@ -299,9 +299,7 @@ deactivate
         end_time_file = base.joinpath("end_time.txt")
 
         if not end_time_file.exists():
-
             start_time_file = base.joinpath("start_time.txt")
-
             if not start_time_file.exists():
                 print(f"Job {self.config.job_id} is still in the queue. 🤯")
             else:
@@ -312,10 +310,8 @@ deactivate
                 console.print(Panel(txt, title=f"Job `{self.config.job_id}` Status", subtitle=self.ssh.get_repr(which="remote"), highlight=True, border_style="bold red", style="bold"))
                 print("\n")
         else:
-
             results_folder_file = base.joinpath("results_folder_path.txt")  # it could be one returned by function executed or one made up by the running context.
             results_folder = results_folder_file.read_text()
-
             print("\n" * 2)
             console.rule("Job Completed 🎉🥳🎆🥂🍾🎊🪅")
             print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.config.job_id}`. 😁

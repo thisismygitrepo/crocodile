@@ -78,16 +78,16 @@ class Cluster:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__.update(state)
     def __init__(self, machine_specs_list: list[dict],
+                 func, func_kwargs_list=None, func_kwargs=None,
+                 thread_load_calc=None, machine_load_calc=None,
                  ditch_unavailable_machines=False,
-                 func_kwargs_list=None, func_kwargs=None,
-                 thrd_load_calc=None, machine_load_calc=None,
                  description="",
                  job_id=None, base_dir=None, remote_machine_config=None):
         self.job_id = job_id or tb.randstr(noun=True)
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
 
-        self.instances_calculator = thrd_load_calc or ThreadsWorkloadDivider()
+        self.instances_calculator = thread_load_calc or ThreadsWorkloadDivider()
         self.load_calculator = machine_load_calc or MachineLoadCalculator(num_machines=len(machine_specs_list))
 
         sshz = []
@@ -108,6 +108,7 @@ class Cluster:
         self.remote_machine_kwargs = remote_machine_config
 
         self.description = description
+        self.func = func
         self.func_kwargs = func_kwargs if func_kwargs is not None else {}
         self.func_kwargs_list = func_kwargs_list
 
@@ -176,7 +177,7 @@ class Cluster:
                                          job_id=self.job_id + f"_{idx}",
                                          base_dir=self.root_dir,
                                          **self.remote_machine_kwargs)
-            m = RemoteMachine(func=None, func_kwargs=a_kwargs, ssh=an_ssh, config=config)
+            m = RemoteMachine(func=self.func, func_kwargs=a_kwargs, ssh=an_ssh, config=config)
             m.run()
             self.machines.append(m)
         try: tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
