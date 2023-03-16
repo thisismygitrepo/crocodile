@@ -10,6 +10,7 @@ from rich.console import Console
 import time
 import os
 import pandas as pd
+from dataclasses import dataclass, field
 
 
 console = Console()
@@ -110,19 +111,43 @@ echo "Unlocked resources"
         # this is further handled by the calling script in case this function failed.
 
 
+@dataclass
+class RemoteMachineConfig:
+    # conn
+    machine_specs: dict
+    job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
+    base_dir: str = None,
+    description: str = "",
+
+    copy_repo: bool = False
+    update_repo: bool = False
+    install_repo: bool or None = None,
+    update_essential_repos: bool = True,
+    data: list or None = None
+
+    # remote machine behaviour
+    open_console: bool = True
+    transfer_method: str = "sftp"
+    notify_upon_completion: bool = False
+    to_email: str = None
+    email_config_name: str = None
+
+    # execution behaviour
+    kill_on_completion: bool = False
+    ipython: bool = False
+    interactive: bool = False
+    pdb: bool = False
+    wrap_in_try_except: bool = False
+    parallelize: bool = False,
+    lock_resources: bool = True
+
+
 class RemoteMachine:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func, func_kwargs: dict or None = None, description="",
-                 copy_repo: bool = False, update_repo: bool = False, update_essential_repos: bool = True,
-                 data: list or None = None, open_console: bool = True, transfer_method="sftp", job_id=None, base=None,
-                 notify_upon_completion=False, to_email=None, email_config_name=None,
-                 machine_specs=None, ssh=None, install_repo=None,
-                 kill_on_completion=False,
-                 ipython=False, interactive=False, pdb=False, wrap_in_try_except=False, parallelize=False,
-                 lock_resources=True):
-
+    def __init__(self, func, config: RemoteMachineConfig, func_kwargs: dict or None = None, data: list or None = None, ssh=None):
+        self.config = config
         # function and its data
         if type(func) is str or type(func) is tb.P: self.func_file, self.func = tb.P(func), None
         elif "<class 'module'" in str(type(func)): self.func_file, self.func = tb.P(func.__file__), None
@@ -131,46 +156,22 @@ class RemoteMachine:
             self.repo_path = tb.P(tb.install_n_import("git", "gitpython").Repo(self.func_file, search_parent_directories=True).working_dir)
             self.func_relative_file = self.func_file.relative_to(self.repo_path)
         except: self.repo_path, self.func_relative_file = self.func_file.parent, self.func_file.name
+        if self.config.install_repo is None: self.config.install_repo = True if "setup.py" in self.repo_path.listdir().apply(str) else False
+
         self.kwargs = func_kwargs or tb.S()
         self.data = data if data is not None else []
-        self.description = description
-        self.copy_repo = copy_repo
-        self.update_repo = update_repo
-        self.install_repo = install_repo if install_repo is not None else (True if "setup.py" in self.repo_path.listdir().apply(str) else False)
-        self.update_essential_repos = update_essential_repos
-
-        # execution behaviour
-        self.wrap_in_try_except = wrap_in_try_except
-        self.ipython = ipython
-        self.interactive = interactive
-        self.pdb = pdb
-        self.parallelize = parallelize
-        self.execution_command = None
-        self.kill_on_completion = kill_on_completion
-
-        # remote machine behaviour
-        self.open_console = open_console
-        self.notify_upon_completion = notify_upon_completion
-        self.to_email = to_email
-        self.email_config_name = email_config_name
-        self.lock_resources = lock_resources
-
         # conn
-        self.machine_specs = machine_specs
-        self.transfer_method = transfer_method
-        self.ssh = ssh or tb.SSH(**machine_specs)
+        self.ssh = ssh or tb.SSH(**self.config.machine_specs)
         self.z = Zellij(self.ssh)
         self.zellij_session = None
-
         # scripts
-        self.job_id = job_id or tb.randstr(noun=True)
-        self.path_dict = ResourceManager(self.job_id, self.ssh.get_remote_machine(), base=base)
-
+        self.path_dict = ResourceManager(self.config.job_id, self.ssh.get_remote_machine(), base=self.config.base_dir)
         # flags
+        self.execution_command = None
         self.submitted = False
         self.results_downloaded = False
         self.results_path = None
-        if self.interactive and self.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
+        if self.config.interactive and self.config.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
 
     def execution_command_to_clip_memory(self):
         print("Execution command copied to clipboard 📋")
@@ -179,7 +180,7 @@ class RemoteMachine:
 
     def fire(self, run=False, open_console=True):
         console.rule("Firing job @ remote machine")
-        if open_console and self.open_console:
+        if open_console and self.config.open_console:
             cmd = self.z.get_new_sess_string()
             self.ssh.open_console(cmd=cmd.split(" -t ")[1], shell="pwsh")
             self.z.asssert_sesion_started()
@@ -202,10 +203,10 @@ class RemoteMachine:
         self.submitted = True  # before sending `self` to the remote.
         try: tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
         except: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
-        if self.transfer_method == "transfer_sh": Submission.transfer_sh(machine=self)
-        elif self.transfer_method == "gdrive": Submission.gdrive(machine=self)
-        elif self.transfer_method == "sftp": Submission.sftp(self)
-        else: raise ValueError(f"Transfer method {self.transfer_method} not recognized. 🤷‍")
+        if self.config.transfer_method == "transfer_sh": Submission.transfer_sh(machine=self)
+        elif self.config.transfer_method == "gdrive": Submission.gdrive(machine=self)
+        elif self.config.transfer_method == "sftp": Submission.sftp(self)
+        else: raise ValueError(f"Transfer method {self.config.transfer_method} not recognized. 🤷‍")
         self.execution_command_to_clip_memory()
 
     def generate_scripts(self):
@@ -219,19 +220,19 @@ class RemoteMachine:
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
-                           func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.description,
-                           job_id=self.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.lock_resources, zellij_session=self.zellij_session)
-        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.parallelize)
+                           func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.config.description,
+                           job_id=self.config.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.config.lock_resources, zellij_session=self.zellij_session)
+        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.config.parallelize)
 
-        if self.notify_upon_completion:
+        if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.repo_path).joinpath(self.func_relative_file).collapseuser().as_posix()}*"""  # for email.
             meta_kwargs = dict(addressee=self.ssh.get_repr("local", add_machine=True),
                                speaker=self.ssh.get_repr('remote', add_machine=True),
                                ssh_conn_string=self.ssh.get_repr('remote', add_machine=False),
                                executed_obj=executed_obj,
-                               job_id=self.job_id, base=self.path_dict.base.as_posix(),
-                               to_email=self.to_email, email_config_name=self.email_config_name)
+                               job_id=self.config.job_id, base=self.path_dict.base.as_posix(),
+                               to_email=self.config.to_email, email_config_name=self.config.email_config_name)
             py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
 
         shell_script = f"""
@@ -240,24 +241,24 @@ class RemoteMachine:
 
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
-{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.update_essential_repos else ''}
+{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.config.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
-{'git pull' if self.update_repo else ''}
-{'pip install -e .' if self.install_repo else ''}
+{'git pull' if self.config.update_repo else ''}
+{'pip install -e .' if self.config.install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
 
 echo ""
-echo "Starting job {self.job_id} 🚀"
+echo "Starting job {self.config.job_id} 🚀"
 echo "Executing Python wrapper script: {self.path_dict.py_script_path.as_posix()}"
 
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if (not self.ipython and not self.pdb) else 'ipython'} {'--pdb' if self.pdb else ''} {'-i' if self.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
+{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'--pdb' if self.config.pdb else ''} {'-i' if self.config.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
 
 deactivate
 
-{f'zellij kill-session {self.zellij_session}' if self.kill_on_completion else ''}
+{f'zellij kill-session {self.zellij_session}' if self.config.kill_on_completion else ''}
 
 """
 # {self.path_dict.get_resources_unlocking() if self.lock_resources else ''}
@@ -282,7 +283,7 @@ deactivate
             if tmp is not None: break
             time.sleep(60 * sleep_minutes)
         self.download_results()
-        if self.notify_upon_completion: pass
+        if self.config.notify_upon_completion: pass
 
     def check_job_status(self) -> tb.P or None:
         if not self.submitted:
@@ -302,13 +303,13 @@ deactivate
             start_time_file = base.joinpath("start_time.txt")
 
             if not start_time_file.exists():
-                print(f"Job {self.job_id} is still in the queue. 🤯")
+                print(f"Job {self.config.job_id} is still in the queue. 🤯")
             else:
                 start_time = start_time_file.read_text()
-                txt = f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.job_id}`. 😟"
+                txt = f"Machine {self.ssh.get_repr('remote', add_machine=True)} has not yet finished job `{self.config.job_id}`. 😟"
                 txt += f"\nIt started at {start_time}. 🕒, and is still running. 🏃‍♂️"
                 txt += f"\nExecution time so far: {pd.Timestamp.now() - pd.to_datetime(start_time)}. 🕒"
-                console.print(Panel(txt, title=f"Job `{self.job_id}` Status", subtitle=self.ssh.get_repr(which="remote"), highlight=True, border_style="bold red", style="bold"))
+                console.print(Panel(txt, title=f"Job `{self.config.job_id}` Status", subtitle=self.ssh.get_repr(which="remote"), highlight=True, border_style="bold red", style="bold"))
                 print("\n")
         else:
 
@@ -317,7 +318,7 @@ deactivate
 
             print("\n" * 2)
             console.rule("Job Completed 🎉🥳🎆🥂🍾🎊🪅")
-            print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.job_id}`. 😁
+            print(f"""Machine {self.ssh.get_repr('remote', add_machine=True)} has finished job `{self.config.job_id}`. 😁
 📁 results_folder_path: {results_folder} """)
             try:
                 inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False)

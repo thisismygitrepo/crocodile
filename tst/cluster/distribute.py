@@ -1,6 +1,6 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster.distribute import Cluster, ThreadsWorkloadDivider
+from crocodile.cluster.distribute import Cluster, ThreadsWorkloadDivider, RemoteMachineConfig
 import time
 
 

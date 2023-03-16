@@ -3,7 +3,7 @@ import numpy as np
 import psutil
 import crocodile.toolbox as tb
 from math import ceil, floor
-from crocodile.cluster.remote_machine import RemoteMachine
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
 from rich.console import Console
 # from platform import system
 # import time
@@ -77,13 +77,14 @@ class Cluster:
         return base.joinpath(f"job_id__{job_id}")
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__.update(state)
-    def __init__(self, machine_specs_list: list[dict], ditch_unavailable_machines=False,
+    def __init__(self, machine_specs_list: list[dict],
+                 ditch_unavailable_machines=False,
                  func_kwargs_list=None, func_kwargs=None,
                  thrd_load_calc=None, machine_load_calc=None,
-                 open_console=False, description="",
-                 job_id=None, base=None, **remote_machine_kwargs):
+                 description="",
+                 job_id=None, base_dir=None, remote_machine_config=None):
         self.job_id = job_id or tb.randstr(noun=True)
-        self.root_dir = self.get_cluster_path(self.job_id, base=base)
+        self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
 
         self.instances_calculator = thrd_load_calc or ThreadsWorkloadDivider()
@@ -104,10 +105,9 @@ class Cluster:
         self.machines: list[RemoteMachine] = []
         self.rams = self.rams_norm = self.cpus = self.cpus_norm = self.resources_product_norm = None
         self.instances_per_machine = []
-        self.remote_machine_kwargs = remote_machine_kwargs
+        self.remote_machine_kwargs = remote_machine_config
 
         self.description = description
-        self.open_console = open_console
         self.func_kwargs = func_kwargs if func_kwargs is not None else {}
         self.func_kwargs_list = func_kwargs_list
 
@@ -172,9 +172,11 @@ class Cluster:
         if self.func_kwargs_list is None: raise Exception("You need to generate standard kwargs first.")
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
-            m = RemoteMachine(func_kwargs=a_kwargs, ssh=an_ssh, open_console=self.open_console, description=desc,
-                              job_id=self.job_id + f"_{idx}", base=self.root_dir,
-                              **self.remote_machine_kwargs)
+            config = RemoteMachineConfig(description=desc,
+                                         job_id=self.job_id + f"_{idx}",
+                                         base_dir=self.root_dir,
+                                         **self.remote_machine_kwargs)
+            m = RemoteMachine(func=None, func_kwargs=a_kwargs, ssh=an_ssh, config=config)
             m.run()
             self.machines.append(m)
         try: tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
