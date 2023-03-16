@@ -2,11 +2,11 @@
 def main():
     from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
     from crocodile.cluster.trial_file import expensive_function
-    config = RemoteMachineConfig(machine_specs=dict(host="thinkpad"), update_essential_repos=True,
-                      notify_upon_completion=True, to_email='random@email.com', email_config_name='enaut',
-                      copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
-                      ipython=True, interactive=True, lock_resources=True,
-                      transfer_method="sftp")
+    config = RemoteMachineConfig(ssh_params=dict(host="thinkpad"), update_essential_repos=True,
+                                 notify_upon_completion=True, to_email='random@email.com', email_config_name='enaut',
+                                 copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
+                                 ipython=True, interactive=True, lock_resources=True,
+                                 transfer_method="sftp")
     m = RemoteMachine(func=expensive_function, func_kwargs=dict(func_kwargs=dict(a=2, b=3)),
                       config=config)
     m.run()

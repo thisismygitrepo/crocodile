@@ -114,10 +114,10 @@ echo "Unlocked resources"
 @dataclass
 class RemoteMachineConfig:
     # conn
-    machine_specs: dict
     job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
-    base_dir: str = None
+    base_dir: str = f"~/tmp_results/remote_machines"
     description: str = ""
+    ssh_params: dict = field(default_factory=lambda: dict())
 
     copy_repo: bool = False
     update_repo: bool = False
@@ -161,7 +161,7 @@ class RemoteMachine:
         self.kwargs = func_kwargs or tb.S()
         self.data = data if data is not None else []
         # conn
-        self.ssh = ssh or tb.SSH(**self.config.machine_specs)
+        self.ssh = ssh or tb.SSH(**self.config.ssh_params)
         self.z = Zellij(self.ssh)
         self.zellij_session = None
         # scripts

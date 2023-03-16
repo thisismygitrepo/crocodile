@@ -2,17 +2,18 @@
 import crocodile.toolbox as tb
 from crocodile.cluster.distribute import Cluster, ThreadsWorkloadDivider, RemoteMachineConfig
 import time
+from crocodile.cluster.trial_file import expensive_function_single_thread
 
 
 def run():
-    from crocodile.cluster.trial_file import expensive_function_single_thread
-    machine_specs_list = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
+    config = RemoteMachineConfig(lock_resources=True, kill_on_completion=True, install_repo=False, parallelize=True)
+    ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
     c = Cluster(func=expensive_function_single_thread,
-                func_kwargs=dict(sim_dict=dict(a=2, b=3)),
-                machine_specs_list=machine_specs_list, install_repo=False,
+                func_kwargs_common=dict(sim_dict=dict(a=2, b=3)),
+                ssh_params=ssh_params,
                 thread_load_calc=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
-                lock_resources=True, kill_on_completion=True,
-                parallelize=True)
+                remote_machine_config=config
+                )
     c.run(run=True, machines_per_tab=2)
     return c.job_id
 

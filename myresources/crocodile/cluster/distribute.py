@@ -77,8 +77,9 @@ class Cluster:
         return base.joinpath(f"job_id__{job_id}")
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__.update(state)
-    def __init__(self, machine_specs_list: list[dict],
-                 func, func_kwargs_list=None, func_kwargs=None,
+    def __init__(self, ssh_params: list[dict],
+                 func, func_kwargs_list: list or None = None,
+                 func_kwargs_common: dict or None =None,
                  thread_load_calc=None, machine_load_calc=None,
                  ditch_unavailable_machines=False,
                  description="",
@@ -88,17 +89,17 @@ class Cluster:
         self.results_downloaded = False
 
         self.instances_calculator = thread_load_calc or ThreadsWorkloadDivider()
-        self.load_calculator = machine_load_calc or MachineLoadCalculator(num_machines=len(machine_specs_list))
+        self.load_calculator = machine_load_calc or MachineLoadCalculator(num_machines=len(ssh_params))
 
         sshz = []
-        for machine_specs in machine_specs_list:
+        for an_ssh_params in ssh_params:
             try:
-                tmp = tb.SSH(**machine_specs)
+                tmp = tb.SSH(**an_ssh_params)
                 sshz.append(tmp)
             except Exception:
-                print(f"Couldn't connect to {machine_specs}")
+                print(f"Couldn't connect to {an_ssh_params}")
                 if ditch_unavailable_machines: continue
-                else: raise Exception(f"Couldn't connect to {machine_specs}")
+                else: raise Exception(f"Couldn't connect to {an_ssh_params}")
 
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
@@ -109,7 +110,7 @@ class Cluster:
 
         self.description = description
         self.func = func
-        self.func_kwargs = func_kwargs if func_kwargs is not None else {}
+        self.func_kwargs = func_kwargs_common if func_kwargs_common is not None else {}
         self.func_kwargs_list = func_kwargs_list
 
         # fire options
