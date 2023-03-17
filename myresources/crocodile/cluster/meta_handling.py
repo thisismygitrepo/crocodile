@@ -18,10 +18,10 @@ def get_script(name: str, kwargs: dict) -> str:
     return tmp
 
 
-def get_py_script(kwargs, rel_full_path, func_name, wrap_in_try_except=False, parallelize=False):
+def get_py_script(kwargs, rel_full_path, func_name, func_class, wrap_in_try_except=False, parallelize=False):
     tmp = get_script(name="script_execution", kwargs=kwargs)
 
-    execution_line = get_execution_line(func_name=func_name, rel_full_path=rel_full_path, parallelize=parallelize)
+    execution_line = get_execution_line(func_name=func_name, func_class=func_class, rel_full_path=rel_full_path, parallelize=parallelize)
     if wrap_in_try_except:
         import textwrap
         execution_line = textwrap.indent(execution_line, " " * 4)
@@ -38,17 +38,18 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, rel_full_path, parallelize=False) -> str:
+def get_execution_line(func_name, func_class, rel_full_path, parallelize=False) -> str:
+    final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
     if parallelize:
         from crocodile.cluster import trial_file
         wrapper_func_name = trial_file.parallelize.__name__
         base_func = tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0]
-        base_func = base_func.replace("expensive_function_single_thread", f"module.{func_name}")
+        base_func = base_func.replace("expensive_function_single_thread", final_func)
         base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
         return base_func
 
     if func_name is not None: return f"""
-res = module.{func_name}(**func_kwargs.__dict__)
+res = {final_func}(**func_kwargs.__dict__)
 """
     return f"""
 res = None  # in case the file did not define it.

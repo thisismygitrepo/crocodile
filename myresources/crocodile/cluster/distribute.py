@@ -83,7 +83,7 @@ class Cluster:
                  thread_load_calc=None, machine_load_calc=None,
                  ditch_unavailable_machines=False,
                  description="",
-                 job_id=None, base_dir=None, remote_machine_config=None):
+                 job_id=None, base_dir=None, remote_machine_config: RemoteMachineConfig or None = None):
         self.job_id = job_id or tb.randstr(noun=True)
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
@@ -174,10 +174,10 @@ class Cluster:
         if self.func_kwargs_list is None: raise Exception("You need to generate standard kwargs first.")
         for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
-            config = RemoteMachineConfig(description=desc,
-                                         job_id=self.job_id + f"_{idx}",
-                                         base_dir=self.root_dir,
-                                         **self.remote_machine_kwargs)
+            if self.remote_machine_kwargs is not None:
+                self.remote_machine_kwargs.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir))
+                config = self.remote_machine_kwargs
+            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir)
             m = RemoteMachine(func=self.func, func_kwargs=a_kwargs, ssh=an_ssh, config=config)
             m.run()
             self.machines.append(m)

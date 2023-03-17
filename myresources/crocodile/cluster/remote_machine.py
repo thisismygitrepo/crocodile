@@ -149,9 +149,9 @@ class RemoteMachine:
     def __init__(self, func, config: RemoteMachineConfig, func_kwargs: dict or None = None, data: list or None = None, ssh=None):
         self.config = config
         # function and its data
-        if type(func) is str or type(func) is tb.P: self.func_file, self.func = tb.P(func), None
-        elif "<class 'module'" in str(type(func)): self.func_file, self.func = tb.P(func.__file__), None
-        else: self.func_file, self.func = tb.P(func.__code__.co_filename), func
+        if type(func) is str or type(func) is tb.P: self.func_file, self.func, self.func_class = tb.P(func), None, None
+        elif func.__name__ != func.__qualname__: self.func_file, self.func, self.func_class = tb.P(func.__code__.co_filename), func, func.__qualname__.split(".")[0]
+        else: self.func_file, self.func, self.func_class = tb.P(func.__code__.co_filename), func, None
         try:
             self.repo_path = tb.P(tb.install_n_import("git", "gitpython").Repo(self.func_file, search_parent_directories=True).working_dir)
             self.func_relative_file = self.func_file.relative_to(self.repo_path)
@@ -220,9 +220,9 @@ class RemoteMachine:
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
-                           func_name=func_name, func_module=func_module, rel_full_path=rel_full_path, description=self.config.description,
+                           func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
                            job_id=self.config.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.config.lock_resources, zellij_session=self.zellij_session)
-        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, rel_full_path=rel_full_path, parallelize=self.config.parallelize)
+        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize)
 
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.

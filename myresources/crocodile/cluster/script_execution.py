@@ -29,6 +29,7 @@ rel_full_path = ""
 repo_path = ""
 func_name = ""
 func_module = ""
+func_class = ""
 
 description = ""
 ssh_repr = ""
@@ -70,11 +71,11 @@ print("\n" * 2)
 if func_module is not None:
     # noinspection PyTypeChecker
     module = __import__(func_module, fromlist=[None])
-    exec_obj = module.__dict__[func_name]
+    exec_obj = module.__dict__[func_name] if not bool(func_class) else getattr(module.__dict__[func_class], func_name)
 elif func_name is not None:
     # This approach is not conducive to parallelization since "mymod" is not pickleable.
     module = SourceFileLoader("mymod", tb.P.home().joinpath(rel_full_path).as_posix()).load_module()  # loading the module assumes its not a script, there should be at least if __name__ == __main__ wrapping any script.
-    exec_obj = getattr(module, func_name)  # for README.md generation.
+    exec_obj = getattr(module, func_name) if not bool(func_class) else getattr(getattr(module, func_class), func_name)
 else:
     module = tb.P.home().joinpath(rel_full_path).readit()  # uses runpy to read .py files.
     exec_obj = module  # for README.md generation.
