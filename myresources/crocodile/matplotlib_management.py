@@ -438,7 +438,7 @@ class ImShow(FigureManager):
     from_img_paths = staticmethod(lambda paths, **kwargs: ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs))
     from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
     test = staticmethod(lambda: ImShow(np.random.rand(12, 10, 80, 120, 3)))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-    resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import(package="skimage", name="scikit-image").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
+    resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import(library="skimage", name="scikit-image").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
 
 
 if __name__ == '__main__':

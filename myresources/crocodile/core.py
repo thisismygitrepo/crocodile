@@ -11,9 +11,9 @@ def timestamp(fmt=None, name=None): return ((name + '_') if name is not None els
 def str2timedelta(shift):  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
-def install_n_import(package, name=None, **kwargs):  # sometimes package name is different from import, e.g. skimage.
-    try: return __import__(package, **kwargs)
-    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", name or package]); return __import__(package, **kwargs)
+def install_n_import(library, package=None, **kwargs):  # sometimes package name is different from import, e.g. skimage.
+    try: return __import__(library, **kwargs)
+    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", package or library]); return __import__(library, **kwargs)
 def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, safe=False, noun=False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     if noun: return install_n_import("randomname").get_name()

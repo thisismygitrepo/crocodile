@@ -2,7 +2,7 @@
 def main():
     from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
     from crocodile.cluster.trial_file import expensive_function
-    config = RemoteMachineConfig(ssh_params=dict(host="thinkpad"), update_essential_repos=True,
+    config = RemoteMachineConfig(ssh_params=dict(host="p51s"), update_essential_repos=True,
                                  notify_upon_completion=True, to_email='random@email.com', email_config_name='enaut',
                                  copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
                                  ipython=True, interactive=True, lock_resources=True,
