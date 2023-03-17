@@ -13,7 +13,7 @@ from rich.console import Console
 console = Console()
 
 
-class ThreadsWorkloadDivider:
+class ThreadLoadCalculator:
     """relies on relative values to a referenc machine specs.
     Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable.
     equal distribution across instances of one machine"""
@@ -70,13 +70,16 @@ class MachineLoadCalculator:
 
 
 class Cluster:
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, state): self.__dict__.update(state)
+    def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
+    @staticmethod
+    def load(job_id, base=None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
     def get_cluster_path(job_id, base=None):
         if base is None: base = tb.P.home().joinpath(rf"tmp_results/remote_machines")
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
-    def __getstate__(self): return self.__dict__
-    def __setstate__(self, state): self.__dict__.update(state)
     def __init__(self, ssh_params: list[dict],
                  func, func_kwargs_list: list or None = None,
                  func_kwargs_common: dict or None =None,
@@ -88,7 +91,7 @@ class Cluster:
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
 
-        self.instances_calculator = thread_load_calc or ThreadsWorkloadDivider()
+        self.instances_calculator = thread_load_calc or ThreadLoadCalculator()
         self.load_calculator = machine_load_calc or MachineLoadCalculator(num_machines=len(ssh_params))
 
         sshz = []
@@ -179,7 +182,8 @@ class Cluster:
                 config = self.remote_machine_kwargs
             else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir)
             m = RemoteMachine(func=self.func, func_kwargs=a_kwargs, ssh=an_ssh, config=config)
-            m.run()
+            m.generate_scripts()
+            m.submit()
             self.machines.append(m)
         try: tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
         except TypeError: print("Couldn't pickle cluster object")
@@ -233,10 +237,6 @@ class Cluster:
         if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
             print(f"All results downloaded to {self.root_dir} 🤗")
             self.results_downloaded = True
-
-    @staticmethod
-    def load(job_id, base=None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
-    def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
 
 
 if __name__ == '__main__':

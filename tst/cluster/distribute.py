@@ -1,6 +1,6 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster.distribute import Cluster, ThreadsWorkloadDivider, RemoteMachineConfig
+from crocodile.cluster.distribute import Cluster, ThreadLoadCalculator, RemoteMachineConfig
 import time
 from crocodile.cluster.trial_file import expensive_function_single_thread
 
@@ -11,7 +11,7 @@ def run():
     c = Cluster(func=expensive_function_single_thread,
                 func_kwargs_common=dict(sim_dict=dict(a=2, b=3)),
                 ssh_params=ssh_params,
-                thread_load_calc=ThreadsWorkloadDivider(multiplier=3, bottleneck_reference_value=8),
+                thread_load_calc=ThreadLoadCalculator(multiplier=3, bottleneck_reference_value=8),
                 remote_machine_config=config
                 )
     c.run(run=True, machines_per_tab=2)

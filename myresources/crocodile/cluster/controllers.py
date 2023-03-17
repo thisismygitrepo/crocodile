@@ -42,7 +42,7 @@ class Zellij:
         self.new_sess_name = sess_name
         return sess_name
 
-    def setup_layout(self, sess_name, cmd="", run=False, job_wd="~/tmp_results/remote_mahcines"):
+    def setup_layout(self, sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "~/tmp_results/remote_mahcines"):
         if self.new_sess_name is None: self.get_new_sess_name()
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]

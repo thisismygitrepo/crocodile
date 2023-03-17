@@ -169,6 +169,7 @@ class RemoteMachine:
         # flags
         self.execution_command = None
         self.submitted = False
+        self.scipts_generated = False
         self.results_downloaded = False
         self.results_path = None
         if self.config.interactive and self.config.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
