@@ -7,7 +7,7 @@ from crocodile.cluster.trial_file import expensive_function_single_thread
 
 def run():
     config = RemoteMachineConfig(lock_resources=True, kill_on_completion=True, install_repo=False, parallelize=True)
-    ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2224)
+    ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2222)
     c = Cluster(func=expensive_function_single_thread,
                 func_kwargs_common=dict(sim_dict=dict(a=2, b=3)),
                 ssh_params=ssh_params,

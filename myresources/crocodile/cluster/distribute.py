@@ -56,6 +56,7 @@ class MachineLoadCalculator:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
     def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_instances) -> list[dict]:
+        """Note: like thread divider in parallelize function, the behaviour is to include the edge cases on both ends of subsequent intervals."""
         tmp = []
         idx_so_far = 0
         for machine_index, (a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances) in enumerate(zip(resources_product_norm, cpus_norm, rams_norm, num_instances)):

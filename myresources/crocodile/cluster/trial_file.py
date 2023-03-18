@@ -29,7 +29,10 @@ def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int, 
 
     print(f"Splitting the work ({idx_start=}, {idx_end=}) equally among {num_instances} instances via `parallelize` of cluster.trial_file ...")
 
-    kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1], idx_max=idx_max))
+    kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1]+1, idx_max=idx_max))
+    kwargs_split[-1]["idx_end"] = idx_end + 0  # edge case
+    """Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals."""
+
     for idx, x in enumerate(kwargs_split):
         tb.S(x).print(as_config=True, title=f"Instance {idx}")
     print("\n" * 2)
