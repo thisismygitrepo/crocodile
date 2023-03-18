@@ -9,7 +9,7 @@ def run():
     config = RemoteMachineConfig(lock_resources=True, kill_on_completion=True, install_repo=False, parallelize=True)
     ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2222)
     c = Cluster(func=expensive_function_single_thread,
-                func_kwargs_common=dict(sim_dict=dict(a=2, b=3)),
+                func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                 ssh_params=ssh_params,
                 thread_load_calc=ThreadLoadCalculator(multiplier=3, bottleneck_reference_value=8),
                 remote_machine_config=config

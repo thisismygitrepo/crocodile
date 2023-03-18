@@ -1,5 +1,6 @@
 
 import crocodile.toolbox as tb
+from crocodile.cluster.remote_machine import WorkloadParams
 
 
 def get_script(name: str, kwargs: dict) -> str:
@@ -18,10 +19,10 @@ def get_script(name: str, kwargs: dict) -> str:
     return tmp
 
 
-def get_py_script(kwargs, rel_full_path, func_name, func_class, wrap_in_try_except=False, parallelize=False):
+def get_py_script(kwargs, rel_full_path, func_name, func_class, workload_params: WorkloadParams, wrap_in_try_except=False, parallelize=False):
     tmp = get_script(name="script_execution", kwargs=kwargs)
 
-    execution_line = get_execution_line(func_name=func_name, func_class=func_class, rel_full_path=rel_full_path, parallelize=parallelize)
+    execution_line = get_execution_line(func_name=func_name, func_class=func_class, rel_full_path=rel_full_path, parallelize=parallelize, workload_params=workload_params)
     if wrap_in_try_except:
         import textwrap
         execution_line = textwrap.indent(execution_line, " " * 4)
@@ -38,14 +39,28 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, func_class, rel_full_path, parallelize=False) -> str:
+def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams, parallelize=False) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
     if parallelize:
-        from crocodile.cluster import trial_file
-        wrapper_func_name = trial_file.parallelize.__name__
-        base_func = tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0]
-        base_func = base_func.replace("expensive_function_single_thread", final_func)
-        base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
+        # from crocodile.cluster import trial_file
+        # wrapper_func_name = trial_file.parallelize.__name__
+        # base_func = tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0]
+        # base_func = base_func.replace("expensive_function_single_thread", final_func)
+        # base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
+
+        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_workers).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max))
+        kwargs_split[-1]["idx_end"] = workload_params.idx_end + 0  # edge case
+        # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
+        for idx, x in enumerate(kwargs_split):
+            tb.S(x).print(as_config=True, title=f"Instance {idx}")
+        print("\n" * 2)
+        base_func = f"""
+print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
+print(f"This share of workload will be split among {workload_params.num_workers} of threads on this machine.")
+kwargs_split = {list(kwargs_split)}
+res = tb.L(kwargs_split).apply(lambda kwargs: {final_func}(**kwargs, **func_kwargs, save_dir_suffix=save_dir_suffix), jobs=num_instances)
+res = tb.P(res[0]).parent if type(res[0]) is str else res
+"""
         return base_func
 
     if func_name is not None: return f"""

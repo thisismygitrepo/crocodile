@@ -1,6 +1,5 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster import meta_handling as meta
 from crocodile.cluster.controllers import Zellij
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -112,6 +111,15 @@ echo "Unlocked resources"
 
 
 @dataclass
+class WorkloadParams:
+    idx_start: int = 0
+    idx_end: int = 1000
+    idx_max: int = 1000
+    num_workers: int = 3
+    save_suffix: str = f"machine_{idx_start}_{idx_end}"
+
+
+@dataclass
 class RemoteMachineConfig:
     # conn
     job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
@@ -119,6 +127,7 @@ class RemoteMachineConfig:
     description: str = ""
     ssh_params: dict = field(default_factory=lambda: dict())
 
+    # data
     copy_repo: bool = False
     update_repo: bool = False
     install_repo: bool or None = None
@@ -140,6 +149,7 @@ class RemoteMachineConfig:
     wrap_in_try_except: bool = False
     parallelize: bool = False
     lock_resources: bool = True
+    workload_params: WorkloadParams = field(default_factory=lambda: WorkloadParams())
 
 
 class RemoteMachine:
@@ -211,6 +221,7 @@ class RemoteMachine:
         self.execution_command_to_clip_memory()
 
     def generate_scripts(self):
+        from crocodile.cluster import meta_handling as meta
         console.rule("Generating scripts")
         func_name = self.func.__name__ if self.func is not None else None
         func_module = self.func.__module__ if self.func is not None else None
@@ -223,7 +234,7 @@ class RemoteMachine:
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
                            job_id=self.config.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.config.lock_resources, zellij_session=self.zellij_session)
-        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize)
+        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
 
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.

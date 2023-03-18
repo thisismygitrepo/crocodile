@@ -3,7 +3,7 @@ import numpy as np
 import psutil
 import crocodile.toolbox as tb
 from math import ceil, floor
-from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
 from rich.console import Console
 # from platform import system
 # import time
@@ -55,18 +55,18 @@ class MachineLoadCalculator:
 
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
-    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_instances) -> list[dict]:
+    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_workers) -> list[WorkloadParams]:
         """Note: like thread divider in parallelize function, the behaviour is to include the edge cases on both ends of subsequent intervals."""
         tmp = []
         idx_so_far = 0
-        for machine_index, (a_product_norm, a_cpu_norm, a_ram_norm, a_num_instances) in enumerate(zip(resources_product_norm, cpus_norm, rams_norm, num_instances)):
+        for machine_index, (a_product_norm, a_cpu_norm, a_ram_norm, a_num_workers) in enumerate(zip(resources_product_norm, cpus_norm, rams_norm, num_workers)):
             load_value = {"ram": a_ram_norm, "cpu": a_cpu_norm, "product": a_product_norm}[self.load_criterion]
             self.load_ratios.append(load_value)
             idx1 = idx_so_far
             idx2 = self.max_num if machine_index == self.num_machines - 1 else (floor(load_value * self.max_num) + idx1)
             if idx2 > self.max_num: raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
             idx_so_far = idx2
-            tmp.append(dict(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_instances=a_num_instances))
+            tmp.append(WorkloadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_workers=a_num_workers))
         return tmp
 
 
@@ -82,8 +82,8 @@ class Cluster:
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
     def __init__(self, ssh_params: list[dict],
-                 func, func_kwargs_list: list or None = None,
-                 func_kwargs_common: dict or None =None,
+                 func, workload_params: list[WorkloadParams] or None = None,
+                 func_kwargs: dict or None = None,
                  thread_load_calc=None, machine_load_calc=None,
                  ditch_unavailable_machines=False,
                  description="",
@@ -114,8 +114,8 @@ class Cluster:
 
         self.description = description
         self.func = func
-        self.func_kwargs = func_kwargs_common if func_kwargs_common is not None else {}
-        self.func_kwargs_list = func_kwargs_list
+        self.func_kwargs = func_kwargs if func_kwargs is not None else {}
+        self.workload_params = workload_params
 
         # fire options
         self.machines_per_tab = None
@@ -125,7 +125,7 @@ class Cluster:
     def print_func_kwargs(self):
         print("\n" * 2)
         console.rule(title=f"kwargs of functions to be run on machines")
-        for an_ssh, a_kwarg in zip(self.sshz, self.func_kwargs_list):
+        for an_ssh, a_kwarg in zip(self.sshz, self.workload_params):
             tb.S(a_kwarg).print(as_config=True, title=an_ssh.get_repr(which="remote"))
     def print_commands(self):
         print("\n" * 2)
@@ -134,7 +134,7 @@ class Cluster:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
     def generate_standard_kwargs(self):
-        if self.func_kwargs_list is not None:
+        if self.workload_params is not None:
             print("func_kwargs_list is not None, so not generating standard kwargs")
             return None
         cpus = []
@@ -155,12 +155,12 @@ class Cluster:
             self.instances_per_machine.append(self.instances_calculator.get_instances_per_machines({"cpu": a_cpu, "ram": a_ram}))
 
         # relies on normalized values of specs.
-        self.func_kwargs_list = self.load_calculator.get_func_kwargs(cpus_norm=self.cpus_norm, rams_norm=self.rams_norm, resources_product_norm=self.resources_product_norm, num_instances=self.instances_per_machine)
-        self.func_kwargs_list = [tb.S(item).update(self.func_kwargs).__dict__ for item in self.func_kwargs_list]
+        self.workload_params = self.load_calculator.get_func_kwargs(cpus_norm=self.cpus_norm, rams_norm=self.rams_norm, resources_product_norm=self.resources_product_norm, num_workers=self.instances_per_machine)
+        # self.func_kwargs_list = [tb.S(item).update(self.func_kwargs).__dict__ for item in self.func_kwargs_list]
         self.print_func_kwargs()
 
     def viz_load_ratios(self):
-        if self.func_kwargs_list is None: raise Exception("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
+        if self.workload_params is None: raise Exception("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
         plt = tb.install_n_import("plotext")
         names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
 
@@ -175,14 +175,14 @@ class Cluster:
         print("\n")
 
     def submit(self):
-        if self.func_kwargs_list is None: raise Exception("You need to generate standard kwargs first.")
-        for idx, (a_kwargs, an_ssh) in enumerate(zip(self.func_kwargs_list, self.sshz)):
+        if self.workload_params is None: raise Exception("You need to generate standard kwargs first.")
+        for idx, (a_workload_params, an_ssh) in enumerate(zip(self.workload_params, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
             if self.remote_machine_kwargs is not None:
-                self.remote_machine_kwargs.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir))
+                self.remote_machine_kwargs.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params))
                 config = self.remote_machine_kwargs
-            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir)
-            m = RemoteMachine(func=self.func, func_kwargs=a_kwargs, ssh=an_ssh, config=config)
+            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params)
+            m = RemoteMachine(func=self.func, func_kwargs=self.func_kwargs, ssh=an_ssh, config=config)
             m.generate_scripts()
             m.submit()
             self.machines.append(m)

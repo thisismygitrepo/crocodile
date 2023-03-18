@@ -2,6 +2,7 @@
 import time
 import crocodile.toolbox as tb
 from rich.progress import track
+from crocodile.cluster.remote_machine import WorkloadParams
 
 
 def expensive_function(func_kwargs=None) -> tb.P:
@@ -20,36 +21,10 @@ def expensive_function(func_kwargs=None) -> tb.P:
     return path.parent  # extra job details files will be added to this res_folder
 
 
-# parallelizeBegins
-
-
-def parallelize(idx_start: int, idx_end: int, idx_max: int, num_instances: int, **other_kwargs) -> tb.P:
-
-    print(f"This script will execute ({(idx_end - idx_start) / idx_max * 100:.2f}%) of the work on this machine.")
-
-    print(f"Splitting the work ({idx_start=}, {idx_end=}) equally among {num_instances} instances via `parallelize` of cluster.trial_file ...")
-
-    kwargs_split = tb.L(range(idx_start, idx_end, 1)).split(to=num_instances).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1]+1, idx_max=idx_max))
-    kwargs_split[-1]["idx_end"] = idx_end + 0  # edge case
-    """Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals."""
-
-    for idx, x in enumerate(kwargs_split):
-        tb.S(x).print(as_config=True, title=f"Instance {idx}")
-    print("\n" * 2)
-
-    save_dir_suffix = f"machine_{idx_start}_{idx_end}"
-
-    res = kwargs_split.apply(lambda kwargs: expensive_function_single_thread(**kwargs, **other_kwargs, save_dir_suffix=save_dir_suffix), jobs=num_instances)
-    return tb.P(res[0]).parent
-
-
-# parallelizeEnds
-
-
 # todo: consider making it a method of a class and user will subclass it and is forced to follow its interface
 
 
-def expensive_function_single_thread(idx_start: int, idx_end: int, idx_max: int, save_dir_suffix: tb.P or str,
+def expensive_function_single_thread(workload_params: WorkloadParams,
                                      sim_dict=None) -> tb.P:
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
     print(f"Oh, I recieved this parameter: {sim_dict=}")
@@ -57,9 +32,9 @@ def expensive_function_single_thread(idx_start: int, idx_end: int, idx_max: int,
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
-    print("I'm done, I crunched numbers from {} to {}.".format(idx_start, idx_end))
-    _ = idx_max
-    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(save_dir_suffix, f"thread_{idx_start}_{idx_end}").create()
+    print("I'm done, I crunched numbers from {} to {}.".format(workload_params.idx_start, workload_params.idx_end))
+    _ = workload_params.idx_max
+    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
     tb.S(a=1).save(path=save_dir.joinpath(f"trial_func_result.Struct.pkl"))
     return save_dir
 
