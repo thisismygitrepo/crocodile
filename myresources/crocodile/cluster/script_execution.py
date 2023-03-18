@@ -3,7 +3,7 @@
 import getpass
 import platform
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import ResourceManager
+from crocodile.cluster.remote_machine import ResourceManager, WorkloadParams
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
@@ -17,7 +17,7 @@ console = Console()
 
 # EXTRA-PLACEHOLDER-PRE
 
-_ = SourceFileLoader
+_ = SourceFileLoader, WorkloadParams
 
 to_be_deleted = ['res = ""  # to be overridden by execution line.', 'exec_obj = ""  # to be overridden by execution line.']
 # items below are defined to silence IDE warnings. They will be deleted by script preparer, then later defined by function to be executed.

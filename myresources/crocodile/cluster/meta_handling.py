@@ -48,17 +48,17 @@ def get_execution_line(func_name, func_class, rel_full_path, workload_params: Wo
         # base_func = base_func.replace("expensive_function_single_thread", final_func)
         # base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
 
-        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_workers).apply(lambda sub_list: dict(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max))
+        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_workers).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1]+1, idx_max=workload_params.idx_max, save_suffix=workload_params.save_suffix, num_workers=workload_params.num_workers))
         kwargs_split[-1]["idx_end"] = workload_params.idx_end + 0  # edge case
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
-        for idx, x in enumerate(kwargs_split):
-            tb.S(x).print(as_config=True, title=f"Instance {idx}")
-        print("\n" * 2)
         base_func = f"""
 print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
 print(f"This share of workload will be split among {workload_params.num_workers} of threads on this machine.")
-kwargs_split = {list(kwargs_split)}
-res = tb.L(kwargs_split).apply(lambda kwargs: {final_func}(**kwargs, **func_kwargs, save_dir_suffix=save_dir_suffix), jobs=num_instances)
+kwargs_workload = {list(kwargs_split.apply(lambda a_kwargs: a_kwargs.__dict__))}
+for idx, x in enumerate(kwargs_workload):
+    tb.S(x).print(as_config=True, title=f"Instance {{idx}}")
+print("\n" * 2)
+res = tb.L(kwargs_workload).apply(lambda a_kwargs_workload: {final_func}(workload_params=WorkloadParams(**a_kwargs_workload), **func_kwargs), jobs={workload_params.num_workers})
 res = tb.P(res[0]).parent if type(res[0]) is str else res
 """
         return base_func
