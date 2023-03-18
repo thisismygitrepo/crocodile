@@ -2,13 +2,13 @@
 import crocodile.toolbox as tb
 from crocodile.cluster.distribute import Cluster, ThreadLoadCalculator, RemoteMachineConfig
 import time
-from crocodile.cluster.trial_file import expensive_function_single_thread
+from crocodile.cluster.trial_file import expensive_function
 
 
 def run():
     config = RemoteMachineConfig(lock_resources=True, kill_on_completion=True, install_repo=False, parallelize=True)
     ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # , dict(host="surface_wsl"), dict(port=2222)
-    c = Cluster(func=expensive_function_single_thread,
+    c = Cluster(func=expensive_function,
                 func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                 ssh_params=ssh_params,
                 thread_load_calc=ThreadLoadCalculator(multiplier=3, bottleneck_reference_value=8),
