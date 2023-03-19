@@ -63,7 +63,7 @@ print("\\n" * 2)
 
 # res = tb.L(workload_params).apply(lambda a_workload_params: {final_func}(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.num_workers})
 # res = tb.P(res[0]).parent if type(res[0]) is str else res
-res = final_func(workload_params=workload_params, **func_kwargs)
+res = {final_func}(workload_params=workload_params, **func_kwargs)
 """
         return base_func
 
