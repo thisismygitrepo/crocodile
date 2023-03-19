@@ -39,7 +39,7 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams, parallelize=False) -> str:
+def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None, parallelize=False) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
     if parallelize:
         # from crocodile.cluster import trial_file
@@ -55,17 +55,23 @@ def get_execution_line(func_name, func_class, rel_full_path, workload_params: Wo
 print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
 print(f"This share of workload will be split among {workload_params.num_workers} of threads on this machine.")
 kwargs_workload = {list(kwargs_split.apply(lambda a_kwargs: a_kwargs.__dict__))}
+workload_params = []
 for idx, x in enumerate(kwargs_workload):
     tb.S(x).print(as_config=True, title=f"Instance {{idx}}")
+    workload_params.append(WorkloadParams(**x))
 print("\\n" * 2)
 
-res = tb.L(kwargs_workload).apply(lambda a_kwargs_workload: {final_func}(workload_params=WorkloadParams(**a_kwargs_workload), **func_kwargs), jobs={workload_params.num_workers})
-res = tb.P(res[0]).parent if type(res[0]) is str else res
+# res = tb.L(workload_params).apply(lambda a_workload_params: {final_func}(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.num_workers})
+# res = tb.P(res[0]).parent if type(res[0]) is str else res
+res = final_func(workload_params=workload_params, **func_kwargs)
 """
         return base_func
 
-    if func_name is not None: return f"""
+    if func_name is not None and workload_params is None: return f"""
 res = {final_func}(**func_kwargs.__dict__)
+"""
+    elif func_name is not None and workload_params is not None: return f"""
+res = {final_func}(workload_params=workload_params, **func_kwargs.__dict__)
 """
     return f"""
 res = None  # in case the file did not define it.

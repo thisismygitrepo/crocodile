@@ -66,7 +66,7 @@ zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
 zellij --session {sess_name} action new-tab --name who{self.id}; sleep 0.2
-zellij --session {sess_name} run --direction down -- neofetch; sleep 0.2
+zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
