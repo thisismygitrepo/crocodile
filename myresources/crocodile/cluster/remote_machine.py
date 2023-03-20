@@ -149,7 +149,7 @@ class RemoteMachineConfig:
     wrap_in_try_except: bool = False
     parallelize: bool = False
     lock_resources: bool = True
-    workload_params: WorkloadParams = field(default_factory=lambda: WorkloadParams())
+    workload_params: WorkloadParams or None = field(default_factory=lambda: None)
 
 
 class RemoteMachine:
