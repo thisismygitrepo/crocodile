@@ -251,13 +251,13 @@ class RemoteMachine:
     
 # EXTRA-PLACEHOLDER-PRE
 
-echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
+echo "~~~~~~~~~~~~~~~~SHELL START~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
 {self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.config.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
 {'git pull' if self.config.update_repo else ''}
 {'pip install -e .' if self.config.install_repo else ''}
-echo "~~~~~~~~~~~~~~~~SHELL~~~~~~~~~~~~~~~"
+echo "~~~~~~~~~~~~~~~~SHELL  END ~~~~~~~~~~~~~~~"
 
 echo ""
 echo "Starting job {self.config.job_id} 🚀"

@@ -32,10 +32,8 @@ class ThreadLoadCalculator:
                     self.bottleneck_reference_value = psutil.cpu_count()
                 elif self.bottleneck_name == "ram":
                     self.bottleneck_reference_value = psutil.virtual_memory().total / 2 ** 30
-                else:
-                    raise NotImplementedError
-        else:
-            raise NotImplementedError
+                else: raise NotImplementedError
+        else: raise NotImplementedError
         return self
 
     def get_instances_per_machines(self, specs: dict) -> int:
