@@ -77,16 +77,27 @@ echo "Unlocked resources"
                 lock_file.print(as_config=True, title="Old Lock File Details")
                 break
             elif self.job_id not in lock_file.queue:
-                print(f"Adding job to the queue.")
+                print(f"Queue is not empty. Adding this job to the queue.")
+                print(f"Queue: {lock_file.queue}, {self.job_id=}")
                 lock_file.queue.append(self.job_id)
-                lock_file.specs[self.job_id] = dict(submission_time=self.submission_time)
+                lock_file.specs[self.job_id] = dict(submission_time=self.submission_time, pid=os.getpid())
                 lock_file.save(lock_path)
             import psutil
+
+            next_job_in_queue = lock_file.queue[0]
+            try: _ = psutil.Process(lock_file.specs[next_job_in_queue]['pid'])
+            except psutil.NoSuchProcess:
+                print(f"Next job in queue {next_job_in_queue} has no associated process, removing it from the queue.")
+                lock_file.queue.pop(0)
+                del lock_file.specs[next_job_in_queue]
+                lock_file.save(lock_path)
+
             try: proc = psutil.Process(lock_file.lock['pid'])
             except psutil.NoSuchProcess:
                 print(f"Locking process with pid {lock_file.lock['pid']} is dead. Ignoring this lock file.")
                 lock_file.print(as_config=True, title="Ignored Lock File Details")
                 break
+
             attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
                          'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                          'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
