@@ -82,9 +82,9 @@ echo "Unlocked resources"
                 lock_file.specs[self.job_id] = dict(submission_time=self.submission_time)
                 lock_file.save(lock_path)
             import psutil
-            try: proc = psutil.Process(lock_file['pid'])
+            try: proc = psutil.Process(lock_file.lock['pid'])
             except psutil.NoSuchProcess:
-                print(f"Locking process with pid {lock_file['pid']} is dead. Ignoring this lock file.")
+                print(f"Locking process with pid {lock_file.lock['pid']} is dead. Ignoring this lock file.")
                 lock_file.print(as_config=True, title="Ignored Lock File Details")
                 break
             attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
@@ -93,14 +93,14 @@ echo "Unlocked resources"
             if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
             # environ, memory_maps, 'io_counters'
             attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
-            inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
-            inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file['pid']})", docs=False, sort=False)
+            inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {lock_file.lock['pid']})", docs=False, sort=False)
+            inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {lock_file.lock['pid']})", docs=False, sort=False)
 
             print(f"Submission time: {self.submission_time}")
             print(f"Time now: {pd.Timestamp.now()}")
             print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - self.submission_time} 🛌")
-            print(f"Time consumed by locking job (job_id = {lock_file['job_id']}) so far = {pd.Timestamp.now() - lock_file['start_time']} ⏰")
-            console.rule(title=f"Resources are locked by another job `{lock_file['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
+            print(f"Time consumed by locking job (job_id = {lock_file.lock['job_id']}) so far = {pd.Timestamp.now() - lock_file.lock['start_time']} ⏰")
+            console.rule(title=f"Resources are locked by another job `{lock_file.lock['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
             print("\n")
             time.sleep(sleep_time_mins * 60)
         self.lock_resources()
@@ -118,7 +118,6 @@ echo "Unlocked resources"
             next_job_id = queue.pop(0)
             assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}."
             specs = current_lock['specs']
-            hist = current_lock['hist']
         else:
             queue = []
             specs = dict()
@@ -157,7 +156,7 @@ class WorkloadParams:
 class RemoteMachineConfig:
     # conn
     job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
-    base_dir: str = f"~/tmp_results/remote_machines"
+    base_dir: str = f"~/tmp_results/remote_machines/jobs"
     description: str = ""
     ssh_params: dict = field(default_factory=lambda: dict())
 
