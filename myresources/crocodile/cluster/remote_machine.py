@@ -16,7 +16,7 @@ console = Console()
 
 
 class ResourceManager:
-    lock_path = tb.P(f"~/tmp_results/remote_machines/lock.Struct.pkl")
+    lock_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/lock.Struct.pkl")
     # TODO: add a queue of jobs to run, and a queue of jobs to run after the current one is done as opposed to having it based on conisidence (who reads first)
 
     def __getstate__(self): return self.__dict__
@@ -149,6 +149,7 @@ class RemoteMachineConfig:
     wrap_in_try_except: bool = False
     parallelize: bool = False
     lock_resources: bool = True
+    max_simulataneous_jobs: int = 1
     workload_params: WorkloadParams or None = field(default_factory=lambda: None)
 
 

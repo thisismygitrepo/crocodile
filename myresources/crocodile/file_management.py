@@ -118,7 +118,7 @@ class P(type(Path()), Path):
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else: (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return notfound
-        if verbose: print(f"Reading {slf.name} ({slf.size()} MB) ...")
+        if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError: raise IOError
