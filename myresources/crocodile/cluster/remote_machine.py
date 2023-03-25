@@ -53,7 +53,7 @@ echo "Unlocked resources"
     def secure_resources(self):
         sleep_time_mins = 10
         lock_path = self.lock_path.expanduser()
-        # queue_path = lock_path.with_name("queue.Struct.pkl")
+        lock_file = None
         print(f"Inspecting Lock file @ {lock_path}")
         lock_status = 'locked'
         while lock_status == 'locked':
@@ -69,9 +69,11 @@ echo "Unlocked resources"
                 break
             except IndexError:
                 print(f"Lock file indicate that the queue is empty ... running the job anyway.")
+                lock_file.queue.append(self.job_id)
+                lock_file.save(lock_path)
                 break
             if lock_status == 'unlocked' and next_job_id == self.job_id:
-                print(f"Lock file was released by the locking job, taking hold of it.")
+                print(f"{lock_status=}, {next_job_id=}, {self.job_id=}")
                 lock_file.print(as_config=True, title="Old Lock File Details")
                 break
             elif self.job_id not in lock_file.queue:
@@ -109,22 +111,18 @@ echo "Unlocked resources"
                     job_id=self.job_id,
                     start_time=pd.Timestamp.now(),
                     submission_time=self.submission_time)
-        current_lock = self.lock_path.expanduser().readit() if self.lock_path.expanduser().exists() else None
-        if current_lock is not None:
+        lock_path = self.lock_path.expanduser()
+        if lock_path.exists():
+            current_lock = lock_path.readit()
             queue = current_lock['queue']
             next_job_id = queue.pop(0)
             assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}."
-        else:
-            queue = []
-        if current_lock is not None:
             specs = current_lock['specs']
-        else:
-            specs = dict()
-        if current_lock is not None:
             hist = current_lock['hist']
         else:
-            hist = []
-        tb.S(lock=lock, queue=queue, specs=specs, hist=hist).save(path=self.lock_path.expanduser())
+            queue = []
+            specs = dict()
+        tb.S(lock=lock, queue=queue, specs=specs).save(path=lock_path)
 
     def unlock_resources(self):
         dat = self.lock_path.expanduser().readit()
