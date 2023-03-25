@@ -8,8 +8,7 @@ from crocodile.cluster.remote_machine import WorkloadParams
 # todo: consider making it a method of a class and user will subclass it and is forced to follow its interface
 
 
-def expensive_function(workload_params: WorkloadParams,
-                                     sim_dict=None) -> tb.P:
+def expensive_function(workload_params: WorkloadParams, sim_dict=None) -> tb.P:
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
     print(f"Oh, I recieved this parameter: {sim_dict=}")
     execution_time_in_seconds = 60 * 1

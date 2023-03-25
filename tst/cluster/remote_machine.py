@@ -7,7 +7,7 @@ def main():
                                  notify_upon_completion=True, to_email='random@email.com', email_config_name='enaut',
                                  copy_repo=False, update_repo=False, wrap_in_try_except=True, install_repo=False,
                                  ipython=True, interactive=True, lock_resources=True,
-                                 transfer_method="sftp", parallelize=True)
+                                 transfer_method="sftp", parallelize=False)
     m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                       config=config)
     m.run()
