@@ -32,8 +32,8 @@ class ResourceManager:
 
         self.submission_time = pd.Timestamp.now()
 
-        self.base = tb.P(base).collapseuser() if bool(base) else tb.P(f"~/tmp_results/remote_machines")
-        self.root_dir = self.base.joinpath(f"job_id__{self.job_id}")
+        self.base = tb.P(base).collapseuser() if bool(base) else tb.P(f"~/tmp_results/remote_machines/jobs")
+        self.root_dir = self.base.joinpath(f"{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
