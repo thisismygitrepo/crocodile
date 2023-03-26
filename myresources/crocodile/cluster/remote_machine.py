@@ -147,7 +147,6 @@ echo "Unlocked resources"
         assert queue_path.exists(), f"Queue file {queue_path} does not exist. This method should not be called in the first place."
         queue_file = queue_path.readit()
         queue_file: Lock
-        assert len(queue_file.queue) < self.max_simulataneous_jobs, f"Number of running jobs ({len(queue_file.queue)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
         next_job_id = queue_file.queue.pop(0)
         assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}. If that is the case, which it is, then this method should not be called in the first place."
         del queue_file.specs[next_job_id]
@@ -158,6 +157,7 @@ echo "Unlocked resources"
             running_file: Lock
         else:
             running_file = Lock(queue=[], specs={})
+        assert len(running_file.queue) < self.max_simulataneous_jobs, f"Number of running jobs ({len(queue_file.queue)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
         running_file.queue.append(self.job_id)
         running_file.specs[self.job_id] = specs
         tb.Save.pickle(obj=running_file, path=running_path)
