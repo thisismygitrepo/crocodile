@@ -19,6 +19,7 @@ class ResourceManager:
     running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running.pkl")
     queue_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/queue.pkl")
     history_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/history.pkl")
+    shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
 
     @staticmethod
     def from_pickle(path):
@@ -51,24 +52,18 @@ class ResourceManager:
         self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
-    shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
-    # simple text file referring to shell script path
-
     def add_to_queue(self):
         try:
             queue_file = self.queue_path.expanduser().readit()
             queue_file: Lock
         except FileNotFoundError:
+            print(f"Queue file was deleted by the locking job, creating an empty one and saving it.")
             queue_file = Lock(queue=[], specs={})
-            print(f"Queue file was deleted by the locking job, taking hold of it.")
+            tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         if self.job_id not in queue_file.queue:
-            if len(queue_file.queue) == 0: print(f"Lock file indicates that the queue is empty, adding the current job to the queue.")
-            else: print(f"Queue is not empty. Adding this job to the queue.")
-            print(f"Queue: {queue_file.queue}, {self.job_id=}")
+            print(f"Adding this job {self.job_id} to the queue and saving it. {queue_file.queue}")
             queue_file.queue.append(self.job_id)
             queue_file.specs[self.job_id] = dict(submission_time=self.submission_time, pid=os.getpid())
-            tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
-        if not self.queue_path.expanduser().exists():
             tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         return queue_file
 
@@ -157,14 +152,12 @@ echo "Unlocked resources"
         assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}. If that is the case, which it is, then this method should not be called in the first place."
         del queue_file.specs[next_job_id]
         tb.Save.pickle(obj=queue_file, path=queue_path)
-
         running_path = self.running_path.expanduser()
         if running_path.exists():
             running_file = running_path.readit()
             running_file: Lock
         else:
             running_file = Lock(queue=[], specs={})
-
         running_file.queue.append(self.job_id)
         running_file.specs[self.job_id] = specs
         tb.Save.pickle(obj=running_file, path=running_path)
