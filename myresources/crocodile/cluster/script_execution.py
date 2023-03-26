@@ -36,10 +36,10 @@ ssh_repr = ""
 ssh_repr_remote = ""
 error_message = "No error message."  # to be updated by try-except block inside execution line.
 zellij_session = ""
-manager_path = ""
+resource_manager_path = ""
 
 print("\n" * 2)
-manager = ResourceManager.from_pickle(manager_path)
+manager = ResourceManager.from_pickle(resource_manager_path)
 manager.secure_resources()
 
 # keep those values after lock is released

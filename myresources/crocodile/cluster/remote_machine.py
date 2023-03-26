@@ -45,6 +45,7 @@ class ResourceManager:
         self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py")
         self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
         self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.Struct.pkl")
+        self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
@@ -284,7 +285,7 @@ class RemoteMachine:
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
-                           manager_path='',
+                           resource_manager_path=self.path_dict.resource_manager_path.as_posix(),
                            zellij_session=self.zellij_session)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
 
@@ -330,6 +331,7 @@ deactivate
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
         with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
+        tb.Save.pickle(obj=self.__getstate__(), path=self.path_dict.resource_manager_path.expanduser(), verbose=False)
         self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         print("\n")
 
