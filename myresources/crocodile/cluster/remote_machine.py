@@ -299,7 +299,6 @@ class RemoteMachine:
                                job_id=self.config.job_id, base=self.path_dict.base.as_posix(),
                                to_email=self.config.to_email, email_config_name=self.config.email_config_name)
             py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
-
         shell_script = f"""
     
 # EXTRA-PLACEHOLDER-PRE
@@ -331,7 +330,7 @@ deactivate
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
         with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
-        tb.Save.pickle(obj=self.__getstate__(), path=self.path_dict.resource_manager_path.expanduser(), verbose=False)
+        tb.Save.pickle(obj=self.path_dict.__getstate__(), path=self.path_dict.resource_manager_path.expanduser(), verbose=False)
         self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         print("\n")
 
