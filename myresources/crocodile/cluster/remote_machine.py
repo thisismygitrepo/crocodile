@@ -54,6 +54,24 @@ class ResourceManager:
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
     # simple text file referring to shell script path
 
+    def add_to_queue(self):
+        try:
+            queue_file = self.queue_path.expanduser().readit()
+            queue_file: Lock
+        except FileNotFoundError:
+            queue_file = Lock(queue=[], specs={})
+            print(f"Queue file was deleted by the locking job, taking hold of it.")
+        if self.job_id not in queue_file.queue:
+            if len(queue_file.queue) == 0: print(f"Lock file indicates that the queue is empty, adding the current job to the queue.")
+            else: print(f"Queue is not empty. Adding this job to the queue.")
+            print(f"Queue: {queue_file.queue}, {self.job_id=}")
+            queue_file.queue.append(self.job_id)
+            queue_file.specs[self.job_id] = dict(submission_time=self.submission_time, pid=os.getpid())
+            tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
+        if not self.queue_path.expanduser().exists():
+            tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
+        return queue_file
+
     def get_resources_unlocking(self):  # this one works at shell level in case python script failed.
         return f"""
 rm {self.running_path.collapseuser().as_posix()}
@@ -71,22 +89,9 @@ echo "Unlocked resources"
             except FileNotFoundError:
                 print(f"Running file was deleted by the locking job, taking hold of it.")
                 break
-            try:
-                queue_file = self.queue_path.expanduser().readit()
-                queue_file: Lock
-            except FileNotFoundError:
-                print(f"Queue file was deleted by the locking job, taking hold of it.")
-                break
 
-            if self.job_id not in queue_file.queue:
-                if len(queue_file.queue) == 0: print(f"Lock file indicates that the queue is empty, adding the current job to the queue.")
-                else: print(f"Queue is not empty. Adding this job to the queue.")
-                print(f"Queue: {queue_file.queue}, {self.job_id=}")
-                queue_file.queue.append(self.job_id)
-                queue_file.specs[self.job_id] = dict(submission_time=self.submission_time, pid=os.getpid())
-                tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
-
-            elif len(running_file.queue) < self.max_simulataneous_jobs: lock_status = 'unlocked'
+            if len(running_file.queue) < self.max_simulataneous_jobs:
+                lock_status = 'unlocked'
             else:
                 for item in running_file.queue:
                     if running_file.specs[item]['status'] == 'unlocked':
@@ -94,6 +99,7 @@ echo "Unlocked resources"
                         lock_status = 'unlocked'
                         break
 
+            queue_file = self.add_to_queue()
             if lock_status == 'unlocked' and queue_file.queue[0] == self.job_id:
                 break
 
@@ -141,7 +147,7 @@ echo "Unlocked resources"
                      start_time=pd.Timestamp.now(),
                      submission_time=self.submission_time)
         queue_path = self.queue_path.expanduser()
-        assert queue_path.exists(), f"Queue file {queue_path} does not exist."
+        assert queue_path.exists(), f"Queue file {queue_path} does not exist. This method should not be called in the first place."
         queue_file = queue_path.readit()
         queue_file: Lock
         assert len(queue_file.queue) < self.max_simulataneous_jobs, f"Number of running jobs ({len(queue_file.queue)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
