@@ -19,7 +19,7 @@ class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/lock.Struct.pkl")
     @staticmethod
     def from_pickle(path):
-        rm = ResourceManager('1', '2', True, 1)
+        rm = ResourceManager(job_id='1', remote_machine_type='Windows', lock_resources=True, max_simulataneous_jobs=1, base=None)
         rm.__setstate__(tb.P(path).expanduser().readit())
         return rm
     def __getstate__(self): return self.__dict__
@@ -285,7 +285,7 @@ class RemoteMachine:
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
-                           resource_manager_path=self.path_dict.resource_manager_path.as_posix(),
+                           resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
                            zellij_session=self.zellij_session)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
 
