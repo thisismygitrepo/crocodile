@@ -3,25 +3,23 @@
 from crocodile.comms.notification import Email
 import crocodile.toolbox as tb
 from crocodile.cluster.remote_machine import ResourceManager
-import platform
 
 # to be replaced
 addressee = ""
 speaker = ""
 ssh_conn_str = ""
 executed_obj = ""
-job_id = ""
-base = ""
 email_config_name = ""
 to_email = ""
-
+resource_manager_path = ""
 
 to_be_deleted = ["exec_times = tb.S()", "res_folder = tb.P()", "error_message = ''"]
 error_message = ''
 exec_times = tb.S()
 res_folder = tb.P()
 
-manager = ResourceManager(job_id=job_id, remote_machine_type=platform.system(), base=base)
+manager = ResourceManager.from_pickle(resource_manager_path)
+
 
 print(f'SENDING notification email using `{email_config_name}` email configuration ...')
 
@@ -64,6 +62,6 @@ ssh.copy_to_here(r'{res_folder.collapseuser().as_posix()}', r=False, zip_first=F
 
 try:
     Email.send_and_close(config_name=email_config_name, to=to_email,
-                         subject=f"Execution Completion Notification, job_id = {job_id}", msg=msg)
+                         subject=f"Execution Completion Notification, job_id = {manager.job_id}", msg=msg)
     print(f'FINISHED sending notification email to `{to_email}`')
 except Exception as e: print(f"Error sending email: {e}")

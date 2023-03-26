@@ -70,7 +70,7 @@ echo "Unlocked resources"
             except FileNotFoundError:
                 print(f"Lock file was deleted by the locking job, taking hold of it.")
                 break
-            except KeyError:
+            except (KeyError, AttributeError):
                 print(f"Lock file was corrupted by the locking job, taking hold of it.")
                 break
 
@@ -296,7 +296,7 @@ class RemoteMachine:
                                speaker=self.ssh.get_repr('remote', add_machine=True),
                                ssh_conn_string=self.ssh.get_repr('remote', add_machine=False),
                                executed_obj=executed_obj,
-                               job_id=self.config.job_id, base=self.path_dict.base.as_posix(),
+                               resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
                                to_email=self.config.to_email, email_config_name=self.config.email_config_name)
             py_script += meta.get_script(name="script_notify_upon_completion", kwargs=meta_kwargs)
         shell_script = f"""
