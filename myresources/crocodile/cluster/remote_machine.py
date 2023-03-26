@@ -88,14 +88,16 @@ echo "Unlocked resources"
                 running_file: Lock
             except FileNotFoundError:
                 print(f"Running file was deleted by the locking job, taking hold of it.")
-                break
+                running_file = Lock(queue=[], specs={})
+                tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
+                self.add_to_queue()
 
             if len(running_file.queue) < self.max_simulataneous_jobs:
                 lock_status = 'unlocked'
             else:
-                for item in running_file.queue:
-                    if running_file.specs[item]['status'] == 'unlocked':
-                        tb.S(running_file.specs[item]).print(as_config=True, title="Old Lock File Details")
+                for job_id in running_file.queue:
+                    if running_file.specs[job_id]['status'] == 'unlocked':
+                        tb.S(running_file.specs[job_id]).print(as_config=True, title="Old Lock File Details")
                         lock_status = 'unlocked'
                         break
 
