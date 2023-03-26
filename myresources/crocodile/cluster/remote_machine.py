@@ -17,10 +17,14 @@ console = Console()
 
 class ResourceManager:
     lock_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/lock.Struct.pkl")
-
+    @staticmethod
+    def from_pickle(path):
+        rm = ResourceManager('1', '2', True, 1)
+        rm.__setstate__(tb.P(path).expanduser().readit())
+        return rm
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
-    def __init__(self, job_id, remote_machine_type, max_simulataneous_jobs=1, base=None):
+    def __init__(self, job_id: str, remote_machine_type: str, lock_resources: bool, max_simulataneous_jobs: int = 1, base=None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.
@@ -29,6 +33,7 @@ class ResourceManager:
         self.remote_machine_type = remote_machine_type
         self.job_id = job_id
         self.max_simulataneous_jobs = max_simulataneous_jobs
+        self.lock_resources = lock_resources
 
         self.submission_time = pd.Timestamp.now()
 
@@ -51,39 +56,38 @@ rm {self.lock_path.collapseuser().as_posix()}
 echo "Unlocked resources"
 """
     def secure_resources(self):
+        if self.lock_resources is False: return True
         sleep_time_mins = 10
         lock_path = self.lock_path.expanduser()
-        lock_file = None
+        # lock_file = None
         print(f"Inspecting Lock file @ {lock_path}")
         lock_status = 'locked'
         while lock_status == 'locked':
             try:
                 lock_file = lock_path.readit()
                 lock_status = lock_file.lock['status']
-                next_job_id = lock_file.queue[0]
             except FileNotFoundError:
                 print(f"Lock file was deleted by the locking job, taking hold of it.")
                 break
             except KeyError:
                 print(f"Lock file was corrupted by the locking job, taking hold of it.")
                 break
-            except IndexError:
-                print(f"Lock file indicate that the queue is empty ... running the job anyway.")
-                lock_file.queue.append(self.job_id)
-                lock_file.save(lock_path)
-                break
-            if lock_status == 'unlocked' and next_job_id == self.job_id:
-                print(f"{lock_status=}, {next_job_id=}, {self.job_id=}")
-                lock_file.print(as_config=True, title="Old Lock File Details")
-                break
-            elif self.job_id not in lock_file.queue:
-                print(f"Queue is not empty. Adding this job to the queue.")
+
+            if self.job_id not in lock_file.queue:
+                if len(lock_file.queue) == 0:
+                    print(f"Lock file indicates that the queue is empty, adding the current job to the queue.")
+                else:
+                    print(f"Queue is not empty. Adding this job to the queue.")
                 print(f"Queue: {lock_file.queue}, {self.job_id=}")
                 lock_file.queue.append(self.job_id)
                 lock_file.specs[self.job_id] = dict(submission_time=self.submission_time, pid=os.getpid())
                 lock_file.save(lock_path)
-            import psutil
 
+            if lock_status == 'unlocked' and lock_file.queue[0] == self.job_id:
+                lock_file.print(as_config=True, title="Old Lock File Details")
+                break
+
+            import psutil
             next_job_in_queue = lock_file.queue[0]
             try: _ = psutil.Process(lock_file.specs[next_job_in_queue]['pid'])
             except psutil.NoSuchProcess:
@@ -91,6 +95,7 @@ echo "Unlocked resources"
                 lock_file.queue.pop(0)
                 del lock_file.specs[next_job_in_queue]
                 lock_file.save(lock_path)
+                continue
 
             try: proc = psutil.Process(lock_file.lock['pid'])
             except psutil.NoSuchProcess:
@@ -114,10 +119,10 @@ echo "Unlocked resources"
             console.rule(title=f"Resources are locked by another job `{lock_file.lock['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
             print("\n")
             time.sleep(sleep_time_mins * 60)
-        self.lock_resources()
+        self.write_lock_file()
         console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
-    def lock_resources(self):
+    def write_lock_file(self):
         lock = dict(status="locked", pid=os.getpid(),
                     job_id=self.job_id,
                     start_time=pd.Timestamp.now(),
@@ -135,6 +140,7 @@ echo "Unlocked resources"
         tb.S(lock=lock, queue=queue, specs=specs).save(path=lock_path)
 
     def unlock_resources(self):
+        if self.lock_resources is False: return True
         dat = self.lock_path.expanduser().readit()
         dat.lock['status'] = 'unlocked'
         dat.save(path=ResourceManager.lock_path.expanduser())
@@ -220,7 +226,7 @@ class RemoteMachine:
         self.z = Zellij(self.ssh)
         self.zellij_session = None
         # scripts
-        self.path_dict = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs)
+        self.path_dict = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
         self.execution_command = None
         self.submitted = False
@@ -278,7 +284,8 @@ class RemoteMachine:
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
-                           job_id=self.config.job_id, base=self.path_dict.base.as_posix(), lock_resources=self.config.lock_resources, zellij_session=self.zellij_session)
+                           manager_path='',
+                           zellij_session=self.zellij_session)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
 
         if self.config.notify_upon_completion:
@@ -318,7 +325,6 @@ deactivate
 {f'zellij kill-session {self.zellij_session}' if self.config.kill_on_completion else ''}
 
 """
-# {self.path_dict.get_resources_unlocking() if self.lock_resources else ''}
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10

@@ -35,16 +35,12 @@ description = ""
 ssh_repr = ""
 ssh_repr_remote = ""
 error_message = "No error message."  # to be updated by try-except block inside execution line.
-
-job_id = ""
-base = ""
-lock_resources = ""
 zellij_session = ""
-
+manager_path = ""
 
 print("\n" * 2)
-manager = ResourceManager(job_id=job_id, remote_machine_type=platform.system(), base=base)
-if lock_resources: manager.secure_resources()
+manager = ResourceManager.from_pickle(manager_path)
+manager.secure_resources()
 
 # keep those values after lock is released
 time_at_execution_start_utc = pd.Timestamp.utcnow()
@@ -90,12 +86,12 @@ print("\n" * 2)
 # ######################### END OF EXECUTION #############################
 
 
-if lock_resources: manager.unlock_resources()
+manager.unlock_resources()
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
 else:
-    res_folder = tb.P.tmp(folder=rf"tmp_dirs/{job_id}").create()
+    res_folder = tb.P.tmp(folder=rf"tmp_dirs/{manager.job_id}").create()
     console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
     print("\n\n")
     try:
@@ -120,7 +116,7 @@ tb.Experimental.generate_readme(path=manager.root_dir.expanduser().joinpath("exe
 
 Job executed via tb.cluster.Machine
 remote: {ssh_repr}
-job_id: {job_id}
+job_id: {manager.job_id}
 
 py_script_path @ `{manager.py_script_path.collapseuser()}`
 shell_script_path @ `{manager.shell_script_path.collapseuser()}`
@@ -152,5 +148,5 @@ if zellij_session != "":
     tb.Terminal().run(f"""zellij --session {zellij_session} action write-chars "cd {res_folder.as_posix()};lf" """)
 
 
-print(f"job {job_id} is completed.")
+print(f"job {manager.job_id} is completed.")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")
