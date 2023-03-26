@@ -20,7 +20,7 @@ class ResourceManager:
     @staticmethod
     def from_pickle(path):
         rm = ResourceManager(job_id='1', remote_machine_type='Windows', lock_resources=True, max_simulataneous_jobs=1, base=None)
-        rm.__setstate__(tb.P(path).expanduser().readit())
+        rm.__setstate__(dict(tb.P(path).expanduser().readit()))
         return rm
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
