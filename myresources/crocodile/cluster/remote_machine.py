@@ -136,25 +136,30 @@ echo "Unlocked resources"
         console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
     def write_lock_file(self):
-        lock = dict(status="locked", pid=os.getpid(),
-                    job_id=self.job_id,
-                    start_time=pd.Timestamp.now(),
-                    submission_time=self.submission_time)
-        lock_path = self.running_path.expanduser()
-        if lock_path.exists():
-            current_lock = lock_path.readit()
-            assert len(current_lock['running']) < self.max_simulataneous_jobs, f"Number of running jobs ({len(current_lock['running'])}) is greater than the maximum allowed ({self.max_simulataneous_jobs})."
-            queue = current_lock['queue']
-            next_job_id = queue.pop(0)
-            assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}."
-            running = current_lock['running']
-            running.append(lock)
-            specs = current_lock['specs']
+        specs = dict(status="locked", pid=os.getpid(),
+                     job_id=self.job_id,
+                     start_time=pd.Timestamp.now(),
+                     submission_time=self.submission_time)
+        queue_path = self.queue_path.expanduser()
+        assert queue_path.exists(), f"Queue file {queue_path} does not exist."
+        queue_file = queue_path.readit()
+        queue_file: Lock
+        assert len(queue_file.queue) < self.max_simulataneous_jobs, f"Number of running jobs ({len(queue_file.queue)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
+        next_job_id = queue_file.queue.pop(0)
+        assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}. If that is the case, which it is, then this method should not be called in the first place."
+        del queue_file.specs[next_job_id]
+        tb.Save.pickle(obj=queue_file, path=queue_path)
+
+        running_path = self.running_path.expanduser()
+        if running_path.exists():
+            running_file = running_path.readit()
+            running_file: Lock
         else:
-            queue = []
-            running = [lock]
-            specs = dict()
-        tb.S(running=running, queue=queue, specs=specs).save(path=lock_path)
+            running_file = Lock(queue=[], specs={})
+
+        running_file.queue.append(self.job_id)
+        running_file.specs[self.job_id] = specs
+        tb.Save.pickle(obj=running_file, path=running_path)
 
     def unlock_resources(self):
         if self.lock_resources is False: return True
