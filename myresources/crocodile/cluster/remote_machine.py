@@ -82,8 +82,8 @@ echo "Unlocked resources"
                 running_file = self.running_path.expanduser().readit()
                 running_file: Lock
             except FileNotFoundError:
-                print(f"Running file was deleted by the locking job, taking hold of it.")
                 running_file = Lock(queue=[], specs={})
+                print(f"Running file was deleted by the locking job, taking hold of it.")
                 tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
                 self.add_to_queue()
 
@@ -153,6 +153,7 @@ echo "Unlocked resources"
         next_job_id = queue_file.queue.pop(0)
         assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}. If that is the case, which it is, then this method should not be called in the first place."
         del queue_file.specs[next_job_id]
+        print(f"Removed current job from waiting queue and added it to the running queue. Saving both files.")
         tb.Save.pickle(obj=queue_file, path=queue_path)
         running_path = self.running_path.expanduser()
         if running_path.exists():
@@ -171,8 +172,8 @@ echo "Unlocked resources"
         dat: Lock
         dat.queue.remove(self.job_id)
         del dat.specs[self.job_id]
+        console.print(f"Resources have been released by this job `{self.job_id}`. Saving new running file")
         tb.Save.pickle(path=self.running_path.expanduser(), obj=dat)
-        console.print(f"Resources have been released by this job `{self.job_id}`.")
         start_time = pd.to_datetime(self.execution_log_dir.expanduser().joinpath("start_time.txt").readit(), utc=False)
         end_time = pd.Timestamp.now()
         item = {"job_id": self.job_id, "start_time": start_time, "end_time": end_time, "submission_time": self.submission_time}
@@ -182,6 +183,7 @@ echo "Unlocked resources"
         else:
             hist = []
         hist.append(item)
+        print(f"Saved history file to {hist_file} with {len(hist)} items.")
         tb.Save.pickle(obj=hist, path=hist_file)
         # this is further handled by the calling script in case this function failed.
 
