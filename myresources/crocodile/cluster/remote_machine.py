@@ -112,6 +112,7 @@ echo "Unlocked resources"
                 continue
 
             # --------------- Clearning up running_file from dead processes -----------------
+            found_dead_process = False
             for job_id in running_file.queue:
                 specs = running_file.specs[job_id]
                 try: proc = psutil.Process(specs['pid'])
@@ -121,7 +122,8 @@ echo "Unlocked resources"
                     running_file.queue.remove(job_id)
                     del running_file.specs[job_id]
                     tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
-                    continue
+                    found_dead_process = True
+                    continue  # for for loop
                 attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
                              'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                              'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
@@ -130,6 +132,7 @@ echo "Unlocked resources"
                 attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
                 inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {specs['pid']})", docs=False, sort=False)
                 inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {specs['pid']})", docs=False, sort=False)
+            if found_dead_process: continue  # repeat while loop logic.
 
             this_specs = {f"Submission time": self.submission_time, f"Time now": pd.Timestamp.now(),
                           f"Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - self.submission_time,
