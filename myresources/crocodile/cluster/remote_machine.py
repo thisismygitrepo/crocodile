@@ -118,7 +118,10 @@ echo "Unlocked resources"
                 except psutil.NoSuchProcess:
                     print(f"Locking process with pid {specs['pid']} is dead. Ignoring this lock file.")
                     tb.S(specs).print(as_config=True, title="Ignored Lock File Details")
-                    break
+                    running_file.queue.remove(job_id)
+                    del running_file.specs[job_id]
+                    tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
+                    continue
                 attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
                              'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                              'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
@@ -128,10 +131,10 @@ echo "Unlocked resources"
                 inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {specs['pid']})", docs=False, sort=False)
                 inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {specs['pid']})", docs=False, sort=False)
 
-            print(f"Submission time: {self.submission_time}")
-            print(f"Time now: {pd.Timestamp.now()}")
-            print(f"Time spent waiting in the queue so far = {pd.Timestamp.now() - self.submission_time} 🛌")
-            print(f"Time consumed by locking job so far (job_id = {specs['job_id']}) so far = {pd.Timestamp.now() - specs['start_time']} ⏰")
+            this_specs = {f"Submission time": self.submission_time, f"Time now": pd.Timestamp.now(),
+                          f"Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - self.submission_time,
+                          f"Time consumed by locking job so far (job_id = {specs['job_id']}) so far ⏰": pd.Timestamp.now() - specs['start_time']}
+            tb.S(this_specs).print(as_config=True, title="This Job Details")
             console.rule(title=f"Resources are locked by another job `{specs['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
             print("\n")
             time.sleep(sleep_time_mins * 60)
