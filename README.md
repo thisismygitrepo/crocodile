@@ -7,7 +7,7 @@ Pythonically facilitate laborious `file management`, `distributed computing`, `s
 
 https://user-images.githubusercontent.com/46288868/213916407-bf6300bd-3409-4a20-b71c-00374f875c7a.mp4
 
-With this cluster management tool, old laptops and desktops are endowed second lives as cluster workhorses to which you offset heavy computations.
+With this cluster management tool, old laptops and desktops are endowed second lives as cluster workhorses to which you offset heavy computations from your little personal laptop.
 
 
 ##### Other Distriubted Computing Features:
