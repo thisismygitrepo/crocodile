@@ -53,7 +53,7 @@ zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 """
         else: exe = f"""
-zellij --session {sess_name} action write-chars "{cmd}" 
+zellij --session {sess_name} action write-chars "{cmd}"
 """
         return self.ssh.run(f"""
 zellij --session {sess_name} action rename-tab main{self.id}  # rename the focused first tab; sleep 0.2
