@@ -53,7 +53,8 @@ class App:
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod
-    def get_app(name=""): return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
+    def get_app(name=""): 
+        return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
 
     @staticmethod
     def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""

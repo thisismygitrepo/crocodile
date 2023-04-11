@@ -190,12 +190,12 @@ class Cluster:
 
     def open_mux(self, machines_per_tab=1, window_number=None):
         self.machines_per_tab = machines_per_tab
-        self.window_number = window_number or tb.randstr(length=3, lower=False, upper=False)
+        self.window_number = window_number if window_number is not None else 0  # tb.randstr(length=3, lower=False, upper=False)
         cmd = f"wt -w {self.window_number} "
         for idx, m in enumerate(self.machines):
             sub_cmd = m.z.get_new_sess_string()
-            if idx == 0: cmd += f""" --title '{m.ssh.hostname}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
-            elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname} pwsh -Command "{sub_cmd}" `;"""
+            if idx == 0: cmd += f""" new-tab --title '{m.ssh.hostname + str(idx)}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
+            elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname + str(idx)} pwsh -Command "{sub_cmd}" `;"""
             else: cmd += f""" split-pane --horizontal --size {1 / self.machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
 
         print("Terminal launch command:\n", cmd)

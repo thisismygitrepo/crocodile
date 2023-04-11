@@ -9,24 +9,13 @@ class Zellij:
         self.ssh = ssh
         self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
         self.new_sess_name = None
-
     # def __getstate__(self): return self.__dict__
     # def __setstate__(self, state): self.__dict__.update(state)
-
-    def get_new_sess_string(self):
+   def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string(), shell="pwsh")
+   def get_new_sess_string(self):
         sess_name = self.get_new_sess_name()
-        sub_cmd = f"{self.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "
+        sub_cmd = f"{self.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "  # -c means create if not exists.
         return sub_cmd
-
-    def asssert_sesion_started(self):
-        while True:
-            resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
-            if self.new_sess_name in resp: break
-            time.sleep(2)
-            print(f"Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
-
-    def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string(), shell="pwsh")
-
     def get_new_sess_name(self):
         if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
@@ -41,7 +30,12 @@ class Zellij:
             else: sess_name = f"ms{1+sess[-1]}"
         self.new_sess_name = sess_name
         return sess_name
-
+    def asssert_sesion_started(self):
+        while True:
+            resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
+            if self.new_sess_name in resp: break
+            time.sleep(2)
+            print(f"Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
     def setup_layout(self, sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "~/tmp_results/remote_mahcines"):
         if self.new_sess_name is None: self.get_new_sess_name()
         if run:

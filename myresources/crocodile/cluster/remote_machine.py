@@ -233,6 +233,7 @@ class RemoteMachineConfig:
     ipython: bool = False
     interactive: bool = False
     pdb: bool = False
+    pudb: bool = False
     wrap_in_try_except: bool = False
     parallelize: bool = False
     lock_resources: bool = True
