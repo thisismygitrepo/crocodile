@@ -56,6 +56,7 @@ class App:
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod
+<<<<<<< HEAD
     def get_app(name=""):
         theme = {
             'dark': True,
@@ -65,8 +66,7 @@ class App:
         }
 
         return dash.Dash(name=name+tb.randstr(), external_stylesheets=[dbc.themes.DARKLY])
-        # [r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
-
+        # [r'https://codepen.io/chriddyp/pen/bWLwgP.css']
     @staticmethod
     def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
         raise NotImplementedError
