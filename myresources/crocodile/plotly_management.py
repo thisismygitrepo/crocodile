@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.io as pio
+import dash_bootstrap_components as dbc
 
 import dash
 from dash import Input, Output, State, callback_context as ctx
@@ -46,14 +47,25 @@ CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
 class App:
     @staticmethod
     def run(app, debug=False, random_port=True):
-        host = "127.0.0.1"
+        host = "0.0.0.0"  #  "127.0.0.1"
         port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
-        tb.P(rf'http://{host}:{port}/')()
+        try: tb.P(rf'http://{host}:{port}/')()
+        except Exception as ex:
+            print(ex)
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod
-    def get_app(name=""): return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
+    def get_app(name=""):
+        theme = {
+            'dark': True,
+            'detail': '#007439',
+            'primary': '#00EA64',
+            'secondary': '#6E6E6E',
+        }
+
+        return dash.Dash(name=name+tb.randstr(), external_stylesheets=[dbc.themes.DARKLY])
+        # [r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
 
     @staticmethod
     def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""

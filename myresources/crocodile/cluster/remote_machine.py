@@ -233,6 +233,7 @@ class RemoteMachineConfig:
     ipython: bool = False
     interactive: bool = False
     pdb: bool = False
+    pudb: bool = False
     wrap_in_try_except: bool = False
     parallelize: bool = False
     lock_resources: bool = True
@@ -316,7 +317,6 @@ class RemoteMachine:
         assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func_name}`"
         rel_full_path = self.repo_path.rel2home().joinpath(self.func_relative_file).as_posix()
         self.zellij_session = self.z.get_new_sess_name()
-
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
@@ -324,7 +324,6 @@ class RemoteMachine:
                            resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
                            zellij_session=self.zellij_session)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
-
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.repo_path).joinpath(self.func_relative_file).collapseuser().as_posix()}*"""  # for email.
@@ -354,13 +353,12 @@ echo "Executing Python wrapper script: {self.path_dict.py_script_path.as_posix()
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'--pdb' if self.config.pdb else ''} {'-i' if self.config.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
+{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} {'-i' if self.config.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
 
 deactivate
 
-{f'zellij kill-session {self.zellij_session}' if self.config.kill_on_completion else ''}
-
 """
+        if self.ssh.get_remote_machine() != "Windows": shell_script += f"""{f'zellij kill-session {self.zellij_session}' if self.config.kill_on_completion else ''}"""
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
