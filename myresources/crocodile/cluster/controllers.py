@@ -11,8 +11,8 @@ class Zellij:
         self.new_sess_name = None
     # def __getstate__(self): return self.__dict__
     # def __setstate__(self, state): self.__dict__.update(state)
-   def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string(), shell="pwsh")
-   def get_new_sess_string(self):
+    def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string(), shell="pwsh")
+    def get_new_sess_string(self):
         sess_name = self.get_new_sess_name()
         sub_cmd = f"{self.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "  # -c means create if not exists.
         return sub_cmd
