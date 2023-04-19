@@ -50,21 +50,21 @@ zellij --session {sess_name} action close-pane; sleep 0.2
 zellij --session {sess_name} action write-chars "{cmd}"
 """
         return self.ssh.run(f"""
-zellij --session {sess_name} action rename-tab main{self.id}  # rename the focused first tab; sleep 0.2
-zellij --session {sess_name} action new-tab --name monitor{self.id}; sleep 0.2
+zellij --session {sess_name} action rename-tab 🖥️{self.id}  # rename the focused first tab; sleep 0.2
+zellij --session {sess_name} action new-tab --name 🔍{self.id}; sleep 0.2
 zellij --session {sess_name} action write-chars htop; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name explorer{self.id}; sleep 0.2
+zellij --session {sess_name} action new-tab --name 📁{self.id}; sleep 0.2
 zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name who{self.id}; sleep 0.2
+zellij --session {sess_name} action new-tab --name 🪪{self.id}; sleep 0.2
 zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name terminal{self.id}; sleep 0.2
+zellij --session {sess_name} action new-tab --name 🧑‍💻{self.id}; sleep 0.2
 zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep 0.2
 zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
