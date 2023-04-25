@@ -217,10 +217,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
 
 
 class Scheduler:
-    def __init__(self, routine=None, wait: str = "2m", other_routine=None, other_ratio: int = 10, max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats=None):
+    def __init__(self, routine=None, wait: str = "2m", max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats=None):
         self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
-        self.other_routine = (lambda sched: None) if other_routine is None else other_routine  # routine to be repeated every `other` time period
-        self.wait, self.other_ratio = str2timedelta(wait).total_seconds(), other_ratio  # wait period between routine cycles.
+        self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger, self.exception_handler = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True)), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
     def run(self, max_cycles=None, until="2050-01-01"):
@@ -229,9 +228,6 @@ class Scheduler:
             time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
             try: self.routine(sched=self)
             except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
-            if self.cycle % self.other_ratio == 0:
-                try: self.other_routine(sched=self)
-                except BaseException as ex: self._handle_exceptions(ex=ex, during="occasional")  # 3- Optional logic every while
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
