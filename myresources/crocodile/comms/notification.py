@@ -25,7 +25,8 @@ class Email:
 
     def __init__(self, config):
         self.config = config
-        self.server = smtplib.SMTP(host=self.config["smpt_host"], port=self.config["smpt_port"])
+        if config['encryption'].lower() == "ssl": self.server = smtplib.SMTP_SSL(host=self.config["smtp_host"], port=self.config["smtp_port"])
+        elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"]) 
         self.server.login(self.config['email_add'], password=self.config["get_password"]())
 
     def send_message(self, to, subject, body, txt_to_html=True, attachments=None):
