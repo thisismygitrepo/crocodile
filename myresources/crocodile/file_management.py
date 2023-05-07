@@ -166,7 +166,7 @@ class P(type(Path()), Path):
     def __len__(self): return len(self.parts)
     def __contains__(self, item): return P(item).as_posix() in self.as_posix()
     def __iter__(self): return self.parts.__iter__()
-    def __deepcopy__(self) -> 'P': return P(str(self))
+    def __deepcopy__(self, *args, **kwargs) -> 'P': return P(str(self))
     def __getstate__(self) -> str: return str(self)
     def __setstate__(self, state): self._str = str(state)
     def __add__(self, other) -> 'P': return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
