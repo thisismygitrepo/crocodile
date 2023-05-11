@@ -18,7 +18,6 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     if noun: return install_n_import("randomname").get_name()
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
-def get_env(): import crocodile.environment as env; return env
 
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path

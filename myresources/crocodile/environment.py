@@ -67,10 +67,11 @@ DotFiles = P.home().joinpath("dotfiles")
 # ============================== Networking ==============================
 
 
-def get_addresses():
-    netifaces = tb.install_n_import("netifaces")
-    subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
-    default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
+def get_network_addresses():
+    # netifaces = tb.install_n_import(package="netifaces2", library="netifaces2")
+    # netifaces = tb.install_n_import(library="netifaces", package="netifaces2")
+    # subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
+    # default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join(("%012X" % mac)[i:i + 2] for i in range(0, 12, 2))
@@ -78,8 +79,8 @@ def get_addresses():
     # else: return mac
     import socket
     local_ip_v4 = socket.gethostbyname(socket.gethostname() + ".local")  # without .local, in linux machines, '/etc/hosts' file content, you have an IP address mapping with '127.0.1.1' to your hostname
-    return dict(subnet_mask=subnet_mask, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=default_gateway, public_ip_v4=P('https://api.ipify.org').download(memory=True).text)
-
+    res = dict(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=P('https://api.ipify.org').download(memory=True).text)
+    return res
 
 # ============================== System Variables ==============================
 

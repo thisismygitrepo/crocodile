@@ -1,5 +1,5 @@
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, get_env, install_n_import
+from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
 
 # %% =============================== Security ================================================
@@ -328,7 +328,8 @@ class P(type(Path()), Path):
         name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
         return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
     def checksum(self, kind=["md5", "sha256"][1]): import hashlib; myhash = {"md5": hashlib.md5, "sha256": hashlib.sha256}[kind](); myhash.update(self.read_bytes()); return myhash.hexdigest()
-    get_env = staticmethod(lambda: get_env())
+    @staticmethod
+    def get_env(): return __import__("crocodile.enviroment")
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username=None, password=None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, txt=True, path=None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(str(self) if "http" in str(self) else (self.read_text() if txt else self.read_bytes())); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
@@ -373,7 +374,7 @@ def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwar
         else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); return P(op_path) / fname
 def seven_zip(path: P, op_path: P, pwd=None, mode='w'):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
     op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path
-    if (env := get_env()).system == "Windows":
+    if (env := P.get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.is_successful, res.print(); return op_path
     elif env.system == "Linux":  # python variant is much slower than 7-zip, and consumes more memroy, see py7zr project on github.
@@ -381,7 +382,7 @@ def seven_zip(path: P, op_path: P, pwd=None, mode='w'):  # benefits over regular
         with py7zr.SevenZipFile(op_path, mode, password=pwd) as archive: archive.writeall(path)
         return op_path
 def un_seven_zip(path, op_dir, overwrite=False, pwd=None):  # TODO: use py7zr instead of two implementations for linux and windows.
-    if (env := get_env()).system == "Windows":
+    if (env := P.get_env()).system == "Windows":
         env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
         res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.is_successful, res.print(); return op_dir
     else: raise NotImplementedError("7z not implemented for Linux")
