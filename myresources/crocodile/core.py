@@ -203,6 +203,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel); return artist
 
+
 def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
 def set_numpy_display(precision=3, linewidth=250, suppress=True, floatmode='fixed', **kwargs) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
