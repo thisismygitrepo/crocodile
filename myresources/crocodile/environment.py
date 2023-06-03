@@ -175,7 +175,7 @@ class PathVar:
         On a windows machine, system and user variables are kept separately. env:Path returns the combination of both, starting from system then user.
         To see impact of change, you will need to restart the process from which the shell started. This is probably windows explorer.
         This can be achieved by suspending the process, alternatively you need to logoff and on.
-        This is because enviroment variables are inherited from parent process, and so long explorere is not updated, restarting the shell would not help."""
+        This is because environment variables are inherited from parent process, and so long explorere is not updated, restarting the shell would not help."""
         tmpfile = tb.P.tmpfile(suffix=".path_backup")
         print(f"Saving original path to {tmpfile}")
         backup = fr'$env:PATH >> {tmpfile}; '
