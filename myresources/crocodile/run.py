@@ -19,9 +19,11 @@ Choices made by default:
 * interactive is the default
 * importing the file to be run (as opposed to running it as main) is the default. The advantage of running it as an imported module is having reference to the file from which classes came. This is vital for pickling.
 
+
+This file is meant to be run by croshell.sh / croshell.ps1 and offers commandline arguments. The latter files not to be confused with croshell.py which is, just the python shell.
+
 """
 
-# import crocodile.toolbox as tb
 import argparse
 import subprocess
 import platform
@@ -32,23 +34,21 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Generic Parser to launch crocodile shell.")
 
     # POSITIONAL ARGUMENT (UNNAMED)
-    # if dest is not specified, then, it has same path as keyword, e.g. "--dest"
-    # parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
+    # parser.add_argument("--read", "-file", dest="file", help="binary/python file path to read/interpret.", default="")
 
     # A FLAG:
-    parser.add_argument("--module", '-m', help="Flag tells to run the file as main.", action="store_true", default=False)  # default is running as main, unless indicated by --module flag.
-    parser.add_argument("--newWindow", "-w", help="Flag for running in new window.", action="store_true", default=False)
-    parser.add_argument("--nonInteratctive", "-N", help="Specify a non-interactive session.", action="store_true", default=False)
-    parser.add_argument("--python", "-p", help="Use python over IPython.", action="store_true", default=False)
+    parser.add_argument("--module", '-m', help="flag to run the file as a module as opposed to main.", action="store_true", default=False)  # default is running as main, unless indicated by --module flag.
+    parser.add_argument("--newWindow", "-w", help="flag for running in new window.", action="store_true", default=False)
+    parser.add_argument("--nonInteratctive", "-N", help="flag for a non-interactive session.", action="store_true", default=False)
+    parser.add_argument("--python", "-p", help="flag to use python over IPython.", action="store_true", default=False)
 
     # OPTIONAL KEYWORD
-    parser.add_argument("--kill", "-k", dest="kill", help="Python file path.", default="")
-    parser.add_argument("--file", "-f", dest="file", help="Python file path.", default="")
-    parser.add_argument("--func", "-F", dest="func", help=f"function to be run after import", default="")
-    parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
-    parser.add_argument("--read", "-r", dest="read", help="Read file", default="")
-    parser.add_argument("--terminal", "-t", dest="terminal",  help=f"Flag to specify which terminal to be used. Default console host.", default="")  # can choose `wt`
-    parser.add_argument("--shell", "-S", dest="shell", help=f"Flag to specify which terminal to be used. Default CMD.", default="")
+    parser.add_argument("--version", "-v", help="flag to print version.", action="store_true", default=False)
+    parser.add_argument("--read", "-r", dest="read", help="read a binary file.", default="")
+    parser.add_argument("--file", "-f", dest="file", help="python file path to interpret", default="")
+    parser.add_argument("--cmd", "-c", dest="cmd", help="python command to interpret", default="")
+    parser.add_argument("--terminal", "-t", dest="terminal",  help=f"specify which terminal to be used. Default console host.", default="")  # can choose `wt`
+    parser.add_argument("--shell", "-S", dest="shell", help=f"specify which shell to be used. Defaults to CMD.", default="")
 
     args = parser.parse_args()
     # print(f"Crocodile.run: args of the firing command = {args.__dict__}")
@@ -58,25 +58,25 @@ def build_parser():
     interactivity = '' if args.nonInteratctive else '-i'
     interpreter = 'python' if args.python else 'ipython'
 
-    if args.file != "":
-        file = Path(args.file).expanduser().absolute()
-        if not args.module: res = f"{interpreter} {interactivity} {file}"
-        else:  # run as a module (i.e. import it)
-            script = fr"""
-from {file} import *
-args.cmd"""
-            if args.func != "": script += f"tb.E.capture_locals({args.func}, globals())"
-            res = f"{interpreter} {interactivity} {script}"
-    elif args.cmd != "":
-        # res = f""" python -c "from crocodile.toolbox import *; import crocodile.environment as env; {args.cmd}" """
+    if args.cmd != "":
         import textwrap
         code = f"from crocodile.toolbox import *\n{textwrap.dedent(args.cmd)}"
-        # print(code)
         exec(code)
-        return None
+        return None  # DONE
+    
+    elif args.file != "" or args.read != "":
 
-    elif args.read != "":
-        code_text = f"""
+        if args.file != "":
+            file = Path(args.file).expanduser().absolute()        
+            code_text = fr"""
+import sys
+sys.path.append(r'{file.parent}')
+from {file.stem} import *
+{args.cmd if args.cmd != '' else ''}
+"""
+
+        elif args.read != "": 
+            code_text = f"""
 # >>>>>>> Reading File <<<<<<<<<
 p = P(r\'{str(args.read).lstrip()}\').absolute()
 try:
@@ -84,25 +84,21 @@ try:
     if type(dat) == tb.Struct: dat.print(as_config=True, title=p.name)
 except Exception as e:
     print(e)
+
 """
 
-        # next, write code_text to file at home directory /tmp_results/shells/python_readfile_script.py using open:
+        # next, write code_text to file at ~/tmp_results/shells/python_readfile_script.py using open:
         base = Path.home().joinpath("tmp_results/shells")
         base.mkdir(parents=True, exist_ok=True)
         code_file = base.joinpath("python_readfile_script.py")
         code_file.write_text(code_text)
         res = f"""ipython --no-banner -i -m crocodile.croshell -- --file "{code_file}" """
-    elif args.kill != "":
-        res = __import__("crocodile.toolbox").toolbox.L(__import__("psutil").process_iter()).filter(lambda x: args.kill in x.name())
-        # res.print()
-        for item in res[::-1]: print(f"killing {item.name()}"); item.kill()
-        return None
-    else:
+
+    else:  # just run croshell.py interactively
         res = f"{interpreter} {interactivity} --no-banner -m crocodile.croshell"  # --term-title croshell
         # Clear-Host;
         # # --autocall 1 in order to enable shell-like behaviour: e.g.: P x is interpreted as P(x)
 
-    # print(res)
     if platform.system() == "Windows": return subprocess.run([f"powershell", "-Command", res], shell=True, capture_output=False, text=True)
     else: return subprocess.run([res], shell=True, capture_output=False, text=True)
 
