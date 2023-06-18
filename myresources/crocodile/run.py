@@ -1,5 +1,7 @@
 
 """
+This file is meant to be run by croshell.sh / croshell.ps1 and offers commandline arguments. The latter files not to be confused with croshell.py which is, just the python shell.
+
 Argument Parsing:
 * Script level.
     * This is system dependent and is hard in bash.
@@ -18,9 +20,6 @@ Choices made by default:
 * ipython over python
 * interactive is the default
 * importing the file to be run (as opposed to running it as main) is the default. The advantage of running it as an imported module is having reference to the file from which classes came. This is vital for pickling.
-
-
-This file is meant to be run by croshell.sh / croshell.ps1 and offers commandline arguments. The latter files not to be confused with croshell.py which is, just the python shell.
 
 """
 
@@ -41,6 +40,7 @@ def build_parser():
     parser.add_argument("--newWindow", "-w", help="flag for running in new window.", action="store_true", default=False)
     parser.add_argument("--nonInteratctive", "-N", help="flag for a non-interactive session.", action="store_true", default=False)
     parser.add_argument("--python", "-p", help="flag to use python over IPython.", action="store_true", default=False)
+    parser.add_argument("--fzf", "-F", help="search with fuzzy finder for python scripts and run them", action="store_true", default=False)
 
     # OPTIONAL KEYWORD
     parser.add_argument("--version", "-v", help="flag to print version.", action="store_true", default=False)
@@ -63,12 +63,17 @@ def build_parser():
         code = f"from crocodile.toolbox import *\n{textwrap.dedent(args.cmd)}"
         exec(code)
         return None  # DONE
-    
+    elif args.fzf:
+        from machineconfig.utils.utils import display_options, P
+        file = display_options(msg="Choose a python file to run", options=list(P.cwd().search("*.py", r=True)), fzf=True, multi=False, )
+        if len(file) == 0: return None
+        res = f"""ipython --no-banner -i -m crocodile.croshell -- --file "{file}" """
     elif args.file != "" or args.read != "":
-
+        code_text = ""
         if args.file != "":
             file = Path(args.file).expanduser().absolute()        
             code_text = fr"""
+# >>>>>>> Importing File <<<<<<<<<
 import sys
 sys.path.append(r'{file.parent}')
 from {file.stem} import *
