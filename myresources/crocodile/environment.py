@@ -112,12 +112,10 @@ class EnvVar:
             else: raise NotImplementedError
         elif system == "Linux": return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
         else: raise NotImplementedError
-
     @staticmethod
     def get(key, run=False):
         result = f"${key}"  # works in powershell and bash
         return result if run is False else tm.run(result, shell="powershell")
-
     # in windows cmd `%key%`
     @staticmethod
     def delete(key, temp=True, scope=["User", "system"][0], run=False):
