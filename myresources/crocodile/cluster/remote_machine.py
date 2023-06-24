@@ -1,6 +1,6 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster.controllers import Zellij
+from crocodile.cluster.controllers import Zellij, Mprocs
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
@@ -262,7 +262,7 @@ class RemoteMachine:
         self.data = data if data is not None else []
         # conn
         self.ssh = ssh or tb.SSH(**self.config.ssh_params)
-        self.z = Zellij(self.ssh)
+        self.z = Zellij(self.ssh) if not self.ssh.get_remote_machine() == "Windows" else Mprocs(self.ssh)
         self.zellij_session = None
         # scripts
         self.path_dict = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
@@ -272,7 +272,7 @@ class RemoteMachine:
         self.scipts_generated = False
         self.results_downloaded = False
         self.results_path = None
-        if self.config.interactive and self.config.lock_resources: print(f"If interactive is on along with lock_resources, the job might never end.")
+        if self.config.interactive and self.config.lock_resources: print(f"If interactive is ON along with lock_resources, the job might never end.")
 
     def execution_command_to_clip_memory(self):
         print("Execution command copied to clipboard 📋")
@@ -290,9 +290,9 @@ class RemoteMachine:
                             job_wd=self.path_dict.root_dir.as_posix())
         print("\n")
 
-    def run(self, run=True, open_console=True):
+    def run(self, run=True, open_console=True, show_scripts=True):
         self.generate_scripts()
-        # self.show_scripts()
+        if show_scripts: self.show_scripts()
         self.submit()
         self.fire(run=run, open_console=open_console)
         print(f"Saved RemoteMachine object can be found @ {self.path_dict.machine_obj_path.expanduser()}")
@@ -364,10 +364,11 @@ deactivate
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
         with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
+        self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
         tb.Save.pickle(obj=self.path_dict.__getstate__(), path=self.path_dict.resource_manager_path.expanduser(), verbose=False)
-        self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         print("\n")
+        # self.show_scripts()
 
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))

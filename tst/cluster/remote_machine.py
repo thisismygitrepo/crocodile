@@ -5,7 +5,7 @@ def main():
     from crocodile.cluster.trial_file import expensive_function
     config = RemoteMachineConfig(
         # connection
-        ssh_params=dict(host="thinkpad"), description="Description of running an expensive function",  # job_id=, base_dir="",
+        ssh_params=dict(host="229234"), description="Description of running an expensive function",  # job_id=, base_dir="",
         # data
         copy_repo=False, update_repo=False, install_repo=False, update_essential_repos=True, data=[], transfer_method="sftp",
         # remote machine behaviour
