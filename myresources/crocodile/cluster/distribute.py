@@ -238,5 +238,21 @@ class Cluster:
             self.results_downloaded = True
 
 
+def expensive_function(thread_params: ThreadParams, sim_dict=None) -> tb.P:
+    import time
+    from rich.progress import track
+    print(f"Hello, I am one thread of an expensive function, and I just started running ...")
+    print(f"Oh, I recieved this parameter: {sim_dict=}")
+    execution_time_in_seconds = 60 * 1
+    steps = 100
+    for _ in track(range(steps), description="Progress bar ..."):
+        time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
+    print("I'm done, I crunched numbers from {} to {}.".format(thread_params.idx_start, thread_params.idx_end))
+    _ = thread_params.idx_max
+    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(thread_params.save_suffix, f"thread_{thread_params.idx_start}_{thread_params.idx_end}").create()
+    tb.S(a=1).save(path=save_dir.joinpath(f"trial_func_result.Struct.pkl"))
+    return save_dir
+
+
 if __name__ == '__main__':
     pass
