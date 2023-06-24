@@ -273,9 +273,11 @@ class P(type(Path()), Path):
     @staticmethod
     def tmp(folder=None, file=None, root="~/tmp_results") -> 'P': return P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
     # ====================================== Compression & Encryption ===========================================
-    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, **kwargs) -> 'P':
+    def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, mode='w', **kwargs) -> 'P':
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
-        if use_7z: path = seven_zip(path=slf, op_path=path, pwd=pwd)
+        if use_7z:  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
+            path = path + '.7z' if not path.suffix == '.7z' else path
+            with install_n_import("py7zr").SevenZipFile(file=path, mode=mode, password=pwd) as archive: archive.writeall(path=str(slf), arcname=None)
         else:
             if (arcname := P(arcname or slf.name)).name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
             if slf.is_file(): path = Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, **kwargs)
@@ -283,7 +285,7 @@ class P(type(Path()), Path):
                 root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
                 path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, merge=True, orig=False, pwd=None, tmp=False, **kwargs) -> 'P':
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, orig=False, pwd=None, tmp=False, pattern=None, **kwargs) -> 'P':
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
@@ -291,7 +293,9 @@ class P(type(Path()), Path):
             zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
-        if slf.suffix == ".7z": P(folder).delete(sure=True) if overwrite else None; result = un_seven_zip(path=slf, op_dir=folder, pwd=pwd)
+        if slf.suffix == ".7z":
+            P(folder).delete(sure=True) if overwrite else None; result = folder
+            with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive: archive.extract(path=folder, targets=[f for f in archive.getnames() if pattern.match(f)]) if pattern is not None else archive.extractall(path=folder)
         else:
             if overwrite:
                 if not content: P(folder).joinpath(fname or "").delete(sure=True, verbose=True)  # deletes a specific file / folder that has the same name as the zip file without extension.
@@ -372,20 +376,6 @@ def unzip(ip_path, op_path=None, fname=None, password=None, memory=False, **kwar
         if memory: return Struct({name: zipObj.read(name) for name in zipObj.namelist()}) if fname is None else zipObj.read(fname)
         if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs); return P(op_path)
         else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); return P(op_path) / fname
-def seven_zip(path: P, op_path: P, pwd=None, mode='w'):  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
-    op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path
-    if (env := P.get_env()).system == "Windows":
-        env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        res = env.tm.run(f"&'{program}' a '{op_path}' '{path}' {f'-p{pwd}' if pwd is not None else ''}", shell="powershell"); assert res.is_successful, res.print(); return op_path
-    elif env.system == "Linux":  # python variant is much slower than 7-zip, and consumes more memroy, see py7zr project on github.
-        op_path = op_path + '.7z' if not op_path.suffix == '.7z' else op_path; py7zr = install_n_import("py7zr")
-        with py7zr.SevenZipFile(op_path, mode, password=pwd) as archive: archive.writeall(path)
-        return op_path
-def un_seven_zip(path, op_dir, overwrite=False, pwd=None):  # TODO: use py7zr instead of two implementations for linux and windows.
-    if (env := P.get_env()).system == "Windows":
-        env.tm.run('winget install --name "7-zip" --Id "7zip.7zip" --source winget', shell="powershell") if not (program := env.ProgramFiles.joinpath("7-Zip/7z.exe")).exists() else None
-        res = env.tm.run(f"&'{program}' x",  f"'{path}'",  f"-o'{op_dir}'", f"-p{pwd}" if pwd is not None else '', shell="powershell"); assert res.is_successful, res.print(); return op_dir
-    else: raise NotImplementedError("7z not implemented for Linux")
 def gz(file, op_path):  # see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
     with open(file, 'rb') as f_in:
         with __import__("gzip").open(op_path, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
