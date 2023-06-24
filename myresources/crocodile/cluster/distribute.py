@@ -3,7 +3,7 @@ import numpy as np
 import psutil
 import crocodile.toolbox as tb
 from math import ceil, floor
-from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, ThreadParams
 from rich.console import Console
 # from platform import system
 # import time
@@ -53,7 +53,7 @@ class MachineLoadCalculator:
 
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
-    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_workers) -> list[WorkloadParams]:
+    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_workers) -> list[ThreadParams]:
         """Note: like thread divider in parallelize function, the behaviour is to include the edge cases on both ends of subsequent intervals."""
         tmp = []
         idx_so_far = 0
@@ -64,7 +64,7 @@ class MachineLoadCalculator:
             idx2 = self.max_num if machine_index == self.num_machines - 1 else (floor(load_value * self.max_num) + idx1)
             if idx2 > self.max_num: raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
             idx_so_far = idx2
-            tmp.append(WorkloadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_workers=a_num_workers))
+            tmp.append(ThreadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_threads=a_num_workers))
         return tmp
 
 
@@ -80,7 +80,7 @@ class Cluster:
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
     def __init__(self, ssh_params: list[dict],
-                 func, workload_params: list[WorkloadParams] or None = None,
+                 func, workload_params: list[ThreadParams] or None = None,
                  func_kwargs: dict or None = None,
                  thread_load_calc=None, machine_load_calc=None,
                  ditch_unavailable_machines=False,
@@ -179,7 +179,7 @@ class Cluster:
             if self.remote_machine_kwargs is not None:
                 self.remote_machine_kwargs.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params))
                 config = self.remote_machine_kwargs
-            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params)
+            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, thread_params=a_workload_params)
             m = RemoteMachine(func=self.func, func_kwargs=self.func_kwargs, ssh=an_ssh, config=config)
             m.generate_scripts()
             m.submit()

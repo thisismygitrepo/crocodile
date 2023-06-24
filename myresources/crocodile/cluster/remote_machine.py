@@ -113,6 +113,7 @@ echo "Unlocked resources"
 
             # --------------- Clearning up running_file from dead processes -----------------
             found_dead_process = False
+            specs = {}
             for job_id in running_file.queue:
                 specs = running_file.specs[job_id]
                 try: proc = psutil.Process(specs['pid'])
@@ -198,11 +199,11 @@ class Lock:
 
 
 @dataclass
-class WorkloadParams:
+class ThreadParams:
     idx_start: int = 0
     idx_end: int = 1000
     idx_max: int = 1000
-    num_workers: int = 3
+    num_threads: int = 3
     save_suffix: str = f"machine_{idx_start}_{idx_end}"
 
 
@@ -220,10 +221,10 @@ class RemoteMachineConfig:
     install_repo: bool or None = None
     update_essential_repos: bool = True
     data: list or None = None
+    transfer_method: str = "sftp"
 
     # remote machine behaviour
     open_console: bool = True
-    transfer_method: str = "sftp"
     notify_upon_completion: bool = False
     to_email: str = None
     email_config_name: str = None
@@ -238,7 +239,7 @@ class RemoteMachineConfig:
     parallelize: bool = False
     lock_resources: bool = True
     max_simulataneous_jobs: int = 1
-    workload_params: WorkloadParams or None = field(default_factory=lambda: None)
+    thread_params: ThreadParams or None = field(default_factory=lambda: None)
 
 
 class RemoteMachine:
@@ -323,7 +324,7 @@ class RemoteMachine:
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
                            resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
                            zellij_session=self.zellij_session)
-        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
+        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.thread_params)
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.repo_path).joinpath(self.func_relative_file).collapseuser().as_posix()}*"""  # for email.
