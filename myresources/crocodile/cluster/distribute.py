@@ -184,8 +184,8 @@ class Cluster:
         for idx, (a_workload_params, an_ssh) in enumerate(zip(self.workload_params, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.machine_load_calc.load_ratios_repr}"
             if self.remote_machine_kwargs is not None:
-                self.remote_machine_kwargs.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params))
                 config = self.remote_machine_kwargs
+                config.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params))
             else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params)
             m = RemoteMachine(func=self.func, func_kwargs=self.func_kwargs, ssh=an_ssh, config=config)
             m.generate_scripts()

@@ -39,16 +39,16 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None, parallelize=False) -> str:
+def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
-    if parallelize:
+    if workload_params is not None:
         # from crocodile.cluster import trial_file
         # wrapper_func_name = trial_file.parallelize.__name__
         # base_func = tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0]
         # base_func = base_func.replace("expensive_function_single_thread", final_func)
         # base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
 
-        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, save_suffix=workload_params.save_suffix, num_threads=workload_params.num_threads))
+        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, num_threads=workload_params.num_threads))
         # kwargs_split[-1]["idx_end"] = workload_params.idx_end + 0  # edge case
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
         base_func = f"""

@@ -208,7 +208,8 @@ class WorkloadParams:
     idx_end: int = 1000
     idx_max: int = 1000
     num_threads: int = 3
-    save_suffix: str = f"machine_{idx_start}_{idx_end}"
+    @property
+    def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
 
 
 @dataclass
