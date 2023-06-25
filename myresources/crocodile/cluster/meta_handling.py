@@ -41,7 +41,7 @@ except Exception as e:
 
 def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None, parallelize: bool) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
-    if parallelize is not None:
+    if parallelize:
         assert workload_params is not None
         kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, num_threads=workload_params.num_threads))
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.

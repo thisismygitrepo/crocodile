@@ -285,7 +285,7 @@ class P(type(Path()), Path):
                 root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
                 path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, orig=False, pwd=None, tmp=False, pattern=None, **kwargs) -> 'P':
+    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, orig=False, pwd=None, tmp=False, pattern=None, merge=False, **kwargs) -> 'P':
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
