@@ -12,8 +12,8 @@ class ExpensiveComputation:
 
     @staticmethod
     def func(workload_params: WorkloadParams, *args, **kwargs) -> tb.P:
-        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, num_threads=workload_params.num_threads))
-        res = tb.L(kwargs_split).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(*args, workload_params=a_workload_params, **kwargs), jobs={workload_params.num_threads})
+        per_job_workload_params = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, num_threads=workload_params.num_threads))
+        res = tb.L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(*args, workload_params=a_workload_params, **kwargs), jobs=workload_params.num_threads)
         return res[0] if len(res) == 1 else res
 
     @staticmethod
@@ -42,7 +42,7 @@ class ExpensiveComputation:
                     remote_machine_config=config,
                     thread_load_calc=ThreadLoadCalculator(num_jobs=3, load_criterion=LoadCriterion.cpu),  # if this machine can run 3 jobs at a time, how many can other machines do?
                     )
-        c.run(run=True, machines_per_tab=2, window_number=354)
+        c.run(run=True, machines_per_tab=len(ssh_params), window_number=354)
         return c
 
 

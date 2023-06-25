@@ -4,7 +4,7 @@ import crocodile.toolbox as tb
 from crocodile.cluster.remote_machine import WorkloadParams
 
 
-def expensive_function(workload_params: WorkloadParams, sim_dict=None) -> tb.P:
+def expensive_function(workload_params: WorkloadParams or None, sim_dict=None) -> tb.P:
     import time
     from rich.progress import track
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
@@ -12,7 +12,7 @@ def expensive_function(workload_params: WorkloadParams, sim_dict=None) -> tb.P:
     execution_time_in_seconds = 60 * 1
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
-        time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
+        time.sleep(execution_time_in_seconds / steps)  # Simulate work being done
     print("I'm done, I crunched numbers from {} to {}.".format(workload_params.idx_start, workload_params.idx_end))
     _ = workload_params.idx_max
 
