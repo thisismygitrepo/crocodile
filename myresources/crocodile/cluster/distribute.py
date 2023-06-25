@@ -81,7 +81,10 @@ class MachineLoadCalculator:
 
 
 class Cluster:
-    def __getstate__(self): return self.__dict__
+    def __getstate__(self):
+        state = self.__dict__
+        state["func"] = None
+        return state
     def __setstate__(self, state): self.__dict__.update(state)
     def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
     @staticmethod
@@ -192,7 +195,7 @@ class Cluster:
             m.submit()
             self.machines.append(m)
         try: tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
-        except TypeError: print("Couldn't pickle cluster object")
+        except: print("Couldn't pickle cluster object")
         self.print_commands()
 
     def open_mux(self, machines_per_tab=1, window_number=None):
