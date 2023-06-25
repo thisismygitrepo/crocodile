@@ -242,7 +242,7 @@ def expensive_function(thread_params: ThreadParams, sim_dict=None) -> tb.P:
     import time
     from rich.progress import track
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
-    print(f"Oh, I recieved this parameter: {sim_dict=}")
+    print(f"Oh, I recieved this parameter: {sim_dict=} & {thread_params=} ")
     execution_time_in_seconds = 60 * 1
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
