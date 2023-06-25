@@ -87,10 +87,14 @@ echo "Unlocked resources"
                 tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
                 self.add_to_queue()
 
-            if len(running_file.queue) < self.max_simulataneous_jobs:
-                lock_status = 'unlocked'
+            if len(running_file.queue) < self.max_simulataneous_jobs: lock_status = 'unlocked'
             else:
                 for job_id in running_file.queue:
+                    if job_id not in running_file.specs.keys():
+                        print(f"Job {job_id} is not in specs, removing it from the queue.")
+                        print(f"{running_file.specs=}")
+                        running_file.queue.remove(job_id)
+                        continue
                     if running_file.specs[job_id]['status'] == 'unlocked':
                         tb.S(running_file.specs[job_id]).print(as_config=True, title="Old Lock File Details")
                         lock_status = 'unlocked'
@@ -341,7 +345,7 @@ class RemoteMachine:
 
 echo "~~~~~~~~~~~~~~~~SHELL START~~~~~~~~~~~~~~~"
 {self.ssh.remote_env_cmd}
-{self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op if self.config.update_essential_repos else ''}
+{'~/scripts/devops -w update' if self.config.update_essential_repos else ''}
 {f'cd {tb.P(self.repo_path).collapseuser().as_posix()}'}
 {'git pull' if self.config.update_repo else ''}
 {'pip install -e .' if self.config.install_repo else ''}
@@ -359,6 +363,7 @@ cd ~
 deactivate
 
 """
+        # self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op
         if self.ssh.get_remote_machine() != "Windows": shell_script += f"""{f'zellij kill-session {self.zellij_session}' if self.config.kill_on_completion else ''}"""
 
         # only available in py 3.10:
