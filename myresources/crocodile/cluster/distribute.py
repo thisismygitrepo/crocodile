@@ -32,42 +32,33 @@ class MachineSpecs:
     cpu_norm: float
     ram_norm: float
     product_norm: float
+    @staticmethod
+    def get_this_machine_specs():
+        cpu, ram = psutil.cpu_count(), psutil.virtual_memory().total / 2 ** 30
+        return MachineSpecs(cpu=cpu, ram=ram, product=cpu*ram, cpu_norm=cpu, ram_norm=ram, product_norm=cpu*ram)
 
 
 class ThreadLoadCalculator:
     """relies on relative values to a referenc machine specs.
     Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable.
     equal distribution across instances of one machine"""
-    def __init__(self, multiplier=None, load_criterion: LoadCriterion = LoadCriterion.cpu, load_reference_value=None, reference_machine="this_machine"):
-        self.multiplier = multiplier
+    def __init__(self, num_jobs=None, load_criterion: LoadCriterion = LoadCriterion.cpu, reference_specs: MachineSpecs or None = None):
+        self.num_jobs = num_jobs
         self.load_criterion = load_criterion
-        self.reference_machine = reference_machine
-        if load_reference_value is not None:  self.load_reference_value = load_reference_value
-        else:
-            if self.reference_machine == "this_machine":
-                if self.load_reference_value is None:
-                    if self.load_criterion == LoadCriterion.cpu:
-                        self.load_reference_value = psutil.cpu_count()
-                    elif self.load_criterion == LoadCriterion.ram:
-                        self.load_reference_value = psutil.virtual_memory().total / 2 ** 30
-                    else: raise NotImplementedError
-            else: raise NotImplementedError
+        self.reference_specs: MachineSpecs = MachineSpecs.get_this_machine_specs() if reference_specs is None else reference_specs
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state: dict): self.__dict__.update(state)
     def get_num_threads(self, machine_specs: MachineSpecs) -> int:
-        if self.multiplier is None: return 1
-        val = machine_specs.cpu if self.load_criterion == "cpu" else machine_specs.ram if self.load_criterion == "ram" else machine_specs.product
-        res = int(floor(self.multiplier * (val / self.load_reference_value)))
-        if res == 0: res = 1
-        return res
+        if self.num_jobs is None: return 1
+        res = int(floor(self.num_jobs * (machine_specs.__dict__[self.load_criterion.name] / self.reference_specs.__dict__[self.load_criterion.name])))
+        return 1 if res == 0 else res
 
 
 class MachineLoadCalculator:
-    def __init__(self, max_num: int = 1000, num_machines=None, load_criterion: LoadCriterion = LoadCriterion.product, load_ratios_repr=""):
+    def __init__(self, max_num: int = 1000, load_criterion: LoadCriterion = LoadCriterion.product, load_ratios_repr=""):
         self.load_ratios = []
         self.load_ratios_repr = load_ratios_repr
         self.max_num = max_num
-        self.num_machines = num_machines
         self.load_criterion = load_criterion
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
@@ -79,8 +70,11 @@ class MachineLoadCalculator:
             load_value = machine_specs.__dict__[self.load_criterion.name]
             self.load_ratios.append(load_value)
             idx1 = idx_so_far
-            idx2 = self.max_num if machine_index == self.num_machines - 1 else (floor(load_value * self.max_num) + idx1)
-            if idx2 > self.max_num: raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
+            idx2 = self.max_num if machine_index == len(threads_per_machine) - 1 else (floor(load_value * self.max_num) + idx1)
+            if idx2 > self.max_num:
+                print(machines_specs, '\n\n', threads_per_machine)
+                print(f"All values: {tmp=}, {idx_so_far=}, {idx1=}, {idx2=}, {self.max_num=}, {a_threads_per_machine=}, {machine_index=}, {machine_specs=}, {load_value=}, {self.load_ratios=}, {self.load_ratios_repr=}")
+                raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
             idx_so_far = idx2
             tmp.append(WorkloadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_threads=a_threads_per_machine))
         return tmp
@@ -111,7 +105,7 @@ class Cluster:
         self.results_downloaded = False
 
         self.thread_load_calc = thread_load_calc or ThreadLoadCalculator()
-        self.machine_load_calc = MachineLoadCalculator(num_machines=len(ssh_params), load_criterion=self.thread_load_calc.load_criterion, )
+        self.machine_load_calc = MachineLoadCalculator(load_criterion=LoadCriterion[self.thread_load_calc.load_criterion.name + "_norm"], )
 
         sshz = []
         for an_ssh_params in ssh_params:
@@ -249,22 +243,6 @@ class Cluster:
         if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
             print(f"All results downloaded to {self.root_dir} 🤗")
             self.results_downloaded = True
-
-
-def expensive_function(workload_params: WorkloadParams, sim_dict=None) -> tb.P:
-    import time
-    from rich.progress import track
-    print(f"Hello, I am one thread of an expensive function, and I just started running ...")
-    print(f"Oh, I recieved this parameter: {sim_dict=} & {workload_params=} ")
-    execution_time_in_seconds = 60 * 1
-    steps = 100
-    for _ in track(range(steps), description="Progress bar ..."):
-        time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
-    print("I'm done, I crunched numbers from {} to {}.".format(workload_params.idx_start, workload_params.idx_end))
-    _ = workload_params.idx_max
-    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
-    tb.S(a=1).save(path=save_dir.joinpath(f"trial_func_result.Struct.pkl"))
-    return save_dir
 
 
 if __name__ == '__main__':
