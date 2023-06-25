@@ -6,7 +6,7 @@ from crocodile.cluster.distribute import Cluster, RemoteMachineConfig, ThreadLoa
 
 
 def run_on_remote():
-    from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, ThreadParams
+    from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
     from crocodile.cluster.distribute import expensive_function
     config = RemoteMachineConfig(
         # connection
@@ -19,7 +19,7 @@ def run_on_remote():
         ipython=True, interactive=True, pdb=False, pudb=False, wrap_in_try_except=True,
         # resources
         lock_resources=True, max_simulataneous_jobs=2, parallelize=False, )
-    m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3), thread_params=ThreadParams()),
+    m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3), workload_params=WorkloadParams()),
                       config=config)
     m.run()
     return m
@@ -35,8 +35,8 @@ def try_run_on_remote():
 
 
 def run_on_cluster():
-    from crocodile.cluster.remote_machine import RemoteMachineConfig, ThreadParams
-    from crocodile.cluster.distribute import expensive_function
+    from crocodile.cluster.remote_machine import RemoteMachineConfig, WorkloadParams
+    from crocodile.cluster.distribute import expensive_function, LoadCriterion
     config = RemoteMachineConfig(
         # connection
         ssh_params={}, description="Description of running an expensive function",  # job_id=, base_dir="",
@@ -53,8 +53,7 @@ def run_on_cluster():
                 func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                 ssh_params=ssh_params,
                 remote_machine_config=config,
-                thread_load_calc=ThreadLoadCalculator(multiplier=3, bottleneck_reference_value=8),
-                machine_load_calc=MachineLoadCalculator(num_machines=len(ssh_params), load_criterion="cpu"),
+                thread_load_calc=ThreadLoadCalculator(multiplier=2, load_reference_value=3, load_criterion=LoadCriterion.cpu),  # if this machine can run 3 jobs at a time, how many can other machines do?
                 )
     c.run(run=True, machines_per_tab=2)
     return c.job_id
@@ -86,7 +85,7 @@ class ExpensiveComputation:
         tb.L(params).apply(lambda single_thread_params: self.main_single_thread(single_thread_params), jobs=len(params))
 
     def run(self, ms):
-        ic = ThreadLoadCalculator(multiplier=7, bottleneck_name="cpu", reference_machine="this_machine")
+        ic = ThreadLoadCalculator(multiplier=7, load_criterion="cpu", reference_machine="this_machine")
         mlc = MachineLoadCalculator(num_machines=len(ms), load_criterion="cpu")
         rm_config = RemoteMachineConfig(install_repo=False, copy_repo=True, update_essential_repos=True,
                                         ipython=False, interactive=False, pdb=False, wrap_in_try_except=False,

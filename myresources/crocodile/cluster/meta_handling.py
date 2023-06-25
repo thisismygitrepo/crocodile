@@ -1,6 +1,6 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import ThreadParams
+from crocodile.cluster.remote_machine import WorkloadParams
 
 
 def get_script(name: str, kwargs: dict) -> str:
@@ -19,7 +19,7 @@ def get_script(name: str, kwargs: dict) -> str:
     return tmp
 
 
-def get_py_script(kwargs, rel_full_path, func_name, func_class, workload_params: ThreadParams, wrap_in_try_except=False, parallelize=False):
+def get_py_script(kwargs, rel_full_path, func_name, func_class, workload_params: WorkloadParams, wrap_in_try_except=False, parallelize=False):
     tmp = get_script(name="script_execution", kwargs=kwargs)
 
     execution_line = get_execution_line(func_name=func_name, func_class=func_class, rel_full_path=rel_full_path, parallelize=parallelize, workload_params=workload_params)
@@ -39,7 +39,7 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, func_class, rel_full_path, workload_params: ThreadParams or None, parallelize=False) -> str:
+def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None, parallelize=False) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
     if parallelize:
         # from crocodile.cluster import trial_file
@@ -48,7 +48,7 @@ def get_execution_line(func_name, func_class, rel_full_path, workload_params: Th
         # base_func = base_func.replace("expensive_function_single_thread", final_func)
         # base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
 
-        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: ThreadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, save_suffix=workload_params.save_suffix, num_threads=workload_params.num_threads))
+        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, save_suffix=workload_params.save_suffix, num_threads=workload_params.num_threads))
         # kwargs_split[-1]["idx_end"] = workload_params.idx_end + 0  # edge case
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
         base_func = f"""

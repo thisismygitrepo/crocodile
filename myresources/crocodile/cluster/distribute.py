@@ -3,8 +3,10 @@ import numpy as np
 import psutil
 import crocodile.toolbox as tb
 from math import ceil, floor
-from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, ThreadParams
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
 from rich.console import Console
+from enum import Enum
+from dataclasses import dataclass
 # from platform import system
 # import time
 # from rich.progress import track
@@ -13,58 +15,74 @@ from rich.console import Console
 console = Console()
 
 
+class LoadCriterion(Enum):
+    cpu = "cpu"
+    ram = "ram"
+    product = "cpu * ram"
+    cpu_norm = "cpu_norm"
+    ram_norm = "ram_norm"
+    product_norm = "cpu_norm * ram_norm"
+
+
+@dataclass
+class MachineSpecs:
+    cpu: float
+    ram: float
+    product: float
+    cpu_norm: float
+    ram_norm: float
+    product_norm: float
+
+
 class ThreadLoadCalculator:
     """relies on relative values to a referenc machine specs.
     Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable.
     equal distribution across instances of one machine"""
-    def __init__(self, multiplier=None, bottleneck_name=["cpu", "ram"][0], bottleneck_reference_value=None, reference_machine="this_machine"):
+    def __init__(self, multiplier=None, load_criterion: LoadCriterion = LoadCriterion.cpu, load_reference_value=None, reference_machine="this_machine"):
         self.multiplier = multiplier
-        self.bottleneck_name = bottleneck_name
+        self.load_criterion = load_criterion
         self.reference_machine = reference_machine
-        self.bottleneck_reference_value = bottleneck_reference_value
-        self.get_bottleneck_reference_value()
+        if load_reference_value is not None:  self.load_reference_value = load_reference_value
+        else:
+            if self.reference_machine == "this_machine":
+                if self.load_reference_value is None:
+                    if self.load_criterion == LoadCriterion.cpu:
+                        self.load_reference_value = psutil.cpu_count()
+                    elif self.load_criterion == LoadCriterion.ram:
+                        self.load_reference_value = psutil.virtual_memory().total / 2 ** 30
+                    else: raise NotImplementedError
+            else: raise NotImplementedError
     def __getstate__(self): return self.__dict__
-    def __setstate__(self, d): self.__dict__.update(d)
-    def get_bottleneck_reference_value(self):
-        if self.reference_machine == "this_machine":
-            if self.bottleneck_reference_value is None:
-                if self.bottleneck_name == "cpu":
-                    self.bottleneck_reference_value = psutil.cpu_count()
-                elif self.bottleneck_name == "ram":
-                    self.bottleneck_reference_value = psutil.virtual_memory().total / 2 ** 30
-                else: raise NotImplementedError
-        else: raise NotImplementedError
-        return self
-
-    def get_instances_per_machines(self, specs: dict) -> int:
+    def __setstate__(self, state: dict): self.__dict__.update(state)
+    def get_num_threads(self, machine_specs: MachineSpecs) -> int:
         if self.multiplier is None: return 1
-        res = int(floor(self.multiplier * (specs[self.bottleneck_name] / self.bottleneck_reference_value)))
+        val = machine_specs.cpu if self.load_criterion == "cpu" else machine_specs.ram if self.load_criterion == "ram" else machine_specs.product
+        res = int(floor(self.multiplier * (val / self.load_reference_value)))
         if res == 0: res = 1
         return res
 
 
 class MachineLoadCalculator:
-    def __init__(self, max_num: int = 1000, num_machines=None, load_ratios=None, load_criterion: str = ["cpu", "ram", "product"][-1], load_ratios_repr=""):
-        self.load_ratios = load_ratios if load_ratios is not None else []
+    def __init__(self, max_num: int = 1000, num_machines=None, load_criterion: LoadCriterion = LoadCriterion.product, load_ratios_repr=""):
+        self.load_ratios = []
         self.load_ratios_repr = load_ratios_repr
         self.max_num = max_num
         self.num_machines = num_machines
         self.load_criterion = load_criterion
-
     def __getstate__(self): return self.__dict__
     def __setstate__(self, d): self.__dict__.update(d)
-    def get_func_kwargs(self, resources_product_norm, cpus_norm, rams_norm, num_workers) -> list[ThreadParams]:
+    def get_workload_params(self, machines_specs: list[MachineSpecs], threads_per_machine: list[int]) -> list[WorkloadParams]:
         """Note: like thread divider in parallelize function, the behaviour is to include the edge cases on both ends of subsequent intervals."""
         tmp = []
         idx_so_far = 0
-        for machine_index, (a_product_norm, a_cpu_norm, a_ram_norm, a_num_workers) in enumerate(zip(resources_product_norm, cpus_norm, rams_norm, num_workers)):
-            load_value = {"ram": a_ram_norm, "cpu": a_cpu_norm, "product": a_product_norm}[self.load_criterion]
+        for machine_index, (machine_specs, a_threads_per_machine) in enumerate(zip(machines_specs, threads_per_machine)):
+            load_value = machine_specs.__dict__[self.load_criterion.name]
             self.load_ratios.append(load_value)
             idx1 = idx_so_far
             idx2 = self.max_num if machine_index == self.num_machines - 1 else (floor(load_value * self.max_num) + idx1)
             if idx2 > self.max_num: raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
             idx_so_far = idx2
-            tmp.append(ThreadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_threads=a_num_workers))
+            tmp.append(WorkloadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_threads=a_threads_per_machine))
         return tmp
 
 
@@ -79,19 +97,21 @@ class Cluster:
         if base is None: base = tb.P.home().joinpath(rf"tmp_results/remote_machines")
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
-    def __init__(self, ssh_params: list[dict],
-                 func, workload_params: list[ThreadParams] or None = None,
-                 func_kwargs: dict or None = None,
-                 thread_load_calc=None, machine_load_calc=None,
+    def __init__(self,
+                 func, func_kwargs: dict or None = None,
+                 ssh_params: list[dict] or None = None,
+                 remote_machine_config: RemoteMachineConfig or None = None,
+                 # workload_params: list[WorkloadParams] or None = None,
+                 thread_load_calc=None,
+                 # machine_load_calc=None,
                  ditch_unavailable_machines=False,
-                 description="",
-                 job_id=None, base_dir=None, remote_machine_config: RemoteMachineConfig or None = None):
+                 description="", job_id=None, base_dir=None):
         self.job_id = job_id or tb.randstr(noun=True)
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
 
-        self.instances_calculator = thread_load_calc or ThreadLoadCalculator()
-        self.load_calculator = machine_load_calc or MachineLoadCalculator(num_machines=len(ssh_params))
+        self.thread_load_calc = thread_load_calc or ThreadLoadCalculator()
+        self.machine_load_calc = MachineLoadCalculator(num_machines=len(ssh_params), load_criterion=self.thread_load_calc.load_criterion, )
 
         sshz = []
         for an_ssh_params in ssh_params:
@@ -106,14 +126,14 @@ class Cluster:
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
         self.machines: list[RemoteMachine] = []
-        self.rams = self.rams_norm = self.cpus = self.cpus_norm = self.resources_product_norm = None
-        self.instances_per_machine = []
-        self.remote_machine_kwargs = remote_machine_config
+        self.machines_specs: list[MachineSpecs] = []
+        self.threads_per_machine = []
+        self.remote_machine_kwargs: RemoteMachineConfig = remote_machine_config
+        self.workload_params: list[WorkloadParams] or None = None
 
-        self.description = description
+        self.description: str = description
         self.func = func
         self.func_kwargs = func_kwargs if func_kwargs is not None else {}
-        self.workload_params = workload_params
 
         # fire options
         self.machines_per_tab = None
@@ -133,28 +153,21 @@ class Cluster:
 
     def generate_standard_kwargs(self):
         if self.workload_params is not None:
-            print("func_kwargs_list is not None, so not generating standard kwargs")
+            print("workload_params is not None, so not generating standard kwargs")
             return None
         cpus = []
+        rams = []
         for an_ssh in self.sshz:
-            a_cpu = an_ssh.run_py("import psutil; print(psutil.cpu_count())", verbose=False).op
-            a_cpu = int(a_cpu)
-            cpus.append(a_cpu)
-        self.cpus = np.array(cpus)
-        self.cpus_norm = self.cpus / self.cpus.sum()
+            res = an_ssh.run_py("import psutil; print(psutil.cpu_count(), psutil.virtual_memory().total)", verbose=False).op
+            cpus.append(int(res.split(' ')[0]))
+            rams.append(ceil(int(res.split(' ')[1]) / 2 ** 30))
+        total_cpu = np.array(cpus).sum()
+        total_ram = np.array(rams).sum()
+        total_product = (np.array(cpus) * np.array(rams)).sum()
 
-        self.rams = np.array([ceil(int(an_ssh.run_py("import psutil; print(psutil.virtual_memory().total)", verbose=False).op) / 2**30) for an_ssh in self.sshz])
-        self.rams_norm = self.rams / self.rams.sum()
-
-        self.resources_product_norm = (cpus * self.rams) / (cpus * self.rams).sum()
-
-        self.instances_per_machine = []
-        for a_cpu, a_ram in zip(self.cpus, self.rams):
-            self.instances_per_machine.append(self.instances_calculator.get_instances_per_machines({"cpu": a_cpu, "ram": a_ram}))
-
-        # relies on normalized values of specs.
-        self.workload_params = self.load_calculator.get_func_kwargs(cpus_norm=self.cpus_norm, rams_norm=self.rams_norm, resources_product_norm=self.resources_product_norm, num_workers=self.instances_per_machine)
-        # self.func_kwargs_list = [tb.S(item).update(self.func_kwargs).__dict__ for item in self.func_kwargs_list]
+        self.machines_specs = [MachineSpecs(cpu=a_cpu, ram=a_ram, product=a_cpu * a_ram, cpu_norm=a_cpu / total_cpu, ram_norm=a_ram / total_ram, product_norm=a_cpu * a_ram / total_product) for a_cpu, a_ram in zip(cpus, rams)]
+        self.threads_per_machine = [self.thread_load_calc.get_num_threads(machine_specs=machine_specs) for machine_specs in self.machines_specs]
+        self.workload_params = self.machine_load_calc.get_workload_params(machines_specs=self.machines_specs, threads_per_machine=self.threads_per_machine)
         self.print_func_kwargs()
 
     def viz_load_ratios(self):
@@ -162,24 +175,24 @@ class Cluster:
         plt = tb.install_n_import("plotext")
         names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
 
-        plt.simple_multiple_bar(names, [list(self.cpus), list(self.rams)], title=f"Resources per machine", labels=["#cpu threads", "memory size"])
+        plt.simple_multiple_bar(names, [[machine_specs.cpu for machine_specs in self.machines_specs], [machine_specs.ram for machine_specs in self.machines_specs]], title=f"Resources per machine", labels=["#cpu threads", "memory size"])
         plt.show()
         print("")
-        plt.simple_bar(names, self.load_calculator.load_ratios, width=100, title=f"Load distribution for machines using criterion `{self.load_calculator.load_criterion}`")
+        plt.simple_bar(names, self.machine_load_calc.load_ratios, width=100, title=f"Load distribution for machines using criterion `{self.machine_load_calc.load_criterion}`")
         plt.show()
 
-        self.load_calculator.load_ratios_repr = tb.S(dict(zip(names, tb.L((np.array(self.load_calculator.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
-        print(self.load_calculator.load_ratios_repr)
+        self.machine_load_calc.load_ratios_repr = tb.S(dict(zip(names, tb.L((np.array(self.machine_load_calc.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
+        print(self.machine_load_calc.load_ratios_repr)
         print("\n")
 
     def submit(self):
         if self.workload_params is None: raise Exception("You need to generate standard kwargs first.")
         for idx, (a_workload_params, an_ssh) in enumerate(zip(self.workload_params, self.sshz)):
-            desc = self.description + f"\nLoad Ratios on machines:\n{self.load_calculator.load_ratios_repr}"
+            desc = self.description + f"\nLoad Ratios on machines:\n{self.machine_load_calc.load_ratios_repr}"
             if self.remote_machine_kwargs is not None:
                 self.remote_machine_kwargs.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params))
                 config = self.remote_machine_kwargs
-            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, thread_params=a_workload_params)
+            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params)
             m = RemoteMachine(func=self.func, func_kwargs=self.func_kwargs, ssh=an_ssh, config=config)
             m.generate_scripts()
             m.submit()
@@ -238,18 +251,18 @@ class Cluster:
             self.results_downloaded = True
 
 
-def expensive_function(thread_params: ThreadParams, sim_dict=None) -> tb.P:
+def expensive_function(workload_params: WorkloadParams, sim_dict=None) -> tb.P:
     import time
     from rich.progress import track
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
-    print(f"Oh, I recieved this parameter: {sim_dict=} & {thread_params=} ")
+    print(f"Oh, I recieved this parameter: {sim_dict=} & {workload_params=} ")
     execution_time_in_seconds = 60 * 1
     steps = 100
     for _ in track(range(steps), description="Progress bar ..."):
         time.sleep(execution_time_in_seconds/steps)  # Simulate work being done
-    print("I'm done, I crunched numbers from {} to {}.".format(thread_params.idx_start, thread_params.idx_end))
-    _ = thread_params.idx_max
-    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(thread_params.save_suffix, f"thread_{thread_params.idx_start}_{thread_params.idx_end}").create()
+    print("I'm done, I crunched numbers from {} to {}.".format(workload_params.idx_start, workload_params.idx_end))
+    _ = workload_params.idx_max
+    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
     tb.S(a=1).save(path=save_dir.joinpath(f"trial_func_result.Struct.pkl"))
     return save_dir
 

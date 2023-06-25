@@ -199,7 +199,7 @@ class Lock:
 
 
 @dataclass
-class ThreadParams:
+class WorkloadParams:
     idx_start: int = 0
     idx_end: int = 1000
     idx_max: int = 1000
@@ -239,7 +239,7 @@ class RemoteMachineConfig:
     parallelize: bool = False
     lock_resources: bool = True
     max_simulataneous_jobs: int = 1
-    thread_params: ThreadParams or None = field(default_factory=lambda: None)
+    workload_params: WorkloadParams or None = field(default_factory=lambda: None)
 
 
 class RemoteMachine:
@@ -324,7 +324,7 @@ class RemoteMachine:
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
                            resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
                            zellij_session=self.zellij_session)
-        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.thread_params)
+        py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.repo_path).joinpath(self.func_relative_file).collapseuser().as_posix()}*"""  # for email.
