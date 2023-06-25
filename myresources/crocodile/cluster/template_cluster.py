@@ -5,13 +5,10 @@ from crocodile.cluster.distribute import Cluster, WorkloadParams
 
 class ExpensiveComputation:
     @staticmethod
-    def func_single_job(workload_params: WorkloadParams, *args, **kwargs):
+    def func_single_job(workload_params: WorkloadParams, *args, **kwargs) -> str:
         from crocodile.cluster.utils import expensive_function
         expensive_function(workload_params=workload_params, *args, **kwargs)
-
-    @staticmethod
-    def func(workload_params: WorkloadParams, *args, **kwargs):
-        tb.L(sub_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(*args, workload_params=a_workload_params, **kwargs), jobs=len(workload_params))
+        return "Done"
 
     @staticmethod
     def submit():
@@ -31,7 +28,7 @@ class ExpensiveComputation:
             lock_resources=True, max_simulataneous_jobs=2, parallelize=True, )
         # ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # ,
         ssh_params = [dict(host="214676wsl"), dict(host="229234wsl")]
-        c = Cluster(func=ExpensiveComputation.func,
+        c = Cluster(func=ExpensiveComputation.func_single_job,
                     func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                     ssh_params=ssh_params,
                     remote_machine_config=config,

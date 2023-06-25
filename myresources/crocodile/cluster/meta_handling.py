@@ -39,17 +39,11 @@ except Exception as e:
     return tmp
 
 
-def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None) -> str:
+def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None, parallelize: bool) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
-    if workload_params is not None:
-        # from crocodile.cluster import trial_file
-        # wrapper_func_name = trial_file.parallelize.__name__
-        # base_func = tb.P(trial_file.__file__).read_text(encoding="utf-8").split("# parallelizeBegins")[1].split("# parallelizeEnds")[0]
-        # base_func = base_func.replace("expensive_function_single_thread", final_func)
-        # base_func += f"\nres = {wrapper_func_name}(**func_kwargs.__dict__)"
-
+    if parallelize is not None:
+        assert workload_params is not None
         kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.num_threads).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, num_threads=workload_params.num_threads))
-        # kwargs_split[-1]["idx_end"] = workload_params.idx_end + 0  # edge case
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
         base_func = f"""
 print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
@@ -61,9 +55,9 @@ for idx, x in enumerate(kwargs_workload):
     workload_params.append(WorkloadParams(**x))
 print("\\n" * 2)
 
-# res = tb.L(workload_params).apply(lambda a_workload_params: {final_func}(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.num_threads})
+res = tb.L(workload_params).apply(lambda a_workload_params: {final_func}(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.num_threads})
 # res = tb.P(res[0]).parent if type(res[0]) is str else res
-res = {final_func}(workload_params=workload_params, **func_kwargs)
+# res = {final_func}(workload_params=workload_params, **func_kwargs)
 """
         return base_func
 
