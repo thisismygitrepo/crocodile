@@ -76,7 +76,7 @@ class MachineLoadCalculator:
                 print(f"All values: {tmp=}, {idx_so_far=}, {idx1=}, {idx2=}, {self.max_num=}, {a_threads_per_machine=}, {machine_index=}, {machine_specs=}, {load_value=}, {self.load_ratios=}, {self.load_ratios_repr=}")
                 raise ValueError(f"idx2 ({idx2}) > max_num ({self.max_num})")
             idx_so_far = idx2
-            tmp.append(WorkloadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, num_threads=a_threads_per_machine))
+            tmp.append(WorkloadParams(idx_start=idx1, idx_end=idx2, idx_max=self.max_num, jobs=a_threads_per_machine))
         return tmp
 
 
