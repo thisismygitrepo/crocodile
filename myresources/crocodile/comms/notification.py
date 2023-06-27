@@ -21,7 +21,7 @@ def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/s
 
 class Email:
     @staticmethod
-    def get_source_of_truth(): return tb.P.home().joinpath("dotfiles/creds/msc/source_of_truth.py").readit(strict=False)
+    def get_source_of_truth(): return tb.P.home().joinpath("dotfiles/machineconfig/source_of_truth.py").readit(strict=False)
 
     def __init__(self, config):
         self.config = config
