@@ -208,8 +208,13 @@ class WorkloadParams:
     idx_end: int = 1000
     idx_max: int = 1000
     jobs: int = 3
+    job_id: int = 0
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
+    def split_to_jobs(self, jobs=None):
+        # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
+        return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
+    def print(self): tb.S(self.__dict__).print(as_config=True, title=f"Job Workload")
 
 
 @dataclass

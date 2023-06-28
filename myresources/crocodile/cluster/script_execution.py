@@ -75,7 +75,6 @@ elif func_name is not None:
 else:
     module = tb.P.home().joinpath(rel_full_path).readit()  # uses runpy to read .py files.
     exec_obj = module  # for README.md generation.
-# TODO: replace the above with a simple import statement that can be tested at local machine side.
 
 # execution_line
 

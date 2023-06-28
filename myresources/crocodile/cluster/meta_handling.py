@@ -41,39 +41,38 @@ except Exception as e:
 
 def get_execution_line(func_name, func_class, rel_full_path, workload_params: WorkloadParams or None, parallelize: bool) -> str:
     final_func = f"""module{('.' + func_class) if func_class is not None else ''}.{func_name}"""
-    if parallelize:
-        assert workload_params is not None
-        kwargs_split = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, jobs=workload_params.jobs))
-        # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
-        base_func = f"""
-print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
-print(f"This share of workload will be split among {workload_params.jobs} of threads on this machine.")
-kwargs_workload = {list(kwargs_split.apply(lambda a_kwargs: a_kwargs.__dict__))}
-workload_params = []
-for idx, x in enumerate(kwargs_workload):
-    tb.S(x).print(as_config=True, title=f"Instance {{idx}}")
-    workload_params.append(WorkloadParams(**x))
-print("\\n" * 2)
-
-res = tb.L(workload_params).apply(lambda a_workload_params: {final_func}(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.jobs})
-# res = tb.P(res[0]).parent if type(res[0]) is str else res
-# res = {final_func}(workload_params=workload_params, **func_kwargs)
-"""
-        return base_func
-
-    if func_name is not None and workload_params is None: return f"""
-res = {final_func}(**func_kwargs.__dict__)
-"""
-    elif func_name is not None and workload_params is not None: return f"""
-res = {final_func}(workload_params=workload_params, **func_kwargs.__dict__)
-"""
-    return f"""
+    if func_name is None: return f"""
 res = None  # in case the file did not define it.
 # --------------------------------- SCRIPT AS IS
 {tb.P.home().joinpath(rel_full_path).read_text()}
 # --------------------------------- END OF SCRIPT AS IS
 """
+    base_func = ""
+    if workload_params is not None: base_func += f"""
+print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
+print(f"This share of workload will be split among {workload_params.jobs} of threads on this machine.")
+"""
+    if not parallelize: base_func += f"""
+workload_params = WorkloadParams(**{workload_params.__dict__})
+"""
+    else: return f"""
+kwargs_workload = {list(workload_params.split_to_jobs().apply(lambda a_kwargs: a_kwargs.__dict__))}
+workload_params = []
+for idx, x in enumerate(kwargs_workload):
+    tb.S(x).print(as_config=True, title=f"Instance {{idx}}")
+    workload_params.append(WorkloadParams(**x))
+print("\\n" * 2)
+res = tb.L(workload_params).apply(lambda a_workload_params: {final_func}(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.jobs})
+# res = tb.P(res[0]).parent if type(res[0]) is str else res
+# res = {final_func}(workload_params=workload_params, **func_kwargs.__dict__)
+"""
 
+    if workload_params is None: return base_func + f"""
+res = {final_func}(**func_kwargs.__dict__)
+"""
+    if workload_params is not None: return base_func + f"""
+res = {final_func}(workload_params=workload_params, **func_kwargs.__dict__)
+"""
 
 # kwargs_for_fire = ' '.join(tb.S(func_kwargs or {}).apply(lambda k, v: f"--{k}={v if type(v) is not str else repr(v)}"))
 
