@@ -33,9 +33,12 @@ class Zellij:
     def asssert_sesion_started(self):
         while True:
             resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
-            if self.new_sess_name in resp: break
+            if self.new_sess_name in resp:
+                print(f"--> Session {resp} has started at the remote {self}")
+                time.sleep(6)
+                break
             time.sleep(2)
-            print(f"Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
+            print(f"--> Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
     def setup_layout(self, sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "~/tmp_results/remote_mahcines"):
         if self.new_sess_name is None: self.get_new_sess_name()
         if run:
