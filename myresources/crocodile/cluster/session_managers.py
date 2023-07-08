@@ -11,12 +11,10 @@ class Zellij:
         self.new_sess_name = None
     # def __getstate__(self): return self.__dict__
     # def __setstate__(self, state): self.__dict__.update(state)
-    def open_console(self): return tb.Terminal().run_async(self.get_new_sess_string(), shell="pwsh")
-    def get_new_sess_string(self):
-        sess_name = self.get_new_sess_name()
-        sub_cmd = f"{self.ssh.get_ssh_conn_str()} -t zellij attach {sess_name} -c "  # -c means create if not exists.
-        return sub_cmd
-    def get_new_sess_name(self):
+    def get_ssh_command(self, sess_name=None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
+    def get_new_session_string(self): return f"{self.ssh.get_ssh_conn_str()} -t {self.get_ssh_command()}"
+    def open_console(self): return tb.Terminal().run_async(self.get_new_session_string(), shell="pwsh")
+    def get_new_session_name(self):
         if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
         resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_repr(which='remote')}` for new session name", verbose=False)
@@ -30,7 +28,7 @@ class Zellij:
             else: sess_name = f"ms{1+sess[-1]}"
         self.new_sess_name = sess_name
         return sess_name
-    def asssert_sesion_started(self):
+    def asssert_session_started(self):
         while True:
             resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
             if self.new_sess_name in resp:
@@ -40,7 +38,7 @@ class Zellij:
             time.sleep(2)
             print(f"--> Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
     def setup_layout(self, sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "~/tmp_results/remote_mahcines"):
-        if self.new_sess_name is None: self.get_new_sess_name()
+        if self.new_sess_name is None: self.get_new_session_name()
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
@@ -75,6 +73,26 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 """, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`", verbose=False)
 
 
+class WindowsTerminal:
+    def __init__(self, ssh: tb.SSH):
+        self.ssh = ssh
+        self.id = "400"  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
+
+    def get_new_session_name(self): return f"mprocs{self.id}"
+    def get_new_session_string(self): return f"lol"
+    def get_ssh_command(self): return ""
+    def open_console(self, cmd, shell="powershell"): return "wt -w 0 -d ."
+    def get_layout(self):
+        temp = self.get_template()
+        temp.procs['main']['shell']['windows'] = "croshell"
+        template_file = tb.Save.yaml(obj=temp, path=tb.P.tmpfile(suffix=".yaml"))
+    def asssert_session_started(self):
+        time.sleep(3)
+        return True
+    # def __getstate__(self): return self.__dict__
+    # def __setstate__(self, state): self.__dict__.update(state)
+
+
 class Mprocs:
     @staticmethod
     def get_template():
@@ -83,14 +101,19 @@ class Mprocs:
 
     def __init__(self, ssh: tb.SSH):
         self.ssh = ssh
-        self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
+        self.id = "4"  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
         self.new_sess_name = None
 
+    def get_new_session_name(self): return f"mprocs{self.id}"
+    def get_new_session_string(self): return f"lol"
+    def get_ssh_command(self): return ""
+    def open_console(self, cmd, shell="powershell"): return "wt -w 0 -d ."
     def get_layout(self):
         temp = self.get_template()
         temp.procs['main']['shell']['windows'] = "croshell"
         template_file = tb.Save.yaml(obj=temp, path=tb.P.tmpfile(suffix=".yaml"))
-
+    def asssert_session_started(self):
+        time.sleep(3)
+        return True
     # def __getstate__(self): return self.__dict__
     # def __setstate__(self, state): self.__dict__.update(state)
-

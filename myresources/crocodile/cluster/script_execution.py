@@ -35,7 +35,7 @@ description = ""
 ssh_repr = ""
 ssh_repr_remote = ""
 error_message = "No error message."  # to be updated by try-except block inside execution line.
-zellij_session = ""
+session_name = ""
 resource_manager_path = ""
 
 print("\n" * 2)
@@ -141,10 +141,10 @@ ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
 ''', style="bold blue on white"), title="Pull results with this line:", border_style="bold red"))
 
 
-if zellij_session != "":
-    tb.Terminal().run(f"""zellij --session {zellij_session} action new-tab --name results  """)
+if session_name != "":
+    tb.Terminal().run(f"""zellij --session {session_name} action new-tab --name results  """)
     # --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl --cwd {res_folder.as_posix()}
-    tb.Terminal().run(f"""zellij --session {zellij_session} action write-chars "cd {res_folder.as_posix()};lf" """)
+    tb.Terminal().run(f"""zellij --session {session_name} action write-chars "cd {res_folder.as_posix()};lf" """)
 
 
 print(f"job {manager.job_id} is completed.")

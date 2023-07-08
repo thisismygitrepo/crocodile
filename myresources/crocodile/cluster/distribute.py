@@ -203,7 +203,7 @@ class Cluster:
         self.window_number = window_number if window_number is not None else 0  # tb.randstr(length=3, lower=False, upper=False)
         cmd = f"wt -w {self.window_number} "
         for idx, m in enumerate(self.machines):
-            sub_cmd = m.z.get_new_sess_string()
+            sub_cmd = m.session_manager.get_new_session_string()
             if idx == 0: cmd += f""" new-tab --title '{m.ssh.hostname + str(idx)}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
             elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname + str(idx)} pwsh -Command "{sub_cmd}" `;"""
             else: cmd += f""" split-pane --horizontal --size {1 / self.machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
@@ -211,7 +211,7 @@ class Cluster:
         print("Terminal launch command:\n", cmd)
         if cmd.endswith("`;"): cmd = cmd[:-2]
         tb.Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
-        self.machines[-1].z.asssert_sesion_started()
+        self.machines[-1].session_manager.asssert_session_started()
 
     def fire(self, machines_per_tab=1, window_number=None, run=False):
         self.open_mux(machines_per_tab=machines_per_tab, window_number=window_number)

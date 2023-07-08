@@ -1,6 +1,7 @@
 
 import crocodile.toolbox as tb
-from crocodile.cluster.controllers import Zellij, Mprocs
+from crocodile.cluster.session_managers import Zellij, WindowsTerminal
+from crocodile.cluster.self_ssh import SelfSSH
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
@@ -224,6 +225,7 @@ class RemoteMachineConfig:
     base_dir: str = f"~/tmp_results/remote_machines/jobs"
     description: str = ""
     ssh_params: dict = field(default_factory=lambda: dict())
+    ssh_obj: tb.SSH or None = None
 
     # data
     copy_repo: bool = False
@@ -250,13 +252,15 @@ class RemoteMachineConfig:
     lock_resources: bool = True
     max_simulataneous_jobs: int = 1
     workload_params: WorkloadParams or None = field(default_factory=lambda: None)
+    def __post_init__(self):
+        if self.interactive and self.lock_resources: print(f"RemoteMachineConfig Warning: If interactive is ON along with lock_resources, the job might never end.")
 
 
 class RemoteMachine:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func, config: RemoteMachineConfig, func_kwargs: dict or None = None, data: list or None = None, ssh=None):
+    def __init__(self, func, config: RemoteMachineConfig, func_kwargs: dict or None = None, data: list or None = None):
         self.config = config
         # function and its data
         if type(func) is str or type(func) is tb.P: self.func_file, self.func, self.func_class = tb.P(func), None, None
@@ -271,9 +275,9 @@ class RemoteMachine:
         self.kwargs = func_kwargs or tb.S()
         self.data = data if data is not None else []
         # conn
-        self.ssh = ssh or tb.SSH(**self.config.ssh_params)
-        self.z = Zellij(self.ssh) if not self.ssh.get_remote_machine() == "Windows" else Mprocs(self.ssh)
-        self.zellij_session = None
+        self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)
+        self.session_manager = Zellij(self.ssh) if not self.ssh.get_remote_machine() == "Windows" else WindowsTerminal(self.ssh)
+        self.session_name = None
         # scripts
         self.path_dict = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
@@ -282,7 +286,6 @@ class RemoteMachine:
         self.scipts_generated = False
         self.results_downloaded = False
         self.results_path = None
-        if self.config.interactive and self.config.lock_resources: print(f"If interactive is ON along with lock_resources, the job might never end.")
 
     def execution_command_to_clip_memory(self):
         print("Execution command copied to clipboard 📋")
@@ -290,14 +293,13 @@ class RemoteMachine:
         print("\n")
 
     def fire(self, run=False, open_console=True):
-        console.rule("Firing job @ remote machine")
+        console.rule(f"Firing job @ remote machine {self.ssh}")
         if open_console and self.config.open_console:
-            cmd = self.z.get_new_sess_string()
-            self.ssh.open_console(cmd=cmd.split(" -t ")[1], shell="pwsh")
-            self.z.asssert_sesion_started()
+            self.ssh.open_console(cmd=self.session_manager.get_ssh_command(), shell="pwsh")
+            self.session_manager.asssert_session_started()
             # send email at start execution time
-        self.z.setup_layout(sess_name=self.z.new_sess_name, cmd=self.execution_command, run=run,
-                            job_wd=self.path_dict.root_dir.as_posix())
+        self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=self.execution_command, run=run,
+                                          job_wd=self.path_dict.root_dir.as_posix())
         print("\n")
 
     def run(self, run=True, open_console=True, show_scripts=True):
@@ -308,8 +310,9 @@ class RemoteMachine:
         print(f"Saved RemoteMachine object can be found @ {self.path_dict.machine_obj_path.expanduser()}")
         return self
 
-    def submit(self):
+    def submit(self) -> None:
         console.rule("Submitting job")
+        if type(self.ssh) is SelfSSH: return None
         from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
         try: tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
@@ -327,13 +330,13 @@ class RemoteMachine:
         func_module = self.func.__module__ if self.func is not None else None
         assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func_name}`"
         rel_full_path = self.repo_path.rel2home().joinpath(self.func_relative_file).as_posix()
-        self.zellij_session = self.z.get_new_sess_name()
+        self.session_name = self.session_manager.get_new_session_name()
         meta_kwargs = dict(ssh_repr=repr(self.ssh),
                            ssh_repr_remote=self.ssh.get_repr("remote"),
                            repo_path=self.repo_path.collapseuser().as_posix(),
                            func_name=func_name, func_module=func_module, func_class=self.func_class, rel_full_path=rel_full_path, description=self.config.description,
                            resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
-                           zellij_session=self.zellij_session)
+                           session_name=self.session_name)
         py_script = meta.get_py_script(kwargs=meta_kwargs, wrap_in_try_except=self.config.wrap_in_try_except, func_name=func_name, func_class=self.func_class, rel_full_path=rel_full_path, parallelize=self.config.parallelize, workload_params=self.config.workload_params)
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
@@ -370,7 +373,7 @@ deactivate
 
 """
         # self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op
-        if self.ssh.get_remote_machine() != "Windows": shell_script += f"""{f'zellij kill-session {self.zellij_session}' if self.config.kill_on_completion else ''}"""
+        if self.ssh.get_remote_machine() != "Windows": shell_script += f"""{f'zellij kill-session {self.session_name}' if self.config.kill_on_completion else ''}"""
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
