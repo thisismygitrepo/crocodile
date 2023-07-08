@@ -87,6 +87,7 @@ p = P(r\'{str(args.read).lstrip()}\').absolute()
 try:
     dat = p.readit()
     if type(dat) == tb.Struct: dat.print(as_config=True, title=p.name)
+    else: print(f"Succcesfully read the file {{p.name}}")
 except Exception as e:
     print(e)
 
