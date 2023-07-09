@@ -367,7 +367,7 @@ echo "Executing Python wrapper script: {self.path_dict.py_script_path.as_posix()
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} {'-i' if self.config.interactive else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
+{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'-i' if self.config.interactive else ''} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
 
 deactivate
 
