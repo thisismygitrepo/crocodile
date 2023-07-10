@@ -53,7 +53,7 @@ class DBMS:
     def __setstate__(self, state): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
 
     @classmethod
-    def from_local_db(cls, path=None, echo=False, **kwargs): return cls(engine=cls.make_sql_engine(path=path, echo=echo, **kwargs))
+    def from_local_db(cls, path=None, echo=False, share_across_threads=False, **kwargs): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
     def close(self, sleep=2): print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`"); self.con.close(); self.ses.close(); self.eng.dispose(); time.sleep(sleep)
@@ -63,12 +63,14 @@ class DBMS:
         else: return table
 
     @staticmethod
-    def make_sql_engine(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0], pool_size=10, **kwargs):
+    def make_sql_engine(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0], pool_size=5, share_across_threads=True, **kwargs):
         """Establish lazy initialization with database"""
         if str(path) == "memory":
             print("Linking to in-memory database.")
-            from sqlalchemy.pool import StaticPool  # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
-            return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
+            if share_across_threads:
+                from sqlalchemy.pool import StaticPool  # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
+                return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
+            else: return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else tb.P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
