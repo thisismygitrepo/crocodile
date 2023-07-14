@@ -21,13 +21,13 @@ def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/s
 
 class Email:
     @staticmethod
-    def get_source_of_truth(): return tb.P.home().joinpath("dotfiles/machineconfig/source_of_truth.py").readit(strict=False)
+    def get_source_of_truth(): return tb.P.home().joinpath("dotfiles/machineconfig/emails.ini").readit()
 
     def __init__(self, config):
         self.config = config
         if config['encryption'].lower() == "ssl": self.server = smtplib.SMTP_SSL(host=self.config["smtp_host"], port=self.config["smtp_port"])
         elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"]) 
-        self.server.login(self.config['email_add'], password=self.config["get_password"]())
+        self.server.login(self.config['email_add'], password=self.config["password"])
 
     def send_message(self, to, subject, body, txt_to_html=True, attachments=None):
         body += "\n\nThis is an automated email sent via crocodile.comms script."
@@ -83,7 +83,8 @@ class Email:
     def close(self): self.server.quit()    # Closing is vital as many servers do not allow mutiple connections.
 
     @staticmethod
-    def send_and_close(config_name, to, subject, msg): tmp = Email(config=Email.get_source_of_truth().EMAIL[config_name]); tmp.send_message(to, subject, msg); tmp.close()
+    def send_and_close(config_name, to, subject, msg):
+        tmp = Email(config=Email.get_source_of_truth()[config_name]); tmp.send_message(to, subject, msg); tmp.close()
 
 
 class PhoneNotification:  # security concerns: avoid using this.
