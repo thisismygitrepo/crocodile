@@ -63,9 +63,9 @@ class App:
             'primary': '#00EA64',
             'secondary': '#6E6E6E',
         }
-
-        return dash.Dash(name=name+tb.randstr(), external_stylesheets=[dbc.themes.DARKLY])
-        # [r'https://codepen.io/chriddyp/pen/bWLwgP.css'
+        return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
+        # [dbc.themes.DARKLY])
+        #
     @staticmethod
     def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
         raise NotImplementedError
