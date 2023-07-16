@@ -359,11 +359,11 @@ class P(type(Path()), Path):
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
         return localpath
-    def sync_to_cloud(self, cloud, sync_up=False, sync_down=False, os_specific=False, transfers=10, delete=False):
-        source, target = (self.expanduser().absolute(), f"{cloud}:{self._get_remote_path(os_specific=os_specific)}") if sync_up else (f"{cloud}:{self._get_remote_path(os_specific=os_specific)}", self.expanduser().absolute())
-        if not sync_down and not sync_up: print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`"); rclone_cmd = f"""rclone bisync {source} {target} --resync --remove-empty-dirs"""
-        else: print(f"SYNCING {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync {source} {target}"""
-        rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += " --delete-during" if delete else ""; from crocodile.meta import Terminal; res = Terminal(stdout=None).run(rclone_cmd, shell="powershell")
+    def sync_to_cloud(self, cloud, sync_up=False, sync_down=False, os_specific=False, rel2home=True, transfers=10, delete=False):
+        source, target = (self.expanduser().absolute().as_posix(), f"{cloud}:{self._get_remote_path(os_specific=os_specific).as_posix() if rel2home else self.expanduser().absolute().as_posix()}") if sync_up else (f"{cloud}:{self._get_remote_path(os_specific=os_specific).as_posix() if rel2home else self.expanduser().absolute().as_posix()}", self.expanduser().absolute().as_posix())
+        if not sync_down and not sync_up: print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`"); rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
+        else: print(f"SYNCING {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
+        rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += " --delete-during" if delete else ""; from crocodile.meta import Terminal; print(rclone_cmd); res = Terminal(stdout=None).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=False), res.print(capture=False)
         return self
 
