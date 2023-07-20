@@ -1,8 +1,8 @@
 
-from crocodile.file_management import P, install_n_import, datetime
+from crocodile.file_management import P, install_n_import
 from crocodile.core import List
-from crocodile.meta import Scheduler, Log
-import time
+# from crocodile.meta import Scheduler, Log
+# import time
 
 
 def share(path):
@@ -56,7 +56,7 @@ class Cycle:
     def get_value(self): return self.list[self.index]
     def get_index(self): return self.index
     def set_index(self, index): self.prev_index = self.index; self.index = index
-    def expand(self, val=None): self.list += (val if type(val) is list else ([self.list[-1] + 1]) if len(self.list) else [0])
+    def expand(self, val=None): self.list += (val if type(val) is list else (([self.list[-1] + 1]) if len(self.list) else [0]))
     def __add__(self, other): pass  # see behviour of matplotlib cyclers.
     def __repr__(self): return f"Cycler @ {self.index}: {self.list[self.index]}"
 class DictCycle(Cycle):

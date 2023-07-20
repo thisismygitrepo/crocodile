@@ -25,7 +25,6 @@ from googleapiclient.discovery import build
 
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
-from crocodile.comms.helper_funcs import process_sent_file, process_retrieved_file
 from enum import Enum
 import crocodile.toolbox as tb
 import io

@@ -32,7 +32,7 @@ def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
         else: key = pwd2key(pwd)  # trailing `;` prevents IPython from caching the result.
     if type(key) is bytes: pass  # passsed explicitly
-    elif key is None: key = P("~/dotfiles/creds/data/encrypted_files_key.bytes").expanduser().read_bytes()  # read from file
+    elif key is None: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
     elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
@@ -219,7 +219,7 @@ class P(type(Path()), Path):
     def as_unix(self, inlieu=False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
-    def validate_name(self, replace='_'): validate_name(self.trunk, replace=replace)
+    def validate_name(self, replace='_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
     def write_text(self, data: str, **kwargs) -> 'P': super(P, self).write_text(data, **kwargs); return self
     def read_text(self, encoding=None, lines=False, printit=False) -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
@@ -251,7 +251,7 @@ class P(type(Path()), Path):
             return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
-        if ".zip" not in slf and compressed: raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]).reduce().list
+        if ".zip" not in slf and compressed: raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]).reduce()
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
     def tree(self, *args, **kwargs): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
@@ -363,7 +363,7 @@ class P(type(Path()), Path):
         source, target = (self.expanduser().absolute().as_posix(), f"{cloud}:{self._get_remote_path(os_specific=os_specific).as_posix() if rel2home else self.expanduser().absolute().as_posix()}") if sync_up else (f"{cloud}:{self._get_remote_path(os_specific=os_specific).as_posix() if rel2home else self.expanduser().absolute().as_posix()}", self.expanduser().absolute().as_posix())
         if not sync_down and not sync_up: print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`"); rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
         else: print(f"SYNCING {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
-        rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += " --delete-during" if delete else ""; from crocodile.meta import Terminal; print(rclone_cmd); res = Terminal(stdout=None).run(rclone_cmd, shell="powershell")
+        rclone_cmd += f" --progress --transfers={transfers} --verbose --vfs-cache-mode full"; rclone_cmd += " --delete-during" if delete else ""; from crocodile.meta import Terminal; print(rclone_cmd); res = Terminal(stdout=None).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=False), res.print(capture=False)
         return self
 
