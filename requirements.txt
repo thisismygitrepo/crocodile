@@ -23,7 +23,7 @@ wheel  # for packaging
 twine  # for pushing package to pypi.org
 pytest  # popular alternative to builtint unittest
 ipython  # interactive python
-jupyterlab  # for jupyter notebook
+# jupyterlab  # for jupyter notebook
 fire  # for automatic CLI interface
 tqdm  # for progress bar
 send2trash  # move to recycle bin

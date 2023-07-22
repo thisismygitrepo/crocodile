@@ -70,13 +70,14 @@ setup(
         # "scipy",  # heavy-weight.
 
         # Accessories
+        "psutil",
         "joblib",  # multitasking
         "ipython",  # interactive python
         "fire",  # for automatic CLI interface
         "tqdm",  # for progress bar
         "dill",  # extends pickle
         "cryptography",  # for encoding
-        # "paramiko",  # for SSH
+        "paramiko",  # for SSH
         "requests",  # interacting with web
         # "cycler",
 

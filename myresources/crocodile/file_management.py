@@ -342,7 +342,7 @@ class P(type(Path()), Path):
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
-        remotepath = (localpath._get_remote_path(root==root, os_specific=os_specific) if rel2home else localpath) if remotepath is None else P(remotepath)
+        remotepath = (localpath._get_remote_path(root=root, os_specific=os_specific) if rel2home else localpath) if remotepath is None else P(remotepath)
         from crocodile.meta import Terminal; print(f" {'>'*10} UPLOADING ⬆️ {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
         res = Terminal(stdout=None).run(f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print(f" {'>'*10} UPLOAD COMPLETED.")
         assert res.is_successful(strict_err=True, strict_returcode=True), res.print(capture=False)
