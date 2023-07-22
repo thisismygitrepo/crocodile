@@ -8,13 +8,21 @@ from typing import Generic, TypeVar
 import enum
 from tqdm import tqdm
 import copy
-
+from dataclasses import dataclass
 
 # %% ========================== DeepLearning Accessories =================================
 
 BM = TypeVar("BM", bound="BaseModel")
 DR = TypeVar("DR", bound="DataReader")
 HPM = TypeVar("HPM", bound="HyperParam")
+
+
+@dataclass
+class DeductionResult:
+    input: np.ndarray
+    preprocessed: np.ndarray
+    postprocessed: np.ndarray
+    prediction: np.ndarray
 
 
 class Device(enum.Enum):
@@ -416,7 +424,7 @@ class BaseModel(ABC):
         y_label = self.compiler.loss.name if hasattr(self.compiler.loss, "name") else self.compiler.loss.__name__
         return res.plot(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
 
-    def infer(self, x):
+    def infer(self, x) -> np.ndarray:
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
         NN is put in eval mode.
         :param x:
@@ -428,12 +436,12 @@ class BaseModel(ABC):
         """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
         return self.postprocess(self.infer(x), **kwargs)
 
-    def deduce(self, obj, viz=True, **kwargs):
+    def deduce(self, obj, viz=True, **kwargs) -> DeductionResult:
         """Assumes that contents of the object are in the form of a batch."""
         preprocessed = self.preprocess(obj, **kwargs)
         prediction = self.infer(preprocessed)
         postprocessed = self.postprocess(prediction, **kwargs)
-        result = tb.Struct(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
+        result = DeductionResult(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
@@ -623,7 +631,7 @@ class Ensemble(tb.Base):
         self.hp_class = hp_class
         self.data_class = data_class
         self.model_class = model_class
-        self.models = tb.List()
+        self.models: list[BaseModel] = []
         self.data = None  # one data object for all models (so that it can fit in the memory)
         if hp_class and data_class and model_class:
             # only generate the dataset once and attach it to the ensemble to be reused by models.
@@ -638,19 +646,19 @@ class Ensemble(tb.Base):
         self.performance = None
 
     @classmethod
-    def from_saved_models(cls, parent_dir, model_class):
+    def from_saved_models(cls, parent_dir, model_class) -> 'Ensemble':
         obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
-        obj.models = tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_model)
+        obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
-    def from_saved_weights(cls, parent_dir, model_class):
+    def from_saved_weights(cls, parent_dir, model_class) -> 'Ensemble':
         obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
-        obj.models = tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights)
+        obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))
         return obj
 
     @staticmethod
-    def from_path(path) -> tb.L: return tb.P(path).expanduser().absolute().search("*").apply(lambda item: BaseModel.from_path(item))
+    def from_path(path) -> list[BaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(lambda item: BaseModel.from_path(item)))
 
     def fit(self, shuffle_train_test=True, save=True, **kwargs):
         self.performance = tb.L()
