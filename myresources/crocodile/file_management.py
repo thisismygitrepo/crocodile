@@ -2,6 +2,7 @@
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
 
+
 # %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
@@ -363,7 +364,8 @@ class P(type(Path()), Path):
         source, target = (self.expanduser().absolute().as_posix(), f"{cloud}:{self._get_remote_path(root=root, os_specific=os_specific).as_posix() if rel2home else self.expanduser().absolute().as_posix()}") if sync_up else (f"{cloud}:{self._get_remote_path(root=root, os_specific=os_specific).as_posix() if rel2home else self.expanduser().absolute().as_posix()}", self.expanduser().absolute().as_posix())
         if not sync_down and not sync_up: print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`"); rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
         else: print(f"SYNCING {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
-        rclone_cmd += f" --progress --transfers={transfers} --verbose --vfs-cache-mode full"; rclone_cmd += " --delete-during" if delete else ""; from crocodile.meta import Terminal; print(rclone_cmd); res = Terminal(stdout=None).run(rclone_cmd, shell="powershell")
+        rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += (" --delete-during" if delete else ""); from crocodile.meta import Terminal; print(rclone_cmd)
+        res = Terminal(stdout=None).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=False), res.print(capture=False)
         return self
 

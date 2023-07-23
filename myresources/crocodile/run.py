@@ -71,13 +71,20 @@ def build_parser():
     elif args.file != "" or args.read != "":
         code_text = ""
         if args.file != "":
-            file = Path(args.file).expanduser().absolute()        
-            code_text = fr"""
+            file = Path(args.file).expanduser().absolute()
+            if args.module:
+                code_text = fr"""
 # >>>>>>> Importing File <<<<<<<<<
 import sys
 sys.path.append(r'{file.parent}')
 from {file.stem} import *
 {args.cmd if args.cmd != '' else ''}
+"""
+            else:
+                code_text = f"""
+# >>>>>>> Executing File <<<<<<<<<
+__file__ = P(r'{file}')
+{file.read_text(encoding="utf-8")}
 """
 
         elif args.read != "": 
