@@ -505,13 +505,17 @@ class BaseModel(ABC):
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
             print(f"Warning: Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
-        module = importlib.import_module(__module)
+        try:
+            module = importlib.import_module(__module)
+        except ModuleNotFoundError as ex:
+            print(ex)
+            module = None
         specs = {'__module__': __module,
                  'model_class': self.__class__.__name__,
                  'data_class': self.data.__class__.__name__,
                  'hp_class': self.hp.__class__.__name__,
                  # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
-                 'module_path_rh': tb.P(module.__file__).resolve().collapseuser().as_posix(),
+                 'module_path_rh': tb.P(module.__file__).resolve().collapseuser().as_posix() if hasattr(module, '__file__') else None,
                  'cwd_rh': tb.P.cwd().collapseuser().as_posix(),
                  }
         tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json'))
