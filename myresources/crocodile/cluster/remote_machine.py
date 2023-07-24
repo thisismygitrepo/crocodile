@@ -222,7 +222,6 @@ class WorkloadParams:
         min_start = series[min_idx_start]
         min_end = series[min_idx_end]
         return min_start, min_end
-
     def print(self): tb.S(self.__dict__).print(as_config=True, title=f"Job Workload")
 
 
