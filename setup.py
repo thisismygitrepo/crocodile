@@ -66,6 +66,7 @@ setup(
         "numpy",
         "pandas",
         "matplotlib",
+        "psutil",
         # "tabulate",  # pretty printing of tables
         # "scipy",  # heavy-weight.
 

@@ -156,7 +156,10 @@ class Cluster:
         rams = []
         for an_ssh in self.sshz:
             res = an_ssh.run_py("import psutil; print(psutil.cpu_count(), psutil.virtual_memory().total)", verbose=False).op
-            cpus.append(int(res.split(' ')[0]))
+            try: cpus.append(int(res.split(' ')[0]))
+            except ValueError:
+                print(f"Couldn't get cpu count from {an_ssh}")
+                raise ValueError(f"Couldn't get cpu count from {an_ssh}")
             rams.append(ceil(int(res.split(' ')[1]) / 2 ** 30))
         total_cpu = np.array(cpus).sum()
         total_ram = np.array(rams).sum()
