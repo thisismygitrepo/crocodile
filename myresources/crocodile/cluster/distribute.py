@@ -159,7 +159,7 @@ class Cluster:
             try: cpus.append(int(res.split(' ')[0]))
             except ValueError:
                 print(f"Couldn't get cpu count from {an_ssh}")
-                raise ValueError(f"Couldn't get cpu count from {an_ssh}")
+                raise ValueError(f"Couldn't get cpu count from {an_ssh.get_repr(which='remote')}")
             rams.append(ceil(int(res.split(' ')[1]) / 2 ** 30))
         total_cpu = np.array(cpus).sum()
         total_ram = np.array(rams).sum()
