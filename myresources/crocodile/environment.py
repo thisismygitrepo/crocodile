@@ -78,7 +78,10 @@ def get_network_addresses():
     # elif hex_format: return hex(mac)
     # else: return mac
     import socket
-    local_ip_v4 = socket.gethostbyname(socket.gethostname() + ".local")  # without .local, in linux machines, '/etc/hosts' file content, you have an IP address mapping with '127.0.1.1' to your hostname
+    try: local_ip_v4 = socket.gethostbyname(socket.gethostname() + ".local")  # without .local, in linux machines, '/etc/hosts' file content, you have an IP address mapping with '127.0.1.1' to your hostname
+    except Exception:
+        print(f"Warning: Could not get local_ip_v4. This is probably because you are running a WSL instance")  # TODO find a way to get the local_ip_v4 in WSL
+        local_ip_v4 = socket.gethostbyname(socket.gethostname())
     res = dict(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=P('https://api.ipify.org').download(memory=True).text)
     return res
 

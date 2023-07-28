@@ -146,9 +146,9 @@ class P(type(Path()), Path):
                 if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
-                    else: print(f"SKIPPED RENAMING {repr(self)} ==> {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
-                self.rename(res); msg = msg or f"RENAMED {repr(self)} ==> {repr(res)}"
-            elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED {repr(self)}."
+                    else: print(f"SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
+                self.rename(res); msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
+            elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
         print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
