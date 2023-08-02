@@ -7,13 +7,13 @@ def run_on_remote():
     data = []
     config = RemoteMachineConfig(
         # connection
-        ssh_obj=dict(host="p51s"),  # SelfSSH(),  # overrides ssh_params
-        ssh_params=dict(host="239wsl"),
+#        ssh_obj=SelfSSH(),  # overrides ssh_params
+        ssh_params=dict(host="p51s"),  # dict(host="239wsl"),
         description="Description of running an expensive function",  # job_id=, base_dir="",
         # data
         copy_repo=False, update_repo=False, install_repo=False, update_essential_repos=True, data=data, transfer_method="sftp",
         # remote machine behaviour
-        open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='enaut', kill_on_completion=False,
+        open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='zoho', kill_on_completion=False,
         # execution behaviour
         ipython=True, interactive=True, pdb=False, pudb=False, wrap_in_try_except=True,
         # resources

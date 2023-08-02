@@ -13,9 +13,9 @@ class Submission:
 
         # downloading repo, this takes place prior to pyscript (otherwise, its tool late as the library is loaded at the top of the pyscript already)
         if machine.config.copy_repo:
-            tmp_file = machine.repo_path.expanduser().zip_n_encrypt()
+            tmp_file = tb.P(machine.job_params.repo_path_rh).expanduser().zip_n_encrypt()
             cloud_download_py_script += f"print('Downloading `{tmp_file.collapseuser()}`.')\n"
-            cloud_download_py_script += f"tb.P(r'{tmp_file.transfer_sh()}').download(folder=r'{machine.repo_path.parent}').decrypt_n_unzip()\n"
+            cloud_download_py_script += f"tb.P(r'{tmp_file.transfer_sh()}').download(folder=r'{tb.P(machine.job_params.repo_path_rh).parent}').decrypt_n_unzip()\n"
             tmp_file.delete(sure=True)
 
         # download data
@@ -41,7 +41,7 @@ class Submission:
         from crocodile.comms.gdrive import GDriveAPI
         api = GDriveAPI()
         paths = [machine.resources.kwargs_path]
-        if machine.config.copy_repo: api.upload(local_path=machine.repo_path, rel2home=True, overwrite=True, zip_first=True, encrypt_first=True)
+        if machine.config.copy_repo: api.upload(local_path=machine.job_params.repo_path_rh, rel2home=True, overwrite=True, zip_first=True, encrypt_first=True)
         if machine.data is not None:
             tb.L(machine.data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
             paths += list(machine.data)
@@ -51,7 +51,7 @@ from crocodile.comms.gdrive import GDriveAPI
 from crocodile.file_management import P
 api = GDriveAPI()
 {downloads}
-{'' if not machine.config.copy_repo else f'api.download(fpath=r"{machine.repo_path.collapseuser().as_posix()}", unzip=True, decrypt=True)'}
+{'' if not machine.config.copy_repo else f'api.download(fpath=r"{tb.P(machine.job_params.repo_path_rh).collapseuser().as_posix()}", unzip=True, decrypt=True)'}
 """
         shell_script_modified = machine.resources.shell_script_path.expanduser().read_text().replace("# EXTRA-PLACEHOLDER-POST", f"bu_gdrive_rx -R {machine.resources.py_script_path.collapseuser().as_posix()}")
         with open(file=machine.resources.shell_script_path.expanduser(), mode='w', newline={"Windows": None, "Linux": "\n"}[machine.ssh.get_remote_machine()]) as file: file.write(shell_script_modified)
@@ -66,12 +66,11 @@ api = GDriveAPI()
     def sftp(self: RemoteMachine):
         assert self.ssh.sftp is not None, f"SFTP is not available for this machine `{self}`. Consider using different `transfer_method` other than `sftp`."
         self.ssh.run_py(f"tb.P(r'{ResourceManager.shell_script_path_log}').expanduser().create(parents_only=True).delete(sure=True).write_text(r'{self.resources.shell_script_path.collapseuser().as_posix()}')", desc="Logging latest shell script path on remote.", verbose=False)
-        if self.config.copy_repo: self.ssh.copy_from_here(self.repo_path, z=True, overwrite=True)
+        if self.config.copy_repo: self.ssh.copy_from_here(self.job_params.repo_path_rh, z=True, overwrite=True)
         tb.L(self.data).apply(lambda x: self.ssh.copy_from_here(x, z=True if tb.P(x).is_dir() else False, r=False, overwrite=True))
 
         self.ssh.copy_from_here(self.resources.root_dir, z=True)
         # self.ssh.print_summary()
-
         # f"source " if self.ssh.get_remote_machine() != "Windows" else "")
         self.execution_command = ". " + f"{self.resources.shell_script_path.collapseuser().as_posix()}"
         # self.ssh.run(f". {self.shell_script_path.collapseuser().as_posix()}", desc="Executing the function")

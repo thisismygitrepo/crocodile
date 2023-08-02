@@ -63,7 +63,6 @@ class JobParams:
     def from_func(func) -> 'JobParams':
         func_module = func.__module__ if func is not None else None
         assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."
-        # function and its data
         if type(func) is str or type(func) is tb.P:
             func_file, func, func_class = tb.P(func), None, None
         elif func.__name__ != func.__qualname__:
@@ -101,7 +100,9 @@ print(f"This machine will execute ({(workload_params.idx_end - workload_params.i
 print(f"This share of workload will be split among {workload_params.jobs} of threads on this machine.")
 workload_params = WorkloadParams(**{workload_params.__dict__})
 repo_path = tb.P(rf'{self.repo_path_rh}').expanduser().absolute()
+file_root = tb.P(rf'{self.file_path_rh}').expanduser().absolute().parent
 tb.sys.path.insert(0, repo_path.str)
+tb.sys.path.insert(0, file_root.str)
 """
         else: base = ""
 

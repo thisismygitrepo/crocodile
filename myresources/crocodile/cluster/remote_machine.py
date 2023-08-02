@@ -63,7 +63,7 @@ class RemoteMachine:
     def __init__(self, func, config: RemoteMachineConfig, func_kwargs: dict or None = None, data: list or None = None):
         self.config = config
         self.func = func
-        self.job_params = JobParams.from_func(func=func)
+        self.job_params: JobParams = JobParams.from_func(func=func)
         if self.config.install_repo is None: self.config.install_repo = self.job_params.is_installabe()
 
         self.kwargs = func_kwargs or tb.S()
