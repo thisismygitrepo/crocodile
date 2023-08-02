@@ -86,7 +86,7 @@ class Cluster:
         state["func"] = None
         return state
     def __setstate__(self, state): self.__dict__.update(state)
-    def save(self) -> tb.P: return tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
+    def save(self) -> tb.P: return tb.Save.vanilla_pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
     @staticmethod
     def load(job_id, base=None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
@@ -126,7 +126,7 @@ class Cluster:
         self.machines_specs: list[MachineSpecs] = []
         self.threads_per_machine = []
         self.remote_machine_kwargs: RemoteMachineConfig = remote_machine_config
-        self.workload_params: list[WorkloadParams] or None = None
+        self.workload_params: list[WorkloadParams] = []
 
         self.description: str = description
         self.func = func
@@ -149,7 +149,7 @@ class Cluster:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
     def generate_standard_kwargs(self):
-        if self.workload_params is not None:
+        if not len(self.workload_params):
             print("workload_params is not None, so not generating standard kwargs")
             return None
         cpus = []
@@ -171,7 +171,7 @@ class Cluster:
         self.print_func_kwargs()
 
     def viz_load_ratios(self):
-        if self.workload_params is None: raise Exception("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
+        if not len(self.workload_params): raise Exception("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
         plt = tb.install_n_import("plotext")
         names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
 
@@ -183,10 +183,11 @@ class Cluster:
 
         self.machine_load_calc.load_ratios_repr = tb.S(dict(zip(names, tb.L((np.array(self.machine_load_calc.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
         print(self.machine_load_calc.load_ratios_repr)
+        # self.workload_params.
         print("\n")
 
     def submit(self):
-        if self.workload_params is None: raise Exception("You need to generate standard kwargs first.")
+        if not len(self.workload_params): raise Exception("You need to generate standard kwargs first.")
         for idx, (a_workload_params, an_ssh) in enumerate(zip(self.workload_params, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.machine_load_calc.load_ratios_repr}"
             if self.remote_machine_kwargs is not None:
@@ -197,7 +198,7 @@ class Cluster:
             m.generate_scripts()
             m.submit()
             self.machines.append(m)
-        try: tb.Save.pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
+        try: self.save()
         except: print("Couldn't pickle cluster object")
         self.print_commands()
 

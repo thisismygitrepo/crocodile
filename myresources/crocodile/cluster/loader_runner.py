@@ -31,6 +31,9 @@ class WorkloadParams:
         min_end = series[min_idx_end]
         return min_start, min_end
     def print(self): tb.S(self.__dict__).print(as_config=True, title=f"Job Workload")
+    def viz(self):
+        print(f"This machine will execute ({(self.idx_end - self.idx_start) / self.idx_max * 100:.2f}%) of total job workload.")
+        print(f"This share of workload will be split among {self.jobs} of threads on this machine.")
 
 
 @dataclass
@@ -96,8 +99,6 @@ class JobParams:
         #     exec_obj = module  # for README.md generation.
 
         if workload_params is not None: base = f"""
-print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
-print(f"This share of workload will be split among {workload_params.jobs} of threads on this machine.")
 workload_params = WorkloadParams(**{workload_params.__dict__})
 repo_path = tb.P(rf'{self.repo_path_rh}').expanduser().absolute()
 file_root = tb.P(rf'{self.file_path_rh}').expanduser().absolute().parent
@@ -149,7 +150,7 @@ except Exception as e:
     error_message = str(e)
     res = None
 
-    """
+"""
         return base
 
 
