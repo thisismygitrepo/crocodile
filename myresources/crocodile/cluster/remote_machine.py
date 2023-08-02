@@ -12,7 +12,7 @@ import time
 import pandas as pd
 from dataclasses import dataclass, field
 from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager
-from crocodile.cluster import script_execution, script_notify_upon_completion
+import crocodile.cluster as cluster
 
 
 console = Console()
@@ -73,7 +73,7 @@ class RemoteMachine:
         self.session_manager = Zellij(self.ssh) if not self.ssh.get_remote_machine() == "Windows" else WindowsTerminal(self.ssh)
         self.session_name = None
         # scripts
-        self.path_dict = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
+        self.resources = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
         self.execution_command = None
         self.submitted = False
@@ -93,7 +93,7 @@ class RemoteMachine:
             self.session_manager.asssert_session_started()
             # send email at start execution time
         self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=self.execution_command, run=run,
-                                          job_wd=self.path_dict.root_dir.as_posix())
+                                          job_wd=self.resources.root_dir.as_posix())
         print("\n")
 
     def run(self, run=True, open_console=True, show_scripts=True):
@@ -101,7 +101,7 @@ class RemoteMachine:
         if show_scripts: self.show_scripts()
         self.submit()
         self.fire(run=run, open_console=open_console)
-        print(f"Saved RemoteMachine object can be found @ {self.path_dict.machine_obj_path.expanduser()}")
+        print(f"Saved RemoteMachine object can be found @ {self.resources.machine_obj_path.expanduser()}")
         return self
 
     def submit(self) -> None:
@@ -109,7 +109,7 @@ class RemoteMachine:
         if type(self.ssh) is SelfSSH: return None
         from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
-        try: tb.Save.pickle(obj=self, path=self.path_dict.machine_obj_path.expanduser())
+        try: tb.Save.pickle(obj=self, path=self.resources.machine_obj_path.expanduser())
         except: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
         if self.config.transfer_method == "transfer_sh": Submission.transfer_sh(machine=self)
         elif self.config.transfer_method == "gdrive": Submission.gdrive(machine=self)
@@ -124,20 +124,20 @@ class RemoteMachine:
         self.job_params.ssh_repr = repr(self.ssh)
         self.job_params.ssh_repr_remote = self.ssh.get_repr("remote")
         self.job_params.description = self.config.description
-        self.job_params.resource_manager_path = self.path_dict.resource_manager_path.collapseuser().as_posix()
+        self.job_params.resource_manager_path = self.resources.resource_manager_path.collapseuser().as_posix()
         self.job_params.session_name = self.session_name
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
-        py_script = tb.P(script_execution.__file__).read_text(encoding="utf-8").replace("params = JobParams.from_empty()", str(self.job_params)).replace("# execution_line", execution_line)
+        py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
             job_params = EmailParams(addressee=self.ssh.get_repr("local", add_machine=True),
-                               speaker=self.ssh.get_repr('remote', add_machine=True),
-                               ssh_conn_str=self.ssh.get_repr('remote', add_machine=False),
-                               executed_obj=executed_obj,
-                               resource_manager_path=self.path_dict.resource_manager_path.collapseuser().as_posix(),
-                               to_email=self.config.to_email, email_config_name=self.config.email_config_name)
-            py_script += tb.P(script_notify_upon_completion.__file__).read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", str(job_params))
+                                     speaker=self.ssh.get_repr('remote', add_machine=True),
+                                     ssh_conn_str=self.ssh.get_repr('remote', add_machine=False),
+                                     executed_obj=executed_obj,
+                                     resource_manager_path=self.resources.resource_manager_path.collapseuser().as_posix(),
+                                     to_email=self.config.to_email, email_config_name=self.config.email_config_name)
+            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {job_params}")
         shell_script = f"""
     
 # EXTRA-PLACEHOLDER-PRE
@@ -152,12 +152,12 @@ echo "~~~~~~~~~~~~~~~~SHELL  END ~~~~~~~~~~~~~~~"
 
 echo ""
 echo "Starting job {self.config.job_id} 🚀"
-echo "Executing Python wrapper script: {self.path_dict.py_script_path.as_posix()}"
+echo "Executing Python wrapper script: {self.resources.py_script_path.as_posix()}"
 
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'-i' if self.config.interactive else ''} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} ./{self.path_dict.py_script_path.rel2home().as_posix()}
+{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'-i' if self.config.interactive else ''} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} ./{self.resources.py_script_path.rel2home().as_posix()}
 
 deactivate
 
@@ -167,17 +167,17 @@ deactivate
 
         # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
-        with open(file=self.path_dict.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
-        self.path_dict.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
-        tb.Save.pickle(obj=self.kwargs, path=self.path_dict.kwargs_path.expanduser(), verbose=False)
-        tb.Save.pickle(obj=self.path_dict.__getstate__(), path=self.path_dict.resource_manager_path.expanduser(), verbose=False)
+        with open(file=self.resources.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
+        self.resources.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
+        tb.Save.pickle(obj=self.kwargs, path=self.resources.kwargs_path.expanduser(), verbose=False)
+        tb.Save.pickle(obj=self.resources.__getstate__(), path=self.resources.resource_manager_path.expanduser(), verbose=False)
         print("\n")
         # self.show_scripts()
 
     def show_scripts(self) -> None:
-        Console().print(Panel(Syntax(self.path_dict.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
-        Console().print(Panel(Syntax(self.path_dict.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
-        inspect(tb.Struct(shell_script=repr(tb.P(self.path_dict.shell_script_path).expanduser()), python_script=repr(tb.P(self.path_dict.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.path_dict.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
+        Console().print(Panel(Syntax(self.resources.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
+        Console().print(Panel(Syntax(self.resources.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
+        inspect(tb.Struct(shell_script=repr(tb.P(self.resources.shell_script_path).expanduser()), python_script=repr(tb.P(self.resources.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.resources.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
 
     def wait_for_results(self, sleep_minutes: int = 10):
         assert self.submitted, "Job even not submitted yet. 🤔"
@@ -197,8 +197,8 @@ deactivate
             print("Job already completed. 🤔")
             return None
 
-        base = self.path_dict.execution_log_dir.expanduser().create()
-        try: self.ssh.copy_to_here(self.path_dict.execution_log_dir.as_posix(), z=True)
+        base = self.resources.execution_log_dir.expanduser().create()
+        try: self.ssh.copy_to_here(self.resources.execution_log_dir.as_posix(), z=True)
         except: pass  # the directory doesn't exist yet at the remote.
         end_time_file = base.joinpath("end_time.txt")
 

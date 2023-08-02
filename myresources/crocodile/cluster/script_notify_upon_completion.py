@@ -5,7 +5,6 @@ import crocodile.toolbox as tb
 from crocodile.cluster.remote_machine import ResourceManager
 from crocodile.cluster.loader_runner import EmailParams
 
-to_be_deleted = ["exec_times = tb.S()", "res_folder = tb.P()", "error_message = ''"]
 error_message = ''
 exec_times = tb.S()
 res_folder = tb.P()

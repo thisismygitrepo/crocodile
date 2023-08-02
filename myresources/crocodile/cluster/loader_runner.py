@@ -77,12 +77,13 @@ class JobParams:
             func_relative_file = func_file.relative_to(repo_path)
         except:
             repo_path, func_relative_file = func_file.parent, func_file.name
-        return JobParams(repo_path_rh=repo_path.collapseuser().as_posix(), file_path_rh=repo_path.rel2home().joinpath(func_relative_file).collapseuser().as_posix(),
+        return JobParams(repo_path_rh=repo_path.collapseuser().as_posix(), file_path_rh=repo_path.collapseuser().joinpath(func_relative_file).collapseuser().as_posix(),
                          file_path_r=func_relative_file.as_posix(),
                          func_module=func_module, func_class=func_class, func_name=func.__name__,
                          description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
 
     def get_execution_line(self, workload_params: WorkloadParams or None, parallelize: bool, wrap_in_try_except: bool) -> str:
+        # tb.P(self.repo_path_rh).name}.{self.file_path_r.replace(".py", '').replace('/', '.')#
         # if func_module is not None:
         #     # noinspection PyTypeChecker
         #     module = __import__(func_module, fromlist=[None])
@@ -99,13 +100,19 @@ class JobParams:
 print(f"This machine will execute ({(workload_params.idx_end - workload_params.idx_start) / workload_params.idx_max * 100:.2f}%) of total job workload.")
 print(f"This share of workload will be split among {workload_params.jobs} of threads on this machine.")
 workload_params = WorkloadParams(**{workload_params.__dict__})
+repo_path = tb.P(rf'{self.repo_path_rh}').expanduser().absolute()
+tb.sys.path.insert(0, repo_path.str)
 """
         else: base = ""
 
-        if self.func_name is not None: base += f"""
-repo_path = tb.P(rf'{self.repo_path_rh}').expanduser().absolute()
-tb.sys.path.insert(0, repo_path.str)
-from import {self.repo_path_rh}.{self.file_path_r.replace('/', '.')} import {self.func_name} as func
+        # loading function ===============================================================
+        if self.func_name is not None:
+            if self.func_class is None: base += f"""
+from {self.func_module} import {self.func_name} as func
+"""
+            elif self.func_class is not None: base += f"""
+from {self.func_module} import {self.func_class} as {self.func_class}
+func = {self.func_class}.{self.func_name}
 """
         else: base = f"""
 res = None  # in case the file did not define it.

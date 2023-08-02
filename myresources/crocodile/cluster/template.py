@@ -7,8 +7,8 @@ def run_on_remote():
     data = []
     config = RemoteMachineConfig(
         # connection
-        ssh_obj=SelfSSH(),  # overrides ssh_params
-        ssh_params=dict(host="229234wsl"),
+        ssh_obj=dict(host="p51s"),  # SelfSSH(),  # overrides ssh_params
+        ssh_params=dict(host="239wsl"),
         description="Description of running an expensive function",  # job_id=, base_dir="",
         # data
         copy_repo=False, update_repo=False, install_repo=False, update_essential_repos=True, data=data, transfer_method="sftp",

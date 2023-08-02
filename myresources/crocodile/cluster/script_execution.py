@@ -82,7 +82,7 @@ manager.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(t
 manager.execution_log_dir.expanduser().joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
 manager.execution_log_dir.expanduser().joinpath("error_message.txt").write_text(params.error_message)
 exec_times.save(path=manager.execution_log_dir.expanduser().joinpath("execution_times.Struct.pkl"))
-tb.Experimental.generate_readme(path=manager.root_dir.expanduser().joinpath("execution_log.md"), obj=exec_obj, desc=f'''
+tb.Experimental.generate_readme(path=manager.root_dir.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
 
 Job executed via tb.cluster.Machine
 remote: {params.ssh_repr}
