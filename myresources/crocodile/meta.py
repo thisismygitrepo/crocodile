@@ -1,5 +1,5 @@
-import os
 
+import os
 from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
 from crocodile.file_management import P, datetime
 import time
@@ -148,14 +148,17 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             try:
                 config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str); config_dict = config.lookup(host or username)
                 self.hostname, self.username, self.host, port, sshkey = config_dict["hostname"], config_dict["user"], host or username, config_dict.get("port", port), tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
+                self.proxycommand = config_dict.get("proxycommand", None)
                 if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("identityfile", sshkey)) is list else tmp
-            except (FileNotFoundError, KeyError): self.hostname, self.username = __import__("platform").node(), username
-        else: self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
+            except (FileNotFoundError, KeyError): self.hostname, self.username, self.proxycommand = __import__("platform").node(), username, None
+        else:
+            self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
+            self.proxycommand = None
         self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey), value=False, title="SSHing To", docs=False, sort=False)
-        self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress)
+        self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=paramiko.proxy.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None)
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
         def view_bar(slf, a, b): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
