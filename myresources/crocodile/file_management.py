@@ -1,6 +1,11 @@
 
+"""
+File
+"""
+
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
+from typing import Any
 
 
 # %% =============================== Security ================================================
