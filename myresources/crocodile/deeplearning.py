@@ -33,6 +33,43 @@ class Device(enum.Enum):
     auto = 'auto'
 
 
+@dataclass
+class HParams:
+    subpath: tb.P = tb.P('metadata/hyper_param')  # location within model directory where this will be saved.
+    name: str = "model_" + tb.randstr(noun=True)
+    root: tb.P = tb.P.tmp(folder="tmp_models")
+    pkg_name: str = 'tensorflow'
+    device_name: Device=Device.gpu0
+    # ===================== Data ==============================
+    seed: int =234
+    shuffle: bool =True
+    precision: str = 'float32'
+    # ===================== Model =============================
+    # depth = 3
+    # ===================== Training ==========================
+    test_split: float = 0.2  # test split
+    learning_rate: float = 0.0005
+    batch_size: int = 32
+    epochs: int = 30
+    
+    _configured: bool = False
+    device_na: None = None
+    save_type = ["data", "obj", "both"][-1]
+
+    def save(self, **kwargs):
+        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
+        if self.save_type in {"data", "both"}: tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.dat.pkl"), obj=self)
+        # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
+
+    @classmethod
+    def from_saved_data(cls, path, *args, **kwargs) -> 'Self': return tb.Read.pickle(path=tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
+    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
+    @property
+    def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
+    @property
+    def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
+
+
 class HyperParam(tb.Struct):
     """Use this class to organize model hyperparameters:
     * one place to control everything: a control panel.

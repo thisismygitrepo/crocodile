@@ -1,8 +1,10 @@
 
 """
+Core
 """
 
 from pathlib import Path
+from typing import Optional
 
 
 # ============================== Accessories ============================================
@@ -22,10 +24,10 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
     def decorator(func):
-        def wrapper(obj, path: str = None, verbose=True, add_suffix=True, desc="", class_name="", **kwargs):
-            if path is None: path = Path.home().joinpath("tmp_results/tmp_files").joinpath(randstr(noun=True)); print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
+        def wrapper(obj, path: Optional[str] = None, verbose=True, add_suffix=True, desc="", class_name="", **kwargs):
+            if path is None: path = str(Path.home().joinpath("tmp_results/tmp_files").joinpath(randstr(noun=True))); _ = print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
             if add_suffix:
-                [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
+                _ = [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
                 path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext; path = Path(path).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
             func(path=path, obj=obj, **kwargs); print(f"SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
             return path
@@ -34,7 +36,7 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
 
 
 @save_decorator(".json")
-def json(obj, path=None, indent=None, **kwargs): return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs))
+def json(obj, path=None, indent=None, encoding='utf-8', **kwargs): return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, encoding=encoding, **kwargs))
 @save_decorator(".yml")
 def yaml(obj, path, **kwargs):
     with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)
@@ -80,13 +82,12 @@ class Base(object):
         attrs = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=Base().get_attributes(remove_base_attrs=False)if remove_base_attrs else []); import inspect
         attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
-    @staticmethod
     def print(self, dtype=False, attrs=False, **kwargs): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     @staticmethod
     def get_state(obj, repr_func=lambda x: x, exclude=None) -> dict: return repr_func(obj) if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]) else (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).__dict__)
     def viz_composition_heirarchy(self, depth=3, obj=None, filt=None):
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename := Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")), filter=filt)
-        __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
+        _ = __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
 class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
@@ -94,7 +95,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
     def print(self, sep='\n', styler=repr, return_str=False, **kwargs): res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)]); print(res) if not return_str else None; return res if return_str else None
-    def __deepcopy__(self): return List([__import__("copy").deepcopy(i) for i in self.list])
+    def __deepcopy__(self, arg): return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self): return bool(self.list)
     def __contains__(self, key): return key in self.list
     def __copy__(self) -> 'List': return List(self.list.copy())
@@ -103,7 +104,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     def __len__(self): return len(self.list)
     def __iter__(self): return iter(self.list)
     def __array__(self): import numpy as np; return np.array(self.list)  # compatibility with numpy
-    len = property(lambda self: self.list.__len__())
+    len = property(lambda self: len(self.list))
     # ================= call methods =====================================
     def __getattr__(self, name) -> 'List': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
     def __call__(self, *args, **kwargs) -> 'List': return List(i(*args, **kwargs) for i in self.list)
@@ -129,9 +130,9 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     np = property(lambda self: self.to_numpy())
     def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
     def __getitem__(self, key: str or list or slice):
-        if type(key) is list: return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
-        elif type(key) is str: return List(item[key] for item in self.list)  # access keys like dictionaries.
-        return self.list[key] if type(key) is not slice else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
+        if isinstance(key, list): return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
+        elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
+        return self.list[key] if not isinstance(key, slice) else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
     def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, prefer=[None, 'processes', 'threads'][0], depth=1, verbose=False, desc=None, **kwargs) -> 'List':
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
@@ -149,7 +150,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
 class Struct(Base):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
     def __init__(self, dictionary=None, **kwargs):
-        if dictionary is None or type(dictionary) is dict: final_dict = dict() if dictionary is None else dictionary
+        if dictionary is None or isinstance(dictionary, dict): final_dict = dict() if dictionary is None else dictionary
         else: final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)
         final_dict.update(kwargs); super(Struct, self).__init__(); self.__dict__ = final_dict
     @staticmethod
@@ -158,7 +159,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def recursive_dict(struct) -> 'Struct': [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path=None, indent=None): return Save.json(obj=self.__dict__, path=path, indent=indent)
     @classmethod
-    def from_keys_values(cls, k, v) -> 'Struct': return cls(dict(zip(k, v)))
+    def from_keys_values(cls, k, v) -> 'Struct': return Struct(dict(zip(k, v)))
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
     def from_names(cls, names, default_=None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
@@ -168,7 +169,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def __str__(self, sep="\n"): return config(self.__dict__, sep=sep)
     def __getattr__(self, item) -> 'Struct':
         try: return self.__dict__[item]
-        except KeyError: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
+        except KeyError as ke: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from ke  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self, limit=150): return "Struct: " + Display.get_repr(self.keys().list.__repr__(), limit=limit, justify=0)
     def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.

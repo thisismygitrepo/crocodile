@@ -116,7 +116,7 @@ class P(type(Path()), Path):
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs) -> 'P':
+    def readit(self, reader=None, strict=True, notfound=None, verbose=False, **kwargs) -> 'Any':
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else: (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return notfound
@@ -424,7 +424,7 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
     def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     def __getstate__(self): state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
-    def __call__(self, fresh=False):
+    def __call__(self, fresh=False) -> Any:
         if self.path is None:  # Memory Cache
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire): self.cache, self.time_produced = self.source_func(), datetime.now(); self.logger.debug(f"Updating / Saving data from {self.source_func}") if self.logger else None
             elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")

@@ -1,18 +1,24 @@
 
-import time
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, text, inspect, Engine
-from sqlalchemy.sql.schema import MetaData
-import crocodile.toolbox as tb
-import pandas as pd
-
-
 """
 https://docs.sqlalchemy.org/en/14/tutorial/index.html#a-note-on-the-future
 
 """
 
-tb.Display.set_pandas_display()
+import time
+from typing import Optional
+
+import pandas as pd
+
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, text, inspect, Engine
+from sqlalchemy.sql.schema import MetaData
+from crocodile.core import Struct, Display
+from crocodile.file_management import List as L, P
+
+_ = create_engine, text
+
+
+Display.set_pandas_display()
 
 
 class DBMS:
@@ -26,7 +32,7 @@ class DBMS:
         self.ses = None
         self.insp = None
         self.meta = None
-        self.path = tb.P(self.eng.url.database)
+        self.path = P(self.eng.url.database)
 
         self.db = db
         self.sch = sch
@@ -34,28 +40,28 @@ class DBMS:
         self.schema = None
         # self.tables = None
         # self.views = None
-        self.sch_tab = None
-        self.sch_vws = None
+        self.sch_tab: Optional[Struct] = None
+        self.sch_vws: Optional[Struct] = None
         self.refresh()
 
-    def refresh(self, sch=None):  # fails if multiple schemas are there and None is specified
+    def refresh(self, sch=None) -> Self:  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
         self.meta = MetaData()
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
         self.insp = inspect(subject=self.eng)
-        self.schema = tb.L(self.insp.get_schema_names())
-        self.sch_tab = tb.Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))
-        self.sch_vws = tb.Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
+        self.schema = L(self.insp.get_schema_names())
+        self.sch_tab = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  # 
+        self.sch_vws = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
         return self
 
-    def __getstate__(self): return tb.Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser(strict=False)).__dict__
+    def __getstate__(self): return Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser(strict=False)).__dict__
     def __setstate__(self, state): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
 
     @classmethod
     def from_local_db(cls, path=None, echo=False, share_across_threads=False, **kwargs): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
-    def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table, sch)].exported_columns.keys()
+    def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table=table, sch)].exported_columns.keys()
     def close(self, sleep=2):
         print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
         self.con.close()
@@ -76,7 +82,7 @@ class DBMS:
                 from sqlalchemy.pool import StaticPool  # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
                 return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
             else: return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
-        path = tb.P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else tb.P(path).expanduser().absolute().create(parents_only=True)
+        path = P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
 
@@ -116,7 +122,7 @@ class DBMS:
         self.refresh()
         tbl = self.meta.tables[table]
         count = self.ses.query(tbl).count()
-        res = tb.Struct(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
+        res = Struct(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
         res.print(dtype=False, as_config=True)
         dat = self.read_table(table=table, sch=sch, size=2)
         cols = self.get_columns(table, sch=sch)

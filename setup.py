@@ -34,7 +34,6 @@ setup(
                 'crocodile.cluster.script_execution',
                 'crocodile.cluster.script_notify_upon_completion',
                 'crocodile.cluster.trial_file',
-                'crocodile.comms.gdrive',
                 'crocodile.comms.helper_funcs',
                 'crocodile.comms.notification',
                 'crocodile.comms.onedrive',
