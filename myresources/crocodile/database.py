@@ -5,7 +5,7 @@ https://docs.sqlalchemy.org/en/14/tutorial/index.html#a-note-on-the-future
 """
 
 import time
-from typing import Optional
+from typing import Optional, Any
 
 import pandas as pd
 
@@ -40,18 +40,21 @@ class DBMS:
         self.schema = None
         # self.tables = None
         # self.views = None
-        self.sch_tab: Optional[Struct] = None
-        self.sch_vws: Optional[Struct] = None
+        # self.sch_tab: Optional[Struct] = None
+        # self.sch_vws: Optional[Struct] = None
         self.refresh()
 
-    def refresh(self, sch=None) -> Self:  # fails if multiple schemas are there and None is specified
+        self.ip_formatter: Optional[Any] = None
+        self.db_specs: Optional[Any] = None
+
+    def refresh(self, sch=None) -> 'Self':  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
         self.meta = MetaData()
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
         self.insp = inspect(subject=self.eng)
         self.schema = L(self.insp.get_schema_names())
-        self.sch_tab = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  # 
+        self.sch_tab = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
         self.sch_vws = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
         return self
 
@@ -61,7 +64,7 @@ class DBMS:
     @classmethod
     def from_local_db(cls, path=None, echo=False, share_across_threads=False, **kwargs): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
-    def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table=table, sch)].exported_columns.keys()
+    def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table=table, sch=sch)].exported_columns.keys()
     def close(self, sleep=2):
         print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
         self.con.close()

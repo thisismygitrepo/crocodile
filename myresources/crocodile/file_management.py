@@ -5,7 +5,7 @@ File
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 
 # %% =============================== Security ================================================
@@ -15,7 +15,7 @@ def pwd2key(password: str, salt=None, iterations=None) -> bytes:  # Derive a sec
     if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
-def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int = None, gen_key=False) -> bytes:
+def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool =True, iteration: Optional[int] = None, gen_key=False) -> bytes:
     salt = None  # silence the linter.
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
@@ -30,7 +30,7 @@ def encrypt(msg: bytes, key=None, pwd: str = None, salted=True, iteration: int =
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
     code = __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).encrypt(msg)
     return __import__("base64").urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), __import__("base64").urlsafe_b64decode(code))) if pwd is not None and salted is True else code
-def decrypt(token: bytes, key=None, pwd: str = None, salted=True) -> bytes:
+def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool =True) -> bytes:
     if pwd is not None:
         assert key is None, f"You can either pass key or pwd, or none of them, but not both."
         if salted:
@@ -443,4 +443,3 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
 if __name__ == '__main__':
     # print('hi from file_managements')
     pass
-

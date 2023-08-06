@@ -4,7 +4,7 @@ from crocodile.matplotlib_management import ImShow, FigureSave
 import numpy as np
 import pandas as pd
 from abc import ABC
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Any, Optional
 import enum
 from tqdm import tqdm
 import copy
@@ -365,17 +365,19 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: Generic[HPM] = None, data: Generic[BM] = None, model=None, compiler=None, history=None):
+    def __init__(self, hp: Generic[HPM], data: Generic[BM], compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
-        self.model = model  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
+        self.model: Any = self.get_model()  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = tb.List() if history is None else history  # should be populated in fit method, or loaded up.
         self.plotter = FigureSave.NullAuto
         self.fig = None
         self.kwargs = None
         self.tmp = None
-
+    def get_model(self):
+        raise NotImplementedError
+        # pass
     def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True, **kwargs):
         """ Updates compiler attributes. This acts like a setter.
         .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
@@ -448,7 +450,9 @@ class BaseModel(ABC):
     def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
     @staticmethod
     def load_model(directory): __import__("tensorflow").keras.models.load_model(directory)  # path to directory. file saved_model.pb is read auto.
-    def load_weights(self, directory): self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
+    def load_weights(self, directory):
+        # assert self.model is not None, "Model is not initialized. Please initialize the model first."
+        self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
@@ -569,7 +573,7 @@ class BaseModel(ABC):
         else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
         if hp_obj.root != path.parent: hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
         d_obj.hp = hp_obj
-        model_obj = cls(hp_obj, d_obj)
+        model_obj: Self = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
         model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L(), strict=False)
         print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
