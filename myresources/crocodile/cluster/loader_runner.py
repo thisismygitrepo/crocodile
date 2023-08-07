@@ -80,7 +80,7 @@ class JobParams:
         except:
             repo_path, func_relative_file = func_file.parent, func_file.name
         return JobParams(repo_path_rh=repo_path.collapseuser().as_posix(), file_path_rh=repo_path.collapseuser().joinpath(func_relative_file).collapseuser().as_posix(),
-                         file_path_r=func_relative_file.as_posix(),
+                         file_path_r=tb.P(func_relative_file).as_posix(),
                          func_module=func_module, func_class=func_class, func_name=func.__name__,
                          description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
 
@@ -166,27 +166,6 @@ class EmailParams:
     @staticmethod
     def from_empty() -> 'EmailParams': return EmailParams(addressee="", speaker="", ssh_conn_str="", executed_obj="", email_config_name="", to_email="", resource_manager_path="")
 
-
-@dataclass
-class WorkloadParams:
-    idx_start: int = 0
-    idx_end: int = 1000
-    idx_max: int = 1000
-    jobs: int = 3
-    job_id: int = 0
-    @property
-    def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
-    def split_to_jobs(self, jobs=None):
-        # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
-        return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
-    def get_section_from_series(self, series: list):
-        from math import floor
-        min_idx_start = int(floor((len(series)-1) * self.idx_start / self.idx_max))
-        min_idx_end = int(floor((len(series)-1) * self.idx_end / self.idx_max))
-        min_start = series[min_idx_start]
-        min_end = series[min_idx_end]
-        return min_start, min_end
-    def print(self): tb.S(self.__dict__).print(as_config=True, title=f"Job Workload")
 
 
 class ResourceManager:

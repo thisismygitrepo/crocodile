@@ -1,4 +1,5 @@
 
+from typing import Optional
 import numpy as np
 import psutil
 import crocodile.toolbox as tb
@@ -86,7 +87,10 @@ class Cluster:
         state["func"] = None
         return state
     def __setstate__(self, state): self.__dict__.update(state)
-    def save(self) -> tb.P: return tb.Save.vanilla_pickle(obj=self, path=self.root_dir.joinpath("cluster.Cluster.pkl"))
+    def save(self) -> tb.P: 
+        path = self.root_dir.joinpath("cluster.Cluster.pkl")
+        tb.Save.vanilla_pickle(obj=self, path=path)
+        return path
     @staticmethod
     def load(job_id, base=None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
@@ -95,14 +99,16 @@ class Cluster:
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
     def __init__(self,
-                 func, func_kwargs: dict or None = None,
-                 ssh_params: list[dict] or None = None,
-                 remote_machine_config: RemoteMachineConfig or None = None,
+                 func, func_kwargs: Optional[dict] = None,
+                 ssh_params: Optional[list[dict]] = None,
+                 remote_machine_config: Optional[RemoteMachineConfig] = None,
                  # workload_params: list[WorkloadParams] or None = None,
-                 thread_load_calc=None,
+                 thread_load_calc: Optional[ThreadLoadCalculator] = None,
                  # machine_load_calc=None,
-                 ditch_unavailable_machines=False,
-                 description="", job_id=None, base_dir=None):
+                 ditch_unavailable_machines: bool=False,
+                 description: str = "",
+                 job_id: Optional[str] = None,
+                 base_dir=None):
         self.job_id = job_id or tb.randstr(noun=True)
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False

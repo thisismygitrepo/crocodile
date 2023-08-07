@@ -1,7 +1,9 @@
 
+from typing import Optional
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
+from pyparsing import Opt
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
@@ -24,22 +26,22 @@ class RemoteMachineConfig:
     job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
     base_dir: str = f"~/tmp_results/remote_machines/jobs"
     description: str = ""
-    ssh_params: dict = field(default_factory=lambda: dict())
-    ssh_obj: tb.SSH or None = None
+    ssh_params: dict = field(default_factory=lambda: {})
+    ssh_obj: Optional[tb.SSH] = None
 
     # data
     copy_repo: bool = False
     update_repo: bool = False
-    install_repo: bool or None = None
+    install_repo: bool = False
     update_essential_repos: bool = True
-    data: list or None = None
+    data: Optional[list] = None
     transfer_method: str = "sftp"
 
     # remote machine behaviour
     open_console: bool = True
     notify_upon_completion: bool = False
-    to_email: str = None
-    email_config_name: str = None
+    to_email: Optional[str] = None
+    email_config_name: Optional[str] = None
 
     # execution behaviour
     kill_on_completion: bool = False
@@ -51,7 +53,7 @@ class RemoteMachineConfig:
     parallelize: bool = False
     lock_resources: bool = True
     max_simulataneous_jobs: int = 1
-    workload_params: WorkloadParams or None = field(default_factory=lambda: None)
+    workload_params: Optional[WorkloadParams] = None
     def __post_init__(self):
         if self.interactive and self.lock_resources: print(f"RemoteMachineConfig Warning: If interactive is ON along with lock_resources, the job might never end.")
 
@@ -60,7 +62,7 @@ class RemoteMachine:
     def __getstate__(self) -> dict: return self.__dict__
     def __setstate__(self, state: dict): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func, config: RemoteMachineConfig, func_kwargs: dict or None = None, data: list or None = None):
+    def __init__(self, func, config: RemoteMachineConfig, func_kwargs: Optional[dict] = None, data: Optional[list] = None):
         self.config = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
