@@ -15,6 +15,16 @@ import copy
 from dataclasses import dataclass
 
 
+@dataclass
+class Specs:
+    ip_shapes: list[tuple[int, ...]]
+    op_shapes: list[tuple[int, ...]]
+    other_shapes: list[tuple[int, ...]]
+    ip_strings: list[str]  # e.g.: ["x1", "x2"]
+    op_strings: list[str]  # e.g.: ["y1", "y2"]
+    other_strings: list[str]  # e.g.: indices or names
+
+
 # %% ========================== DeepLearning Accessories =================================
 
 BM = TypeVar("BM", bound="BaseModel")
@@ -70,127 +80,11 @@ class HParams:
     def from_saved_data(cls, path, *args, **kwargs) -> 'Self': return tb.Read.pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
     def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
-    def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
-    @property
-    def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
-
-
-class HyperParam(tb.Struct):
-    """Use this class to organize model hyperparameters:
-    * one place to control everything: a control panel.
-    * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
-    * Ease of saving settings of experiments! and also replicating it later.
-    """
-    subpath = tb.P('metadata/hyper_param')  # location within model directory where this will be saved.
-
-    def __init__(self, **kwargs):
-        super().__init__(
-            # ==================== Environment =========================
-            name="model_" + tb.randstr(noun=True),
-            root=tb.P.tmp(folder="tmp_models"),
-            pkg_name='tensorflow',
-            device_name=Device.gpu0,
-            # ===================== Data ==============================
-            seed=234,
-            shuffle=True,
-            precision='float32',
-            # ===================== Model =============================
-            # depth = 3
-            # ===================== Training ==========================
-            test_split=0.2,  # test split
-            learning_rate=0.0005,
-            batch_size=32,
-            epochs=30,
-        )
-        self._configured = False
-        self.device_name = None
-        self.save_type = ["data", "obj", "both"][-1]
-        self.update(**kwargs)
-    def save(self, **kwargs):
-        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
-        if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.dat.pkl"), add_suffix=False, data_only=True, desc="")
-        # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
-    @classmethod
-    def from_saved_data(cls, path, *args, **kwargs): return super(HyperParam, cls).from_saved_data(tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
-    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
-    @property
     def pkg(self): 
-        assert self.pkg in {"tensorflow", "torch"}, f"pkg_name must be either `tensorflow` or `torch`"
+        if self.pkg_name not in ("tensorflow", "torch"): raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
         return __import__("tensorflow") if self.pkg_name == "tensorflow" else __import__("torch")
     @property
     def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
-    @property
-    def device(self):
-        handle = self.pkg
-        if handle.__name__ == 'tensorflow':
-            """
-            To disable gpu, here's one way: # before importing tensorflow do this:
-            if device == 'cpu':
-                os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-            handle.device(device)  # used as context, every tensor constructed and every computation takes place therein
-            For more manual control, use .cpu() and .gpu('0') .gpu('1') attributes.
-            """
-            devices = handle.config.experimental.list_physical_devices('CPU')
-            devices += handle.config.experimental.list_physical_devices('GPU')
-            device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
-            if self.device_name is Device.auto: chosen_device = Device.gpu0 if len(devices) > 1 else Device.cpu
-            else: chosen_device = self.device_name
-            device_str = chosen_device.value if 1 > 0 else "haha"
-            if device_str not in device_dict.keys():
-                print(f"This machine has no such a device to be chosen! ({device_str})\n" * 10)
-                device_str = "cpu"  # Revert to cpu, keep going, instead of throwing an error.
-            try:
-                device = device_dict[device_str]
-                return device
-            except KeyError:  # 2gpus not a key in the dict.
-                assert len(handle.config.experimental.get_visible_devices()) > 2
-                mirrored_strategy = handle.distribute.MirroredStrategy()
-                return mirrored_strategy
-
-        elif handle.__name__ == 'torch':
-            device = self.device_name
-            if device is Device.auto: return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
-            elif device is Device.cpu: return handle.device('cpu')
-            elif device is Device.gpu0:
-                assert handle.cuda.device_count() > 0, f"GPU {device} not available"
-                return handle.device('cuda:0')
-            elif device is Device.gpu1:
-                assert handle.cuda.device_count() > 1, f"GPU {device} not available"
-                return handle.device('cuda:1')
-            # How to run Torch model on 2 GPUs ?
-        else: raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
-
-    def config_device(self):
-        """
-        """
-        handle = self.pkg
-        device_str = self.device_name.value
-        device = self.device
-        if handle.__name__ == 'torch': return None
-        try:
-            # Now we want only one device to be seen:
-            if device_str in ['gpu0', 'gpu1']:
-                limit_memory = True
-                if limit_memory:  # memory growth can only be limited for GPU devices.
-                    handle.config.experimental.set_memory_growth(device, True)
-                handle.config.experimental.set_visible_devices(device, 'GPU')  # will only see this device
-                # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                # now, logical gpu is created only for visible device
-                # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-            else:  # for cpu devices, we want no gpu to be seen:
-                handle.config.experimental.set_visible_devices([], 'GPU')  # will only see this device
-                # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                # now, logical gpu is created only for visible device
-                # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-        except AssertionError as e:
-            print(e)
-            print(f"Trying again with auto-device {Device.auto}")
-            self.device_name = Device.auto
-            self.config_device()
-        except ValueError: print("Cannot set memory growth on non-GPU devices")
-        except RuntimeError as e:
-            print(e)
-            print(f"Device already configured, skipping ... ")
 
 
 class DataReader(tb.Base):
@@ -202,17 +96,13 @@ class DataReader(tb.Base):
     implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the 
     need to reference `.dataspects`.
     """
-    def __init__(self, hp: Generic[HPM], specs: Optional[dict] = None, split: Optional[dict] = None):
+    def __init__(self, hp: HParams, specs: Optional[Specs] = None, split: Optional[dict] = None):
         super().__init__()
         self.hp = hp
         self.split = split
         self.plotter = None
         # attributes to be saved.
-        self.specs: dict = {} if specs is None else specs
-        self.ip_strings = None  # e.g.: ["x1", "x2"]
-        self.op_strings = None  # e.g.: ["y1", "y2"]
-        self.other_strings = None  # e.g.: indices or names
-
+        self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_strings=[], op_strings=[], other_strings=[]) if specs is None else specs
         # dataframes
         self.scaler = None
         self.imputer = None
@@ -224,9 +114,7 @@ class DataReader(tb.Base):
 
     def save(self, path=None, *args, **kwargs):
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
-        if self.hp.save_type in {"data", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
-        # if self.hp.save_type in {"obj", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False, data_only=False)
-
+        super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
     def __getstate__(self):
@@ -242,28 +130,26 @@ class DataReader(tb.Base):
         if ip_strings is None:
             ip_strings = [f"x_{i}" for i in range(len(args)-1)]
             if len(ip_strings) == 1: ip_strings = ["x"]
-        self.ip_strings = ip_strings
+        self.specs.ip_strings = ip_strings
         if op_strings is None: op_strings = ["y"]
-        self.op_strings = op_strings
+        self.specs.op_strings = op_strings
         if others_string is None: others_string = []
-        self.other_strings = others_string
+        self.specs.other_strings = others_string
         strings = ip_strings + op_strings + others_string
-        self.specs.ip_shapes = []  # useful info for instantiating models.
-        self.specs.op_shapes = []
-        self.specs.other_shapes = []
 
+        assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
         for an_arg, key in zip(args, strings):
             a_shape = an_arg.iloc[0].shape if type(an_arg) in {pd.DataFrame, pd.Series} else np.array(an_arg[0]).shape
             if key in ip_strings: self.specs.ip_shapes.append(a_shape)
             elif key in op_strings: self.specs.op_shapes.append(a_shape)
             elif key in others_string: self.specs.other_shapes.append(a_shape)
-        self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
-        self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
+        self.split.data.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
+        self.split.data.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
         self.split.print()
 
     def get_data_strings(self, which_data="ip", which_split="train"):
-        strings = {"op": self.op_strings, "ip": self.ip_strings, "others": self.other_strings}[which_data]
+        strings = {"op": self.specs.op_strings, "ip": self.specs.ip_strings, "others": self.specs.other_strings}[which_data]
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
@@ -288,9 +174,9 @@ class DataReader(tb.Base):
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
-        x = x[0] if len(self.ip_strings) == 1 else x
-        y = y[0] if len(self.op_strings) == 1 else y
-        others = others[0] if len(self.other_strings) == 1 else others
+        x = x[0] if len(self.specs.ip_strings) == 1 else x
+        y = y[0] if len(self.specs.op_strings) == 1 else y
+        others = others[0] if len(self.specs.other_strings) == 1 else others
         if len(others) == 0:
             # others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
             if type(selection) is slice:
@@ -305,8 +191,8 @@ class DataReader(tb.Base):
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
         x = [np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype) for ip_shape in ip_shapes]
         y = [np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype) for op_shape in op_shapes]
-        x = x[0] if len(self.ip_strings) == 1 else x
-        y = y[0] if len(self.op_strings) == 1 else y
+        x = x[0] if len(self.specs.ip_strings) == 1 else x
+        y = y[0] if len(self.specs.op_strings) == 1 else y
         return x, y
 
     def profile_dataframe(self, df, file=None, silent=False, suffix="", explorative=True):
@@ -340,8 +226,8 @@ class DataReader(tb.Base):
         assert self.split is not None, "Load up the data first before you standardize it."
         from sklearn.preprocessing import StandardScaler
         self.scaler = StandardScaler()
-        self.split.x_train = self.scaler.fit_transform(self.split.x_train)
-        self.split.x_test = self.scaler.transform(self.split.x_test)
+        self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
+        self.split['x_test']= self.scaler.transform(self.split['x_test'])
 
     def image_viz(self, pred, gt=None, names=None, **kwargs):
         """
@@ -369,7 +255,7 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: Generic[HPM], data: Generic[BM], compiler=None, history=None):
+    def __init__(self, hp: HParams, data: DataReader, compiler=None, history=None):
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
         self.model: Any = self.get_model()  # should be populated upon instantiation.
@@ -665,7 +551,7 @@ class BaseModel(ABC):
 
 
 class Ensemble(tb.Base):
-    def __init__(self, hp_class: Generic[HPM] = None, data_class: Generic[DR] = None, model_class: Generic[BM] = None, size=10, *args, **kwargs):
+    def __init__(self, hp_class: HParams, data_class: DataReader, model_class: BaseModel, size=10, *args, **kwargs):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
