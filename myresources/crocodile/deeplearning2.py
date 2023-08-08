@@ -13,6 +13,7 @@ import enum
 from tqdm import tqdm
 import copy
 from dataclasses import dataclass
+from sklearn.preprocessing import StandardScaler
 
 
 @dataclass
@@ -104,11 +105,11 @@ class DataReader(tb.Base):
         # attributes to be saved.
         self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_strings=[], op_strings=[], other_strings=[]) if specs is None else specs
         # dataframes
-        self.scaler = None
+        self.scaler: Optional[StandardScaler] = None
         self.imputer = None
-        self.cols_ordinal = None
-        self.cols_onehot = None
-        self.cols_numerical = None
+        self.cols_ordinal: list[str]
+        self.cols_onehot: list[str]
+        self.cols_numerical: list[str]
         self.encoder_onehot = None
         self.encoder_ordinal = None
 
@@ -136,7 +137,6 @@ class DataReader(tb.Base):
         if others_string is None: others_string = []
         self.specs.other_strings = others_string
         strings = ip_strings + op_strings + others_string
-
         assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
         for an_arg, key in zip(args, strings):
             a_shape = an_arg.iloc[0].shape if type(an_arg) in {pd.DataFrame, pd.Series} else np.array(an_arg[0]).shape
@@ -215,7 +215,9 @@ class DataReader(tb.Base):
     def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
         df.fillna(np.nan, inplace=True)  # SKlearn Imputer only works with Numpy's np.nan, as opposed to Pandas' pd.NA
         columns = df.columns
+        assert self.imputer is not None
         df = self.imputer.transform(df)
+        assert self.scaler is not None
         df = self.scaler.transform(pd.DataFrame(df, columns=columns))
         return pd.DataFrame(df, columns=columns)
 
@@ -224,7 +226,6 @@ class DataReader(tb.Base):
 
     def standardize(self):
         assert self.split is not None, "Load up the data first before you standardize it."
-        from sklearn.preprocessing import StandardScaler
         self.scaler = StandardScaler()
         self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
         self.split['x_test']= self.scaler.transform(self.split['x_test'])
