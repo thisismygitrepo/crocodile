@@ -221,7 +221,7 @@ class P(type(Path()), Path):
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
     def clickable(self, inlieu=False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
-    def as_url_str(self, inlieu=False) -> 'P': return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
+    def as_url_str(self, inlieu=False) -> str: return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
     def as_url_obj(self, inlieu=False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
     def as_unix(self, inlieu=False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
@@ -301,7 +301,8 @@ class P(type(Path()), Path):
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
         if slf.suffix == ".7z":
-            P(folder).delete(sure=True) if overwrite else None; result = folder
+            if overwrite: P(folder).delete(sure=True)
+            result = folder
             with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive: archive.extract(path=folder, targets=[f for f in archive.getnames() if pattern.match(f)]) if pattern is not None else archive.extractall(path=folder)
         else:
             if overwrite:
