@@ -44,12 +44,12 @@ if platform.system() == "Windows":
     _3x = P.home().joinpath(r"AppData/Local/Microsoft/WindowsApps/boxes.exe").exists()
 
     if _1x and _2x and _3x:
-        if random.choice([True, True, False]):
+        if 1 < 2 or random.choice([True, True, False]):
             from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles
             font = random.choice(FIGJS_FONTS)
             # print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
-            _cmd = f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs'
+            _cmd = f'figlet -f "{font}" "xiao" | boxes -d "{box_style}" | lolcatjs'
             print(_cmd)
             os.system(_cmd)  # | lolcat
         else:
