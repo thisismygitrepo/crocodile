@@ -104,7 +104,7 @@ except Exception as e:
         base = Path.home().joinpath("tmp_results/shells")
         base.mkdir(parents=True, exist_ok=True)
         code_file = base.joinpath("python_readfile_script.py")
-        code_file.write_text(code_text)
+        code_file.write_text(code_text, encoding="utf-8")
         res = f"""ipython --no-banner -i -m crocodile.croshell -- --file "{code_file}" """
 
     else:  # just run croshell.py interactively

@@ -36,7 +36,9 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
 
 
 @save_decorator(".json")
-def json(obj, path=None, indent=None, encoding='utf-8', **kwargs): return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, encoding=encoding, **kwargs))
+def json(obj, path=None, indent=None, encoding='utf-8', **kwargs): 
+    _ = encoding
+    return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__ **kwargs))
 @save_decorator(".yml")
 def yaml(obj, path, **kwargs):
     with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)

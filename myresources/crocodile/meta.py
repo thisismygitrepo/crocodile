@@ -57,8 +57,8 @@ class Terminal:
     class Response:
         @staticmethod
         def from_completed_process(cp: subprocess.CompletedProcess): (resp := Terminal.Response(cmd=cp.args)).output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)); return resp
-        def __init__(self, stdin=None, stdout=None, stderr=None, cmd=None, desc=""): self.std, self.output, self.input, self.desc = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd, desc  # input command
-        def __call__(self, *args, **kwargs): return self.op.rstrip() if type(self.op) is str else None
+        def __init__(self, stdin=None, stdout=None, stderr=None, cmd: Optional[str] = None, desc: str =""): self.std, self.output, self.input, self.desc = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd, desc  # input command
+        def __call__(self, *args, **kwargs) -> Optional[str]: return self.op.rstrip() if type(self.op) is str else None
         op = property(lambda self: self.output["stdout"])
         ip = property(lambda self: self.output["stdin"])
         err = property(lambda self: self.output["stderr"])
@@ -258,24 +258,28 @@ class Scheduler:
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
 
-def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):
-    try: return func()
-    except BaseException as ex:  # or Exception
-        if verbose: print(ex)
-        if raise_ is not None: raise raise_
-        if handle is not None: return handle(ex, **kwargs)
-        return run() if run is not None else return_
+# def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):
+#     try: return func()
+#     except BaseException as ex:  # or Exception
+#         if verbose: print(ex)
+#         if raise_ is not None: raise raise_
+#         if handle is not None: return handle(ex, **kwargs)
+#         return run() if run is not None else return_
 def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
 def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
 def generate_readme(path, obj=None, desc=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-    text, obj_path, path = "# Description\n" + (desc if desc is not None else '') + (separator := "\n" + "-" * 50 + "\n\n"), P(__import__('inspect').getfile(obj)) if obj is not None else None, P(path)
-    text += (f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator) if obj is not None else ""
-    try:
-        repo = install_n_import("git", "gitpython").Repo(obj_path.parent, search_parent_directories=True)
-        text += f"# Last Commit\n{repo.git.execute('git log -1')}{separator}# Remote Repo\n{repo.git.execute('git remote -v')}{separator}"
-        text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{Experimental.try_this(lambda: obj_path.relative_to(repo.working_dir).as_posix(), return_='')}{separator}"
-    except: text += f"Could not read git repository @ `{obj_path.parent}`.\n"
+    text = "# Description\n" + (desc if desc is not None else '') + (separator := "\n" + "-" * 50 + "\n\n")
+    obj_path = P(__import__('inspect').getfile(obj)) if obj is not None else None
+    path = P(path)
+    if obj_path is not None: 
+        text += f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator
+        try:
+            repo = install_n_import("git", "gitpython").Repo(obj_path.parent, search_parent_directories=True)
+            text += f"# Last Commit\n{repo.git.execute('git log -1')}{separator}# Remote Repo\n{repo.git.execute('git remote -v')}{separator}"
+            text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{Experimental.try_this(lambda: obj_path.relative_to(repo.working_dir).as_posix(), return_='')}{separator}"
+        except: 
+            text += f"Could not read git repository @ `{obj_path.parent}`.\n"
     text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
@@ -300,7 +304,7 @@ def run_cell(pointer, module=sys.modules[__name__]):
         if pointer in cell.split('\n')[0]: break  # bingo
     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
     print(cell); install_n_import("clipboard").copy(cell); return cell
-class Experimental: try_this = try_this; show_globals = show_globals; monkey_patch = monkey_patch; capture_locals = capture_locals; generate_readme = generate_readme; load_from_source_code = load_from_source_code; extract_code = extract_code; extract_arguments = extract_arguments; run_cell = run_cell  # Debugging and Meta programming tools"""
+class Experimental: show_globals = show_globals; monkey_patch = monkey_patch; capture_locals = capture_locals; generate_readme = generate_readme; load_from_source_code = load_from_source_code; extract_code = extract_code; extract_arguments = extract_arguments; run_cell = run_cell  # Debugging and Meta programming tools"""
 
 
 if __name__ == '__main__':

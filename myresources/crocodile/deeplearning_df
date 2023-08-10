@@ -1,0 +1,158 @@
+
+"""
+This module contains classes that can be used to preprocess dataframes for deep learning
+"""
+
+
+from typing import Optional
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+import crocodile.toolbox as tb
+
+
+class CategoricalClipper:
+    """Use pre onehot or ordinal encoding to create a new category "Other" for values that are less than a certain threshold"""
+    def __init__(self, thresh: float = 1.0, others_name: str ='Other'):
+        self.thresh = thresh
+        self.others_name = others_name
+        self.columns: Optional[list[str]] = None
+        self.pre_percentage_counts = {}
+        self.post_percentage_counts = {}
+        self.mapper = {}
+
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, state): self.__dict__ = state
+
+    def fit(self, df):
+        self.columns = list(df.columns)
+        for col in self.columns:
+            series = df[col]
+            self.pre_percentage_counts[col] = series.value_counts(normalize=True) * 100
+            self.post_percentage_counts[col], self.mapper[col] = self.create_others_category(self.pre_percentage_counts[col], thresh=self.thresh, others_name=self.others_name)
+            name = self.pre_percentage_counts[col].name
+            self.pre_percentage_counts[col].name = "Percentage"
+            self.pre_percentage_counts[col].index.name = name
+            self.post_percentage_counts[col].name = "Percentage"
+            self.post_percentage_counts[col].index.name = name
+            print(f"Categories pre summarizer:\n{self.pre_percentage_counts[col].to_markdown()}\n\nCategories post summarizer:\n{self.post_percentage_counts[col].to_markdown()}")
+
+    def transform(self, df, inplace=True):
+        if self.columns is None: raise RuntimeError("Fit the encoder first")
+        if not inplace: raise NotImplementedError
+        else:
+            for col in self.columns:
+                series = df.loc[:, col]
+                df.loc[:, col] = series.map(self.mapper[col])
+            return df
+
+    def fit_transform(self, df, inplace=True):
+        self.fit(df)
+        return self.transform(df, inplace=inplace)
+
+    @staticmethod
+    def create_others_category(percentage_counts, thresh=1.0, others_name='Other'):
+        orig_caregories = percentage_counts.index.tolist()
+        other_cats = percentage_counts[percentage_counts < thresh].index
+        mask = percentage_counts.index.isin(other_cats)
+        others_percentage = percentage_counts[mask].sum()
+
+        percentage_counts_updated = percentage_counts[~mask]
+        percentage_counts_updated[others_name] = others_percentage
+
+        # tmp = series.value_counts(normalize=True) * 100
+        # print(f"Percentage of `Other` after collation = {series.value_counts(normalize=True).Other}")
+        mapper = {cat: others_name for cat in other_cats}
+        mapper.update({cat: cat for cat in orig_caregories if cat not in other_cats})
+        return percentage_counts_updated, mapper
+
+
+class NumericalClipper:
+    def __init__(self, quant_min, quant_max):
+        self.columns = None
+        self.quant_min = quant_min
+        self.quant_max = quant_max
+        self.value_min = {}
+        self.value_max = {}
+
+    def __getstate__(self): return self.__dict__
+    def __setstate__(self, state): self.__dict__ = state
+
+    def fit(self, df):
+        self.columns = df.columns
+        for col in self.columns:
+            series = df[col]
+            self.value_min[col] = series.quantile(self.quant_min)
+            self.value_max[col] = series.quantile(self.quant_max)
+        self.viz()
+        return self
+
+    def viz(self):
+        print("\n")
+        print(f"Clipping Columns".center(100, '-'))
+        print(pd.DataFrame([self.value_min, self.value_max], index=["min", "max"]).T)
+        print(f"-" * 100)
+        print("\n")
+
+    def transform(self, df):
+        if not self.columns: raise RuntimeError("Fit the encoder first")
+        for col in self.columns:
+            series = df.loc[:, col]
+            df.loc[:, col] = series.clip(lower=self.value_min[col], upper=self.value_max[col])
+        return df
+
+    @staticmethod
+    def clip_values(y: pd.Series, los_clip_upper_quantile=0.98, los_clip_lower_quantile=0.02):
+        los_clip_uppper_hrs = y.quantile(los_clip_upper_quantile)
+        los_clip_lower_hrs = y.quantile(los_clip_lower_quantile)
+        return y.clip(lower=los_clip_lower_hrs, upper=los_clip_uppper_hrs)
+
+
+class DataFrameHander:
+    def __init__(self, scaler: StandardScaler, imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
+                 encoder_onehot: OneHotEncoder, encoder_ordinal: OrdinalEncoder) -> None:
+        self.scaler: StandardScaler = scaler
+        self.imputer: SimpleImputer = imputer
+        self.cols_ordinal: list[str] = cols_ordinal
+        self.cols_onehot: list[str] = cols_onehot
+        self.cols_numerical: list[str] = cols_numerical
+        self.encoder_onehot: OneHotEncoder = encoder_onehot
+        self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
+        self.clipper_categorical = None
+        self.clipper_numerical = None
+    def __getstate__(self):
+        atts = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
+        res = {}
+        for att in atts:
+            if hasattr(self, att):
+                res[att] = getattr(self, att)
+        return res
+    def profile_dataframe(self, df, path: tb.P, silent=False, explorative=True):
+        profile_report = tb.install_n_import("pandas_profiling").ProfileReport
+        # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
+        profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(path, silent=silent)
+        return path
+
+    def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
+        """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
+        df[self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
+        tmp = self.encoder_onehot.transform(df[self.cols_onehot])
+        df.drop(columns=self.cols_onehot, inplace=True)
+        df[self.encoder_onehot.get_feature_names_out()] = tmp
+        df[self.cols_numerical] = df[self.cols_numerical].to_numpy().astype(precision)
+        return df
+
+    def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
+        df.fillna(np.nan, inplace=True)  # SKlearn Imputer only works with Numpy's np.nan, as opposed to Pandas' pd.NA
+        columns = df.columns
+        res = self.imputer.transform(df)
+        assert isinstance(res, np.ndarray), f"Imputer returned {type(res)}, but expected np.ndarray"
+        res = self.scaler.transform(pd.DataFrame(res, columns=columns))
+        assert isinstance(res, np.ndarray), f"Scaler returned {type(res)}, but expected np.ndarray"
+        return pd.DataFrame(res, columns=columns)
+
+
+if __name__ == "__main__":
+    pass

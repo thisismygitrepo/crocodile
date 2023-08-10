@@ -26,14 +26,6 @@ class HParams(dl.HParams):
     learning_rate: float = 0.0005
     batch_size: int = 32
     epochs: int = 30
-    # self.cols_onehot = ['feat1', 'feat2']
-    # self.cols_ordinal = ['feat3']
-    # self.cols_numerical = ['feat4']
-    # self.cols_x_pre_encoding = self.cols_onehot + self.cols_ordinal + self.cols_numerical
-    # self.cols_x_encoded_all = None  # the offical order of columns fed to model. To be populated after onehot encoding of categorical columns (new columns are added)
-    # self.cols_y = ['los_hrs']
-    # self.encoder_onehot = None
-    # self.encoder_ordinal = None
 
 
 class DataReader(dl.DataReader):
@@ -47,14 +39,6 @@ class DataReader(dl.DataReader):
         super().__init__(hp=hp, specs=specs)
         self.dataset = None
         if load_trianing_data: self.load_trianing_data()  # make sure that DataReader can be instantiated cheaply without loading data.
-
-    def __getstate__(self):  # make sure critical data is saved when pickling.
-        items: list[str] = ["cols_onehot", "cols_ordinal", "cols_numerical", "cols_x_pre_encoding", "cols_x_encoded_all", "cols_y",
-                 "clipper_categorical", "clipper_numerical",
-                 "encoder_onehot", "encoder_ordinal",
-                 "imputer", "scaler",
-                 "other_strings", "ip_strings", "op_strings", "specs"]
-        return dict(zip(items, [getattr(self, item) for item in items]))
 
     def load_trianing_data(self, profile_df=False):
         self.dataset = dict(x=np.random.randn(1000, 10).astype(self.hp.precision),

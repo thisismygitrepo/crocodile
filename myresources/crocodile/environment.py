@@ -22,7 +22,7 @@ tm = tb.Terminal()
 
 LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
 AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
-WindowsApps = LocalAppData.joinpath(r"Microsoft\WindowsApps") if AppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
+WindowsApps = LocalAppData.joinpath(r"Microsoft\WindowsApps") if LocalAppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
 
 ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
 ProgramFiles = P(tmp) if (tmp := os.getenv("ProgramFiles")) else None  # C:\Program Files
@@ -64,6 +64,7 @@ else: OneDriveExe = None
 
 DotFiles = P.home().joinpath("dotfiles")
 
+
 # ============================== Networking ==============================
 
 
@@ -84,6 +85,7 @@ def get_network_addresses():
         local_ip_v4 = socket.gethostbyname(socket.gethostname())
     res = dict(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=P('https://api.ipify.org').download(memory=True).text)
     return res
+
 
 # ============================== System Variables ==============================
 

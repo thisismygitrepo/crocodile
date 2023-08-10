@@ -14,9 +14,6 @@ import enum
 from tqdm import tqdm
 import copy
 from dataclasses import dataclass
-from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 
 
 @dataclass
@@ -101,44 +98,6 @@ class HParams:
     def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
 
 
-class DataFrameHander:
-    def __init__(self, scaler: StandardScaler, imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
-                 encoder_onehot: OneHotEncoder, encoder_ordinal: OrdinalEncoder) -> None:
-        self.scaler: StandardScaler = scaler
-        self.imputer: SimpleImputer = imputer
-        self.cols_ordinal: list[str] = cols_ordinal
-        self.cols_onehot: list[str] = cols_onehot
-        self.cols_numerical: list[str] = cols_numerical
-        self.encoder_onehot: OneHotEncoder = encoder_onehot
-        self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
-        self.clipper_categorical = None
-        self.clipper_numerical = None
-        
-    def profile_dataframe(self, df, path: tb.P, silent=False, explorative=True):
-        profile_report = tb.install_n_import("pandas_profiling").ProfileReport
-        # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
-        profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(path, silent=silent)
-        return path
-
-    def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
-        """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
-        df[self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
-        tmp = self.encoder_onehot.transform(df[self.cols_onehot])
-        df.drop(columns=self.cols_onehot, inplace=True)
-        df[self.encoder_onehot.get_feature_names_out()] = tmp
-        df[self.cols_numerical] = df[self.cols_numerical].to_numpy().astype(precision)
-        return df
-
-    def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
-        df.fillna(np.nan, inplace=True)  # SKlearn Imputer only works with Numpy's np.nan, as opposed to Pandas' pd.NA
-        columns = df.columns
-        res = self.imputer.transform(df)
-        assert isinstance(res, np.ndarray), f"Imputer returned {type(res)}, but expected np.ndarray"
-        res = self.scaler.transform(pd.DataFrame(res, columns=columns))
-        assert isinstance(res, np.ndarray), f"Scaler returned {type(res)}, but expected np.ndarray"
-        return pd.DataFrame(res, columns=columns)
-
-
 SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
 def _silence_pylance(hp: SubclassedHParams) -> SubclassedHParams: return hp
 
@@ -158,17 +117,20 @@ class DataReader(tb.Base):
         self.hp = hp
         self.split = split
         self.plotter = None
-        # attributes to be saved.
         self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_strings=[], op_strings=[], other_strings=[]) if specs is None else specs
-    def save(self, path: Optional[str] = None, **kwargs):
+        # self.df_handler = df_handler
+    def save(self, path: Optional[str] = None, **kwargs) -> None:
         _ = kwargs
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
         super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
-    def __getstate__(self):
-        items = ["specs", "scaler", "imputer", "ip_strings", "op_strings", "other_strings", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal"]
-        return dict(zip(items, [getattr(self, item) for item in items]))
+    def __getstate__(self) -> dict[str, Any]:
+        items = ["specs"]
+        res = {}
+        for item in items:
+            if hasattr(self, item): res[item] = getattr(self, item)
+        return res
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
