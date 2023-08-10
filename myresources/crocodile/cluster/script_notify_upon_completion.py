@@ -1,4 +1,7 @@
 
+"""
+Notify User Upon Completion
+"""
 
 from crocodile.comms.notification import Email
 import crocodile.toolbox as tb

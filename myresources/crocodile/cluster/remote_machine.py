@@ -1,9 +1,9 @@
 
+from pickle import PickleError
 from typing import Optional
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
-from pyparsing import Opt
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
@@ -89,12 +89,14 @@ class RemoteMachine:
         print("\n")
 
     def fire(self, run=False, open_console=True):
+        assert self.execution_command is not None, "Execution command is not yet generated. Run generate_scripts() first. 🤷‍♂️"
         console.rule(f"Firing job @ remote machine {self.ssh}")
         if open_console and self.config.open_console:
             self.ssh.open_console(cmd=self.session_manager.get_ssh_command(), shell="pwsh")
             self.session_manager.asssert_session_started()
             # send email at start execution time
-        self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=self.execution_command, run=run,
+        if isinstance(self.session_manager, Zellij):
+            self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=self.execution_command, run=run,
                                           job_wd=self.resources.root_dir.as_posix())
         print("\n")
 
@@ -112,7 +114,7 @@ class RemoteMachine:
         from crocodile.cluster.data_transfer import Submission
         self.submitted = True  # before sending `self` to the remote.
         try: tb.Save.pickle(obj=self, path=self.resources.machine_obj_path.expanduser())
-        except: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
+        except PickleError: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
         if self.config.transfer_method == "transfer_sh": Submission.transfer_sh(machine=self)
         elif self.config.transfer_method == "gdrive": Submission.gdrive(machine=self)
         elif self.config.transfer_method == "sftp": Submission.sftp(self)
@@ -133,6 +135,8 @@ class RemoteMachine:
         if self.config.notify_upon_completion:
             if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
+            assert self.config.email_config_name is not None, "Email config name is not provided. 🤷‍♂️"
+            assert self.config.to_email is not None, "Email address is not provided. 🤷‍♂️"
             job_params = EmailParams(addressee=self.ssh.get_repr("local", add_machine=True),
                                      speaker=self.ssh.get_repr('remote', add_machine=True),
                                      ssh_conn_str=self.ssh.get_repr('remote', add_machine=False),
@@ -191,7 +195,7 @@ deactivate
         self.download_results()
         if self.config.notify_upon_completion: pass
 
-    def check_job_status(self) -> tb.P or None:
+    def check_job_status(self) -> Optional[tb.P]:
         if not self.submitted:
             print("Job even not submitted yet. 🤔")
             return None
@@ -231,6 +235,7 @@ deactivate
             return self.results_path
 
     def download_results(self, target=None, r=True, zip_first=False):
+        assert self.results_path is not None, "Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first."
         if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{self.results_path.expanduser().absolute()}`"); return
         if self.results_path is not None:
             self.ssh.copy_to_here(source=self.results_path.collapseuser().as_posix(), target=target, r=r, z=zip_first)

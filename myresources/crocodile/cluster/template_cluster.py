@@ -1,4 +1,8 @@
 
+"""
+Cluster Template
+"""
+
 import crocodile.toolbox as tb
 from crocodile.cluster.distribute import Cluster, WorkloadParams
 
@@ -13,8 +17,8 @@ class ExpensiveComputation:
     @staticmethod
     def func(workload_params: WorkloadParams, *args, **kwargs) -> tb.P:
         per_job_workload_params = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=workload_params.idx_max, jobs=workload_params.jobs))
-        res = tb.L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(*args, workload_params=a_workload_params, **kwargs), jobs=workload_params.jobs)
-        return res[0] if len(res) == 1 else res
+        res: list[tb.P] = tb.L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(*args, workload_params=a_workload_params, **kwargs), jobs=workload_params.jobs).list
+        return res[0]
 
     @staticmethod
     def submit():

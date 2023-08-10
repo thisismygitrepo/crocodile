@@ -6,7 +6,7 @@ import time
 import logging
 import subprocess
 import sys
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Callable
 
 
 class Null:
@@ -155,7 +155,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         else:
             self.username, self.hostname = username.split("@") if "@" in username else (username, hostname)
             self.proxycommand = None
-        self.hostname, self.port = self.hostname.split(":") if ":" in self.hostname else (self.hostname, port); self.port = int(self.port)
+        if isinstance(self.hostname, str):
+            if ":" in self.hostname:
+                self.hostname, port = self.hostname.split(":")
+            else: self.port = port
+            self.port: int = int(self.port)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey), value=False, title="SSHing To", docs=False, sort=False)
@@ -222,15 +226,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             except Exception as ex: source_full = ex
             source_rel2home = source_full.zip()
         files = source_full.search(folders=False, r=True).collapseuser() if r and exists and is_dir else None; return dict(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
-
     def print_summary(self):   # ip=rsp.ip, op=rsp.op
         install_n_import("tabulate"); df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode))); print("\nSummary of operations performed:"); print(df.to_markdown())
         print("\nAll operations completed successfully.\n") if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))) else print("\nSome operations failed. \n"); return df
 
 
 class Scheduler:
-    def __init__(self, routine=None, wait: str = "2m", max_cycles=float("inf"), exception_handler=None, logger: Log = None, sess_stats=None):
-        self.routine = (lambda sched: None) if routine is None else routine  # main routine to be repeated every `wait` time period
+    def __init__(self, routine: Callable = None, wait: str = "2m", max_cycles=float("inf"), exception_handler=None, logger: Optional[Log] = None, sess_stats=None):
+        self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger, self.exception_handler = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True)), exception_handler
         self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})

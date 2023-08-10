@@ -1,5 +1,10 @@
 
-from typing import Optional
+"""
+Distributed Computing
+"""
+
+
+from typing import Optional, Any
 import numpy as np
 import psutil
 import crocodile.toolbox as tb
@@ -43,7 +48,7 @@ class ThreadLoadCalculator:
     """relies on relative values to a referenc machine specs.
     Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable.
     equal distribution across instances of one machine"""
-    def __init__(self, num_jobs=None, load_criterion: LoadCriterion = LoadCriterion.cpu, reference_specs: MachineSpecs or None = None):
+    def __init__(self, num_jobs=None, load_criterion: LoadCriterion = LoadCriterion.cpu, reference_specs: Optional[MachineSpecs] = None):
         self.num_jobs = num_jobs
         self.load_criterion = load_criterion
         self.reference_specs: MachineSpecs = MachineSpecs.get_this_machine_specs() if reference_specs is None else reference_specs
@@ -57,12 +62,12 @@ class ThreadLoadCalculator:
 
 class MachineLoadCalculator:
     def __init__(self, max_num: int = 1000, load_criterion: LoadCriterion = LoadCriterion.product, load_ratios_repr=""):
-        self.load_ratios = []
+        self.load_ratios: list[float] = []
         self.load_ratios_repr = load_ratios_repr
-        self.max_num = max_num
+        self.max_num: int = max_num
         self.load_criterion = load_criterion
-    def __getstate__(self): return self.__dict__
-    def __setstate__(self, d): self.__dict__.update(d)
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__
+    def __setstate__(self, d) -> None: self.__dict__.update(d)
     def get_workload_params(self, machines_specs: list[MachineSpecs], threads_per_machine: list[int]) -> list[WorkloadParams]:
         """Note: like thread divider in parallelize function, the behaviour is to include the edge cases on both ends of subsequent intervals."""
         tmp = []
@@ -82,12 +87,12 @@ class MachineLoadCalculator:
 
 
 class Cluster:
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__
         state["func"] = None
         return state
-    def __setstate__(self, state): self.__dict__.update(state)
-    def save(self) -> tb.P: 
+    def __setstate__(self, state) -> None: self.__dict__.update(state)
+    def save(self) -> tb.P:
         path = self.root_dir.joinpath("cluster.Cluster.pkl")
         tb.Save.vanilla_pickle(obj=self, path=path)
         return path
@@ -99,9 +104,10 @@ class Cluster:
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
     def __init__(self,
-                 func, func_kwargs: Optional[dict] = None,
-                 ssh_params: Optional[list[dict]] = None,
-                 remote_machine_config: Optional[RemoteMachineConfig] = None,
+                 func,
+                 ssh_params: list[dict],
+                 remote_machine_config: RemoteMachineConfig,
+                 func_kwargs: Optional[dict] = None,
                  # workload_params: list[WorkloadParams] or None = None,
                  thread_load_calc: Optional[ThreadLoadCalculator] = None,
                  # machine_load_calc=None,
@@ -121,10 +127,10 @@ class Cluster:
             try:
                 tmp = tb.SSH(**an_ssh_params)
                 sshz.append(tmp)
-            except Exception:
+            except Exception as ex:
                 print(f"Couldn't connect to {an_ssh_params}")
                 if ditch_unavailable_machines: continue
-                else: raise Exception(f"Couldn't connect to {an_ssh_params}")
+                else: raise Exception(f"Couldn't connect to {an_ssh_params}") from ex
 
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
@@ -155,17 +161,17 @@ class Cluster:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
     def generate_standard_kwargs(self):
-        if not len(self.workload_params):
+        if not self.workload_params:
             print("workload_params is not None, so not generating standard kwargs")
             return None
-        cpus = []
-        rams = []
+        cpus: list[float] = []
+        rams: list[float] = []
         for an_ssh in self.sshz:
             res = an_ssh.run_py("import psutil; print(psutil.cpu_count(), psutil.virtual_memory().total)", verbose=False).op
             try: cpus.append(int(res.split(' ')[0]))
-            except ValueError:
+            except ValueError as ve:
                 print(f"Couldn't get cpu count from {an_ssh}")
-                raise ValueError(f"Couldn't get cpu count from {an_ssh.get_repr(which='remote')}")
+                raise ValueError(f"Couldn't get cpu count from {an_ssh.get_repr(which='remote')}") from ve
             rams.append(ceil(int(res.split(' ')[1]) / 2 ** 30))
         total_cpu = np.array(cpus).sum()
         total_ram = np.array(rams).sum()
@@ -176,8 +182,8 @@ class Cluster:
         self.workload_params = self.machine_load_calc.get_workload_params(machines_specs=self.machines_specs, threads_per_machine=self.threads_per_machine)
         self.print_func_kwargs()
 
-    def viz_load_ratios(self):
-        if not len(self.workload_params): raise Exception("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
+    def viz_load_ratios(self) -> None:
+        if not self.workload_params: raise RuntimeError("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
         plt = tb.install_n_import("plotext")
         names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
 
@@ -192,20 +198,22 @@ class Cluster:
         # self.workload_params.
         print("\n")
 
-    def submit(self):
-        if not len(self.workload_params): raise Exception("You need to generate standard kwargs first.")
+    def submit(self) -> None:
+        if not self.workload_params: raise RuntimeError("You need to generate standard kwargs first.")
         for idx, (a_workload_params, an_ssh) in enumerate(zip(self.workload_params, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.machine_load_calc.load_ratios_repr}"
             if self.remote_machine_kwargs is not None:
                 config = self.remote_machine_kwargs
                 config.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params, ssh_obj=an_ssh))
-            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params, ssh_obj=an_ssh)
+            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir.as_posix(), workload_params=a_workload_params, ssh_obj=an_ssh)
             m = RemoteMachine(func=self.func, func_kwargs=self.func_kwargs, config=config)
             m.generate_scripts()
             m.submit()
             self.machines.append(m)
         try: self.save()
-        except: print("Couldn't pickle cluster object")
+        except RuntimeError as re:
+            print(re)
+            print("Couldn't pickle cluster object")
         self.print_commands()
 
     def open_mux(self, machines_per_tab=1, window_number=None):
@@ -214,8 +222,8 @@ class Cluster:
         cmd = f"wt -w {self.window_number} "
         for idx, m in enumerate(self.machines):
             sub_cmd = m.session_manager.get_new_session_string()
-            if idx == 0: cmd += f""" new-tab --title '{m.ssh.hostname + str(idx)}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
-            elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {m.ssh.hostname + str(idx)} pwsh -Command "{sub_cmd}" `;"""
+            if idx == 0: cmd += f""" new-tab --title '{str(m.ssh.hostname) + str(idx)}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
+            elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {str(m.ssh.hostname) + str(idx)} pwsh -Command "{sub_cmd}" `;"""
             else: cmd += f""" split-pane --horizontal --size {1 / self.machines_per_tab} pwsh -Command "{sub_cmd}" `;"""
 
         print("Terminal launch command:\n", cmd)
@@ -243,6 +251,7 @@ class Cluster:
             print(f"All results downloaded to {self.root_dir} 🤗")
             return True
         for idx, a_m in enumerate(self.machines):
+            _ = idx
             if a_m.results_path is None:
                 print(f"Results are not ready for machine {a_m}.")
                 print(f"Try to run `.check_job_status()` to check if the job is done and obtain results path.")

@@ -1,11 +1,15 @@
 
+"""
+Runner
+"""
+
 from dataclasses import dataclass
 import crocodile.toolbox as tb
 import os
 from rich import inspect
 from rich.console import Console
 import time
-
+from typing import Optional, Callable, Union  # , Any
 import pandas as pd
 
 console = Console()
@@ -48,8 +52,8 @@ class JobParams:
     file_path_rh: str
     file_path_r: str
     func_module: str
-    func_class: str
-    func_name: str
+    func_class: Optional[str]  # the callable might be a function on its own, not a method of a class.
+    func_name: Optional[str]  # the job might be running a script as is, no particular method.
 
     description: str
     ssh_repr: str
@@ -63,28 +67,36 @@ class JobParams:
     def from_empty() -> 'JobParams':
         return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
     @staticmethod
-    def from_func(func) -> 'JobParams':
-        func_module = func.__module__ if func is not None else None
-        assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."
-        if type(func) is str or type(func) is tb.P:
-            func_file, func, func_class = tb.P(func), None, None
-        elif func.__name__ != func.__qualname__:
-            print(f"Passed function {func} is a method of a class.")
-            func_file, func, func_class = tb.P(func.__code__.co_filename), func, func.__qualname__.split(".")[0]
-        else:
-            print(f"Passed function {func} is not a method of a class.")
-            func_file, func, func_class = tb.P(func.__code__.co_filename), func, None
+    def from_func(func: Union[Callable, tb.P, str]) -> 'JobParams':
+        if isinstance(func, Callable) and not isinstance(func, tb.P):
+            func_name = func.__name__
+            func_module = func.__module__
+            assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."
+            if func.__name__ != func.__qualname__:
+                print(f"Passed function {func} is a method of a class.")
+                func_file, func_class = tb.P(func.__code__.co_filename), func.__qualname__.split(".")[0]
+            else:
+                print(f"Passed function {func} is not a method of a class.")
+                func_file, func_class = tb.P(func.__code__.co_filename), None
+        elif type(func) is str or type(func) is tb.P:
+            func_file = tb.P(func)
+            # func = None
+            func_class = None
+            func_name = None
+            func_module = func_file.stem
+        else: raise TypeError(f"Passed function {func} is not a callable or a path to a python file.")
         try:
             repo_path = tb.P(tb.install_n_import("git", "gitpython").Repo(func_file, search_parent_directories=True).working_dir)
             func_relative_file = func_file.relative_to(repo_path)
-        except:
+        except Exception as e:
+            print(e)
             repo_path, func_relative_file = func_file.parent, func_file.name
         return JobParams(repo_path_rh=repo_path.collapseuser().as_posix(), file_path_rh=repo_path.collapseuser().joinpath(func_relative_file).collapseuser().as_posix(),
                          file_path_r=tb.P(func_relative_file).as_posix(),
-                         func_module=func_module, func_class=func_class, func_name=func.__name__,
+                         func_module=func_module, func_class=func_class, func_name=func_name,
                          description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
 
-    def get_execution_line(self, workload_params: WorkloadParams or None, parallelize: bool, wrap_in_try_except: bool) -> str:
+    def get_execution_line(self, workload_params: Optional[WorkloadParams], parallelize: bool, wrap_in_try_except: bool) -> str:
         # tb.P(self.repo_path_rh).name}.{self.file_path_r.replace(".py", '').replace('/', '.')#
         # if func_module is not None:
         #     # noinspection PyTypeChecker
