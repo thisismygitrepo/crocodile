@@ -5,7 +5,7 @@ File
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union, Any
 
 
 # %% =============================== Security ================================================
@@ -25,7 +25,7 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
         else:
             try: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes(); print(f"Using key from: {P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes')}")
             except FileNotFoundError as err: print("\n"*3, "~"*50, f"""Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~"*50, "\n"*3); raise FileNotFoundError(err)
-    elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # a path to a key file was passed, read it:
+    elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
     code = __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).encrypt(msg)
@@ -39,7 +39,7 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
         else: key = pwd2key(pwd)  # trailing `;` prevents IPython from caching the result.
     if type(key) is bytes: pass  # passsed explicitly
     elif key is None: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
-    elif type(key) in {str, P, Path}: key = P(key).read_bytes()  # passed a path to a file containing kwy
+    elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 def unlock(drive="D:", pwd=None, auto_unlock=False):
@@ -55,12 +55,12 @@ def read(path, **kwargs):
         if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
         try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}")
         except ImportError as err: print(f"Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err)
-def json(path, r=False, **kwargs):
+def json(path, r=False, **kwargs) -> Struct:
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
     return Struct.recursive_struct(mydict) if r else Struct(mydict)
 def yaml(path, r=False):
-    with open(str(path), "r") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
+    with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
     return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 def ini(path): import configparser; res = configparser.ConfigParser(); res.read(str(path)); return res
 def toml(path): return install_n_import("tomli").loads(P(path).read_text())
@@ -185,13 +185,13 @@ class P(type(Path()), Path):
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
         return self if (str(self).startswith("~") or P.home().as_posix() not in self.resolve().as_posix()) else self._return(P("~") / (self.expanduser().absolute().resolve(strict=strict) - P.home()))  # resolve also solves the problem of Windows case insensitivty.
     def __getitem__(self, slici): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
-    def __setitem__(self, key: str or int or slice, value: str or Path):
+    def __setitem__(self, key: Union['str', int, slice], value: Union['str', Path]):
         fullparts, new = list(self.parts), list(P(value).parts)
         if type(key) is str: idx = fullparts.index(key); fullparts.remove(key); fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
         elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
         elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
         self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
-    def split(self, at: str = None, index: int = None, sep=[-1, 0, 1][-1], strict=True):
+    def split(self, at: Optional['str'] = None, index: Optional[int] = None, sep: int = -1, strict: bool = True):
         if index is None and (at is not None):  # at is provided  # ====================================   Splitting
             if not strict:  # behaves like split method of string
                 one, two = (items := str(self).split(sep=str(at)))[0], items[1]; one, two = P(one[:-1]) if one.endswith("/") else P(one), P(two[1:]) if two.startswith("/") else P(two)
@@ -220,12 +220,12 @@ class P(type(Path()), Path):
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
-    def clickable(self, inlieu=False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
-    def as_url_str(self, inlieu=False) -> str: return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
-    def as_url_obj(self, inlieu=False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
-    def as_unix(self, inlieu=False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
+    def clickable(self, inlieu: bool =False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
+    def as_url_str(self, inlieu: bool =False) -> str: return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
+    def as_url_obj(self, inlieu: bool =False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
+    def as_unix(self, inlieu: bool =False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
-    def get_num(self, astring=None): int("".join(filter(str.isdigit, str(astring or self.stem))))
+    def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
     def write_text(self, data: str, **kwargs) -> 'P': super(P, self).write_text(data, **kwargs); return self
@@ -234,7 +234,7 @@ class P(type(Path()), Path):
         slf = self.expanduser().absolute(); slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self
-    def touch(self, mode: int = 0o666, parents=True, exist_ok: bool = ...) -> 'P': self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
+    def touch(self, mode: int = 0o666, parents: bool = True, exist_ok: bool = ...) -> 'P': self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, src_folder=None, src_file=None, verbose=False, overwrite=False):
         assert self.expanduser().exists(), "self must exist if this method is used."
         if src_file is not None: assert src_folder is None, "You can only pass source or source_dir, not both."; result = P(src_file).expanduser().absolute()
@@ -400,10 +400,10 @@ def gz(file, op_path):  # see this on what to use: https://stackoverflow.com/que
     with open(file, 'rb') as f_in:
         with __import__("gzip").open(op_path, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
-def ungz(self, op_path=None):
+def ungz(self, op_path: str):
     with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
-def unbz(self, op_path=None):
+def unbz(self, op_path: str):
     with __import__("bz2").BZ2File(str(self), 'r') as fr, open(str(op_path), 'wb') as fw: __import__("shutil").copyfileobj(fr, fw)
     return P(op_path)
 def xz(self, op_path):

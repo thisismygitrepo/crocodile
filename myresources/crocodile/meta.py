@@ -6,6 +6,7 @@ import time
 import logging
 import subprocess
 import sys
+from typing import Union, Any, Optional
 
 
 class Null:
@@ -62,7 +63,7 @@ class Terminal:
         ip = property(lambda self: self.output["stdin"])
         err = property(lambda self: self.output["stderr"])
         returncode = property(lambda self: self.output["returncode"])
-        def op2path(self, strict_returncode=True, strict_err=False) -> P or None:
+        def op2path(self, strict_returncode=True, strict_err=False) -> Union[P, None]:
             return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
         def op_if_successfull_or_default(self, strict_returcode=True, strict_err=False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
         def is_successful(self, strict_returcode=True, strict_err=False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)

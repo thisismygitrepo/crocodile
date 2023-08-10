@@ -49,7 +49,7 @@ if platform.system() == "Windows":
             font = random.choice(FIGJS_FONTS)
             # print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
-            _cmd = f'figlet -f "{font}" "Xiao" | boxes -d "{box_style}" | lolcatjs'
+            _cmd = f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs'
             print(_cmd)
             os.system(_cmd)  # | lolcat
         else:
