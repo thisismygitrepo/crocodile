@@ -1,6 +1,12 @@
+
+"""
+PKG
+"""
+
 from setuptools import setup
 from myresources.crocodile import __version__
 import setuptools
+
 
 with open("README.md", "r", encoding="utf-8") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
@@ -19,6 +25,8 @@ setup(
                 'crocodile.croshell',
                 'crocodile.database',
                 'crocodile.deeplearning',
+                'crocodile.deeplearning_template',
+                'crocodile.deeplearning_df',
                 'crocodile.deeplearning_torch',
                 'crocodile.environment',
                 'crocodile.file_management',
