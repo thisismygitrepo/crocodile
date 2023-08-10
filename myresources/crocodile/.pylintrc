@@ -1,0 +1,19 @@
+
+disable =
+    # W503: line break before binary operator
+    # W504: line break after binary operator
+    W503,
+    W504,
+    # E203: whitespace before ':'
+    E203,
+    # E501: line too long
+    E501,
+    # E731: do not assign a lambda expression, use a def
+    E731,
+    # E741: ambiguous variable name
+    E741,
+    # E402: module level import not at top of file
+    E402,
+    # E722: do not use bare except
+    E722,
+    # E741: ambiguous v

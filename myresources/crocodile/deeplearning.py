@@ -67,7 +67,7 @@ class HParams:
         # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
 
     @classmethod
-    def from_saved_data(cls, path, *args, **kwargs) -> 'Self': return tb.Read.pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+    def from_saved_data(cls, path, *args, **kwargs) -> 'HParams': return tb.Read.pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
     def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
     def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
@@ -498,9 +498,9 @@ class BaseModel(ABC):
         y_pred = self.infer(x_test)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
         if loss_df is not None:
-            if len(self.data.other_strings) == 1: loss_df[self.data.other_strings[0]] = names_test
+            if len(self.data.other_names) == 1: loss_df[self.data.other_names[0]] = names_test
             else:
-                for val, name in zip(names_test, self.data.other_strings): loss_df[name] = val
+                for val, name in zip(names_test, self.data.other_names): loss_df[name] = val
         y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = tb.Struct(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=names_test, loss_df=loss_df, )
@@ -549,7 +549,7 @@ class BaseModel(ABC):
         import importlib
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
-            print(f"Warning: Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+            raise RuntimeError("Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
         try:
             module = importlib.import_module(__module)
         except ModuleNotFoundError as ex:
@@ -577,7 +577,7 @@ class BaseModel(ABC):
         else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
         if hp_obj.root != path.parent: hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
         d_obj.hp = hp_obj
-        model_obj: Self = cls(hp_obj, d_obj)
+        model_obj: cls = cls(hp_obj, d_obj)
         model_obj.load_weights(path.search('*_save_*')[0])
         model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L(), strict=False)
         print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None

@@ -30,9 +30,9 @@ class HParams(dl.HParams):
 
 class DataReader(dl.DataReader):
     def __init__(self, hp: HParams, load_trianing_data=False):
-        specs = dl.Specs(ip_strings=['x'],
-                         op_strings=["y"],
-                         other_strings=["idx"],
+        specs = dl.Specs(ip_names=['x'],
+                         op_names=["y"],
+                         other_names=["idx"],
                          ip_shapes=[],
                          op_shapes=[],
                          other_shapes=[])

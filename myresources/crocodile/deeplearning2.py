@@ -21,10 +21,10 @@ class Specs:
     ip_shapes: list[tuple[int, ...]]
     op_shapes: list[tuple[int, ...]]
     other_shapes: list[tuple[int, ...]]
-    ip_strings: list[str]  # e.g.: ["x1", "x2"]
-    op_strings: list[str]  # e.g.: ["y1", "y2"]
-    other_strings: list[str]  # e.g.: indices or names
-    def get_all_strings(self): return self.ip_strings + self.op_strings + self.other_strings
+    ip_names: list[str]  # e.g.: ["x1", "x2"]
+    op_names: list[str]  # e.g.: ["y1", "y2"]
+    other_names: list[str]  # e.g.: indices or names
+    def get_all_strings(self): return self.ip_names + self.op_names + self.other_names
 
 
 @dataclass
@@ -63,10 +63,10 @@ class HParams:
     name: str = "model_" + tb.randstr(noun=True)
     root: tb.P = tb.P.tmp(folder="tmp_models")
     pkg_name: str = 'tensorflow'
-    device_name: Device=Device.gpu0
+    device_name: Device = Device.gpu0
     # ===================== Data ==============================
-    seed: int =234
-    shuffle: bool =True
+    seed: int = 234
+    shuffle: bool = True
     precision: str = 'float32'
     # ===================== Model =============================
     # depth = 3
@@ -117,7 +117,7 @@ class DataReader(tb.Base):
         self.hp = hp
         self.split = split
         self.plotter = None
-        self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_strings=[], op_strings=[], other_strings=[]) if specs is None else specs
+        self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
         # self.df_handler = df_handler
     def save(self, path: Optional[str] = None, **kwargs) -> None:
         _ = kwargs
@@ -138,26 +138,26 @@ class DataReader(tb.Base):
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = dict(train_loader=None, test_loader=None)
-        if self.specs.ip_strings is None:
+        if self.specs.ip_names is None:
             ip_strings = [f"x_{i}" for i in range(len(args)-1)]
             if len(ip_strings) == 1: ip_strings = ["x"]
-            self.specs.ip_strings = ip_strings
-        if self.specs.op_strings is None: self.specs.op_strings = ["y"]
-        if self.specs.other_strings is None: self.specs.other_strings = []
+            self.specs.ip_names = ip_strings
+        if self.specs.op_names is None: self.specs.op_names = ["y"]
+        if self.specs.other_names is None: self.specs.other_names = []
         strings = self.specs.get_all_strings()
         assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
         for an_arg, key in zip(args, strings):
             a_shape = an_arg.iloc[0].shape if type(an_arg) in {pd.DataFrame, pd.Series} else np.array(an_arg[0]).shape
-            if key in self.specs.ip_strings: self.specs.ip_shapes.append(a_shape)
-            elif key in self.specs.op_strings: self.specs.op_shapes.append(a_shape)
-            elif key in self.specs.other_strings: self.specs.other_shapes.append(a_shape)
+            if key in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
+            elif key in self.specs.op_names: self.specs.op_shapes.append(a_shape)
+            elif key in self.specs.other_names: self.specs.other_shapes.append(a_shape)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
         tb.Struct(self.split).print()
 
     def get_data_strings(self, which_data="ip", which_split="train"):
-        strings = {"op": self.specs.op_strings, "ip": self.specs.ip_strings, "others": self.specs.other_strings}[which_data]
+        strings = {"op": self.specs.op_names, "ip": self.specs.ip_names, "others": self.specs.other_names}[which_data]
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
@@ -186,9 +186,9 @@ class DataReader(tb.Base):
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
-        x = x[0] if len(self.specs.ip_strings) == 1 else x
-        y = y[0] if len(self.specs.op_strings) == 1 else y
-        others = others[0] if len(self.specs.other_strings) == 1 else others
+        x = x[0] if len(self.specs.ip_names) == 1 else x
+        y = y[0] if len(self.specs.op_names) == 1 else y
+        others = others[0] if len(self.specs.other_names) == 1 else others
         if len(others) == 0:
             # others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
             if type(selection) is slice:
@@ -203,8 +203,8 @@ class DataReader(tb.Base):
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
         x = [np.random.randn(self.hp.batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes]
         y = [np.random.randn(self.hp.batch_size, * op_shape).astype(dtype) for op_shape in op_shapes]
-        x = x[0] if len(self.specs.ip_strings) == 1 else x
-        y = y[0] if len(self.specs.op_strings) == 1 else y
+        x = x[0] if len(self.specs.ip_names) == 1 else x
+        y = y[0] if len(self.specs.op_names) == 1 else y
         return x, y
 
     def preprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity.
@@ -310,7 +310,7 @@ class BaseModel(ABC):
             artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True))
         return self
 
-    def switch_to_sgd(self, epochs=10):
+    def switch_to_sgd(self, epochs: int = 10):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         if self.hp.pkg.__name__ == 'tensorflow': new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
@@ -318,7 +318,7 @@ class BaseModel(ABC):
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
-    def switch_to_l1(self, epochs=10):
+    def switch_to_l1(self, epochs: int = 10):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         if self.hp.pkg.__name__ == 'tensorflow':
             self.model.reset_metrics()
@@ -389,9 +389,9 @@ class BaseModel(ABC):
         y_pred = self.infer(x_test)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
         if loss_df is not None:
-            if len(self.data.specs.other_strings) == 1: loss_df[self.data.specs.other_strings[0]] = names_test
+            if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
             else:
-                for val, name in zip(names_test, self.data.specs.other_strings): loss_df[name] = val
+                for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
         y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
@@ -420,7 +420,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only=True, version='0', **kwargs):
+    def save_class(self, weights_only: bool =True, version: str ='0', **kwargs):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -440,7 +440,7 @@ class BaseModel(ABC):
         import importlib
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
-            print(f"Warning: Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+            raise RuntimeError("Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
         try:
             module = importlib.import_module(__module)
         except ModuleNotFoundError as ex:
@@ -463,7 +463,7 @@ class BaseModel(ABC):
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None, verbose=True):
+    def from_class_weights(cls, path, hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool =True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
         else: hp_obj = (path / HParams.subpath + "hparams.HyperParam.pkl").readit()
@@ -506,10 +506,10 @@ class BaseModel(ABC):
             except ModuleNotFoundError as ex2:
                 print(ex2)
                 print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
-                module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute())
-        model_class = getattr(module, specs['model_class'])
-        data_class = getattr(module, specs['data_class'])
-        hp_class = getattr(module, specs['hp_class'])
+                module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute().as_posix())
+        model_class: BaseModel = getattr(module, specs['model_class'])
+        data_class: DataReader = getattr(module, specs['data_class'])
+        hp_class: HParams = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
     def plot_model(self, dpi=150, **kwargs):  # alternative viz via tf2onnx then Netron.
@@ -765,7 +765,7 @@ def get_template():
     print("Copied to clipboard")
 
 
-def load_class(file_path):
+def load_class(file_path: str):
     import importlib.util
     module_spec = importlib.util.spec_from_file_location(name="__temp_module__", location=file_path)
     if module_spec is None: raise ValueError(f"Failed to load up module from path: {file_path}")
