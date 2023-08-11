@@ -267,9 +267,9 @@ class Scheduler:
 #         return run() if run is not None else return_
 def show_globals(scope, **kwargs): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 def monkey_patch(class_inst, func): setattr(class_inst.__class__, func.__name__, func)
-def capture_locals(func, scope, args=None, self: str = None, update_scope=True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
-def generate_readme(path, obj=None, desc=None, save_source_code=True, verbose=True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-    text = "# Description\n" + (desc if desc is not None else '') + (separator := "\n" + "-" * 50 + "\n\n")
+def capture_locals(func, scope, args=None, self: Optional[str] = None, update_scope: bool = True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
+def generate_readme(path, obj: Any = None, desc: str = '', save_source_code: bool = True, verbose: bool = True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
+    text = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
     obj_path = P(__import__('inspect').getfile(obj)) if obj is not None else None
     path = P(path)
     if obj_path is not None: 

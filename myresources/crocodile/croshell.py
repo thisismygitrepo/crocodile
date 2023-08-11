@@ -30,7 +30,7 @@ console.rule(_, style="bold red", align="center")
 # link to tutorial or github
 _ = Text(f"Crocodile Shell")
 _.stylize("#93e6c7 on #093006")
-print(_, __import__('crocodile').__version__)
+print(_, __import__(name='crocodile').__version__)
 print("Made with 🐍 | Built with ❤️")
 
 tb.D.set_numpy_display()

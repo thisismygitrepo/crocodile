@@ -53,7 +53,7 @@ class CategoricalClipper:
         return self.transform(df, inplace=inplace)
 
     @staticmethod
-    def create_others_category(percentage_counts: pd.Series, thresh=1.0, others_name='Other'):
+    def create_others_category(percentage_counts: pd.Series, thresh: float = 1.0, others_name: str = 'Other'):
         orig_caregories = percentage_counts.index.tolist()
         other_cats = percentage_counts[percentage_counts < thresh].index
         mask = percentage_counts.index.isin(other_cats)
@@ -104,15 +104,18 @@ class NumericalClipper:
         return df
 
     @staticmethod
-    def clip_values(y: pd.Series, los_clip_upper_quantile=0.98, los_clip_lower_quantile=0.02):
-        los_clip_uppper_hrs = y.quantile(los_clip_upper_quantile)
-        los_clip_lower_hrs = y.quantile(los_clip_lower_quantile)
+    def clip_values(y: pd.Series, quant_min: float = 0.98, quant_max: float = 0.02):
+        los_clip_uppper_hrs = y.quantile(quant_max)
+        los_clip_lower_hrs = y.quantile(quant_min)
         return y.clip(lower=los_clip_lower_hrs, upper=los_clip_uppper_hrs)
 
 
 class DataFrameHander:
     def __init__(self, scaler: StandardScaler, imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
-                 encoder_onehot: OneHotEncoder, encoder_ordinal: OrdinalEncoder) -> None:
+                 encoder_onehot: OneHotEncoder, encoder_ordinal: OrdinalEncoder,
+                 clipper_categorical: Optional[CategoricalClipper],
+                 clipper_numerical: Optional[NumericalClipper]
+                 ) -> None:
         self.scaler: StandardScaler = scaler
         self.imputer: SimpleImputer = imputer
         self.cols_ordinal: list[str] = cols_ordinal
@@ -120,8 +123,8 @@ class DataFrameHander:
         self.cols_numerical: list[str] = cols_numerical
         self.encoder_onehot: OneHotEncoder = encoder_onehot
         self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
-        self.clipper_categorical: Optional[CategoricalClipper]
-        self.clipper_numerical: Optional[NumericalClipper]
+        self.clipper_categorical: Optional[CategoricalClipper] = clipper_categorical
+        self.clipper_numerical: Optional[NumericalClipper] = clipper_numerical
     def __getstate__(self):
         atts: list[str] = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
         res = {}
