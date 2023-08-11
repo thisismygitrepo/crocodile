@@ -4,7 +4,7 @@ This module contains classes that can be used to preprocess dataframes for deep 
 """
 
 
-from typing import Optional
+from typing import Optional, Any
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -26,7 +26,7 @@ class CategoricalClipper:
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state): self.__dict__ = state
 
-    def fit(self, df):
+    def fit(self, df: pd.DataFrame):
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
@@ -39,7 +39,7 @@ class CategoricalClipper:
             self.post_percentage_counts[col].index.name = name
             print(f"Categories pre summarizer:\n{self.pre_percentage_counts[col].to_markdown()}\n\nCategories post summarizer:\n{self.post_percentage_counts[col].to_markdown()}")
 
-    def transform(self, df, inplace=True):
+    def transform(self, df: pd.DataFrame, inplace: bool = True):
         if self.columns is None: raise RuntimeError("Fit the encoder first")
         if not inplace: raise NotImplementedError
         else:
@@ -48,12 +48,12 @@ class CategoricalClipper:
                 df.loc[:, col] = series.map(self.mapper[col])
             return df
 
-    def fit_transform(self, df, inplace=True):
+    def fit_transform(self, df: pd.DataFrame, inplace: bool = True):
         self.fit(df)
         return self.transform(df, inplace=inplace)
 
     @staticmethod
-    def create_others_category(percentage_counts, thresh=1.0, others_name='Other'):
+    def create_others_category(percentage_counts: pd.Series, thresh=1.0, others_name='Other'):
         orig_caregories = percentage_counts.index.tolist()
         other_cats = percentage_counts[percentage_counts < thresh].index
         mask = percentage_counts.index.isin(other_cats)
@@ -70,18 +70,18 @@ class CategoricalClipper:
 
 
 class NumericalClipper:
-    def __init__(self, quant_min, quant_max):
-        self.columns = None
-        self.quant_min = quant_min
-        self.quant_max = quant_max
-        self.value_min = {}
-        self.value_max = {}
+    def __init__(self, quant_min: float, quant_max: float):
+        self.columns: Optional[list[str]] = None
+        self.quant_min: float = quant_min
+        self.quant_max: float = quant_max
+        self.value_min: dict[str, float] = {}
+        self.value_max: dict[str, float] = {}
 
-    def __getstate__(self): return self.__dict__
-    def __setstate__(self, state): self.__dict__ = state
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__
+    def __setstate__(self, state) -> None: self.__dict__ = state
 
-    def fit(self, df):
-        self.columns = df.columns
+    def fit(self, df: pd.DataFrame):
+        self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
             self.value_min[col] = series.quantile(self.quant_min)
@@ -120,8 +120,8 @@ class DataFrameHander:
         self.cols_numerical: list[str] = cols_numerical
         self.encoder_onehot: OneHotEncoder = encoder_onehot
         self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
-        self.clipper_categorical = None
-        self.clipper_numerical = None
+        self.clipper_categorical: Optional[CategoricalClipper]
+        self.clipper_numerical: Optional[NumericalClipper]
     def __getstate__(self):
         atts = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
         res = {}
@@ -129,7 +129,7 @@ class DataFrameHander:
             if hasattr(self, att):
                 res[att] = getattr(self, att)
         return res
-    def profile_dataframe(self, df, path: tb.P, silent=False, explorative=True):
+    def profile_dataframe(self, df: pd.DataFrame, path: tb.P, silent: bool = False, explorative: bool = True):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
         profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(path, silent=silent)
