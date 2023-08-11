@@ -4,7 +4,7 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional,Union
 import datetime
 
 # ============================== Accessories ============================================
@@ -24,36 +24,42 @@ def randstr(length=10, lower=True, upper=True, digits=True, punctuation=False, s
 
 def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
     def decorator(func):
-        def wrapper(obj, path: Optional[str] = None, verbose=True, add_suffix=True, desc="", class_name="", **kwargs):
-            if path is None: path = str(Path.home().joinpath("tmp_results/tmp_files").joinpath(randstr(noun=True))); _ = print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {path.absolute().as_uri()}") if verbose else None
+        def wrapper(obj, path: Union[str, Path, None] = None, verbose=True, add_suffix=False, desc="", class_name="", **kwargs):
+            if path is None:
+                path = Path.home().joinpath("tmp_results/tmp_files").joinpath(randstr(noun=True))
+                _ = print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {Path(path).absolute().as_uri()}") if verbose else None
             if add_suffix:
                 _ = [(print(f"tb.core: Warning: suffix `{a_suffix}` is added to path passed {path}") if verbose else None) for a_suffix in [ext, class_name] if a_suffix not in str(path)]
-                path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext; path = Path(path).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
-            func(path=path, obj=obj, **kwargs); print(f"SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB") if verbose else None  # |  Directory: `{path.parent.absolute().as_uri()}`
+                path = str(path).replace(ext, "").replace(class_name, "") + class_name + ext
+                path = Path(path).expanduser().resolve()
+                path.parent.mkdir(parents=True, exist_ok=True)
+            else: path = Path(path).expanduser().resolve()
+            func(path=path, obj=obj, **kwargs)
+            if verbose: print(f"SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB")  # |  Directory: `{path.parent.absolute().as_uri()}`
             return path
         return wrapper
     return decorator
 
 
 @save_decorator(".json")
-def json(obj, path=None, indent=None, encoding='utf-8', **kwargs): 
+def json(obj, path:Optional[str] = None, indent:Optional[str] = None, encoding='utf-8', **kwargs): 
     _ = encoding
-    return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__ **kwargs))
+    return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__ **kwargs), encoding="utf-8")
 @save_decorator(".yml")
 def yaml(obj, path, **kwargs):
-    with open(Path(path), 'w') as file: __import__("yaml").dump(obj, file, **kwargs)
+    with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
 @save_decorator(".toml")
 def toml(obj: dict, path): return Path(path).write_text(install_n_import("toml").dumps(obj))
 @save_decorator(".ini")
 def ini(obj: dict, path, **kwargs):
     conf = install_n_import("configparser").ConfigParser(); conf.read_dict(obj)
-    with open(path, 'w') as configfile: conf.write(configfile, **kwargs)
+    with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
 @save_decorator(".csv")
 def csv(obj, path=None): return obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
 @save_decorator(".npy")
 def npy(obj, path, **kwargs): return __import__('numpy').save(path, obj, **kwargs)
 @save_decorator(".mat")
-def mat(mdict, path=None, **kwargs): [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
+def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
 @save_decorator(".pkl")
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")

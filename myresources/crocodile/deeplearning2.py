@@ -9,7 +9,7 @@ from crocodile.matplotlib_management import ImShow, FigureSave
 import numpy as np
 import pandas as pd
 from abc import ABC
-from typing import Generic, TypeVar, Type, Any, Optional
+from typing import Generic, TypeVar, Type, Any, Optional, Union
 import enum
 from tqdm import tqdm
 import copy
@@ -60,7 +60,7 @@ class Device(enum.Enum):
 @dataclass
 class HParams:
     subpath: tb.P = tb.P('metadata/hyperparameters')  # location within model directory where this will be saved.
-    name: str = "model_" + tb.randstr(noun=True)
+    name: str = "model-" + tb.randstr(noun=True)
     root: tb.P = tb.P.tmp(folder="tmp_models")
     pkg_name: str = 'tensorflow'
     device_name: Device = Device.gpu0
@@ -82,12 +82,15 @@ class HParams:
 
     def save(self):
         self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
-        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.dat.pkl"), obj=self)
-        # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
-
+        try: data = self.__getstate__()
+        except AttributeError: data: dict[str, Any] = self.__dict__
+        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.dat.pkl"), obj=data)
+        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.pkl"), obj=self)
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__
+    def __setstate__(self, state: dict): return self.__dict__.update(state)
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs) -> 'HParams':
-        data = tb.Read.pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+        data: dict = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
     def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
@@ -102,7 +105,7 @@ SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
 def _silence_pylance(hp: SubclassedHParams) -> SubclassedHParams: return hp
 
 
-class DataReader(tb.Base):
+class DataReader:
     subpath = tb.P("metadata/data_reader")
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time_produced, but the former need not to be saved. As such,
@@ -122,9 +125,17 @@ class DataReader(tb.Base):
     def save(self, path: Optional[str] = None, **kwargs) -> None:
         _ = kwargs
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
-        super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
+        try: data = self.__getstate__()
+        except AttributeError: data: dict[str, Any] = self.__dict__
+        tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
+        tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
-    def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
+    def from_saved_data(cls, path: Union[str, tb.P], hp: HParams, *args, **kwargs):
+        path = tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
+        data: dict = tb.Read.vanilla_pickle(path)
+        obj = cls(hp=hp, *args, **kwargs)
+        obj.__setstate__(data)
+        return obj
     def __getstate__(self) -> dict[str, Any]:
         items = ["specs"]
         res = {}
@@ -431,7 +442,7 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        tb.Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
@@ -458,7 +469,7 @@ class BaseModel(ABC):
                  'module_path_rh': module_path_rh,
                  'cwd_rh': tb.P.cwd().collapseuser().as_posix(),
                  }
-        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json'))
+        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str)
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
         return self.hp.save_dir
 
@@ -466,23 +477,29 @@ class BaseModel(ABC):
     def from_class_weights(cls, path, hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool =True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
-        else: hp_obj = (path / HParams.subpath + "hparams.HyperParam.pkl").readit()
+        else: hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
         if device_name: hp_obj.device_name = device_name
         if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
-        else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
+        else: d_obj = tb.Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
         if hp_obj.root != path.parent: hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
+        # if type(hp_obj) is Generic[HParams]:
         d_obj.hp = hp_obj
+        # else:rd
+            # raise ValueError(f"hp_obj must be of type `HParams` or `Generic[HParams]`. Got {type(hp_obj)}")
         model_obj: 'BaseModel' = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
-        model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L(), strict=False)
+        history_path = path / "metadata/training/history.pkl"
+        if history_path.exists(): history: list =  tb.Read.vanilla_pickle(path=history_path)
+        else: history = []
+        model_obj.history = history
         _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
         return model_obj
 
     @classmethod
     def from_class_model(cls, path):
         path = tb.P(path)
-        data_obj = DataReader.from_saved_data(path)
         hp_obj = HParams.from_saved_data(path)
+        data_obj = DataReader.from_saved_data(path, hp=hp_obj)
         directory = path.search('*_save_*')
         model_obj = cls.load_model(list(directory)[0])
         wrapper_class = cls(hp_obj, data_obj, model_obj)
@@ -491,7 +508,7 @@ class BaseModel(ABC):
     @staticmethod
     def from_path(path_model, **kwargs):
         path_model = tb.P(path_model).expanduser().absolute()
-        specs = path_model.joinpath('metadata/code_specs.json').readit()
+        specs = tb.Read.json(path=path_model.joinpath('metadata/code_specs.json'))
         print(f"Loading up module: `{specs['__module__']}`.")
         import importlib
         try:

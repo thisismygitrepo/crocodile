@@ -11,7 +11,7 @@ import tensorflow as tf
 
 class HParams(dl.HParams):
     subpath: tb.P = tb.P('metadata/hyperparameters')  # location within model directory where this will be saved.
-    name: str = "model_" + tb.randstr(noun=True)
+    name: str = "model-" + tb.randstr(noun=True)
     root: tb.P = tb.P.tmp(folder="tmp_models")
     pkg_name: str = 'tensorflow'
     # device_name: Device=Device.gpu0

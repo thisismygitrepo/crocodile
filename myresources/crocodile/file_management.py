@@ -11,7 +11,7 @@ from typing import Any, Optional, Union, Any
 # %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
-def pwd2key(password: str, salt=None, iterations=None) -> bytes:  # Derive a secret key from a given password and salt"""
+def pwd2key(password: str, salt=None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
     if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
@@ -51,10 +51,10 @@ def read(path, **kwargs):
     suffix = Path(path).suffix[1:]
     try: return getattr(Read, suffix)(str(path), **kwargs)
     except AttributeError as err:
-        if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err)
+        if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
         if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-        try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}")
-        except ImportError as err: print(f"Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err)
+        try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
+        except ImportError as err2: print(f"Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
 def json(path, r=False, **kwargs) -> Struct:
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
@@ -70,8 +70,9 @@ def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
 def py(path, init_globals=None, run_name=None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
 def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
 def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
-def pkl(*args, **kwargs): return pickle(*args, **kwargs)
-class Read: read = read; mat = mat; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; pkl = pkl; py = py; pickle = pickle; toml = toml; txt = lambda path, encoding=None: P(path).read_text(encoding=encoding)
+def vanilla_pickle(path, **kwargs): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
+def txt(path: Union[Path, str], encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
+class Read: read = read; mat = mat; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; vanilla_pickle = vanilla_pickle; py = py; pkl = vanilla_pickle; pickle = pickle; toml = toml; txt = txt
 
 
 def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append=False, prepend=False, strict=False):
@@ -95,26 +96,26 @@ class P(type(Path()), Path):
     This can be seen in `zip` and `encrypt` but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
     Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
     def delete(self, sure=False, verbose=True) -> 'P':  # slf = self.expanduser().resolve() don't resolve symlinks.
-        if not sure: print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
+        if not sure: _ = print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
         if not self.exists(): self.unlink(missing_ok=True); print(f"Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
-        self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); print(f"DELETED {repr(self)}.") if verbose else None; return self
+        _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); print(f"DELETED {repr(self)}.") if verbose else None; return self
     def send2trash(self, verbose=True) -> 'P':
         if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
     def move(self, folder=None, name=None, path=None, rel2it=False, overwrite=False, verbose=True, parents=True, content=False) -> 'P':
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
-        path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
+        _ = path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
             assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(folder=path.parent, content=False, overwrite=overwrite)); return path  # contents live within this directory.
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
         else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
-        print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
+        _ = print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder=None, name=None, path=None, content=False, verbose=True, append=None, overwrite=False, orig=False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
         dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
         dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
-        dest.delete(sure=True) if not content and overwrite and dest.exists() else None
+        _ = dest.delete(sure=True) if not content and overwrite and dest.exists() else None
         if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); print(f"COPIED {'Content of ' if False else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
@@ -152,10 +153,10 @@ class P(type(Path()), Path):
                 if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
-                    else: print(f"SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
+                    else: _ = print(f"SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res); msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
             elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
-        print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
+        _ = print(msg) if verbose and msg != "" else None; print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
@@ -228,8 +229,8 @@ class P(type(Path()), Path):
     def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
-    def write_text(self, data: str, **kwargs) -> 'P': super(P, self).write_text(data, **kwargs); return self
-    def read_text(self, encoding=None, lines=False, printit=False) -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
+    def write_text(self, data: str, encoding: str = 'utf-8') -> 'P': super(P, self).write_text(data, encoding=encoding); return self
+    def read_text(self, lines=False, printit=False, encoding: str = 'utf-8') -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
     def write_bytes(self, data: bytes, overwrite=False) -> 'P':
         slf = self.expanduser().absolute(); slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
