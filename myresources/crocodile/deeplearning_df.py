@@ -23,10 +23,10 @@ class CategoricalClipper:
         self.post_percentage_counts = {}
         self.mapper = {}
 
-    def __getstate__(self): return self.__dict__
-    def __setstate__(self, state): self.__dict__ = state
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__
+    def __setstate__(self, state) -> None: self.__dict__ = state
 
-    def fit(self, df: pd.DataFrame):
+    def fit(self, df: pd.DataFrame) -> 'CategoricalClipper':
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
@@ -38,7 +38,7 @@ class CategoricalClipper:
             self.post_percentage_counts[col].name = "Percentage"
             self.post_percentage_counts[col].index.name = name
             print(f"Categories pre summarizer:\n{self.pre_percentage_counts[col].to_markdown()}\n\nCategories post summarizer:\n{self.post_percentage_counts[col].to_markdown()}")
-
+        return self
     def transform(self, df: pd.DataFrame, inplace: bool = True):
         if self.columns is None: raise RuntimeError("Fit the encoder first")
         if not inplace: raise NotImplementedError
@@ -89,14 +89,14 @@ class NumericalClipper:
         self.viz()
         return self
 
-    def viz(self):
+    def viz(self) -> None:
         print("\n")
         print(f"Clipping Columns".center(100, '-'))
         print(pd.DataFrame([self.value_min, self.value_max], index=["min", "max"]).T)
         print(f"-" * 100)
         print("\n")
 
-    def transform(self, df):
+    def transform(self, df: pd.DataFrame):
         if not self.columns: raise RuntimeError("Fit the encoder first")
         for col in self.columns:
             series = df.loc[:, col]
@@ -123,7 +123,7 @@ class DataFrameHander:
         self.clipper_categorical: Optional[CategoricalClipper]
         self.clipper_numerical: Optional[NumericalClipper]
     def __getstate__(self):
-        atts = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
+        atts: list[str] = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
         res = {}
         for att in atts:
             if hasattr(self, att):

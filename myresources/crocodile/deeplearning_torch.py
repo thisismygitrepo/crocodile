@@ -8,6 +8,7 @@ import torch as t
 import numpy as np
 # import torch.nn
 import pandas as pd
+from typing import Optional, Any, Union
 
 Flatten = t.nn.Flatten
 
@@ -81,7 +82,7 @@ class PTBaseModel(dl.BaseModel, dl.ABC):
         with t.no_grad(): op = self.model(self.data.to_torch_tensor(xx))
         return self.data.to_numpy(op)
 
-    def fit(self, epochs=None, plot=True, **kwargs):
+    def fit(self, epochs: Optional[int] = None, plot: bool = True, **kwargs):
         """
         """
         if epochs is None: epochs = self.hp.epochs
