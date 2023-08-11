@@ -19,8 +19,8 @@ class CategoricalClipper:
         self.thresh = thresh
         self.others_name = others_name
         self.columns: Optional[list[str]] = None
-        self.pre_percentage_counts = {}
-        self.post_percentage_counts = {}
+        self.pre_percentage_counts: dict[str, pd.Series] = {}
+        self.post_percentage_counts: dict[str, pd.Series] = {}
         self.mapper = {}
 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
