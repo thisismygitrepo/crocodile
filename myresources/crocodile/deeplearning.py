@@ -150,9 +150,9 @@ class DataReader:
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = dict(train_loader=None, test_loader=None)
         if self.specs.ip_names is None:
-            ip_strings = [f"x_{i}" for i in range(len(args)-1)]
-            if len(ip_strings) == 1: ip_strings = ["x"]
-            self.specs.ip_names = ip_strings
+            ip_names: list[str] = [f"x_{i}" for i in range(len(args)-1)]
+            if len(ip_names) == 1: ip_names = ["x"]
+            self.specs.ip_names = ip_names
         if self.specs.op_names is None: self.specs.op_names = ["y"]
         if self.specs.other_names is None: self.specs.other_names = []
         strings = self.specs.get_all_strings()
