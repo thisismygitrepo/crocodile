@@ -5,7 +5,7 @@ File
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
-from typing import Any, Optional, Union, Any
+from typing import Any, Optional, Union, Any, Callable
 
 
 # %% =============================== Security ================================================
@@ -138,7 +138,7 @@ class P(type(Path()), Path):
         else:  __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args, **kwargs) -> 'P': self.start(*args, **kwargs); return self
     def append_text(self, appendix) -> 'P': self.write_text(self.read_text() + appendix); return self
-    def cache_from(self, source_func, expire="1w", save=Save.pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
+    def cache_from(self, source_func, expire="1w", save=Save.vanilla_pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt_search, txt_alt, replace_line=False, notfound_append=False, prepend=False, encoding=None):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
@@ -423,14 +423,14 @@ class Compression: compress_folder = compress_folder; zip_file = zip_file; unzip
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
-    def __init__(self, source_func, expire="1m", logger=None, path=None, save=Save.pickle, reader=Read.read):
+    def __init__(self, source_func: Callable, expire="1m", logger=None, path=None, save: Callable=Save.pickle, reader: Callable=Read.read) -> None:
         self.cache = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
-        self.path = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
+        self.path: P | None = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.time_produced, self.save, self.reader, self.logger, self.expire = None, save, reader, logger, expire
     age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
-    def __setstate__(self, state): self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
-    def __getstate__(self): state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
+    def __setstate__(self, state) -> None: self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
+    def __getstate__(self) -> dict[str, Any]: state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh=False) -> Any:
         if self.path is None:  # Memory Cache
             if self.cache is None or fresh is True or self.age > str2timedelta(self.expire): self.cache, self.time_produced = self.source_func(), datetime.now(); self.logger.debug(f"Updating / Saving data from {self.source_func}") if self.logger else None

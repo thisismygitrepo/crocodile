@@ -4,7 +4,8 @@ Cluster Template
 """
 
 import crocodile.toolbox as tb
-from crocodile.cluster.distribute import Cluster, WorkloadParams
+from crocodile.cluster.distribute import WorkloadParams
+from crocodile.cluster.distribute import RemoteMachineConfig, LoadCriterion, Cluster, ThreadLoadCalculator
 
 
 class ExpensiveComputation:
@@ -22,7 +23,6 @@ class ExpensiveComputation:
 
     @staticmethod
     def submit():
-        from crocodile.cluster.distribute import RemoteMachineConfig, LoadCriterion, Cluster, ThreadLoadCalculator
         config = RemoteMachineConfig(
             # connection
             ssh_params={}, description="Description of running an expensive function",  # job_id=, base_dir="",
@@ -38,8 +38,6 @@ class ExpensiveComputation:
             lock_resources=True, max_simulataneous_jobs=2, parallelize=True, )
         ssh_params = [dict(host="thinkpad"), dict(host="p51s")]  # ,
         # ssh_params = [dict(host="214676wsl"), dict(host="229234wsl")]
-        # noinspection PyUnresolvedReferences
-        from crocodile.cluster.template_cluster import ExpensiveComputation
         c = Cluster(func=ExpensiveComputation.func_single_job,
                     func_kwargs=dict(sim_dict=dict(a=2, b=3)),
                     ssh_params=ssh_params,

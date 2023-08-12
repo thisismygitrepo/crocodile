@@ -34,6 +34,7 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
                 path = Path(path).expanduser().resolve()
                 path.parent.mkdir(parents=True, exist_ok=True)
             else: path = Path(path).expanduser().resolve()
+            path.parent.mkdir(parents=True, exist_ok=True)
             func(path=path, obj=obj, **kwargs)
             if verbose: print(f"SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB")  # |  Directory: `{path.parent.absolute().as_uri()}`
             return path
