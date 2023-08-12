@@ -5,7 +5,7 @@ dl template
 
 import numpy as np
 import crocodile.toolbox as tb
-import crocodile.deeplearning2 as dl
+import crocodile.deeplearning as dl
 import tensorflow as tf
 
 
@@ -37,6 +37,7 @@ class DataReader(dl.DataReader):
                          op_shapes=[],
                          other_shapes=[])
         super().__init__(hp=hp, specs=specs)
+        self.hp: HParams
         self.dataset = None
         if load_trianing_data: self.load_trianing_data()  # make sure that DataReader can be instantiated cheaply without loading data.
 

@@ -5,21 +5,40 @@ dl
 
 import crocodile.toolbox as tb
 from crocodile.matplotlib_management import ImShow, FigureSave
+# from matplotlib.pyplot import hist
 import numpy as np
 import pandas as pd
 from abc import ABC
-from typing import Generic, TypeVar, Any, Optional
+from typing import Generic, TypeVar, Type, Any, Optional, Union
 import enum
 from tqdm import tqdm
 import copy
 from dataclasses import dataclass
 
 
-# %% ========================== DeepLearning Accessories =================================
+@dataclass
+class Specs:
+    ip_shapes: list[tuple[int, ...]]
+    op_shapes: list[tuple[int, ...]]
+    other_shapes: list[tuple[int, ...]]
+    ip_names: list[str]  # e.g.: ["x1", "x2"]
+    op_names: list[str]  # e.g.: ["y1", "y2"]
+    other_names: list[str]  # e.g.: indices or names
+    def get_all_strings(self): return self.ip_names + self.op_names + self.other_names
 
-BM = TypeVar("BM", bound="BaseModel")
-DR = TypeVar("DR", bound="DataReader")
-HPM = TypeVar("HPM", bound="HParams")
+
+@dataclass
+class EvaluationData:
+    x: Any
+    y_pred: Any
+    y_pred_pp: Any
+    y_true: Any
+    y_true_pp: Any
+    names: list[str]
+    loss_df: Any
+
+
+# %% ========================== DeepLearning Accessories =================================
 
 
 @dataclass
@@ -41,13 +60,13 @@ class Device(enum.Enum):
 @dataclass
 class HParams:
     subpath: tb.P = tb.P('metadata/hyperparameters')  # location within model directory where this will be saved.
-    name: str = "model_" + tb.randstr(noun=True)
+    name: str = "model-" + tb.randstr(noun=True)
     root: tb.P = tb.P.tmp(folder="tmp_models")
     pkg_name: str = 'tensorflow'
-    device_name: Device=Device.gpu0
+    device_name: Device = Device.gpu0
     # ===================== Data ==============================
-    seed: int =234
-    shuffle: bool =True
+    seed: int = 234
+    shuffle: bool = True
     precision: str = 'float32'
     # ===================== Model =============================
     # depth = 3
@@ -63,137 +82,30 @@ class HParams:
 
     def save(self):
         self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
-        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.dat.pkl"), obj=self)
-        # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
-
+        try: data = self.__getstate__()
+        except AttributeError: data: dict[str, Any] = self.__dict__
+        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.dat.pkl"), obj=data)
+        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.pkl"), obj=self)
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__
+    def __setstate__(self, state: dict): return self.__dict__.update(state)
     @classmethod
-    def from_saved_data(cls, path, *args, **kwargs) -> 'HParams': return tb.Read.pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+    def from_saved_data(cls, path, *args, **kwargs) -> 'HParams':
+        data: dict = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+        return cls(**data)
     def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
-    def pkg(self): return __import__("tensorflow") if self.pkg_name == "tensorflow" else (__import__("torch") if self.pkg_name == "torch" else ValueError(f"pkg_name must be either `tensorflow` or `torch`"))
-    @property
-    def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
-
-
-class HyperParam(tb.Struct):
-    """Use this class to organize model hyperparameters:
-    * one place to control everything: a control panel.
-    * When doing multiple experiments, one command in console reminds you of settings used in that run (hp.__dict__).
-    * Ease of saving settings of experiments! and also replicating it later.
-    """
-    subpath = tb.P('metadata/hyper_param')  # location within model directory where this will be saved.
-
-    def __init__(self, **kwargs):
-        super().__init__(
-            # ==================== Environment =========================
-            name="model_" + tb.randstr(noun=True),
-            root=tb.P.tmp(folder="tmp_models"),
-            pkg_name='tensorflow',
-            device_name=Device.gpu0,
-            # ===================== Data ==============================
-            seed=234,
-            shuffle=True,
-            precision='float32',
-            # ===================== Model =============================
-            # depth = 3
-            # ===================== Training ==========================
-            test_split=0.2,  # test split
-            learning_rate=0.0005,
-            batch_size=32,
-            epochs=30,
-        )
-        self._configured = False
-        self.device_name = None
-        self.save_type = ["data", "obj", "both"][-1]
-        self.update(**kwargs)
-    def save(self, **kwargs):
-        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
-        if self.save_type in {"data", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.dat.pkl"), add_suffix=False, data_only=True, desc="")
-        # if self.save_type in {"obj", "both"}: super(HyperParam, self).save(path=self.save_dir.joinpath(self.subpath / "hparams.HyperParam.pkl"), add_suffix=False, data_only=False, desc="")
-    @classmethod
-    def from_saved_data(cls, path, *args, **kwargs): return super(HyperParam, cls).from_saved_data(tb.P(path) / cls.subpath / "hparams.HyperParam.dat.pkl", *args, **kwargs)
-    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
-    @property
-    def pkg(self): 
-        assert self.pkg in {"tensorflow", "torch"}, f"pkg_name must be either `tensorflow` or `torch`"
+    def pkg(self):
+        if self.pkg_name not in ("tensorflow", "torch"): raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
         return __import__("tensorflow") if self.pkg_name == "tensorflow" else __import__("torch")
     @property
     def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
-    @property
-    def device(self):
-        handle = self.pkg
-        if handle.__name__ == 'tensorflow':
-            """
-            To disable gpu, here's one way: # before importing tensorflow do this:
-            if device == 'cpu':
-                os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-            handle.device(device)  # used as context, every tensor constructed and every computation takes place therein
-            For more manual control, use .cpu() and .gpu('0') .gpu('1') attributes.
-            """
-            devices = handle.config.experimental.list_physical_devices('CPU')
-            devices += handle.config.experimental.list_physical_devices('GPU')
-            device_dict = dict(zip(['cpu', 'gpu0', 'gpu1'], devices))
-            if self.device_name is Device.auto: chosen_device = Device.gpu0 if len(devices) > 1 else Device.cpu
-            else: chosen_device = self.device_name
-            device_str = chosen_device.value if 1 > 0 else "haha"
-            if device_str not in device_dict.keys():
-                print(f"This machine has no such a device to be chosen! ({device_str})\n" * 10)
-                device_str = "cpu"  # Revert to cpu, keep going, instead of throwing an error.
-            try:
-                device = device_dict[device_str]
-                return device
-            except KeyError:  # 2gpus not a key in the dict.
-                assert len(handle.config.experimental.get_visible_devices()) > 2
-                mirrored_strategy = handle.distribute.MirroredStrategy()
-                return mirrored_strategy
-
-        elif handle.__name__ == 'torch':
-            device = self.device_name
-            if device is Device.auto: return handle.device('cuda:0') if handle.cuda.is_available() else handle.device('cpu')
-            elif device is Device.cpu: return handle.device('cpu')
-            elif device is Device.gpu0:
-                assert handle.cuda.device_count() > 0, f"GPU {device} not available"
-                return handle.device('cuda:0')
-            elif device is Device.gpu1:
-                assert handle.cuda.device_count() > 1, f"GPU {device} not available"
-                return handle.device('cuda:1')
-            # How to run Torch model on 2 GPUs ?
-        else: raise NotImplementedError(f"I don't know how to configure devices for this package {handle}")
-
-    def config_device(self):
-        """
-        """
-        handle = self.pkg
-        device_str = self.device_name.value
-        device = self.device
-        if handle.__name__ == 'torch': return None
-        try:
-            # Now we want only one device to be seen:
-            if device_str in ['gpu0', 'gpu1']:
-                limit_memory = True
-                if limit_memory:  # memory growth can only be limited for GPU devices.
-                    handle.config.experimental.set_memory_growth(device, True)
-                handle.config.experimental.set_visible_devices(device, 'GPU')  # will only see this device
-                # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                # now, logical gpu is created only for visible device
-                # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-            else:  # for cpu devices, we want no gpu to be seen:
-                handle.config.experimental.set_visible_devices([], 'GPU')  # will only see this device
-                # logical_gpus = handle.config.experimental.list_logical_devices('GPU')
-                # now, logical gpu is created only for visible device
-                # print(len(devices), "Physical devices,", len(logical_gpus), "Logical GPU")
-        except AssertionError as e:
-            print(e)
-            print(f"Trying again with auto-device {Device.auto}")
-            self.device_name = Device.auto
-            self.config_device()
-        except ValueError: print("Cannot set memory growth on non-GPU devices")
-        except RuntimeError as e:
-            print(e)
-            print(f"Device already configured, skipping ... ")
 
 
-class DataReader(tb.Base):
+SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
+def _silence_pylance(hp: SubclassedHParams) -> SubclassedHParams: return hp
+
+
+class DataReader:
     subpath = tb.P("metadata/data_reader")
     """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
     and postprocessing. The latter is essential at inference time_produced, but the former need not to be saved. As such,
@@ -202,68 +114,61 @@ class DataReader(tb.Base):
     implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the 
     need to reference `.dataspects`.
     """
-    def __init__(self, hp: Generic[HPM], specs: Optional[dict] = None, split: Optional[dict] = None):
+    def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
+    def __init__(self, hp: SubclassedHParams, specs: Optional[Specs] = None, split: Optional[dict[str, np.ndarray]] = None) -> None:
         super().__init__()
         self.hp = hp
         self.split = split
         self.plotter = None
-        # attributes to be saved.
-        self.specs: dict = {} if specs is None else specs
-        self.ip_strings = None  # e.g.: ["x1", "x2"]
-        self.op_strings = None  # e.g.: ["y1", "y2"]
-        self.other_strings = None  # e.g.: indices or names
-
-        # dataframes
-        self.scaler = None
-        self.imputer = None
-        self.cols_ordinal = None
-        self.cols_onehot = None
-        self.cols_numerical = None
-        self.encoder_onehot = None
-        self.encoder_ordinal = None
-
-    def save(self, path=None, *args, **kwargs):
+        self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
+        # self.df_handler = df_handler
+    def save(self, path: Optional[str] = None, **kwargs) -> None:
+        _ = kwargs
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
-        if self.hp.save_type in {"data", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.dat.pkl", add_suffix=False, data_only=True)
-        # if self.hp.save_type in {"obj", "both"}: super(DataReader, self).save(path=base / "data_reader.DataReader.pkl", add_suffix=False, data_only=False)
-
+        try: data = self.__getstate__()
+        except AttributeError: data: dict[str, Any] = self.__dict__
+        tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
+        tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
-    def from_saved_data(cls, path, *args, **kwargs): return super(DataReader, cls).from_saved_data(tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl", *args, **kwargs)
-    def __getstate__(self):
-        items = ["specs", "scaler", "imputer", "ip_strings", "op_strings", "other_strings", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal"]
-        return dict(zip(items, [getattr(self, item) for item in items]))
+    def from_saved_data(cls, path: Union[str, tb.P], hp: HParams, *args, **kwargs):
+        path = tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
+        data: dict = tb.Read.vanilla_pickle(path)
+        obj = cls(hp=hp, *args, **kwargs)
+        obj.__setstate__(data)
+        return obj
+    def __getstate__(self) -> dict[str, Any]:
+        items = ["specs"]
+        res = {}
+        for item in items:
+            if hasattr(self, item): res[item] = getattr(self, item)
+        return res
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
-    def split_the_data(self, *args, ip_strings=None, op_strings=None, others_string=None, **kwargs):
+    def split_the_data(self, *args, **kwargs):
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
-        self.split = tb.Struct(train_loader=None, test_loader=None)
-        if ip_strings is None:
+        self.split = dict(train_loader=None, test_loader=None)
+        if self.specs.ip_names is None:
             ip_strings = [f"x_{i}" for i in range(len(args)-1)]
             if len(ip_strings) == 1: ip_strings = ["x"]
-        self.ip_strings = ip_strings
-        if op_strings is None: op_strings = ["y"]
-        self.op_strings = op_strings
-        if others_string is None: others_string = []
-        self.other_strings = others_string
-        strings = ip_strings + op_strings + others_string
-        self.specs.ip_shapes = []  # useful info for instantiating models.
-        self.specs.op_shapes = []
-        self.specs.other_shapes = []
-
+            self.specs.ip_names = ip_strings
+        if self.specs.op_names is None: self.specs.op_names = ["y"]
+        if self.specs.other_names is None: self.specs.other_names = []
+        strings = self.specs.get_all_strings()
+        assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
         for an_arg, key in zip(args, strings):
             a_shape = an_arg.iloc[0].shape if type(an_arg) in {pd.DataFrame, pd.Series} else np.array(an_arg[0]).shape
-            if key in ip_strings: self.specs.ip_shapes.append(a_shape)
-            elif key in op_strings: self.specs.op_shapes.append(a_shape)
-            elif key in others_string: self.specs.other_shapes.append(a_shape)
+            if key in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
+            elif key in self.specs.op_names: self.specs.op_shapes.append(a_shape)
+            elif key in self.specs.other_names: self.specs.other_shapes.append(a_shape)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
-        self.split.print()
+        tb.Struct(self.split).print()
 
     def get_data_strings(self, which_data="ip", which_split="train"):
-        strings = {"op": self.op_strings, "ip": self.ip_strings, "others": self.other_strings}[which_data]
+        strings = {"op": self.specs.op_names, "ip": self.specs.ip_names, "others": self.specs.other_names}[which_data]
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
@@ -272,7 +177,9 @@ class DataReader(tb.Base):
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
         keys_others = self.get_data_strings(which_data="others", which_split=split)
-        ds_size = len(self.split[keys_ip[0]])
+        tmp = self.split[keys_ip[0]]
+        assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
+        ds_size = len(tmp)
         select_size = size or self.hp.batch_size
         start_idx = np.random.choice(ds_size - select_size)
 
@@ -284,13 +191,15 @@ class DataReader(tb.Base):
         x, y, others = [], [], []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp = self.split[key]
-            item = tmp.iloc[selection] if type(tmp) in {pd.DataFrame, pd.Series} else tmp[selection]
+            if isinstance(tmp, (pd.DataFrame, pd.Series)): item = tmp.iloc[selection]
+            elif tmp is not None: item = tmp[selection]
+            else: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
-        x = x[0] if len(self.ip_strings) == 1 else x
-        y = y[0] if len(self.op_strings) == 1 else y
-        others = others[0] if len(self.other_strings) == 1 else others
+        x = x[0] if len(self.specs.ip_names) == 1 else x
+        y = y[0] if len(self.specs.op_names) == 1 else y
+        others = others[0] if len(self.specs.other_names) == 1 else others
         if len(others) == 0:
             # others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
             if type(selection) is slice:
@@ -303,57 +212,42 @@ class DataReader(tb.Base):
         if ip_shapes is None: ip_shapes = self.specs.ip_shapes
         if op_shapes is None: op_shapes = self.specs.op_shapes
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
-        x = [np.random.randn(*((self.hp.batch_size,) + ip_shape)).astype(dtype) for ip_shape in ip_shapes]
-        y = [np.random.randn(*((self.hp.batch_size,) + op_shape)).astype(dtype) for op_shape in op_shapes]
-        x = x[0] if len(self.ip_strings) == 1 else x
-        y = y[0] if len(self.op_strings) == 1 else y
+        x = [np.random.randn(self.hp.batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes]
+        y = [np.random.randn(self.hp.batch_size, * op_shape).astype(dtype) for op_shape in op_shapes]
+        x = x[0] if len(self.specs.ip_names) == 1 else x
+        y = y[0] if len(self.specs.op_names) == 1 else y
         return x, y
-
-    def profile_dataframe(self, df, file=None, silent=False, suffix="", explorative=True):
-        profile_report = tb.install_n_import("pandas_profiling").ProfileReport
-        # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
-        file = file or self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
-        profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(file, silent=silent)
-        return file
-    def open_dataframe_profile(self): self.hp.save_dir.joinpath(self.subpath, "pandas_profile_report.html")()
-
-    def encode(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
-        df[self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
-        tmp = self.encoder_onehot.transform(df[self.cols_onehot])
-        df.drop(columns=self.cols_onehot, inplace=True)
-        df[self.encoder_onehot.get_feature_names_out()] = tmp
-        df[self.cols_numerical] = df[self.cols_numerical].to_numpy().astype(self.hp.precision)
-        return df
-
-    def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
-        df.fillna(np.nan, inplace=True)  # SKlearn Imputer only works with Numpy's np.nan, as opposed to Pandas' pd.NA
-        columns = df.columns
-        df = self.imputer.transform(df)
-        df = self.scaler.transform(pd.DataFrame(df, columns=columns))
-        return pd.DataFrame(df, columns=columns)
 
     def preprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity.
     def postprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity
 
-    def standardize(self):
-        assert self.split is not None, "Load up the data first before you standardize it."
-        from sklearn.preprocessing import StandardScaler
-        self.scaler = StandardScaler()
-        self.split.x_train = self.scaler.fit_transform(self.split.x_train)
-        self.split.x_test = self.scaler.transform(self.split.x_test)
+    # def standardize(self):
+    #     assert self.split is not None, "Load up the data first before you standardize it."
+    #     self.scaler = StandardScaler()
+    #     self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
+    #     self.split['x_test']= self.scaler.transform(self.split['x_test'])
 
     def image_viz(self, pred, gt=None, names=None, **kwargs):
         """
         Assumes numpy inputs
         """
         if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
-        else: self.plotter = ImShow(pred, gt, labels=['Reconstruction', 'Ground Truth'], sup_titles=names, origin='lower', **kwargs)
+        else: self.plotter = ImShow(img_tensor=pred, sup_titles=names, labels=['Reconstruction', 'Ground Truth'], origin='lower', **kwargs)
 
     def viz(self, *args, **kwargs):
         """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
         _ = self, args, kwargs
         return None
+
+
+SubclassedDataReader = TypeVar("SubclassedDataReader", bound=DataReader)
+
+
+@dataclass
+class Compiler:
+    loss: Any
+    optimizer: Any
+    metrics: list[Any]
 
 
 class BaseModel(ABC):
@@ -369,12 +263,13 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: Generic[HPM], data: Generic[BM], compiler=None, history=None):
+    def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader, compiler: Optional[Compiler] = None, history: Optional[list[dict]] = None):
+        # : Optional[list]
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
         self.model: Any = self.get_model()  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
-        self.history = tb.List() if history is None else history  # should be populated in fit method, or loaded up.
+        self.history = history if history is not None else [] # should be populated in fit method, or loaded up.
         self.plotter = FigureSave.NullAuto
         self.fig = None
         self.kwargs = None
@@ -382,7 +277,7 @@ class BaseModel(ABC):
     def get_model(self):
         raise NotImplementedError
         # pass
-    def compile(self, loss=None, optimizer=None, metrics=None, compile_model=True, **kwargs):
+    def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model=True):
         """ Updates compiler attributes. This acts like a setter.
         .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
                   * In case of TF, this is not the case as TF requires actual futher different
@@ -400,38 +295,42 @@ class BaseModel(ABC):
             if loss is None: loss = pkg.nn.MSELoss()
             if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
             if metrics is None: metrics = []  # [tmp.MeanSquareError()]
+        else: raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
         # Create a new compiler object
-        self.compiler = tb.Struct(loss=loss, optimizer=optimizer, metrics=metrics, **kwargs)
+        self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz=True, val_sample_weights=None, **kwargs):
-        x_train = self.data.split.get(keys=self.data.get_data_strings(which_data="ip", which_split="train")).list
-        y_train = self.data.split.get(keys=self.data.get_data_strings(which_data="op", which_split="train")).list
-        x_test = self.data.split.get(keys=self.data.get_data_strings(which_data="ip", which_split="test")).list
-        y_test = self.data.split.get(keys=self.data.get_data_strings(which_data="op", which_split="test")).list
+    def fit(self, viz: bool =True, val_sample_weights: Optional[np.ndarray] = None, **kwargs):
+        assert self.data.split is not None, "Split your data before you start fitting."
+        x_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="train")]
+        y_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="train")]
+        x_test = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="test")]
+        y_test = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="test")]
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
-        default_settings = tb.Struct(x=x_train[0] if len(x_train) == 1 else x_train,
-                                     y=y_train[0] if len(y_train) == 1 else y_train,
-                                     validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
-                                     batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
+        default_settings = dict(x=x_train[0] if len(x_train) == 1 else x_train,
+                                y=y_train[0] if len(y_train) == 1 else y_train,
+                                validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
+                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
-        hist = self.model.fit(**default_settings.__dict__)
-        self.history.append(tb.Struct(copy.deepcopy(hist.history)))  # it is paramount to copy, cause source can change.
+        hist = self.model.fit(**default_settings)
+        self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
             artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True))
         return self
 
-    def switch_to_sgd(self, epochs=10):
+    def switch_to_sgd(self, epochs: int = 10):
+        assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         if self.hp.pkg.__name__ == 'tensorflow': new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
         else: new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
-    def switch_to_l1(self, epochs=10):
+    def switch_to_l1(self, epochs: int = 10):
+        assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         if self.hp.pkg.__name__ == 'tensorflow':
             self.model.reset_metrics()
         print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
@@ -453,20 +352,22 @@ class BaseModel(ABC):
     def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
     @staticmethod
-    def load_model(directory): __import__("tensorflow").keras.models.load_model(directory)  # path to directory. file saved_model.pb is read auto.
+    def load_model(directory: tb.P): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
     def load_weights(self, directory):
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
         self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
-        with open(str(path), 'w') as f:
+        with open(str(path), 'w', encoding='utf-8') as f:
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
-    def config(self): [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
+    def config(self): _ = [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
     def plot_loss(self, *args, **kwargs):
         res = tb.Struct.concat_values(*self.history)
-        y_label = self.compiler.loss.name if hasattr(self.compiler.loss, "name") else self.compiler.loss.__name__
+        assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
+        if hasattr(self.compiler.loss, "name"): y_label = self.compiler.loss.name
+        else: y_label = self.compiler.loss.__name__
         return res.plot(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
 
     def infer(self, x) -> np.ndarray:
@@ -493,17 +394,18 @@ class BaseModel(ABC):
     def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, split="test", viz=True, viz_kwargs=None, **kwargs):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
-        elif names_test is None: names_test = np.arange(len(x_test))
+        elif names_test is None and x_test is not None: names_test = np.arange(len(x_test))
+        else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
         # ==========================================================================
         y_pred = self.infer(x_test)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
         if loss_df is not None:
-            if len(self.data.other_names) == 1: loss_df[self.data.other_names[0]] = names_test
+            if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
             else:
-                for val, name in zip(names_test, self.data.other_names): loss_df[name] = val
+                for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
         y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
-        results = tb.Struct(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=names_test, loss_df=loss_df, )
+        results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
         if viz:
             loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
@@ -511,10 +413,10 @@ class BaseModel(ABC):
             self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **(viz_kwargs or {}))
         return results
 
-    def get_metrics_evaluations(self, prediction, groun_truth) -> pd.DataFrame or None:
+    def get_metrics_evaluations(self, prediction, groun_truth) -> Optional[pd.DataFrame]:
         if self.compiler is None: return None
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
-        loss_dict = dict()
+        loss_dict: dict[str, np.ndarray] = dict()
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
@@ -529,7 +431,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only=True, version='0', **kwargs):
+    def save_class(self, weights_only: bool =True, version: str ='0', **kwargs):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -540,7 +442,7 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        tb.Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        tb.Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
@@ -555,47 +457,58 @@ class BaseModel(ABC):
         except ModuleNotFoundError as ex:
             print(ex)
             module = None
+        if module is not None and hasattr(module, '__file__') and module.__file__ is not None:
+            module_path_rh = tb.P(module.__file__).resolve().collapseuser().as_posix()
+        else:
+            module_path_rh = None
         specs = {'__module__': __module,
                  'model_class': self.__class__.__name__,
                  'data_class': self.data.__class__.__name__,
                  'hp_class': self.hp.__class__.__name__,
                  # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
-                 'module_path_rh': tb.P(module.__file__).resolve().collapseuser().as_posix() if hasattr(module, '__file__') else None,
+                 'module_path_rh': module_path_rh,
                  'cwd_rh': tb.P.cwd().collapseuser().as_posix(),
                  }
-        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json'))
+        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str)
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path, hparam_class=None, data_class=None, device_name=None, verbose=True):
+    def from_class_weights(cls, path, hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool =True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
-        else: hp_obj = (path / HyperParam.subpath + "hparams.HyperParam.pkl").readit()
+        else: hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
         if device_name: hp_obj.device_name = device_name
         if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
-        else: d_obj = (path / DataReader.subpath / "data_reader.DataReader.pkl").readit()
+        else: d_obj = tb.Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
         if hp_obj.root != path.parent: hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
+        # if type(hp_obj) is Generic[HParams]:
         d_obj.hp = hp_obj
-        model_obj: cls = cls(hp_obj, d_obj)
-        model_obj.load_weights(path.search('*_save_*')[0])
-        model_obj.history = (path / "metadata/training/history.pkl").readit(notfound=tb.L(), strict=False)
-        print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
+        # else:rd
+            # raise ValueError(f"hp_obj must be of type `HParams` or `Generic[HParams]`. Got {type(hp_obj)}")
+        model_obj: 'BaseModel' = cls(hp_obj, d_obj)
+        model_obj.load_weights(list(path.search('*_save_*'))[0])
+        history_path = path / "metadata/training/history.pkl"
+        if history_path.exists(): history: list =  tb.Read.vanilla_pickle(path=history_path)
+        else: history = []
+        model_obj.history = history
+        _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
         return model_obj
 
     @classmethod
     def from_class_model(cls, path):
         path = tb.P(path)
-        data_obj = DataReader.from_saved_data(path)
-        hp_obj = HyperParam.from_saved_data(path)
-        model_obj = cls.load_model(path.search('*_save_*')[0])  # static method.
+        hp_obj = HParams.from_saved_data(path)
+        data_obj = DataReader.from_saved_data(path, hp=hp_obj)
+        directory = path.search('*_save_*')
+        model_obj = cls.load_model(list(directory)[0])
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
     @staticmethod
     def from_path(path_model, **kwargs):
         path_model = tb.P(path_model).expanduser().absolute()
-        specs = path_model.joinpath('metadata/code_specs.json').readit()
+        specs = tb.Read.json(path=path_model.joinpath('metadata/code_specs.json'))
         print(f"Loading up module: `{specs['__module__']}`.")
         import importlib
         try:
@@ -607,19 +520,19 @@ class BaseModel(ABC):
             sys.path.append(tb.P(specs['cwd_rh']).expanduser().absolute().str)
             try:
                 module = importlib.import_module(specs['__module__'])
-            except ModuleNotFoundError as ex:
-                print(ex)
+            except ModuleNotFoundError as ex2:
+                print(ex2)
                 print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
-                module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute())
-        model_class = getattr(module, specs['model_class'])
-        data_class = getattr(module, specs['data_class'])
-        hp_class = getattr(module, specs['hp_class'])
+                module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute().as_posix())
+        model_class: BaseModel = getattr(module, specs['model_class'])
+        data_class: DataReader = getattr(module, specs['data_class'])
+        hp_class: HParams = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
     def plot_model(self, dpi=150, **kwargs):  # alternative viz via tf2onnx then Netron.
         import tensorflow as tf
         path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
-        tf.keras.utils.plot_model(self.model, to_file=path, show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
+        tf.keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
@@ -637,8 +550,8 @@ class BaseModel(ABC):
         try:
             keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
             keys_op = self.data.get_data_strings(which_data="op", which_split="test")
-        except TypeError:
-            raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.")
+        except TypeError as te:
+            raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
         if ip is None:
             if sample_dataset: ip, _, _ = self.data.sample_dataset()
@@ -664,8 +577,11 @@ class BaseModel(ABC):
             print("\n")
 
 
+SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound=BaseModel)
+
+
 class Ensemble(tb.Base):
-    def __init__(self, hp_class: Generic[HPM] = None, data_class: Generic[DR] = None, model_class: Generic[BM] = None, size=10, *args, **kwargs):
+    def __init__(self, hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader], model_class: Type[SubclassedBaseModel], size=10, **kwargs):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
@@ -674,43 +590,43 @@ class Ensemble(tb.Base):
           Otherwise, you must pass a list of already constructed saved_models.
         :param size: size of ensemble
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(kwargs)
         self.size = size
         self.hp_class = hp_class
         self.data_class = data_class
         self.model_class = model_class
         self.models: list[BaseModel] = []
-        self.data = None  # one data object for all models (so that it can fit in the memory)
+        # self.data = None  # one data object for all models (so that it can fit in the memory)
         if hp_class and data_class and model_class:
             # only generate the dataset once and attach it to the ensemble to be reused by models.
-            self.data = self.data_class(hp_class(), load_trianing_data=True)
+            self.data = self.data_class(hp=hp_class())
             print("Creating Models".center(100, "="))
             for i in tqdm(range(size)):
                 hp = self.hp_class()
                 hp.name = str(hp.name) + f'__model__{i}'
-                datacopy = copy.copy(self.data)  # shallow copy
-                datacopy.hp = hp
+                datacopy: SubclassedDataReader = copy.copy(self.data)  # shallow copy
+                datacopy.hp = hp  # type: ignore
                 self.models.append(model_class(hp, datacopy))
         self.performance = None
 
     @classmethod
-    def from_saved_models(cls, parent_dir, model_class) -> 'Ensemble':
-        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
-        obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_model))
+    def from_saved_models(cls, parent_dir, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+        obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
+        obj.models = list(tb.P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
-    def from_saved_weights(cls, parent_dir, model_class) -> 'Ensemble':
-        obj = cls(model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
+    def from_saved_weights(cls, parent_dir, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+        obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
         obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))
         return obj
 
     @staticmethod
-    def from_path(path) -> list[BaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(lambda item: BaseModel.from_path(item)))
+    def from_path(path) -> list[SubclassedBaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(BaseModel.from_path))
 
     def fit(self, shuffle_train_test=True, save=True, **kwargs):
-        self.performance = tb.L()
+        self.performance = []
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
             if shuffle_train_test:
@@ -720,7 +636,7 @@ class Ensemble(tb.Base):
             self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
             if save:
                 self.models[i].save_class()
-                self.performance.save(self.hp_class.save_dir / "performance.List.pkl")
+                tb.Save.vanilla_pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
@@ -738,7 +654,8 @@ class Losses:
 
             def call(self, y_true, y_pred):
                 _ = self
-                factor = (20 / tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype)))
+                tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))
+                factor = tf.Tensor(20) / tmp
                 return factor * tf.math.log(tf.reduce_mean((y_true - y_pred)**2))
         return LogSquareLoss
 
@@ -789,26 +706,26 @@ class HPTuning:
         # should return a result that you want to maximize
         return _
 
-    def gen_writer(self):
-        import tensorflow as tf
-        with tf.summary.create_file_writer(str(self.dir)).as_default():
-            self.hpt.hparams_config(
-                hparams=self.params,
-                metrics=self.metrics)
+    # def gen_writer(self):
+    #     import tensorflow as tf
+    #     with tf.summary.create_file_writer(str(self.dir)).as_default():
+    #         self.hpt.hparams_config(
+    #             hparams=self.params,
+    #             metrics=self.metrics)
 
-    def loop(self):
-        import itertools
-        counter = -1
-        tmp = self.params.list[0].domain.values
-        for combination in itertools.product(*[tmp]):
-            counter += 1
-            param_dict = dict(zip(self.params.list, combination))
-            with self.pkg.summary.create_file_writer(str(self.dir / f"run_{counter}")).as_default():
-                self.hpt.hparams(param_dict)  # record the values used in this trial
-                accuracy = self.run(param_dict)
-                self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
+    # def loop(self):
+    #     import itertools
+    #     counter = -1
+    #     tmp = self.params.list[0].domain.values
+    #     for combination in itertools.product(*[tmp]):
+    #         counter += 1
+    #         param_dict = dict(zip(self.params.list, combination))
+    #         with self.pkg.summary.create_file_writer(str(self.dir / f"run_{counter}")).as_default():
+    #             self.hpt.hparams(param_dict)  # record the values used in this trial
+    #             accuracy = self.run(param_dict)
+    #             self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
 
-    def optimize(self): self.gen_writer(); self.loop()
+    # def optimize(self): self.gen_writer(); self.loop()
 
 
 class KerasOptimizer:
@@ -855,7 +772,7 @@ def batcherv2(func_type='function', order=1):
     elif func_type == 'class': raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
-            def __int__(self, func): self.func = func
+            def __init__(self, func): self.func = func
             def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
         return Batch
 
@@ -865,10 +782,12 @@ def get_template():
     print("Copied to clipboard")
 
 
-def load_class(file_path):
+def load_class(file_path: str):
     import importlib.util
     module_spec = importlib.util.spec_from_file_location(name="__temp_module__", location=file_path)
+    if module_spec is None: raise ValueError(f"Failed to load up module from path: {file_path}")
     module = importlib.util.module_from_spec(module_spec)
+    assert module_spec.loader is not None, "Module loader is None."
     module_spec.loader.exec_module(module)
     return module
 
