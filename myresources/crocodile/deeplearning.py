@@ -13,7 +13,7 @@ from typing import Generic, TypeVar, Type, Any, Optional, Union
 import enum
 from tqdm import tqdm
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -59,8 +59,8 @@ class Device(enum.Enum):
 
 @dataclass
 class HParams:
-    subpath: tb.P = tb.P('metadata/hyperparameters')  # location within model directory where this will be saved.
-    name: str = "model-" + tb.randstr(noun=True)
+    subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
+    name: str = field(default_factory=lambda: "model-" + tb.randstr(noun=True))
     root: tb.P = tb.P.tmp(folder="tmp_models")
     pkg_name: str = 'tensorflow'
     device_name: Device = Device.gpu0
@@ -76,16 +76,16 @@ class HParams:
     batch_size: int = 32
     epochs: int = 30
 
-    _configured: bool = False
-    device_na: None = None
+    # _configured: bool = False
+    # device_na: None = None
     # save_type = ["data", "obj", "both"][-1]
 
     def save(self):
-        self.save_dir.joinpath(self.subpath / 'hparams.txt').create(parents_only=True).write_text(str(self))
+        self.save_dir.joinpath(self.subpath, 'hparams.txt').create(parents_only=True).write_text(str(self))
         try: data = self.__getstate__()
         except AttributeError: data: dict[str, Any] = self.__dict__
-        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.dat.pkl"), obj=data)
-        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath / "hparams.HParams.pkl"), obj=self)
+        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
+        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict): return self.__dict__.update(state)
     @classmethod
@@ -145,7 +145,7 @@ class DataReader:
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
-    def split_the_data(self, *args, **kwargs):
+    def split_the_data(self, *args, **kwargs) -> None:
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = dict(train_loader=None, test_loader=None)
@@ -416,7 +416,7 @@ class BaseModel(ABC):
     def get_metrics_evaluations(self, prediction, groun_truth) -> Optional[pd.DataFrame]:
         if self.compiler is None: return None
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
-        loss_dict: dict[str, np.ndarray] = dict()
+        loss_dict: dict[str, list] = dict()
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
