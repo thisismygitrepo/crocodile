@@ -122,10 +122,10 @@ tb.sys.path.insert(0, file_root.str)
         # loading function ===============================================================
         if self.func_name is not None:
             if self.func_class is None: base += f"""
-from {self.func_module} import {self.func_name} as func
+from {self.func_module.replace('.py', '')} import {self.func_name} as func
 """
             elif self.func_class is not None: base += f"""
-from {self.func_module} import {self.func_class} as {self.func_class}
+from {self.func_module.replace('.py', '')} import {self.func_class} as {self.func_class}
 func = {self.func_class}.{self.func_name}
 """
         else: base = f"""

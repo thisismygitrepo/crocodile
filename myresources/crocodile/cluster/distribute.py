@@ -160,8 +160,10 @@ class Cluster:
         for machine in self.machines:
             print(f"{repr(machine)} ==> {machine.execution_command}")
 
-    def generate_standard_kwargs(self):
-        if not self.workload_params:
+    def generate_standard_kwargs(self) -> None:
+        if self.workload_params:
+            self.print_func_kwargs()
+            print(self.workload_params, len(self.workload_params), type(self.workload_params))
             print("workload_params is not None, so not generating standard kwargs")
             return None
         cpus: list[float] = []
@@ -178,7 +180,7 @@ class Cluster:
         total_product = (np.array(cpus) * np.array(rams)).sum()
 
         self.machines_specs = [MachineSpecs(cpu=a_cpu, ram=a_ram, product=a_cpu * a_ram, cpu_norm=a_cpu / total_cpu, ram_norm=a_ram / total_ram, product_norm=a_cpu * a_ram / total_product) for a_cpu, a_ram in zip(cpus, rams)]
-        self.threads_per_machine = [self.thread_load_calc.get_num_threads(machine_specs=machine_specs) for machine_specs in self.machines_specs]
+        self.threads_per_machine: list[int] = [self.thread_load_calc.get_num_threads(machine_specs=machine_specs) for machine_specs in self.machines_specs]
         self.workload_params = self.machine_load_calc.get_workload_params(machines_specs=self.machines_specs, threads_per_machine=self.threads_per_machine)
         self.print_func_kwargs()
 
@@ -211,7 +213,7 @@ class Cluster:
             m.submit()
             self.machines.append(m)
         try: self.save()
-        except RuntimeError as re:
+        except Exception as re:
             print(re)
             print("Couldn't pickle cluster object")
         self.print_commands()
