@@ -13,7 +13,7 @@ from typing import Generic, TypeVar, Type, Any, Optional, Union
 import enum
 from tqdm import tqdm
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass  # , field
 
 
 @dataclass
@@ -59,26 +59,25 @@ class Device(enum.Enum):
 
 @dataclass
 class HParams:
-    subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
-    name: str = field(default_factory=lambda: "model-" + tb.randstr(noun=True))
-    root: tb.P = tb.P.tmp(folder="tmp_models")
-    pkg_name: str = 'tensorflow'
-    device_name: Device = Device.gpu0
     # ===================== Data ==============================
-    seed: int = 234
-    shuffle: bool = True
-    precision: str = 'float32'
+    seed: int
+    shuffle: bool
+    precision: str
     # ===================== Model =============================
     # depth = 3
     # ===================== Training ==========================
-    test_split: float = 0.2  # test split
-    learning_rate: float = 0.0005
-    batch_size: int = 32
-    epochs: int = 30
-
+    test_split: float  # test split
+    learning_rate: float
+    batch_size: int
+    epochs: int
+    # ================== General ==============================
+    name: str  # field(default_factory=lambda: "model-" + tb.randstr(noun=True))
+    root: tb.P  # = tb.P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
-    # save_type = ["data", "obj", "both"][-1]
+    pkg_name: str = 'tensorflow'
+    device_name: Device = Device.gpu0
+    subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
     def save(self):
         self.save_dir.joinpath(self.subpath, 'hparams.txt').create(parents_only=True).write_text(str(self))
@@ -111,7 +110,7 @@ class DataReader:
     and postprocessing. The latter is essential at inference time_produced, but the former need not to be saved. As such,
     at save time_produced, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
     such type of data, make sure to keep them inside that `Struct`. Lastly, for convenience purpose, the class has
-    implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the 
+    implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the
     need to reference `.dataspects`.
     """
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
@@ -150,7 +149,7 @@ class DataReader:
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = dict(train_loader=None, test_loader=None)
         if self.specs.ip_names is None:
-            ip_names: list[str] = [f"x_{i}" for i in range(len(args)-1)]
+            ip_names: list[str] = [f"x_{i}" for i in range(len(args) - 1)]
             if len(ip_names) == 1: ip_names = ["x"]
             self.specs.ip_names = ip_names
         if self.specs.op_names is None: self.specs.op_names = ["y"]
@@ -269,7 +268,7 @@ class BaseModel(ABC):
         self.data = data  # should be populated upon instantiation.
         self.model: Any = self.get_model()  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
-        self.history = history if history is not None else [] # should be populated in fit method, or loaded up.
+        self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
         self.plotter = FigureSave.NullAuto
         self.fig = None
         self.kwargs = None
@@ -301,7 +300,7 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz: bool =True, val_sample_weights: Optional[np.ndarray] = None, **kwargs):
+    def fit(self, viz: bool = True, val_sample_weights: Optional[np.ndarray] = None, **kwargs):
         assert self.data.split is not None, "Split your data before you start fitting."
         x_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="train")]
         y_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="train")]
@@ -431,7 +430,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only: bool =True, version: str ='0', **kwargs):
+    def save_class(self, weights_only: bool = True, version: str = '0', **kwargs):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -474,7 +473,7 @@ class BaseModel(ABC):
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path, hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool =True):
+    def from_class_weights(cls, path, hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool = True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
         else: hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
@@ -489,7 +488,7 @@ class BaseModel(ABC):
         model_obj: 'BaseModel' = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
         history_path = path / "metadata/training/history.pkl"
-        if history_path.exists(): history: list =  tb.Read.vanilla_pickle(path=history_path)
+        if history_path.exists(): history: list = tb.Read.vanilla_pickle(path=history_path)
         else: history = []
         model_obj.history = history
         _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None

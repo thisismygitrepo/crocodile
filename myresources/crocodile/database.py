@@ -43,9 +43,8 @@ class DBMS:
         # self.sch_tab: Optional[Struct] = None
         # self.sch_vws: Optional[Struct] = None
         self.refresh()
-
-        self.ip_formatter: Optional[Any] = None
-        self.db_specs: Optional[Any] = None
+        # self.ip_formatter: Optional[Any] = None
+        # self.db_specs: Optional[Any] = None
 
     def refresh(self, sch=None) -> 'Self':  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
@@ -64,7 +63,8 @@ class DBMS:
     @classmethod
     def from_local_db(cls, path=None, echo=False, share_across_threads=False, **kwargs): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
-    def get_columns(self, table, sch=None): return self.meta.tables[self._get_table_identifier(table=table, sch=sch)].exported_columns.keys()
+    def get_columns(self, table, sch=None):
+        return self.meta.tables[self._get_table_identifier(table=table, sch=sch)].exported_columns.keys()
     def close(self, sleep=2):
         print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
         self.con.close()

@@ -4,7 +4,7 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional,Union
+from typing import Optional, Union
 import datetime
 
 # ============================== Accessories ============================================
@@ -43,9 +43,9 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
 
 
 @save_decorator(".json")
-def json(obj, path:Optional[str] = None, indent:Optional[str] = None, encoding='utf-8', **kwargs): 
+def json(obj, path: Optional[str] = None, indent: Optional[str] = None, encoding='utf-8', **kwargs):
     _ = encoding
-    return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__ **kwargs), encoding="utf-8")
+    return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
 @save_decorator(".yml")
 def yaml(obj, path, **kwargs):
     with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
@@ -120,7 +120,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
     # ======================== Access Methods ==========================================
     def __setitem__(self, key, value): self.list[key] = value
     def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def split(self, every=1, to=None) -> 'List': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix+every] if ix+every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
+    def split(self, every=1, to=None) -> 'List': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
     def filter(self, func, which=lambda idx, x: x) -> 'List': self.eval(func, func=True); return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func=lambda x, y: x+y, default=None) -> list: args = (self.eval(func, func=True, other=True), self.list) + ((default,) if default is not None else ()); return __import__("functools").reduce(*args)
@@ -143,7 +143,7 @@ class List(Base):  # Inheriting from Base gives save method.  # Use this class t
         elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
         return self.list[key] if not isinstance(key, slice) else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
     def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, prefer=[None, 'processes', 'threads'][0], depth=1, verbose=False, desc=None, **kwargs) -> 'List':
-        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth-1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
+        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])

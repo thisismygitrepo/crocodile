@@ -7,17 +7,19 @@ import numpy as np
 import crocodile.toolbox as tb
 import crocodile.deeplearning as dl
 import tensorflow as tf
+from dataclasses import field
 
 
+@dl.dataclass
 class HParams(dl.HParams):
-    subpath: tb.P = tb.P('metadata/hyperparameters')  # location within model directory where this will be saved.
-    name: str = "model-" + tb.randstr(noun=True)
+    subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
+    name: str = field(default_factory=lambda: "model-" + tb.randstr(noun=True))
     root: tb.P = tb.P.tmp(folder="tmp_models")
     pkg_name: str = 'tensorflow'
     # device_name: Device=Device.gpu0
     # ===================== Data ==============================
-    seed: int =234
-    shuffle: bool =True
+    seed: int = 234
+    shuffle: bool = True
     precision: str = 'float32'
     # ===================== Model =============================
     # depth = 3
