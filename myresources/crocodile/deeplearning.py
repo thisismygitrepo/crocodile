@@ -349,7 +349,8 @@ class BaseModel(ABC):
     def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
     def viz(self, *args, **kwargs): return self.data.viz(*args, **kwargs)
     def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
-    def save_weights(self, directory): self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
+    def save_weights(self, directory):
+        self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
     @staticmethod
     def load_model(directory: tb.P): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
     def load_weights(self, directory):

@@ -252,7 +252,7 @@ class P(type(Path()), Path):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
     # ======================================== Folder management =======================================
-    def search(self, pattern='*', r: bool =False, files: bool =True, folders: bool =True, compressed: bool =False, dotfiles=False, filters: Optional[list] = None, not_in: Optional[list[str]] = None, exts: Optional[list[str]] = None, win_order: bool =False) -> List:
+    def search(self, pattern='*', r: bool = False, files: bool = True, folders: bool = True, compressed: bool = False, dotfiles=False, filters: Optional[list] = None, not_in: Optional[list[str]] = None, exts: Optional[list[str]] = None, win_order: bool = False) -> List:
         filters = (filters or []) + ([lambda x: all([str(notin) not in str(x) for notin in not_in])] if not_in is not None else []) + ([lambda x: any([ext in x.name for ext in exts])] if exts is not None else [])
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
             root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(lambda x: root.joinpath(x))
@@ -267,7 +267,7 @@ class P(type(Path()), Path):
     #     if compressed is False and self.is_file(): return self
     #     if len(results := self.search(*args, r=r, compressed=compressed, **func_kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
-    def create(self, parents=True, exist_ok=True, parents_only=False) -> 'P': self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
+    def create(self, parents=True, exist_ok=True, parents_only=False) -> 'P': _ = self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     def chdir(self) -> 'P': __import__("os").chdir(str(self.expanduser())); return self
     def listdir(self) -> List: return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
     @staticmethod
@@ -298,7 +298,7 @@ class P(type(Path()), Path):
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
             if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
-            zipfile, fname = slf.split(at=List(slf.parts).filter(lambda x: ztype in x)[0], sep=-1)
+            zipfile, fname = slf.split(at=str(List(slf.parts).filter(lambda x: ztype in x)[0]), sep=-1)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
         if slf.suffix == ".7z":
@@ -324,7 +324,7 @@ class P(type(Path()), Path):
     def unbz(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': Compression.unbz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
     def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': raise NotImplementedError("Not implemented yet.")
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False) -> 'P':  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
-        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name+suffix)
+        slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name + suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
     def decrypt(self, key=None, pwd=None, path=None, folder=None, name=None, verbose=True, suffix=".enc", **kwargs) -> 'P':
@@ -359,7 +359,7 @@ class P(type(Path()), Path):
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
         if share: print("🔗 SHARING FILE"); res = Terminal().run(f"""rclone link '{cloud}:{remotepath.as_posix()}'""", shell="powershell").capture(); return res.op2path(strict_err=True, strict_returncode=True)
         return self
-    def from_cloud(self, cloud, localpath=None, decrypt=False, unzip=False, key=None, pwd=None, rel2home=False, overwrite=True, merge=False, os_specific=False, transfers=10, root="myhome"):
+    def from_cloud(self, cloud, localpath=None, decrypt: bool = False, unzip: bool = False, key=None, pwd=None, rel2home: bool = False, overwrite: bool = True, merge: bool = False, os_specific=False, transfers=10, root="myhome"):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
         if rel2home: remotepath = remotepath._get_remote_path(root=root, os_specific=os_specific)
