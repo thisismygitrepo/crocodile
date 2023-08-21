@@ -355,7 +355,7 @@ class BaseModel(ABC):
     def load_model(directory: tb.P): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
     def load_weights(self, directory):
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
-        self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0])  # requires path to file path.
+        self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0]).expect_partial()  # requires path to file path.
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
