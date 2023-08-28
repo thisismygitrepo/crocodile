@@ -4,7 +4,7 @@ Distributed Computing
 """
 
 
-from typing import Optional, Any
+from typing import Optional, Any, Callable, Union
 from math import ceil, floor
 from enum import Enum
 from dataclasses import dataclass
@@ -41,19 +41,19 @@ class MachineSpecs:
     @staticmethod
     def get_this_machine_specs():
         cpu, ram = psutil.cpu_count(), psutil.virtual_memory().total / 2 ** 30
-        return MachineSpecs(cpu=cpu, ram=ram, product=cpu*ram, cpu_norm=cpu, ram_norm=ram, product_norm=cpu*ram)
+        return MachineSpecs(cpu=cpu, ram=ram, product=cpu * ram, cpu_norm=cpu, ram_norm=ram, product_norm=cpu * ram)
 
 
 class ThreadLoadCalculator:
     """relies on relative values to a referenc machine specs.
     Runs multiple instances of code per machine. Useful if code doesn't run faster with more resources avaliable.
     equal distribution across instances of one machine"""
-    def __init__(self, num_jobs=None, load_criterion: LoadCriterion = LoadCriterion.cpu, reference_specs: Optional[MachineSpecs] = None):
+    def __init__(self, num_jobs: Optional[int] = None, load_criterion: LoadCriterion = LoadCriterion.cpu, reference_specs: Optional[MachineSpecs] = None):
         self.num_jobs = num_jobs
         self.load_criterion = load_criterion
         self.reference_specs: MachineSpecs = MachineSpecs.get_this_machine_specs() if reference_specs is None else reference_specs
     def __getstate__(self): return self.__dict__
-    def __setstate__(self, state: dict): self.__dict__.update(state)
+    def __setstate__(self, state: dict[str, Any]): self.__dict__.update(state)
     def get_num_threads(self, machine_specs: MachineSpecs) -> int:
         if self.num_jobs is None: return 1
         res = int(floor(self.num_jobs * (machine_specs.__dict__[self.load_criterion.name] / self.reference_specs.__dict__[self.load_criterion.name])))
@@ -61,16 +61,16 @@ class ThreadLoadCalculator:
 
 
 class MachineLoadCalculator:
-    def __init__(self, max_num: int = 1000, load_criterion: LoadCriterion = LoadCriterion.product, load_ratios_repr=""):
+    def __init__(self, max_num: int = 1000, load_criterion: LoadCriterion = LoadCriterion.product, load_ratios_repr: str = ""):
         self.load_ratios: list[float] = []
         self.load_ratios_repr = load_ratios_repr
         self.max_num: int = max_num
         self.load_criterion = load_criterion
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
-    def __setstate__(self, d) -> None: self.__dict__.update(d)
+    def __setstate__(self, d: dict[str, Any]) -> None: self.__dict__.update(d)
     def get_workload_params(self, machines_specs: list[MachineSpecs], threads_per_machine: list[int]) -> list[WorkloadParams]:
         """Note: like thread divider in parallelize function, the behaviour is to include the edge cases on both ends of subsequent intervals."""
-        tmp = []
+        tmp: list[WorkloadParams] = []
         idx_so_far = 0
         for machine_index, (machine_specs, a_threads_per_machine) in enumerate(zip(machines_specs, threads_per_machine)):
             load_value = machine_specs.__dict__[self.load_criterion.name]
@@ -99,22 +99,22 @@ class Cluster:
     @staticmethod
     def load(job_id: str, base: Optional[str] = None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
-    def get_cluster_path(job_id: str, base: Optional[str] = None):
-        if base is None: base = tb.P.home().joinpath(rf"tmp_results/remote_machines")
-        else: base = tb.P(base)
-        return base.joinpath(f"job_id__{job_id}")
+    def get_cluster_path(job_id: str, base: Union[str, tb.P, None] = None):
+        if base is None: base_obj = tb.P.home().joinpath(rf"tmp_results/remote_machines")
+        else: base_obj = tb.P(base)
+        return base_obj.joinpath(f"job_id__{job_id}")
     def __init__(self,
-                 func,
-                 ssh_params: list[dict],
+                 func: Callable[..., Any],
+                 ssh_params: list[dict[str, Any]],
                  remote_machine_config: RemoteMachineConfig,
-                 func_kwargs: Optional[dict] = None,
+                 func_kwargs: Optional[dict[str, Any]] = None,
                  # workload_params: list[WorkloadParams] or None = None,
                  thread_load_calc: Optional[ThreadLoadCalculator] = None,
                  # machine_load_calc=None,
-                 ditch_unavailable_machines: bool=False,
+                 ditch_unavailable_machines: bool = False,
                  description: str = "",
                  job_id: Optional[str] = None,
-                 base_dir=None):
+                 base_dir: Union[str, tb.P, None] = None):
         self.job_id = job_id or tb.randstr(noun=True)
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
@@ -122,7 +122,7 @@ class Cluster:
         self.thread_load_calc = thread_load_calc or ThreadLoadCalculator()
         self.machine_load_calc = MachineLoadCalculator(load_criterion=LoadCriterion[self.thread_load_calc.load_criterion.name + "_norm"], )
 
-        sshz = []
+        sshz: list[tb.SSH] = []
         for an_ssh_params in ssh_params:
             try:
                 tmp = tb.SSH(**an_ssh_params)
@@ -130,7 +130,7 @@ class Cluster:
             except Exception as ex:
                 print(f"Couldn't connect to {an_ssh_params}")
                 if ditch_unavailable_machines: continue
-                else: raise Exception(f"Couldn't connect to {an_ssh_params}") from ex
+                else: raise Exception(f"Couldn't connect to {an_ssh_params}") from ex  # type: ignore
 
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
@@ -145,15 +145,15 @@ class Cluster:
         self.func_kwargs = func_kwargs if func_kwargs is not None else {}
 
         # fire options
-        self.machines_per_tab = None
-        self.window_number = None
+        self.machines_per_tab: int = 1
+        self.window_number: int = 2
 
     def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
     def print_func_kwargs(self):
         print("\n" * 2)
         console.rule(title=f"kwargs of functions to be run on machines")
         for an_ssh, a_kwarg in zip(self.sshz, self.workload_params):
-            tb.S(a_kwarg).print(as_config=True, title=an_ssh.get_repr(which="remote"))
+            tb.S(a_kwarg.__dict__).print(as_config=True, title=an_ssh.get_repr(which="remote"))
     def print_commands(self):
         print("\n" * 2)
         console.rule(title="Commands to run on each machine:")
@@ -187,7 +187,7 @@ class Cluster:
     def viz_load_ratios(self) -> None:
         if not self.workload_params: raise RuntimeError("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
         plt = tb.install_n_import("plotext")
-        names = tb.L(self.sshz).get_repr('remote', add_machine=True).list
+        names = tb.L(self.sshz).apply(lambda x: x.get_repr(which='remote', add_machine=True)).list
 
         plt.simple_multiple_bar(names, [[machine_specs.cpu for machine_specs in self.machines_specs], [machine_specs.ram for machine_specs in self.machines_specs]], title=f"Resources per machine", labels=["#cpu threads", "memory size"])
         plt.show()

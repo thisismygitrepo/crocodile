@@ -1,20 +1,22 @@
 
+"""RM
+"""
+
 from pickle import PickleError
 from typing import Optional, Any, Union, Callable
+from dataclasses import dataclass, field
+import time
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
+from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager
+import crocodile.cluster as cluster
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
 # from rich.text import Text
 from rich.console import Console
-import time
-
 import pandas as pd
-from dataclasses import dataclass, field
-from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager
-import crocodile.cluster as cluster
 
 
 console = Console()
@@ -62,7 +64,7 @@ class RemoteMachine:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func: Callable[[Any], Any], config: RemoteMachineConfig, func_kwargs: Optional[dict] = None, data: Optional[list] = None):
+    def __init__(self, func: Callable[..., Any], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list] = None):
         self.config = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
@@ -72,7 +74,7 @@ class RemoteMachine:
         self.data = data if data is not None else []
         # conn
         self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)
-        self.session_manager = Zellij(self.ssh) if not self.ssh.get_remote_machine() == "Windows" else WindowsTerminal(self.ssh)
+        self.session_manager = Zellij(self.ssh) if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal(self.ssh)
         self.session_name = None
         # scripts
         self.resources = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
@@ -97,7 +99,7 @@ class RemoteMachine:
             # send email at start execution time
         if isinstance(self.session_manager, Zellij):
             self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=self.execution_command, run=run,
-                                          job_wd=self.resources.root_dir.as_posix())
+                                              job_wd=self.resources.root_dir.as_posix())
         print("\n")
 
     def run(self, run=True, open_console: bool = True, show_scripts: bool = True):
@@ -145,7 +147,7 @@ class RemoteMachine:
                                      to_email=self.config.to_email, email_config_name=self.config.email_config_name)
             py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {job_params}")
         shell_script = f"""
-    
+
 # EXTRA-PLACEHOLDER-PRE
 
 echo "~~~~~~~~~~~~~~~~SHELL START~~~~~~~~~~~~~~~"
@@ -205,7 +207,7 @@ deactivate
 
         base = self.resources.execution_log_dir.expanduser().create()
         try: self.ssh.copy_to_here(self.resources.execution_log_dir.as_posix(), z=True)
-        except: pass  # the directory doesn't exist yet at the remote.
+        except Exception: pass  # type: ignore  # the directory doesn't exist yet at the remote.
         end_time_file = base.joinpath("end_time.txt")
 
         if not end_time_file.exists():
