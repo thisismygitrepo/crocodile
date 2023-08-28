@@ -4,7 +4,7 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable
+from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable, Iterable
 import datetime
 
 
@@ -77,9 +77,9 @@ class Base(object):
     def __setstate__(self, state): self.__dict__.update(state)
     def __deepcopy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(__import__("copy").deepcopy(self.__dict__)); return obj
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
-    def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
+    # def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
     def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
-    def save(self, path: str = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc=""):  # + (".dat" if data_only else "")
+    def save(self, path: Union[str, 'P', Path] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc=""):  # + (".dat" if data_only else "")
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
     @classmethod
@@ -105,7 +105,7 @@ T2 = TypeVar('T2')
 
 
 class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
-    def __init__(self, obj_list: Union[ListType[T], None, Iterator[T]]): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
+    def __init__(self, obj_list: Union[ListType[T], None, Iterator[T], Iterable[T]] = None) -> None: super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
     def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]): res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)]); print(res) if not return_str else None; return res if return_str else None
     def __deepcopy__(self, arg: Any) -> "List[T]": return List([__import__("copy").deepcopy(i) for i in self.list])
@@ -124,10 +124,12 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
     def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def split(self, every: int = 1, to: Optional[int] = None) -> 'List[T]': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
-    def filter(self, func: Callable[[T], Any], which: Optional[Callable[[int, T], Any]] = lambda idx, x: x) -> 'List[Any]': self.eval(func, func=True); return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
+    def split(self, every: int = 1, to: Optional[int] = None) -> 'List[List[T]]': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
+    def filter(self, func: Callable[[T], bool], which: Optional[Callable[[int, T], T2]] = lambda _idx, x: x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]: args = (self.eval(func, func=True, other=True), self.list) + ((default,) if default is not None else ()); return __import__("functools").reduce(*args)
+    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]:
+        args = (func, self.list) + ((default,) if default is not None else ())
+        return __import__("functools").reduce(*args)
     def append(self, item: T) -> 'List[T]': self.list.append(item); return self
     def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other: 'List[T]') -> 'List[T]': return List(list(other) + self.list)
@@ -140,7 +142,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list[T]: return self.list
     def to_numpy(self, **kwargs: dict[str, Any]): import numpy as np; return np.array(self.list, **kwargs)
-    def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
+    def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
     # def index(self, val: int) -> int: return self.list.index(val)
     def slice(self, start: Optional[int] = None, stop: Optional[int] = None, step: Optional[int] = None) -> 'List[T]': return List(self.list[start:stop:step])
     def __getitem__(self, key: Union[int, list[int], slice]) -> Union[T, 'List[T]']:
@@ -149,7 +151,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         elif isinstance(key, int): return self.list[key]
         return List(self.list[key])
     def apply(self, func: Callable[[T], T2], *args: list[Any], other: Optional['List[T]'] = None, filt: Optional[Callable[[T], bool]] = lambda x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], depth: int = 1, verbose: bool = False, desc: Optional[str] = None, **kwargs: dict[str, Any]) -> 'List[T2]':
-        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
+        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])
@@ -178,8 +180,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
     def from_names(cls, names, default_=None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
-    def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), self.eval(values, func=False))
-    def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(self.eval(keys, func=False), self.values())
+    def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), values)
+    def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(keys, self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, sep="\n"): return config(self.__dict__, sep=sep)
     def __getattr__(self, item) -> 'Struct':
@@ -223,7 +225,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
 
 def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress=True, floatmode='fixed', **kwargs) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
+def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress=True, floatmode: str = 'fixed', **kwargs) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
 def config(mydict, sep="\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
 def f(str_, limit=float('inf'), justify: int = 50, direc="<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})

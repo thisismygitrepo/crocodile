@@ -7,18 +7,17 @@ email: programmer@usa.com
 This is `export file` where one can dictate what will be exposed with toolbox
 """
 
-from crocodile import core
-from crocodile import meta
-from crocodile import file_management as _fm
+from crocodile.meta import Experimental, Terminal, Log, Null, Scheduler, SSH
+from crocodile.meta import logging, subprocess, sys, time
 # from crocodile import run
+from crocodile.file_management import P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
+from crocodile.core import List, Base, Struct, Display, Save
+from crocodile.core import str2timedelta, timestamp, randstr, validate_name, install_n_import
 
-# CORE =====================================
-str2timedelta, timestamp, randstr, validate_name, install_n_import = core.str2timedelta, core.timestamp, core.randstr, core.validate_name, core.install_n_import
-Base, Struct, Display, Save, List = core.Base, core.Struct, core.Display, core.Save, core.List
-# File Management ==========================
-P, Read, Compression, Cache, encrypt, decrypt, modify_text = _fm.P, _fm.Read, _fm.Compression, _fm.Cache, _fm.encrypt, _fm.decrypt, _fm.modify_text
-# META =====================================
-Experimental, Terminal, Log, Null, Scheduler, SSH = meta.Experimental, meta.Terminal, meta.Log, meta.Null, meta.Scheduler, meta.SSH
+_ = str2timedelta, timestamp, randstr, validate_name, install_n_import
+_ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
+_ = Experimental, Terminal, Log, Null, Scheduler, SSH
+_ = logging, subprocess, sys, time
 
 Path = P
 L = List
@@ -30,8 +29,6 @@ tmp = P.tmp
 
 _ = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
-logging, subprocess, sys, time = meta.logging, meta.subprocess, meta.sys, meta.time
-datetime = _fm.datetime
 
 
 # _ = False
