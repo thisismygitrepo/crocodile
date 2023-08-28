@@ -5,7 +5,7 @@ File
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime
-from typing import Any, Optional, Union, Any, Callable, TypeVar
+from typing import Any, Optional, Union, Callable, TypeVar
 
 
 # %% =============================== Security ================================================
@@ -15,7 +15,7 @@ def pwd2key(password: str, salt=None, iterations: int = 10) -> bytes:  # Derive 
     if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
-def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool =True, iteration: Optional[int] = None, gen_key=False) -> bytes:
+def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True, iteration: Optional[int] = None, gen_key=False) -> bytes:
     salt = None  # silence the linter.
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
@@ -42,7 +42,7 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
     elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
-def unlock(drive="D:", pwd=None, auto_unlock=False):
+def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = False):
     return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="pwsh")
 
 
@@ -75,7 +75,7 @@ def txt(path: Union[Path, str], encoding: str = 'utf-8') -> str: return P(path).
 class Read: read = read; mat = mat; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; vanilla_pickle = vanilla_pickle; py = py; pkl = vanilla_pickle; pickle = pickle; toml = toml; txt = txt
 
 
-def modify_text(txt_raw, txt_search, txt_alt, replace_line=True, notfound_append=False, prepend=False, strict=False):
+def modify_text(txt_raw: str, txt_search: str, txt_alt: str, replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):
     lines, bingo = txt_raw.split("\n"), False
     if not replace_line:  # no need for line splitting
         if txt_search in txt_raw: return txt_raw.replace(txt_search, txt_alt)
@@ -387,10 +387,10 @@ class P(type(Path()), Path):
         return self
 
 
-def compress_folder(root_dir, op_path, base_dir, fmt='zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
+def compress_folder(root_dir: str, op_path: str, base_dir: str, fmt: str = 'zip', **kwargs):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
     assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}  # .zip is added automatically by library, hence we'd like to avoid repeating it if user sent it.
     return P(__import__('shutil').make_archive(base_name=str(op_path)[:-4] if str(op_path).endswith(".zip") else str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
-def zip_file(ip_path, op_path, arcname=None, password=None, mode="w", **kwargs):
+def zip_file(ip_path: str, op_path: str, arcname: Optional[str] = None, password: Optional[str] = None, mode: str = "w", **kwargs):
     """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
     When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
     import zipfile
