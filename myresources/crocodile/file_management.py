@@ -221,10 +221,10 @@ class P(type(Path()), Path):
     def stats(self): return Struct(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
-    def clickable(self, inlieu: bool =False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
-    def as_url_str(self, inlieu: bool =False) -> str: return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
-    def as_url_obj(self, inlieu: bool =False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
-    def as_unix(self, inlieu: bool =False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
+    def clickable(self, inlieu: bool = False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
+    def as_url_str(self, inlieu: bool = False) -> str: return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
+    def as_url_obj(self, inlieu: bool = False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
+    def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace='_'): return validate_name(self.trunk, replace=replace)
@@ -277,9 +277,9 @@ class P(type(Path()), Path):
     @staticmethod
     def tmpdir(prefix="") -> 'P': return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     @staticmethod
-    def tmpfile(name=None, suffix="", folder=None, tstamp=False, noun=False) -> 'P': return P.tmp(file=(name or randstr(noun=noun)) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files")
+    def tmpfile(name: Optional[str] = None, suffix="", folder: Optional[str] = None, tstamp: bool = False, noun: bool = False) -> 'P': return P.tmp(file=(name or randstr(noun=noun)) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files")
     @staticmethod
-    def tmp(folder=None, file=None, root="~/tmp_results") -> 'P': return P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
+    def tmp(folder: Optional[str] = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P': return P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
     # ====================================== Compression & Encryption ===========================================
     def zip(self, path=None, folder=None, name=None, arcname=None, inplace=False, verbose=True, content=False, orig=False, use_7z=False, pwd=None, mode='w', **kwargs) -> 'P':
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
@@ -293,7 +293,7 @@ class P(type(Path()), Path):
                 root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
                 path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)  # TODO: see if this supports mode
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
-    def unzip(self, folder=None, fname=None, verbose=True, content=False, inplace=False, overwrite=False, orig=False, pwd=None, tmp=False, pattern=None, merge=False, **kwargs) -> 'P':
+    def unzip(self, folder: Optional[str] = None, fname: Optional[str] = None, verbose=True, content=False, inplace=False, overwrite=False, orig=False, pwd=None, tmp=False, pattern=None, merge=False, **kwargs) -> 'P':
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
@@ -320,9 +320,9 @@ class P(type(Path()), Path):
     def tar_gz(self, folder=None, name=None, path=None, inplace=False, orig=False, verbose=True) -> 'P': return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def ungz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.ungz(name=f"tmp_{randstr()}.tar", inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)  # this works for .tgz suffix as well as .tar.gz
     def tar_xz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def unxz_untar(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def unbz(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': Compression.unbz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
-    def decompress(self, folder=None, name=None, path=None, inplace=False,  verbose=True, orig=False) -> 'P': raise NotImplementedError("Not implemented yet.")
+    def unxz_untar(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
+    def unbz(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': Compression.unbz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
+    def decompress(self, folder=None, name=None, path=None, inplace=False, verbose=True, orig=False) -> 'P': raise NotImplementedError("Not implemented yet.")
     def encrypt(self, key=None, pwd=None, folder=None, name=None, path=None, verbose=True, suffix=".enc", inplace=False, orig=False) -> 'P':  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name + suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"; path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))

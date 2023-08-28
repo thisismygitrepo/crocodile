@@ -53,8 +53,8 @@ class DBMS:
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
         self.insp = inspect(subject=self.eng)
         self.schema = L(self.insp.get_schema_names())
-        self.sch_tab = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
-        self.sch_vws = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
+        self.sch_tab: dict[str, list[str]] = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
+        self.sch_vws: dict[str, list[str]] = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
         return self
 
     def __getstate__(self): return Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser(strict=False)).__dict__
