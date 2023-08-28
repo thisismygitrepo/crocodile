@@ -5,14 +5,14 @@ Distributed Computing
 
 
 from typing import Optional, Any
-import numpy as np
-import psutil
-import crocodile.toolbox as tb
 from math import ceil, floor
-from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
-from rich.console import Console
 from enum import Enum
 from dataclasses import dataclass
+import psutil
+import numpy as np
+import crocodile.toolbox as tb
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
+from rich.console import Console
 # from platform import system
 # import time
 # from rich.progress import track
@@ -91,15 +91,15 @@ class Cluster:
         state = self.__dict__
         state["func"] = None
         return state
-    def __setstate__(self, state) -> None: self.__dict__.update(state)
+    def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__.update(state)
     def save(self) -> tb.P:
         path = self.root_dir.joinpath("cluster.Cluster.pkl")
         tb.Save.vanilla_pickle(obj=self.__getstate__(), path=path)
         return path
     @staticmethod
-    def load(job_id, base=None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
+    def load(job_id: str, base: Optional[str] = None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
-    def get_cluster_path(job_id, base=None):
+    def get_cluster_path(job_id: str, base: Optional[str] = None):
         if base is None: base = tb.P.home().joinpath(rf"tmp_results/remote_machines")
         else: base = tb.P(base)
         return base.joinpath(f"job_id__{job_id}")
@@ -136,7 +136,7 @@ class Cluster:
         self.sshz: list[tb.SSH] = sshz
         self.machines: list[RemoteMachine] = []
         self.machines_specs: list[MachineSpecs] = []
-        self.threads_per_machine = []
+        self.threads_per_machine: list[int] = []
         self.remote_machine_kwargs: RemoteMachineConfig = remote_machine_config
         self.workload_params: list[WorkloadParams] = []
 
@@ -180,7 +180,7 @@ class Cluster:
         total_product = (np.array(cpus) * np.array(rams)).sum()
 
         self.machines_specs = [MachineSpecs(cpu=a_cpu, ram=a_ram, product=a_cpu * a_ram, cpu_norm=a_cpu / total_cpu, ram_norm=a_ram / total_ram, product_norm=a_cpu * a_ram / total_product) for a_cpu, a_ram in zip(cpus, rams)]
-        self.threads_per_machine: list[int] = [self.thread_load_calc.get_num_threads(machine_specs=machine_specs) for machine_specs in self.machines_specs]
+        self.threads_per_machine = [self.thread_load_calc.get_num_threads(machine_specs=machine_specs) for machine_specs in self.machines_specs]
         self.workload_params = self.machine_load_calc.get_workload_params(machines_specs=self.machines_specs, threads_per_machine=self.threads_per_machine)
         self.print_func_kwargs()
 
@@ -204,10 +204,10 @@ class Cluster:
         if not self.workload_params: raise RuntimeError("You need to generate standard kwargs first.")
         for idx, (a_workload_params, an_ssh) in enumerate(zip(self.workload_params, self.sshz)):
             desc = self.description + f"\nLoad Ratios on machines:\n{self.machine_load_calc.load_ratios_repr}"
-            if self.remote_machine_kwargs is not None:
-                config = self.remote_machine_kwargs
-                config.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params, ssh_obj=an_ssh))
-            else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir.as_posix(), workload_params=a_workload_params, ssh_obj=an_ssh)
+            # if self.remote_machine_kwargs is not None:
+            config = self.remote_machine_kwargs
+            config.__dict__.update(dict(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir, workload_params=a_workload_params, ssh_obj=an_ssh))
+            # else: config = RemoteMachineConfig(description=desc, job_id=self.job_id + f"_{idx}", base_dir=self.root_dir.as_posix(), workload_params=a_workload_params, ssh_obj=an_ssh)
             m = RemoteMachine(func=self.func, func_kwargs=self.func_kwargs, config=config)
             m.generate_scripts()
             m.submit()
@@ -247,7 +247,7 @@ class Cluster:
         self.save()
         return self
 
-    def check_job_status(self): tb.L(self.machines).apply(lambda machine: machine.check_job_status())
+    def check_job_status(self) -> None: tb.L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
         if self.results_downloaded:
             print(f"All results downloaded to {self.root_dir} 🤗")
@@ -258,8 +258,8 @@ class Cluster:
                 print(f"Results are not ready for machine {a_m}.")
                 print(f"Try to run `.check_job_status()` to check if the job is done and obtain results path.")
                 continue
-            results_folder = tb.P(a_m.results_path).expanduser()
-            if results_folder is not None and a_m.results_downloaded is False:
+            # results_folder = tb.P(a_m.results_path).expanduser()
+            if a_m.results_downloaded is False:
                 print("\n")
                 console.rule(f"Downloading results from {a_m}")
                 print("\n")

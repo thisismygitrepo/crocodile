@@ -179,7 +179,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def from_keys_values(cls, k, v) -> 'Struct': return Struct(dict(zip(k, v)))
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
-    def from_names(cls, names, default_=None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
+    def from_names(cls, names: list[str], default_=None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
     def spawn_from_values(self, values) -> 'Struct': return self.from_keys_values(self.keys(), values)
     def spawn_from_keys(self, keys) -> 'Struct': return self.from_keys_values(keys, self.values())
     def to_default(self, default=lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self

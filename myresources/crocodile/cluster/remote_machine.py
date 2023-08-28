@@ -1,6 +1,6 @@
 
 from pickle import PickleError
-from typing import Optional
+from typing import Optional, Any, Union, Callable
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
@@ -26,7 +26,7 @@ class RemoteMachineConfig:
     job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
     base_dir: str = f"~/tmp_results/remote_machines/jobs"
     description: str = ""
-    ssh_params: dict = field(default_factory=lambda: {})
+    ssh_params: dict[str, Union[str, int]] = field(default_factory=lambda: {})
     ssh_obj: Optional[tb.SSH] = None
 
     # data
@@ -34,7 +34,7 @@ class RemoteMachineConfig:
     update_repo: bool = False
     install_repo: bool = False
     update_essential_repos: bool = True
-    data: Optional[list] = None
+    data: Optional[list[Any]] = None
     transfer_method: str = "sftp"
 
     # remote machine behaviour
@@ -59,10 +59,10 @@ class RemoteMachineConfig:
 
 
 class RemoteMachine:
-    def __getstate__(self) -> dict: return self.__dict__
-    def __setstate__(self, state: dict): self.__dict__ = state
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__
+    def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func, config: RemoteMachineConfig, func_kwargs: Optional[dict] = None, data: Optional[list] = None):
+    def __init__(self, func: Callable[[Any], Any], config: RemoteMachineConfig, func_kwargs: Optional[dict] = None, data: Optional[list] = None):
         self.config = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
@@ -88,7 +88,7 @@ class RemoteMachine:
         print(self.execution_command); tb.install_n_import("clipboard").copy(self.execution_command)
         print("\n")
 
-    def fire(self, run=False, open_console=True):
+    def fire(self, run: bool = False, open_console: bool = True):
         assert self.execution_command is not None, "Execution command is not yet generated. Run generate_scripts() first. 🤷‍♂️"
         console.rule(f"Firing job @ remote machine {self.ssh}")
         if open_console and self.config.open_console:
@@ -100,7 +100,7 @@ class RemoteMachine:
                                           job_wd=self.resources.root_dir.as_posix())
         print("\n")
 
-    def run(self, run=True, open_console=True, show_scripts=True):
+    def run(self, run=True, open_console: bool = True, show_scripts: bool = True):
         self.generate_scripts()
         if show_scripts: self.show_scripts()
         self.submit()
@@ -234,7 +234,7 @@ deactivate
             self.results_path = tb.P(results_folder)
             return self.results_path
 
-    def download_results(self, target=None, r=True, zip_first=False):
+    def download_results(self, target: Optional[str] = None, r: bool = True, zip_first: bool = False):
         assert self.results_path is not None, "Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first."
         if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{self.results_path.expanduser().absolute()}`"); return
         if self.results_path is not None:

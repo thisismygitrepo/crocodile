@@ -9,7 +9,7 @@ import os
 from rich import inspect
 from rich.console import Console
 import time
-from typing import Optional, Callable, Union  # , Any
+from typing import Optional, Callable, Union, Any
 import pandas as pd
 
 console = Console()
@@ -67,7 +67,7 @@ class JobParams:
     def from_empty() -> 'JobParams':
         return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
     @staticmethod
-    def from_func(func: Union[Callable, tb.P, str]) -> 'JobParams':
+    def from_func(func: Union[Callable[[Any], Any], tb.P, str]) -> 'JobParams':
         if isinstance(func, Callable) and not isinstance(func, tb.P):
             func_name = func.__name__
             func_module = func.__module__
@@ -179,7 +179,6 @@ class EmailParams:
     def from_empty() -> 'EmailParams': return EmailParams(addressee="", speaker="", ssh_conn_str="", executed_obj="", email_config_name="", to_email="", resource_manager_path="")
 
 
-
 class ResourceManager:
     running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running.pkl")
     queue_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/queue.pkl")
@@ -187,12 +186,12 @@ class ResourceManager:
     shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
 
     @staticmethod
-    def from_pickle(path):
+    def from_pickle(path: Union[str, tb.P]):
         rm = ResourceManager(job_id='1', remote_machine_type='Windows', lock_resources=True, max_simulataneous_jobs=1, base=None)
         rm.__setstate__(dict(tb.P(path).expanduser().readit()))
         return rm
     def __getstate__(self): return self.__dict__
-    def __setstate__(self, state): self.__dict__ = state
+    def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __init__(self, job_id: str, remote_machine_type: str, lock_resources: bool, max_simulataneous_jobs: int = 1, base=None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
@@ -219,8 +218,7 @@ class ResourceManager:
 
     def add_to_queue(self):
         try:
-            queue_file = self.queue_path.expanduser().readit()
-            queue_file: Lock
+            queue_file: Lock = self.queue_path.expanduser().readit()
         except FileNotFoundError:
             print(f"Queue file was deleted by the locking job, creating an empty one and saving it.")
             queue_file = Lock(queue=[], specs={})
@@ -244,8 +242,8 @@ echo "Unlocked resources"
         lock_status = 'locked'
         while lock_status == 'locked':
             try:
-                running_file = self.running_path.expanduser().readit()
-                running_file: Lock
+                running_file: Lock = self.running_path.expanduser().readit()
+                # running_file: Lock
             except FileNotFoundError:
                 running_file = Lock(queue=[], specs={})
                 print(f"Running file was deleted by the locking job, taking hold of it.")
@@ -321,8 +319,7 @@ echo "Unlocked resources"
                      submission_time=self.submission_time)
         queue_path = self.queue_path.expanduser()
         assert queue_path.exists(), f"Queue file {queue_path} does not exist. This method should not be called in the first place."
-        queue_file = queue_path.readit()
-        queue_file: Lock
+        queue_file: Lock = queue_path.readit()
         next_job_id = queue_file.queue.pop(0)
         assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}. If that is the case, which it is, then this method should not be called in the first place."
         del queue_file.specs[next_job_id]
@@ -330,8 +327,7 @@ echo "Unlocked resources"
         tb.Save.pickle(obj=queue_file, path=queue_path)
         running_path = self.running_path.expanduser()
         if running_path.exists():
-            running_file = running_path.readit()
-            running_file: Lock
+            running_file: Lock = running_path.readit()
         else:
             running_file = Lock(queue=[], specs={})
         assert len(running_file.queue) < self.max_simulataneous_jobs, f"Number of running jobs ({len(queue_file.queue)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
