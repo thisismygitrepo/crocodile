@@ -252,7 +252,7 @@ class P(type(Path()), Path):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
     # ======================================== Folder management =======================================
-    def search(self, pattern='*', r: bool = False, files: bool = True, folders: bool = True, compressed: bool = False, dotfiles=False, filters: Optional[list] = None, not_in: Optional[list[str]] = None, exts: Optional[list[str]] = None, win_order: bool = False) -> List:
+    def search(self, pattern='*', r: bool = False, files: bool = True, folders: bool = True, compressed: bool = False, dotfiles=False, filters: Optional[list] = None, not_in: Optional[list[str]] = None, exts: Optional[list[str]] = None, win_order: bool = False) -> List['P']:
         filters = (filters or []) + ([lambda x: all([str(notin) not in str(x) for notin in not_in])] if not_in is not None else []) + ([lambda x: any([ext in x.name for ext in exts])] if exts is not None else [])
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
             root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(lambda x: root.joinpath(x))
@@ -269,7 +269,7 @@ class P(type(Path()), Path):
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
     def create(self, parents=True, exist_ok=True, parents_only=False) -> 'P': _ = self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
     def chdir(self) -> 'P': __import__("os").chdir(str(self.expanduser())); return self
-    def listdir(self) -> List: return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
+    def listdir(self) -> List['P']: return List(__import__("os").listdir(self.expanduser().resolve())).apply(P)
     @staticmethod
     def tempdir() -> 'P': return P(__import__("tempfile").mktemp())
     @staticmethod
