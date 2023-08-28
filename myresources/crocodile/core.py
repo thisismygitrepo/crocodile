@@ -4,8 +4,9 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable
 import datetime
+
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace='_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
@@ -99,55 +100,58 @@ class Base(object):
         _ = __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
-class List(Base):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
-    def __init__(self, obj_list=None): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
-    def save_items(self, directory, names=None, saver=None): [(saver or Save.pickle)(path=directory / name, obj=item) for name, item in zip(names or range(len(self)), self.list)]
+T = TypeVar('T')
+T2 = TypeVar('T2')
+
+
+class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
+    def __init__(self, obj_list: Union[ListType[T], None, Iterator[T]]): super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
-    def print(self, sep='\n', styler=repr, return_str=False, **kwargs): res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)]); print(res) if not return_str else None; return res if return_str else None
-    def __deepcopy__(self, arg): return List([__import__("copy").deepcopy(i) for i in self.list])
-    def __bool__(self): return bool(self.list)
-    def __contains__(self, key): return key in self.list
-    def __copy__(self) -> 'List': return List(self.list.copy())
-    def __getstate__(self): return self.list
-    def __setstate__(self, state): self.list = state
-    def __len__(self): return len(self.list)
-    def __iter__(self): return iter(self.list)
+    def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]): res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)]); print(res) if not return_str else None; return res if return_str else None
+    def __deepcopy__(self, arg: Any) -> "List[T]": return List([__import__("copy").deepcopy(i) for i in self.list])
+    def __bool__(self) -> bool: return bool(self.list)
+    def __contains__(self, key: str) -> bool: return key in self.list
+    def __copy__(self) -> 'List[T]': return List(self.list.copy())
+    def __getstate__(self) -> list[T]: return self.list
+    def __setstate__(self, state: list[T]): self.list = state
+    def __len__(self) -> int: return len(self.list)
+    def __iter__(self) -> Iterator[T]: return iter(self.list)
     def __array__(self): import numpy as np; return np.array(self.list)  # compatibility with numpy
     len = property(lambda self: len(self.list))
     # ================= call methods =====================================
-    def __getattr__(self, name) -> 'List': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args, **kwargs) -> 'List': return List(i(*args, **kwargs) for i in self.list)
+    def __getattr__(self, name: str) -> 'List[T]': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
+    def __call__(self, *args: list[Any], **kwargs: dict[str, Any]) -> 'List[Any]': return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
-    def __setitem__(self, key, value): self.list[key] = value
-    def sample(self, size=1, replace=False, p=None) -> 'List': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def split(self, every=1, to=None) -> 'List': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
-    def filter(self, func, which=lambda idx, x: x) -> 'List': self.eval(func, func=True); return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
+    def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
+    def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
+    def split(self, every: int = 1, to: Optional[int] = None) -> 'List[T]': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
+    def filter(self, func: Callable[[T], Any], which: Optional[Callable[[int, T], Any]] = lambda idx, x: x) -> 'List[Any]': self.eval(func, func=True); return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func=lambda x, y: x+y, default=None) -> list: args = (self.eval(func, func=True, other=True), self.list) + ((default,) if default is not None else ()); return __import__("functools").reduce(*args)
-    def append(self, item) -> 'List': self.list.append(item); return self
-    def __add__(self, other) -> 'List': return List(self.list + list(other))  # implement coersion
-    def __radd__(self, other) -> 'List': return List(list(other) + self.list)
-    def __iadd__(self, other) -> 'List': self.list = self.list + list(other); return self  # inplace add.
-    def sort(self, key=None, reverse=False) -> 'List': self.list.sort(key=key, reverse=reverse); return self
-    def sorted(self, *args, **kwargs) -> 'List': return List(sorted(self.list, *args, **kwargs))
-    def insert(self, __index: int, __object): self.list.insert(__index, __object); return self
-    def modify(self, expr: str, other=None) -> 'List': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
-    def remove(self, value=None, values=None, strict=True) -> 'List': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
+    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]: args = (self.eval(func, func=True, other=True), self.list) + ((default,) if default is not None else ()); return __import__("functools").reduce(*args)
+    def append(self, item: T) -> 'List[T]': self.list.append(item); return self
+    def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion
+    def __radd__(self, other: 'List[T]') -> 'List[T]': return List(list(other) + self.list)
+    def __iadd__(self, other: 'List[T]') -> 'List[T]': self.list = self.list + list(other); return self  # inplace add.
+    def sort(self, key=None, reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
+    def sorted(self, *args: list[Any], **kwargs: dict[str, Any]) -> 'List[T]': return List(sorted(self.list, *args, **kwargs))
+    def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
+    def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
+    def remove(self, value: Optional[T] = None, values: Optional[list[T]] = None, strict: bool = True) -> 'List[T]': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
     def to_series(self): return __import__("pandas").Series(self.list)
-    def to_list(self) -> list: return self.list
-    def to_numpy(self, **kwargs): import numpy as np; return np.array(self.list, **kwargs)
-    np = property(lambda self: self.to_numpy())
-    def to_struct(self, key_val=None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
-    def __getitem__(self, key: str or list or slice):
+    def to_list(self) -> list[T]: return self.list
+    def to_numpy(self, **kwargs: dict[str, Any]): import numpy as np; return np.array(self.list, **kwargs)
+    def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(self.eval(key_val, func=True) if key_val else lambda x: (str(x), x)))
+    def __getitem__(self, key: Union[int, list[int], slice]) -> Union[T, 'List[T]']:
         if isinstance(key, list): return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
-        elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
-        return self.list[key] if not isinstance(key, slice) else List(self.list[key])  # must be an integer or slice: behaves similarly to Numpy A[1] vs A[1:2]
-    def apply(self, func, *args, other=None, filt=lambda x: True, jobs=None, prefer=[None, 'processes', 'threads'][0], depth=1, verbose=False, desc=None, **kwargs) -> 'List':
+        # elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
+        elif isinstance(key, int): return self.list[key]
+        return List(self.list[key])
+    def apply(self, func: Callable[[T], T2], *args: list[Any], other: Optional['List[T]'] = None, filt: Optional[Callable[[T], bool]] = lambda x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], depth: int = 1, verbose: bool = False, desc: Optional[str] = None, **kwargs: dict[str, Any]) -> 'List[T2]':
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs)); func = self.eval(func, func=True, other=bool(other))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
         if jobs: from joblib import Parallel, delayed; return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator)) if other is None else List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))
         return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])
-    def to_dataframe(self, names=None, minimal=False, obj_included=True):
+    def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
         df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
         if minimal: return df
         for i, obj in enumerate(self.list):  # Populate the dataframe:
@@ -209,25 +213,25 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"]))
         (install_n_import("rich").print(res.to_markdown()) if ("DataFrame" in res.__class__.__name__ and install_n_import("tabulate")) else print(res)) if not return_str else None; return str(res) if return_str else self
     @staticmethod
-    def concat_values(*dicts, orient='list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
-    def plot(self, use_plt=True, title='', xlabel='', ylabel='', **kwargs):
+    def concat_values(*dicts, orient: str = 'list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
+    def plot(self, use_plt: bool = True, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel); return artist
 
 
-def set_pandas_display(rows=1000, columns=1000, width=5000, colwidth=40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
+def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-def set_numpy_display(precision=3, linewidth=250, suppress=True, floatmode='fixed', **kwargs) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
-def config(mydict, sep="\n", justify=15, quotes=False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
-def f(str_, limit=float('inf'), justify=50, direc="<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
+def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress=True, floatmode='fixed', **kwargs) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
+def config(mydict, sep="\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+def f(str_, limit=float('inf'), justify: int = 50, direc="<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
-def outline(array, name="Array", printit=True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
-def get_repr(data, justify=15, limit=float('inf'), direc="<") -> str:
+def outline(array, name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
+def get_repr(data, justify: int = 15, limit=float('inf'), direc="<") -> str:
     if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
     return f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
-def print_string_list(mylist, char_per_row=125, sep=" ", style=str, _counter=0):
+def print_string_list(mylist, char_per_row: int = 1 25, sep=" ", style=str, _counter: int = 0):
     for item in mylist: print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 class Display: set_pandas_display = set_pandas_display; set_pandas_auto_width = set_pandas_auto_width; set_numpy_display = set_numpy_display; config = config; f = f; eng = eng; outline = outline; get_repr = get_repr; print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
 

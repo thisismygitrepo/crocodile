@@ -24,13 +24,13 @@ class WorkloadParams:
     job_id: int = 0
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
-    def split_to_jobs(self, jobs=None):
+    def split_to_jobs(self, jobs: Optional[int] = None):
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
         return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
     def get_section_from_series(self, series: list):
         from math import floor
-        min_idx_start = int(floor((len(series)-1) * self.idx_start / self.idx_max))
-        min_idx_end = int(floor((len(series)-1) * self.idx_end / self.idx_max))
+        min_idx_start = int(floor((len(series) - 1) * self.idx_start / self.idx_max))
+        min_idx_end = int(floor((len(series) - 1) * self.idx_end / self.idx_max))
         min_start = series[min_idx_start]
         min_end = series[min_idx_end]
         return min_start, min_end

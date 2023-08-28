@@ -218,7 +218,7 @@ class Cluster:
             print("Couldn't pickle cluster object")
         self.print_commands()
 
-    def open_mux(self, machines_per_tab=1, window_number=None):
+    def open_mux(self, machines_per_tab: int = 1, window_number: Optional[int] = None):
         self.machines_per_tab = machines_per_tab
         self.window_number = window_number if window_number is not None else 0  # tb.randstr(length=3, lower=False, upper=False)
         cmd = f"wt -w {self.window_number} "
@@ -233,12 +233,12 @@ class Cluster:
         tb.Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
         self.machines[-1].session_manager.asssert_session_started()
 
-    def fire(self, machines_per_tab=1, window_number=None, run=False):
+    def fire(self, machines_per_tab: int = 1, window_number: Optional[int] = None, run: bool = False):
         self.open_mux(machines_per_tab=machines_per_tab, window_number=window_number)
         for m in self.machines:
             m.fire(run=run, open_console=False)
 
-    def run(self, run=False, machines_per_tab=1, window_number=None):
+    def run(self, run: bool = False, machines_per_tab: int = 1, window_number: Optional[int] = None):
         self.generate_standard_kwargs()
         self.viz_load_ratios()
         print(self)
