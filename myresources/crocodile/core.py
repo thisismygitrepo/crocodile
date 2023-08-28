@@ -124,7 +124,9 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
     def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
-    def split(self, every: int = 1, to: Optional[int] = None) -> 'List[List[T]]': every = every if to is None else __import__("math").ceil(len(self) / to); return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
+    def split(self, every: int = 1, to: Optional[int] = None) -> 'List[List[T]]':
+        every = every if to is None else __import__("math").ceil(len(self) / to)
+        return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
     def filter(self, func: Callable[[T], bool], which: Optional[Callable[[int, T], T2]] = lambda _idx, x: x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]:
@@ -149,7 +151,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         if isinstance(key, list): return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         # elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
         elif isinstance(key, int): return self.list[key]
-        return List([self.list[key]])
+        assert isinstance(key, slice)
+        return List(self.list[key])  # for slices
     def apply(self, func: Callable[[T], T2], *args: list[Any], other: Optional['List[T]'] = None, filt: Optional[Callable[[T], bool]] = lambda x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], depth: int = 1, verbose: bool = False, desc: Optional[str] = None, **kwargs: dict[str, Any]) -> 'List[T2]':
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
