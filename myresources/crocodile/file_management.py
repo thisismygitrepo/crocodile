@@ -346,13 +346,13 @@ class P(type(Path()), Path):
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username=None, password=None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, txt=True, path=None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(str(self) if "http" in str(self) else (self.read_text() if txt else self.read_bytes())); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
-    def _get_remote_path(self, root, os_specific=False): return P(root) / (__import__('platform').system().lower() if os_specific else 'generic_os') / self.rel2home()
+    def get_remote_path(self, root, os_specific=False): return P(root) / (__import__('platform').system().lower() if os_specific else 'generic_os') / self.rel2home()
     def to_cloud(self, cloud, remotepath=None, zip=False, encrypt=False, key=None, pwd=None, rel2home=False, share=False, verbose=True, os_specific=False, transfers=10, root="myhome") -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
         if remotepath is None:
-            remotepath = localpath._get_remote_path(root=root, os_specific=os_specific) if rel2home else (P(root) / localpath if root is not None else localpath)
+            remotepath = localpath.get_remote_path(root=root, os_specific=os_specific) if rel2home else (P(root) / localpath if root is not None else localpath)
         else: remotepath = P(remotepath)
         from crocodile.meta import Terminal; print(f"{'⬆️'*5} UPLOADING {localpath.as_posix()} to {cloud}:{remotepath.as_posix()}")
         res = Terminal(stdout=None).run(f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{remotepath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell").capture(); [item.delete(sure=True) for item in to_del]; print(f"{'⬆️'*5} UPLOAD COMPLETED.")
@@ -362,7 +362,7 @@ class P(type(Path()), Path):
     def from_cloud(self, cloud, localpath=None, decrypt: bool = False, unzip: bool = False, key=None, pwd=None, rel2home: bool = False, overwrite: bool = True, merge: bool = False, os_specific=False, transfers=10, root="myhome"):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
-        if rel2home: remotepath = remotepath._get_remote_path(root=root, os_specific=os_specific)
+        if rel2home: remotepath = remotepath.get_remote_path(root=root, os_specific=os_specific)
         remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""; localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
         from crocodile.meta import Terminal; print(f"{'⬇️' * 5} DOWNLOADING {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}")
         res = Terminal(stdout=None).run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' --progress --transfers={transfers}""", shell="powershell")
@@ -371,7 +371,7 @@ class P(type(Path()), Path):
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
         return localpath
     def sync_to_cloud(self, cloud, sync_up=False, sync_down=False, os_specific=False, rel2home=True, transfers=10, delete=False, root="myhome"):
-        tmp1, tmp2 = self.expanduser().absolute().create(parents_only=True).as_posix(), self._get_remote_path(root=root, os_specific=os_specific).as_posix()
+        tmp1, tmp2 = self.expanduser().absolute().create(parents_only=True).as_posix(), self.get_remote_path(root=root, os_specific=os_specific).as_posix()
         source, target = (tmp1, f"{cloud}:{tmp2 if rel2home else tmp1}") if sync_up else (f"{cloud}:{tmp2 if rel2home else tmp1}", tmp1)  # in bisync direction is irrelavent.
         if not sync_down and not sync_up: print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`"); rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
         else: print(f"SYNCING {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
