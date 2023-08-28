@@ -19,7 +19,7 @@ class Submission:
             tmp_file.delete(sure=True)
 
         # download data
-        for idx, item in enumerate(machine.data):
+        for _idx, item in enumerate(machine.data):
             cloud_download_py_script += f"tb.P(r'{tb.P(item).transfer_sh()}').download(folder=r'{item.collapseuser().parent}')\n"
 
         # save cloud_download_script_py

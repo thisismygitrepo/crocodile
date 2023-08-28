@@ -64,7 +64,7 @@ class RemoteMachine:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func: Callable[..., Any], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list] = None):
+    def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list] = None):
         self.config = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
