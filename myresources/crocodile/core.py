@@ -23,7 +23,7 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
 
-def save_decorator(ext=""):  # apply default paths, add extension to path, print the saved file path
+def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
     def decorator(func):
         def wrapper(obj: Any, path: Union[str, Path, None] = None, verbose: bool = True, add_suffix: bool = False, desc: str = "", class_name: str = "", **kwargs):
             if path is None:
@@ -44,7 +44,7 @@ def save_decorator(ext=""):  # apply default paths, add extension to path, print
 
 
 @save_decorator(".json")
-def json(obj: Any, path: Optional[str] = None, indent: Optional[str] = None, encoding='utf-8', **kwargs):
+def json(obj: Any, path: Optional[str] = None, indent: Optional[str] = None, encoding: str = 'utf-8', **kwargs):
     _ = encoding
     return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
 @save_decorator(".yml")
@@ -65,9 +65,19 @@ def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, valu
 @save_decorator(".pkl")
 def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
-def pickle(obj=None, path=None, r=False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
-def pickles(obj, r=False, **kwargs): return __import__("dill").dumps(obj, r=r, **kwargs)
-class Save: json = json; yaml = yaml; toml = toml; ini = ini; csv = csv; npy = npy; mat = mat; vanilla_pickle = vanilla_pickle; pickle = pickle; pickles = pickles
+def pickle(obj=None, path=None, r: bool = False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
+def pickles(obj, r: bool = False, **kwargs): return __import__("dill").dumps(obj, r=r, **kwargs)
+class Save:
+    json = json
+    yaml = yaml
+    toml = toml
+    ini = ini
+    csv = csv
+    npy = npy
+    mat = mat
+    vanilla_pickle = vanilla_pickle
+    pickle = pickle
+    pickles = pickles
 
 
 # ====================================== Object Management ====================================
@@ -240,7 +250,14 @@ def get_repr(data: Any, justify: int = 15, limit: Union[int, float] = float('inf
     return f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
 def print_string_list(mylist: list[Any], char_per_row: int = 125, sep: str = " ", style: Callable[[Any], str] = str, _counter: int = 0):
     for item in mylist: print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
-class Display: set_pandas_display = set_pandas_display; set_pandas_auto_width = set_pandas_auto_width; set_numpy_display = set_numpy_display; config = config; f = f; eng = eng; outline = outline; get_repr = get_repr; print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
+class Display:
+    set_pandas_display = set_pandas_display
+    set_pandas_auto_width = set_pandas_auto_width
+    set_numpy_display = set_numpy_display
+    config = config; f = f
+    eng = eng; outline = outline
+    get_repr = get_repr
+    print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
 
 
 if __name__ == '__main__':
