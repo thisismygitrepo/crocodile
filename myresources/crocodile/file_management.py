@@ -72,10 +72,22 @@ def npy(path, **kwargs): data = (np := __import__("numpy")).load(str(path), allo
 def csv(path, **kwargs): return __import__("pandas").read_csv(path, **kwargs)
 def py(path, init_globals=None, run_name=None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
 def pickles(bytes_obj): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
-def pickle(path, **kwargs): obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+def pickle(path, **kwargs) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 def vanilla_pickle(path, **kwargs): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
 def txt(path: Union[Path, str], encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
-class Read: read = read; json = json; yaml = yaml; ini = ini; npy = npy; csv = csv; vanilla_pickle = vanilla_pickle; py = py; pkl = vanilla_pickle; pickle = pickle; toml = toml; txt = txt
+class Read:
+    read = read
+    json = json
+    yaml = yaml
+    ini = ini
+    npy = npy
+    csv = csv
+    pkl = vanilla_pickle
+    vanilla_pickle = vanilla_pickle
+    pickle = pickle
+    py = py
+    toml = toml
+    txt = txt
 
 
 def modify_text(txt_raw: str, txt_search: str, txt_alt: str, replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):
@@ -87,11 +99,11 @@ def modify_text(txt_raw: str, txt_search: str, txt_alt: str, replace_line: bool 
         if txt_search in line:
             lines[idx], bingo = txt_alt if type(txt_alt) is str else txt_alt(line), True
     if strict and not bingo: raise ValueError(f"txt_search `{txt_search}` not found in txt_raw `{txt_raw}`")
-    if bingo is False and notfound_append is True: (lines.insert(0, txt_alt) if prepend else lines.append(txt_alt))  # txt not found, add it anyway.
+    if bingo is False and notfound_append is True: _ = (lines.insert(0, txt_alt) if prepend else lines.append(txt_alt))  # txt not found, add it anyway.
     return "\n".join(lines)
 
 
-class P(type(Path()), Path):
+class P(type(Path()), Path):  # type: ignore
     # ============= Path management ==================
     """ The default behaviour of methods acting on underlying disk object is to perform the action and return a new path referring to the mutated object in disk drive.
     However, there is a flag `orig` that makes the function return orignal path object `self` as opposed to the new one pointing to new object.
@@ -101,9 +113,9 @@ class P(type(Path()), Path):
     def delete(self, sure: bool = False, verbose: bool = True) -> 'P':  # slf = self.expanduser().resolve() don't resolve symlinks.
         if not sure: _ = print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
         if not self.exists(): self.unlink(missing_ok=True); _ = print(f"Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
-        _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); print(f"DELETED {repr(self)}.") if verbose else None; return self
+        _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); _ = print(f"DELETED {repr(self)}.") if verbose else None; return self
     def send2trash(self, verbose: bool = True) -> 'P':
-        if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
+        if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); _ = print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
     def move(self, folder: Union[str, 'P', None] = None, name: PLike = None, path: Union[str, 'P', None] = None, rel2it=False, overwrite: bool = False, verbose: bool = True, parents: bool = True, content=False) -> 'P':
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
@@ -120,7 +132,7 @@ class P(type(Path()), Path):
         dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
         _ = dest.delete(sure=True) if not content and overwrite and dest.exists() else None
         if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
-        if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
+        if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); _ = print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); print(f"COPIED {'Content of ' if False else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
@@ -239,7 +251,7 @@ class P(type(Path()), Path):
     # ========================== override =======================================
     def write_text(self, data: str, encoding: Optional[str] = 'utf-8') -> 'P': super(P, self).write_text(data, encoding=encoding); return self
     def read_text(self, lines=False, printit=False, encoding: Optional[str] = 'utf-8') -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
-    def write_bytes(self, data: bytes, overwrite=False) -> 'P':
+    def write_bytes(self, data: bytes, overwrite: bool = False) -> 'P':
         slf = self.expanduser().absolute(); slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self

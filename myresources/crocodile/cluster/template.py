@@ -1,13 +1,16 @@
 
+"""
+This file contains a template for a remote machine. It is not meant to be run, but rather to be used as a template for
+"""
 
 def run_on_remote():
     from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
     from crocodile.cluster.utils import expensive_function
-    from crocodile.cluster.self_ssh import SelfSSH
+    # from crocodile.cluster.self_ssh import SelfSSH
     data = []
     config = RemoteMachineConfig(
         # connection
-#        ssh_obj=SelfSSH(),  # overrides ssh_params
+        #        ssh_obj=SelfSSH(),  # overrides ssh_params
         ssh_params=dict(host="p51s"),  # dict(host="239wsl"),
         description="Description of running an expensive function",  # job_id=, base_dir="",
         # data

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable, Iterable
 import datetime
 
+PLike = Union[str, Path]
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace: str = '_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
@@ -44,29 +45,29 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
 
 
 @save_decorator(".json")
-def json(obj: Any, path: Optional[str] = None, indent: Optional[str] = None, encoding: str = 'utf-8', **kwargs):
+def json(obj: Any, path: PLike, indent: Optional[str] = None, encoding: str = 'utf-8', **kwargs):
     _ = encoding
     return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
 @save_decorator(".yml")
-def yaml(obj, path, **kwargs):
+def yaml(obj: dict[Any, Any], path: PLike, **kwargs):
     with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
 @save_decorator(".toml")
-def toml(obj: dict, path): return Path(path).write_text(install_n_import("toml").dumps(obj))
+def toml(obj: dict[Any, Any], path: PLike): return Path(path).write_text(install_n_import("toml").dumps(obj))
 @save_decorator(".ini")
-def ini(obj: dict, path, **kwargs):
+def ini(obj: dict[Any, Any], path: PLike, **kwargs):
     conf = install_n_import("configparser").ConfigParser(); conf.read_dict(obj)
-    with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
+    with open(path: PLike, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
 @save_decorator(".csv")
-def csv(obj, path=None): return obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
+def csv(obj: Any, path: PLike): return obj.to_frame('dtypes').reset_index().to_csv(path + ".dtypes")
 @save_decorator(".npy")
-def npy(obj, path, **kwargs): return __import__('numpy').save(path, obj, **kwargs)
-@save_decorator(".mat")
-def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
+def npy(obj: Any, path: PLike, **kwargs): return __import__('numpy').save(path, obj, **kwargs)
+# @save_decorator(".mat")
+# def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
 @save_decorator(".pkl")
-def vanilla_pickle(obj, path, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
+def vanilla_pickle(obj: Any, path: PLike, **kwargs): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
 @save_decorator(".pkl")
-def pickle(obj=None, path=None, r: bool = False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
-def pickles(obj, r: bool = False, **kwargs): return __import__("dill").dumps(obj, r=r, **kwargs)
+def pickle(obj: Any, path: PLike, r: bool = False, **kwargs): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
+def pickles(obj: Any, r: bool = False, **kwargs): return __import__("dill").dumps(obj, r=r, **kwargs)
 class Save:
     json = json
     yaml = yaml
@@ -74,7 +75,7 @@ class Save:
     ini = ini
     csv = csv
     npy = npy
-    mat = mat
+    # mat = mat
     vanilla_pickle = vanilla_pickle
     pickle = pickle
     pickles = pickles
@@ -89,12 +90,12 @@ class Base(object):
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
     # def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
     def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
-    def save(self, path: Union[str, 'P', Path] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc=""):  # + (".dat" if data_only else "")
+    def save(self, path: Union[str, 'P', Path] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc: str = ""):  # + (".dat" if data_only else "")
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
     @classmethod
     def from_saved_data(cls, path, *args, **kwargs): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
-    def save_code(self, path):
+    def save_code(self, path: Union[str, Path]):
         if hasattr(module := __import__("inspect").getmodule(self), "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         Path(path).expanduser().write_text(file.read_text()); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
@@ -213,12 +214,12 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def __delitem__(self, key): del self.__dict__[key]
     def copy(self) -> 'Struct': return Struct(self.__dict__.copy())
     def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
-    def keys(self, verbose=False) -> 'List': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
-    def values(self, verbose=False) -> 'List': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
-    def items(self, verbose=False, desc="") -> 'List': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
-    def get(self, key=None, default=None, strict=False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
-    def apply2keys(self, kv_func, verbose=False, desc="") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
-    def apply2values(self, kv_func, verbose=False, desc="") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
+    def keys(self, verbose: bool = False) -> 'List': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
+    def values(self, verbose: bool = False) -> 'List': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
+    def items(self, verbose: bool = False, desc: str = "") -> 'List': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
+    def get(self, key=None, default=None, strict: bool = False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
+    def apply2keys(self, kv_func, verbose: bool = False, desc: str = "") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
+    def apply2values(self, kv_func, verbose: bool = False, desc: str = "") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def apply(self, kv_func) -> 'List': return self.items().apply(lambda item: kv_func(item[0], item[1]))
     def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.__dict__.items()})
@@ -239,7 +240,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
 def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None: import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
 def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: str = 'fixed', **kwargs) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
-def config(mydict, sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
 def f(str_, limit=float('inf'), justify: int = 50, direc="<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array, name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_

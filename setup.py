@@ -5,7 +5,7 @@ PKG
 
 from setuptools import setup
 from myresources.crocodile import __version__
-import setuptools
+# import setuptools
 
 
 with open("README.md", "r", encoding="utf-8") as file:
@@ -48,8 +48,8 @@ setup(
                 'crocodile.msc.ascii_art',
                 'crocodile.msc.dl_template',
                 'crocodile.msc.numerical',
-                'crocodile.msc.odds']
-    ,
+                'crocodile.msc.odds'
+                ],
     url='https://github.com/thisismygitrepo/crocodile',
     project_urls={
         "Bug Tracker": "https://github.com/thisismygitrepo/crocodile/issues",
@@ -102,6 +102,6 @@ setup(
 
 )
 
-with open("./myresources/crocodile/art/happy_croco", "r") as file:
+with open("./myresources/crocodile/art/happy_croco", "r", encoding="utf-8") as file:
     croco = file.read()  # search ascii art or characters art.
 print(croco)
