@@ -4,7 +4,7 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable, Iterable, Hashable
+from typing import Optional, Union, Generic, TypeVar, Type, List as ListType, Any, Iterator, Callable, Iterable, Hashable
 import datetime
 
 PLike = Union[str, Path]
@@ -154,8 +154,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def sort(self, key=None, reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args: list[Any], **kwargs: Any) -> 'List[T]': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
-    def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
-    def remove(self, value: Optional[T] = None, values: Optional[list[T]] = None, strict: bool = True) -> 'List[T]': [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
+    def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': _ = [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
+    def remove(self, value: Optional[T] = None, values: Optional[list[T]] = None, strict: bool = True) -> 'List[T]': _ = [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list[T]: return self.list
     def to_numpy(self, **kwargs: dict[str, Any]): import numpy as np; return np.array(self.list, **kwargs)
@@ -184,25 +184,27 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
 
 class Struct(Base):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
-    def __init__(self, dictionary: Optional[dict[Any, Any]] = None, **kwargs: Any):
+    def __init__(self, dictionary: Union[dict[Any, Any], Type[object], None] = None, **kwargs: Any):
         if dictionary is None or isinstance(dictionary, dict): final_dict = dict() if dictionary is None else dictionary
-        else: final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)
-        final_dict.update(kwargs); super(Struct, self).__init__(); self.__dict__ = final_dict
-    @staticmethod
-    def recursive_struct(mydict: dict[Any, Any]) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
-    @staticmethod
-    def recursive_dict(struct) -> 'Struct': _ = [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
+        else:
+            final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)  # type: ignore
+        final_dict.update(kwargs)  # type ignore
+        super(Struct, self).__init__(); self.__dict__ = final_dict  # type: ignore
+    # @staticmethod
+    # def recursive_struct(mydict: dict[Any, Any]) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
+    # @staticmethod
+    # def recursive_dict(struct) -> 'Struct': _ = [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path: Optional[PLike] = None, indent: Optional[str] = None): return Save.json(obj=self.__dict__, path=path, indent=indent)
     @classmethod
-    def from_keys_values(cls, k, v) -> 'Struct': return Struct(dict(zip(k, v)))
+    def from_keys_values(cls, k: list[str], v: list[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
     def from_names(cls, names: list[str], default_: Optional[Any] = None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
-    def spawn_from_values(self, values: list[Any]) -> 'Struct': return self.from_keys_values(self.keys(), values)
-    def spawn_from_keys(self, keys: list[str]) -> 'Struct': return self.from_keys_values(keys, self.values())
+    def spawn_from_values(self, values: Union[list[Any], List[Any]]) -> 'Struct': return self.from_keys_values(list(self.keys()), values)
+    def spawn_from_keys(self, keys: Union[list[str], List[str]]) -> 'Struct': return self.from_keys_values(keys, list(self.values()))
     def to_default(self, default: Optional[Callable[[], Any]] = lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
     def __str__(self, sep: str = "\n"): return config(self.__dict__, sep=sep)
-    def __getattr__(self, item) -> 'Struct':
+    def __getattr__(self, item: str) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError as ke: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from ke  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
@@ -225,10 +227,15 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def apply2keys(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
     def apply2values(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': _ = [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def apply(self, kv_func: Callable[[Any, Any], Any]) -> 'List[Any]': return self.items().apply(lambda item: kv_func(item[0], item[1]))
-    def filter(self, kv_func: Optional[Callable[[Any, Any], Any]] = None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
+    def filter(self, kv_func: Callable[[Any, Any], Any]) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.__dict__.items()})
     def update(self, *args: Any, **kwargs: Any) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
-    def delete(self, key: Optional[str] = None, keys: Optional[list[str]] = None, kv_func: Optional[Callable[[Any, Any], Any]] = None) -> 'Struct': _ = [self.__dict__.__delitem__(key) for key in ([key] if key else [] + (keys if keys is not None else []))]; [self.__dict__.__delitem__(k) for k, v in self.items() if kv_func(k, v)] if kv_func is not None else None; return self
+    def delete(self, key: Optional[str] = None, keys: Optional[list[str]] = None, kv_func: Optional[Callable[[Any, Any], Any]] = None) -> 'Struct':
+        for key in ([key] if key else [] + (keys if keys is not None else [])): self.__dict__.__delitem__(key)
+        if kv_func is not None:
+            for k, v in self.items():
+                if kv_func(k, v): self.__dict__.__delitem__(k)
+        return self
     def _pandas_repr(self, justify: int, return_str: bool = False, limit: int = 30): res = __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"]); return res if not return_str else str(res)
     def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False, limit: int = 50, title: str = "", **kwargs: Any) -> Union[str, 'Struct']:
         if as_config and not return_str: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
@@ -246,9 +253,9 @@ def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000,
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
 def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: str = 'fixed', **kwargs: Any) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
 def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
-def f(str_: str, limit: Union[int, float] = float('inf'), justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
+def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
-def outline(array, name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
+def outline(array: 'Any', name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; _ = print(str_) if printit else None; return str_
 def get_repr(data: Any, justify: int = 15, limit: Union[int, float] = float('inf'), direc: str = "<") -> str:
     if (dtype := data.__class__.__name__) in {'List[Any]', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
