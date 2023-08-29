@@ -5,6 +5,7 @@ Session Manager
 
 import crocodile.toolbox as tb
 import time
+from typing import Optional
 
 
 class Zellij:
@@ -20,7 +21,7 @@ class Zellij:
         return tmp
     # def __getstate__(self): return self.__dict__
     # def __setstate__(self, state): self.__dict__.update(state)
-    def get_ssh_command(self, sess_name=None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
+    def get_ssh_command(self, sess_name: Optional[str] = None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
     def get_new_session_string(self): return f"{self.ssh.get_ssh_conn_str()} -t {self.get_ssh_command()}"
     def open_console(self): return tb.Terminal().run_async(self.get_new_session_string(), shell="pwsh")
     def get_new_session_name(self):

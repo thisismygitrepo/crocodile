@@ -16,7 +16,7 @@ class Null:
     def __init__(self, return_='self'): self.return_ = return_
     def __getattr__(self, item) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
     def __getitem__(self, item) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
-    def __call__(self, *args, **kwargs) -> 'Null': return self if self.return_ == 'self' else self.return_
+    def __call__(self, *args: Any, **kwargs: Any) -> 'Null': return self if self.return_ == 'self' else self.return_
     def __len__(self): return 0
     def __bool__(self): return False
     def __contains__(self, item): _ = self, item; return False
@@ -64,7 +64,7 @@ class Terminal:
         @staticmethod
         def from_completed_process(cp: subprocess.CompletedProcess): (resp := Terminal.Response(cmd=cp.args)).output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)); return resp
         def __init__(self, stdin=None, stdout=None, stderr=None, cmd: Optional[str] = None, desc: str =""): self.std, self.output, self.input, self.desc = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd, desc  # input command
-        def __call__(self, *args, **kwargs) -> Optional[str]: return self.op.rstrip() if type(self.op) is str else None
+        def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]: return self.op.rstrip() if type(self.op) is str else None
         op = property(lambda self: self.output["stdout"])
         ip = property(lambda self: self.output["stdin"])
         err = property(lambda self: self.output["stderr"])

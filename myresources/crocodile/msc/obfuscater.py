@@ -1,9 +1,10 @@
 
 import crocodile.toolbox as tb
+from typing import Any, Optional
 
 
 class Obfuscator(tb.Base):
-    def __init__(self, directory="", noun=False, suffix="same", *args, **kwargs) -> None:
+    def __init__(self, directory: str = "", noun: bool = False, suffix: str = "same", *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.directory = tb.P(directory).expanduser().absolute()
         assert self.directory.is_dir()
@@ -13,12 +14,12 @@ class Obfuscator(tb.Base):
         self.noun = noun
         self.suffix = suffix
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state['directory'] = self.directory.collapseuser(strict=False)
         return state
 
-    def __setstate__(self, state: dict):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__ = state
         self.directory = self.directory.expanduser()
 
@@ -30,7 +31,7 @@ class Obfuscator(tb.Base):
     def obfuscate(self, path: tb.P) -> tb.P:
         return self.directory.parent.joinpath(self.real_to_phony[path.relative_to(self.directory).as_posix()])
 
-    def execute_map(self, forward=True):
+    def execute_map(self, forward: bool = True) -> None:
         root = self.directory if forward else self.obfuscate(self.directory)
         self._execute_map(root, forward=forward)
 
@@ -45,7 +46,7 @@ class Obfuscator(tb.Base):
     @staticmethod
     def lcd(path1, path2): return tb.P("/".join([part1 for part1, part2 in zip(tb.P(path1).expanduser().absolute().parts, tb.P(path2).expanduser().absolute().parts) if part1 == part2]))
 
-    def _execute_map(self, path: tb.P, forward):
+    def _execute_map(self, path: tb.P, forward: bool) -> None:
         assert path.is_dir()
         children = path.search("*", r=False)
         for child in children:
@@ -97,11 +98,11 @@ class Obfuscator(tb.Base):
             print(v)
             print('-' * 100)
 
-    def save(self, **kwargs):
+    def save(self, **kwargs: Any):
         _ = kwargs
         super().save(self.directory.append("_obfuscater.pkl"))
 
-    def update_symlinks(self, directory=None):
+    def update_symlinks(self, directory: Optional[str] = None):
         for path in (directory or self.directory).search("*", r=False):
             if path.is_symlink(): continue
             if path.is_dir():

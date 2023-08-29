@@ -88,7 +88,7 @@ class HParams:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict): return self.__dict__.update(state)
     @classmethod
-    def from_saved_data(cls, path, *args, **kwargs) -> 'HParams':
+    def from_saved_data(cls, path, *args: Any, **kwargs: Any) -> 'HParams':
         data: dict = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
     def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
@@ -144,7 +144,7 @@ class DataReader:
     def __setstate__(self, state): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
-    def split_the_data(self, *args, **kwargs) -> None:
+    def split_the_data(self, *args: Any, **kwargs: Any) -> None:
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = dict(train_loader=None, test_loader=None)

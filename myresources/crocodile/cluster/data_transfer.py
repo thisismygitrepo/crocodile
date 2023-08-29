@@ -15,12 +15,12 @@ class Submission:
         if machine.config.copy_repo:
             tmp_file = tb.P(machine.job_params.repo_path_rh).expanduser().zip_n_encrypt()
             cloud_download_py_script += f"print('Downloading `{tmp_file.collapseuser()}`.')\n"
-            cloud_download_py_script += f"tb.P(r'{tmp_file.transfer_sh()}').download(folder=r'{tb.P(machine.job_params.repo_path_rh).parent}').decrypt_n_unzip()\n"
+            cloud_download_py_script += f"tb.P(r'{tmp_file.share_on_cloud()}').download(folder=r'{tb.P(machine.job_params.repo_path_rh).parent}').decrypt_n_unzip()\n"
             tmp_file.delete(sure=True)
 
         # download data
         for _idx, item in enumerate(machine.data):
-            cloud_download_py_script += f"tb.P(r'{tb.P(item).transfer_sh()}').download(folder=r'{item.collapseuser().parent}')\n"
+            cloud_download_py_script += f"tb.P(r'{tb.P(item).share_on_cloud()}').download(folder=r'{item.collapseuser().parent}')\n"
 
         # save cloud_download_script_py
         machine.resources.cloud_download_py_script_path.expanduser().write_text(cloud_download_py_script, encoding="utf-8")

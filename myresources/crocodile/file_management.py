@@ -151,7 +151,7 @@ class P(type(Path()), Path):  # type: ignore
             __import__("subprocess").Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
         elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
         else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
-    def __call__(self, *args, **kwargs) -> 'P': self.start(*args, **kwargs); return self
+    def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
     def append_text(self, appendix) -> 'P': self.write_text(self.read_text() + appendix); return self
     def cache_from(self, source_func, expire="1w", save=Save.vanilla_pickle, reader=Read.read, **kwargs): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt_search, txt_alt, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding=None):
@@ -193,7 +193,7 @@ class P(type(Path()), Path):  # type: ignore
     def __len__(self) -> int: return len(self.parts)
     def __contains__(self, item): return P(item).as_posix() in self.as_posix()
     def __iter__(self): return self.parts.__iter__()
-    def __deepcopy__(self, *args, **kwargs) -> 'P': return P(str(self))
+    def __deepcopy__(self, *args: Any, **kwargs: Any) -> 'P': return P(str(self))
     def __getstate__(self) -> str: return str(self)
     def __setstate__(self, state): self._str = str(state)
     def __add__(self, other) -> 'P': return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.

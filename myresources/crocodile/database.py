@@ -26,7 +26,7 @@ class DBMS:
     * Always use sqlalchemy API and avoid sql-dielect specific language.
     * Engine is provided externally. It is the end-user's business to make this engine.
     """
-    def __init__(self, engine, db=None, sch=None, vws=False):
+    def __init__(self, engine: Engine, db=None, sch: Optional[str] = None, vws=False):
         self.eng: Engine = engine
         self.con = None
         self.ses = None
@@ -46,7 +46,7 @@ class DBMS:
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
 
-    def refresh(self, sch=None) -> 'Self':  # fails if multiple schemas are there and None is specified
+    def refresh(self, sch: Optional[str] = None) -> 'Self':  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
         self.meta = MetaData()
@@ -58,14 +58,14 @@ class DBMS:
         return self
 
     def __getstate__(self): return Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser(strict=False)).__dict__
-    def __setstate__(self, state): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
+    def __setstate__(self, state: dict[str, Any]): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
 
     @classmethod
-    def from_local_db(cls, path=None, echo=False, share_across_threads=False, **kwargs): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
+    def from_local_db(cls, path=None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
-    def get_columns(self, table, sch=None):
+    def get_columns(self, table: str, sch=None):
         return self.meta.tables[self._get_table_identifier(table=table, sch=sch)].exported_columns.keys()
-    def close(self, sleep=2):
+    def close(self, sleep: int = 2):
         print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
         self.con.close()
         self.ses.close()
@@ -77,7 +77,7 @@ class DBMS:
         else: return table
 
     @staticmethod
-    def make_sql_engine(path=None, echo=False, dialect="sqlite", driver=["pysqlite", "DBAPI"][0], pool_size=5, share_across_threads=True, **kwargs):
+    def make_sql_engine(path=None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
         """Establish lazy initialization with database"""
         if str(path) == "memory":
             print("Linking to in-memory database.")
@@ -102,25 +102,25 @@ class DBMS:
             result = res_func(result)
         return result if not df else pd.DataFrame(result)
 
-    def execute(self, command, df=False):
+    def execute(self, command: str, df=False):
         with self.eng.begin() as conn: result = conn.execute(text(command))
         return result if not df else pd.DataFrame(result)
 
-    def execute_script(self, command, df=False):
+    def execute_script(self, command: str, df=False):
         with self.eng.begin() as conn: result = conn.executescript(text(command))
         return result if not df else pd.DataFrame(result)
 
     # ========================== TABLES =====================================
-    def read_table(self, table, sch=None, size=100):
+    def read_table(self, table: str, sch: Optional[str] = None, size: int = 100):
         res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
         return pd.DataFrame(res.fetchmany(size))
 
-    def insert_dicts(self, table, *mydicts):
+    def insert_dicts(self, table: str, *mydicts):
         cmd = f"""INSERT INTO {table} VALUES """
         for mydict in mydicts: cmd += f"""({tuple(mydict)}), """
         self.execute_begin_once(cmd)
 
-    def describe_table(self, table, sch=None, dtype=True):
+    def describe_table(self, table: str, sch=None, dtype=True):
         print(table.center(100, "="))
         self.refresh()
         tbl = self.meta.tables[table]
