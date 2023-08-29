@@ -92,7 +92,7 @@ class Base(object):
         return obj
     def __copy__(self, *args: Any, **kwargs: Any): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
     # def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
-    def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
+    # def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
     def save(self, path: Union[str, Path, None] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc: str = ""):  # + (".dat" if data_only else "")
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         _ = self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
@@ -103,13 +103,13 @@ class Base(object):
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8')); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
     def get_attributes(self, remove_base_attrs: bool = True, return_objects: bool = False, fields: bool = True, methods: bool = True):
-        attrs = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=Base().get_attributes(remove_base_attrs=False)if remove_base_attrs else []); import inspect
-        attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
+        attrs: List[Any] = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=Base().get_attributes(remove_base_attrs=False)if remove_base_attrs else []); import inspect
+        attrs: List[Any] = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     def print(self, dtype: bool = False, attrs: bool = False, **kwargs: Any): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     @staticmethod
     def get_state(obj: Any, repr_func: Callable[[Any], str] = lambda x: x, exclude: Optional[list[str]] = None) -> dict[str, Any]: return repr_func(obj) if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]) else (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).__dict__)
-    def viz_composition_heirarchy(self, depth: int = 3, obj: Any = None, filt=None):
+    def viz_composition_heirarchy(self, depth: int = 3, obj: Any = None, filt: Optional[Callable[[Any], None]] = None):
         install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename := Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")), filter=filt)
         _ = __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
@@ -207,8 +207,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         except KeyError as ke: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from ke  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self, limit: int = 150): return "Struct: " + Display.get_repr(self.keys().list.__repr__(), limit=limit, justify=0)
-    def __getitem__(self, item: Hashable): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
-    def __setitem__(self, key: Hashable, value: Any): self.__dict__[key] = value
+    def __getitem__(self, item: str): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
+    def __setitem__(self, key: str, value: Any): self.__dict__[key] = value
     def __bool__(self): return bool(self.__dict__)
     def __contains__(self, key: Hashable): return key in self.__dict__
     def __len__(self): return len(self.keys())
