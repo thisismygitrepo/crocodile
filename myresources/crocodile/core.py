@@ -4,7 +4,7 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable, Iterable
+from typing import Optional, Union, Generic, TypeVar, List as ListType, Any, Iterator, Callable, Iterable, Hashable
 import datetime
 
 PLike = Union[str, Path]
@@ -90,7 +90,7 @@ class Base(object):
     def __copy__(self, *args, **kwargs): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
     # def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
     def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
-    def save(self, path: Union[str, 'P', Path] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc: str = ""):  # + (".dat" if data_only else "")
+    def save(self, path: Union[str, Path, None] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc: str = ""):  # + (".dat" if data_only else "")
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
     @classmethod
@@ -203,24 +203,24 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         except KeyError as ke: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from ke  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
     clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self, limit: int = 150): return "Struct: " + Display.get_repr(self.keys().list.__repr__(), limit=limit, justify=0)
-    def __getitem__(self, item): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
-    def __setitem__(self, key, value): self.__dict__[key] = value
+    def __getitem__(self, item: Hashable): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
+    def __setitem__(self, key: Hashable, value): self.__dict__[key] = value
     def __bool__(self): return bool(self.__dict__)
-    def __contains__(self, key): return key in self.__dict__
+    def __contains__(self, key: Hashable): return key in self.__dict__
     def __len__(self): return len(self.keys())
     def __getstate__(self): return self.__dict__  # serialization
-    def __setstate__(self, state): self.__dict__ = state
+    def __setstate__(self, state: dict[Any, Any]): self.__dict__ = state
     def __iter__(self): return iter(self.__dict__.items())
-    def __delitem__(self, key): del self.__dict__[key]
+    def __delitem__(self, key: Hashable): del self.__dict__[key]
     def copy(self) -> 'Struct': return Struct(self.__dict__.copy())
     def to_dataframe(self, *args, **kwargs): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
-    def keys(self, verbose: bool = False) -> 'List': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
-    def values(self, verbose: bool = False) -> 'List': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
-    def items(self, verbose: bool = False, desc: str = "") -> 'List': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
-    def get(self, key=None, default=None, strict: bool = False, keys=None) -> 'List': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
+    def keys(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
+    def values(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
+    def items(self, verbose: bool = False, desc: str = "") -> 'List[Any]': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
+    def get(self, key: Optional[Hashable] = None, default: Optional[Any] = None, strict: bool = False, keys: Optional[list[Hashable]] = None) -> 'List[Any]': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
     def apply2keys(self, kv_func, verbose: bool = False, desc: str = "") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
     def apply2values(self, kv_func, verbose: bool = False, desc: str = "") -> 'Struct': [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
-    def apply(self, kv_func) -> 'List': return self.items().apply(lambda item: kv_func(item[0], item[1]))
+    def apply(self, kv_func) -> 'List[Any]': return self.items().apply(lambda item: kv_func(item[0], item[1]))
     def filter(self, kv_func=None) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.__dict__.items()})
     def update(self, *args, **kwargs) -> 'Struct': self.__dict__.update(Struct(*args, **kwargs).__dict__); return self
@@ -231,7 +231,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"]))
         (install_n_import("rich").print(res.to_markdown()) if ("DataFrame" in res.__class__.__name__ and install_n_import("tabulate")) else print(res)) if not return_str else None; return str(res) if return_str else self
     @staticmethod
-    def concat_values(*dicts, orient: str = 'list') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
+    def concat_values(*dicts, orient: str = 'List[Any]') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, use_plt: bool = True, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel); return artist
@@ -245,7 +245,7 @@ def f(str_, limit=float('inf'), justify: int = 50, direc="<") -> str: return f"{
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array, name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; print(str_) if printit else None; return str_
 def get_repr(data: Any, justify: int = 15, limit: Union[int, float] = float('inf'), direc: str = "<") -> str:
-    if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+    if (dtype := data.__class__.__name__) in {'List[Any]', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
     return f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
