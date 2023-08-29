@@ -64,7 +64,7 @@ class RemoteMachine:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
-    def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list] = None):
+    def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list[tb.P]] = None):
         self.config = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
@@ -79,11 +79,11 @@ class RemoteMachine:
         # scripts
         self.resources = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
-        self.execution_command = None
-        self.submitted = False
-        self.scipts_generated = False
-        self.results_downloaded = False
-        self.results_path = None
+        self.execution_command: Optional[str] = None
+        self.submitted: bool = False
+        self.scipts_generated: bool = False
+        self.results_downloaded: bool = False
+        self.results_path: Optional[tb.P] = None
 
     def execution_command_to_clip_memory(self):
         print("Execution command copied to clipboard 📋")
@@ -102,7 +102,7 @@ class RemoteMachine:
                                               job_wd=self.resources.root_dir.as_posix())
         print("\n")
 
-    def run(self, run=True, open_console: bool = True, show_scripts: bool = True):
+    def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
         self.generate_scripts()
         if show_scripts: self.show_scripts()
         self.submit()
@@ -117,8 +117,8 @@ class RemoteMachine:
         self.submitted = True  # before sending `self` to the remote.
         try: tb.Save.pickle(obj=self, path=self.resources.machine_obj_path.expanduser())
         except PickleError: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
-        if self.config.transfer_method == "transfer_sh": Submission.transfer_sh(machine=self)
-        elif self.config.transfer_method == "gdrive": Submission.gdrive(machine=self)
+        if self.config.transfer_method == "transfer_sh": Submission.transfer_sh(rm=self)
+        elif self.config.transfer_method == "gdrive": Submission.gdrive(rm=self)
         elif self.config.transfer_method == "sftp": Submission.sftp(self)
         else: raise ValueError(f"Transfer method {self.config.transfer_method} not recognized. 🤷‍")
         self.execution_command_to_clip_memory()
@@ -235,6 +235,7 @@ deactivate
 
             self.results_path = tb.P(results_folder)
             return self.results_path
+        return None
 
     def download_results(self, target: Optional[str] = None, r: bool = True, zip_first: bool = False):
         assert self.results_path is not None, "Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first."
