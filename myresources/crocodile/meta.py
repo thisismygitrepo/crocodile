@@ -323,7 +323,15 @@ def run_cell(pointer, module=sys.modules[__name__]):
         if pointer in cell.split('\n')[0]: break  # bingo
     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
     print(cell); install_n_import("clipboard").copy(cell); return cell
-class Experimental: show_globals = show_globals; monkey_patch = monkey_patch; capture_locals = capture_locals; generate_readme = generate_readme; load_from_source_code = load_from_source_code; extract_code = extract_code; extract_arguments = extract_arguments; run_cell = run_cell  # Debugging and Meta programming tools"""
+class Experimental:
+    show_globals = show_globals
+    monkey_patch = monkey_patch
+    capture_locals = capture_locals
+    generate_readme = generate_readme
+    load_from_source_code = load_from_source_code
+    extract_code = extract_code
+    extract_arguments = extract_arguments
+    run_cell = run_cell  # Debugging and Meta programming tools"""
 
 
 if __name__ == '__main__':
