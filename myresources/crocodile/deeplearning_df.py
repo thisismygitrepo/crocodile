@@ -15,16 +15,16 @@ import crocodile.toolbox as tb
 
 class CategoricalClipper:
     """Use pre onehot or ordinal encoding to create a new category "Other" for values that are less than a certain threshold"""
-    def __init__(self, thresh: float = 1.0, others_name: str ='Other'):
+    def __init__(self, thresh: float = 1.0, others_name: str = 'Other'):
         self.thresh = thresh
         self.others_name = others_name
         self.columns: Optional[list[str]] = None
-        self.pre_percentage_counts: dict[str, pd.Series] = {}
-        self.post_percentage_counts: dict[str, pd.Series] = {}
+        self.pre_percentage_counts: dict[str, 'pd.Series[float]'] = {}
+        self.post_percentage_counts: dict[str, 'pd.Series[float]'] = {}
         self.mapper = {}
 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
-    def __setstate__(self, state) -> None: self.__dict__ = state
+    def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__ = state
 
     def fit(self, df: pd.DataFrame) -> 'CategoricalClipper':
         self.columns = list(df.columns)
@@ -53,7 +53,7 @@ class CategoricalClipper:
         return self.transform(df, inplace=inplace)
 
     @staticmethod
-    def create_others_category(percentage_counts: pd.Series, thresh: float = 1.0, others_name: str = 'Other'):
+    def create_others_category(percentage_counts: 'pd.Series', thresh: float = 1.0, others_name: str = 'Other'):
         orig_caregories = percentage_counts.index.tolist()
         other_cats = percentage_counts[percentage_counts < thresh].index
         mask = percentage_counts.index.isin(other_cats)
@@ -78,9 +78,9 @@ class NumericalClipper:
         self.value_max: dict[str, float] = {}
 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
-    def __setstate__(self, state) -> None: self.__dict__ = state
+    def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__ = state
 
-    def fit(self, df: pd.DataFrame):
+    def fit(self, df: 'pd.DataFrame'):
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
@@ -104,7 +104,7 @@ class NumericalClipper:
         return df
 
     @staticmethod
-    def clip_values(y: pd.Series, quant_min: float = 0.98, quant_max: float = 0.02):
+    def clip_values(y: 'pd.Series[float]', quant_min: float = 0.98, quant_max: float = 0.02):
         los_clip_uppper_hrs = y.quantile(quant_max)
         los_clip_lower_hrs = y.quantile(quant_min)
         return y.clip(lower=los_clip_lower_hrs, upper=los_clip_uppper_hrs)

@@ -1,10 +1,11 @@
 
 
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name
-from crocodile.file_management import P
+from crocodile.file_management import P, PLike
 from crocodile.meta import Terminal
 
 import matplotlib.pyplot as plt
+from matplotlib.backend_bases.Event import Event
 from crocodile.msc.odds import Cycle
 from matplotlib import widgets
 import matplotlib.colors as mcolors
@@ -14,6 +15,7 @@ import subprocess
 import platform
 import pandas as pd
 import numpy as np
+from typing import Any, Optional, Union
 
 
 """TODO: add implementation https://github.com/gustavovelascoh/plot_update
@@ -28,24 +30,24 @@ class FigurePolicy(enum.Enum):
 
 def assert_requirements():
     try: subprocess.check_output(['where.exe' if platform.system() == 'Windows' else 'which', 'magick'])
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, subprocess.CalledProcessError) as err:
         # P(r"https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z").download().unzip().search()[0].rename("ffmpeg").move(r"C://")  # P("C:\\ffmpeg\\bin")  # add to PATH
         print("Installinng image magick")
         if __import__("platform").system() == "Windows":
             Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
             print("You might need to restart your machine before PATH change impact takes place.")
-        else: raise NotImplementedError
+        else: raise NotImplementedError from err
 
 
 class FigureSave:
     class GenericSave:
         stream = ['clear', 'accumulate', 'update'][0]
-        def __init__(self, save_dir=None, save_name=None, watch_figs: list or None = None, max_calls=2000, delay=100, **kwargs):
+        def __init__(self, save_dir: PLike = None, save_name: Optional[str] = None, watch_figs: Optional[list[Any]] = None, max_calls: int = 2000, delay: int = 100, **kwargs: Any):
             """How to control what to be saved: you can either pass the figures to be tracked at init time, pass them dynamically at add time, or, add method will capture every figure and axis"""
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
             self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_fig_save")
             self.kwargs, self.counter, self.delay, self.max = kwargs, 0, delay, max_calls
-        def add(self, fignames=None, names=None, **kwargs):  # generic method used at runtime, never changed.
+        def add(self, fignames: Optional[list[str]] = None, names: Optional[list[str]] = None, **kwargs: Any):  # generic method used at runtime, never changed.
             print(f"Saver added frame number {self.counter}", end='\r')
             self.counter += 1; plt.pause(self.delay * 0.001); print('Turning off IO') if self.counter > self.max else None; plt.ioff()
             self.watch_figs = [plt.figure(figname) for figname in fignames] if fignames else ([plt.figure(k) for k in plt.get_figlabels()] if self.watch_figs is None else self.watch_figs)  # path sent explicitly, # None exist ==> add all else # they exist already.
@@ -60,11 +62,11 @@ class FigureSave:
             super().__init__(*args, **kwargs)
             from matplotlib.backends.backend_pdf import PdfPages
             self.fname = self.save_dir.joinpath(self.save_name + ('.pdf' if '.pdf' not in str(self.save_name) else '')); self.pp = PdfPages(self.fname)
-        def _save(self, a_fig, a_name, bbox_inches='tight', pad_inches=0.3, **kwargs): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
+        def _save(self, a_fig, a_name: str, bbox_inches: str = 'tight', pad_inches: float = 0.3, **kwargs): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
         def finish(self): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); return self
     class PNG(GenericSave):
-        def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
-        def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
+        def _save(self, afigure: str, aname: str, dpi: int = 150, **kwargs: Any):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
         def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
     class GIF(GenericSave):  # NOT RECOMMENDED, used GIFFileBased instead.
         """This class uses ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc (limitation).
@@ -73,10 +75,10 @@ class FigureSave:
         Works for images only. Add more .imshow to the same axis, and that's it. imshow will conver up previous images. For lines, it will superimpose it and will look ugly.
         The class will automatically detect new lines by their "neo" labels and add them then hide them for the next round.
         """
-        def __init__(self, interval=100, **kwargs):
+        def __init__(self, interval: int = 100, **kwargs: Any):
             super().__init__(**kwargs); from collections import defaultdict
             self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time.
-        def _save(self, afigure, aname, cla=False, **kwargs):
+        def _save(self, afigure, aname, cla=False, **kwargs: Any):
             fig_list, subcontainer = self.container[afigure.get_label()], []
             for item in FigureManager.findobj(afigure, 'neo'): item.set_label('processed'); item.set_visible(False); subcontainer += [item]
             fig_list.append(subcontainer)  # if you want the method coupled with cla being used in main, then it add_line is required for axes.
@@ -91,7 +93,7 @@ class FigureSave:
                     print(f"SAVED GIF @", P(self.fname).absolute().as_uri())
                 else: print(f"Nothing to be saved by GIF writer."); return self.fname
     class GIFFileBased(GenericSave):
-        def __init__(self, fps=4, dpi=100, bitrate=1800, _type='GIFFileBased', **kwargs):
+        def __init__(self, fps: int = 4, dpi: int = 100, bitrate: int = 1800, _type='GIFFileBased', **kwargs):
             super().__init__(**kwargs); assert_requirements()
             if _type == 'GIFPipeBased': writer, extension = animation.ImageMagickFileWriter, '.gif'  # internally calls: matplotlib._get_executable_info("magick")
             elif _type == "GIFFileBased": writer, extension = animation.ImageMagickWriter, '.gif'
@@ -102,7 +104,7 @@ class FigureSave:
             self.fname = self.save_dir.joinpath(self.save_name + extension)
             assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
             self.writer.setup(fig=self.watch_figs[0], outfile=str(self.fname), dpi=dpi)
-        def _save(self, afig, aname, **kwargs): self.writer.grab_frame(**kwargs)
+        def _save(self, afig: str, aname: str, **kwargs: Any): self.writer.grab_frame(**kwargs)
         def finish(self): print('Saving results ...'); self.writer.finish(); print(f"SAVED GIF @", P(self.fname).absolute().as_uri()); return self
     class GIFPipeBased(GIFFileBased):
         def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
@@ -113,7 +115,7 @@ class FigureSave:
     class GenericAuto(GenericSave):
         """Parses the data internally, hence requires artist with animate method implemetend. Artist needs to have .fig attribute."""
         save_type = 'auto'
-        def __init__(self, plotter_class, data, names_list=None, **kwargs):
+        def __init__(self, plotter_class, data, names_list: Optional[list[str]] = None, **kwargs: Any):
             super().__init__(**kwargs); self.saver, self.plotter = None, None; assert_requirements()
             self.plotter_class, self.data, self.names_list, self.kwargs = plotter_class, data, names_list, kwargs
         def animate(self):
@@ -121,7 +123,7 @@ class FigureSave:
             for idx, datum in __import__("tqdm").tqdm(enumerate(self.data)): self.plotter.animate(datum); self.saver.add(names=[self.names_list[idx] if self.names_list is not None else str(idx)])
             self.saver.finish()
     class GIFAuto(GenericAuto):
-        def __init__(self, plotter_class, data, interval=500, extension='gif', fps=4, metadata=None, **kwargs):
+        def __init__(self, plotter_class, data, interval: int = 500, extension: str = 'gif', fps: int = 4, metadata=None, **kwargs: Any):
             super().__init__(plotter_class, data, **kwargs)
             writer = animation.PillowWriter(fps=fps) if extension == '.mp4' else animation.FFMpegWriter(fps=fps, metadata=metadata, bitrate=2500)
             self.plotter = self.plotter_class(**kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
@@ -136,7 +138,7 @@ class FigureSave:
     class NullAuto(GenericAuto):
         def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.Null(**kwargs); self.fname = self.saver.fname; self.animate()
     class GIFFileBasedAuto(GenericAuto):
-        def __init__(self, plotter_class, data, fps=4, dpi=150, bitrate=2500, _type='GIFFileBasedAuto', **kwargs):
+        def __init__(self, plotter_class, data, fps: int = 4, dpi: int = 150, bitrate: int = 2500, _type='GIFFileBasedAuto', **kwargs):
             super().__init__(**kwargs)
             if _type == 'GIFPipeBasedAuto': writer = animation.ImageMagickFileWriter; extension = '.gif'
             elif _type == 'MPEGFileBasedAuto': writer = animation.FFMpegFileWriter; extension = '.mp4'
@@ -157,7 +159,7 @@ class FigureSave:
 
 
 class FigureManager:  # use as base class for Artist & Viewers to give it free animation powers.
-    def __init__(self, info_loc=None, figpolicy=FigurePolicy.same):
+    def __init__(self, info_loc=None, figpolicy: FigurePolicy = FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
         self.cmaps, self.colors, self.mcolors, self.facecolor = Cycle(plt.colormaps()), Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color']), list(mcolors.CSS4_COLORS.keys()), Cycle(list(mcolors.CSS4_COLORS.values()))
@@ -179,7 +181,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.auto_brightness, self.pix_vals = False, False; self.boundaries_flag, self.annot_flag = True, False
         self.info_loc = [0.8, 0.01] if info_loc is None else info_loc
         self.message, self.message_obj, self.cursor = '', None, None
-    def show_help(self, event):
+    def show_help(self, event: Event):
         default_plt = {"q ": {'help': "Quit Figure."},
                        "Ll": {'help': "change x/y scale to log and back to linear (toggle)"},
                        "Gg": {'help': "Turn on and off x and y grid respectively."},
@@ -195,15 +197,18 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     # =============== EVENT METHODS ====================================
     def animate(self): pass  # a method of the artist child class that is inheriting from this class to define behaviour when user press next or previous buttons.
     def connect(self): self.fig.canvas.mpl_connect('key_press_event', self.process_key); return self
-    def process_key(self, event):
+    def process_key(self, event: Event):
         self.event = event  # useful for debugging.
         for key in self.help_menu.keys():
-            if event.key in key: self.help_menu[key]['func'](event); self.update_info_text(self.message); break
+            if event.key in key:
+                self.help_menu[key]['func'](event)
+                self.update_info_text(self.message)
+                break
         if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
-    def toggle_annotate(self, event):
+    def toggle_annotate(self, event: Event):
         self.annot_flag = not self.annot_flag
         if event.inaxes and event.inaxes.images: event.inaxes.images[0].set_picker(True); self.message = f"Annotation flag is toggled to {self.annot_flag}"
-    def annotate(self, event, axis=None, data=None):
+    def annotate(self, event: Event, axis=None, data=None):
         self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
         if not ax: return None
         if not hasattr(ax, 'annot_obj'): ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
@@ -212,14 +217,14 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         x, y = int(np.round(e.xdata)), int(np.round(e.ydata))
         z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
         ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}'); ax.annot_obj.xy = (x, y); self.fig.canvas.draw_idle()
-    def save(self, event): _ = event; Save.pickle(path=P.tmpfile(name="figure_manager"), obj=self)
-    def replay(self, event): _ = event; self.pause = False; self.idx_cycle.set_index(0); self.message = 'Replaying'; self.animate()
-    def pause_func(self, event): _ = event; self.pause = not self.pause; self.message = f'Pause flag is set to {self.pause}'; self.animate()
-    def previous(self, event): _ = event; self.idx_cycle.previous(); self.message = f'Previous {self.idx_cycle}'; self.animate()
-    def next(self, event): _ = event; self.idx_cycle.next(); self.message = f'Next {self.idx_cycle}'; self.animate()
-    def text_info(self, event): _ = event; self.message = ''
-    def change_facecolor(self, event): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
-    def adjust_brightness(self, event):
+    def save(self, event: Event): _ = event; Save.pickle(path=P.tmpfile(name="figure_manager"), obj=self)
+    def replay(self, event: Event): _ = event; self.pause = False; self.idx_cycle.set_index(0); self.message = 'Replaying'; self.animate()
+    def pause_func(self, event: Event): _ = event; self.pause = not self.pause; self.message = f'Pause flag is set to {self.pause}'; self.animate()
+    def previous(self, event: Event): _ = event; self.idx_cycle.previous(); self.message = f'Previous {self.idx_cycle}'; self.animate()
+    def next(self, event: Event): _ = event; self.idx_cycle.next(); self.message = f'Next {self.idx_cycle}'; self.animate()
+    def text_info(self, event: Event): _ = event; self.message = ''
+    def change_facecolor(self, event: Event): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
+    def adjust_brightness(self, event: Event):
         ax, message = event.inaxes, "None"
         if ax is None or not ax.images: return None
         if event.key == '\\':
@@ -233,44 +238,44 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.message = message + '  ' + str(round(vmin, 1)) + '  ' + str(round(vmax, 1))
         if event.key in '_+}{': [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
         else: ax.images[0].set_clim((vmin, vmax)) if ax.images else None
-    def change_cmap(self, event):
+    def change_cmap(self, event: Event):
         if ax := event.inaxes is not None:
             cmap = self.cmaps.next() if event.key in 'tT' else self.cmaps.previous()
             [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axe] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
             self.message = f"Color map changed to {ax.images[0].cmap.name}"
-    def show_pix_val(self, event):
+    def show_pix_val(self, event: Event):
         if (ax := event.inaxes) is not None:
             self.pix_vals = not self.pix_vals; self.message = f"Pixel values flag set to {self.pix_vals}"
             if self.pix_vals: self.show_pixels_values(ax)
             else:
                 while len(ax.texts) > 0: [text.remove() for text in ax.texts]
-    def show_cursor(self, event):
+    def show_cursor(self, event: Event):
         if not (ax := event.inaxes): return None  # don't do this if c was pressed outside an axis.
         if hasattr(ax, 'cursor_'):  # is this the first time?
             if ax.cursor_ is None: ax.cursor_ = widgets.Cursor(ax=ax, vertOn=True, horizOn=True, color='red', lw=1.0)
             else: ax.cursor_ = None  # toggle the cursor.
             self.message = f'Cursor flag set to {bool(ax.cursor_)}'
         else: ax.cursor_ = None; self.show_cursor(event)  # first call
-    def show_ticks(self, event):
+    def show_ticks(self, event: Event):
         self.boundaries_flag = not self.boundaries_flag
         if event.key == 'a' and (axis := event.inaxes): self.toggle_ticks(axis); self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
         else: [self.toggle_ticks(ax) for ax in self.ax]
     # ====================== class methods ===============================
-    def get_fig(self, figname='', suffix=None, **kwargs): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
-    def update_info_text(self, message): self.message_obj.remove() if self.message_obj else None; self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
+    def get_fig(self, figname: str = '', suffix: Optional[str] = None, **kwargs: Any): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
+    def update_info_text(self, message: str): self.message_obj.remove() if self.message_obj else None; self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
     def maximize_fig(self): _ = self; plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
     def clear_axes(self): [ax.cla() for ax in self.ax]
     def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
     def close(self): plt.close(self.fig)
     # ====================== axis helpers ========================
     @staticmethod
-    def grid(ax, factor=5, x_or_y='both', color='gray', alpha1=0.5, alpha2=0.25):
+    def grid(ax, factor: int = 5, x_or_y: str = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
         if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]  # Turning on major grid for both axes.
         ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
         if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(plt.MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
         if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(plt.MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
     @staticmethod
-    def set_ax_size(ax, w, h, units='inches'):
+    def set_ax_size(ax, w, h, units: str = 'inches'):
         l, r, t, b, _ = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom, units
         ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
     @staticmethod
@@ -297,9 +302,9 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         elif not nrows and ncols: nrows = int(np.ceil(num_plots / ncols))
         return nrows, ncols
     @staticmethod
-    def findobj(figname, obj_name): return (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
+    def findobj(figname: str, obj_name: str): return (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
     @staticmethod
-    def get_fig_static(figpolicy, figname='', suffix=None, **kwargs):
+    def get_fig_static(figpolicy: FigurePolicy, figname: str = '', suffix: Optional[str] = None, **kwargs: Any):
         exist = True if figname in plt.get_figlabels() else False
         if figpolicy is FigurePolicy.same: return plt.figure(num=figname, **kwargs)
         elif figpolicy is FigurePolicy.add_new: return plt.figure(num=(timestamp(name=figname) if suffix is None else figname + suffix) if exist else figname, **kwargs)
@@ -311,16 +316,16 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         ax.plot(x, y); ax.axis("square"); ax.set_xlim(0, 100); ax.set_ylim(-100, 100)
         FigureManager.set_ax_to_real_life_size(ax); fig.savefig(P.tmp() / "trial.png", dpi=250)
     @staticmethod
-    def write(txt, name="text", size=8, **kwargs):
+    def write(txt: str, name: str = "text", size: int = 8, **kwargs: Any):
         FigureManager.maximize_fig(fig := plt.figure(figsize=(11.69, 8.27), num=name))
         fig.clf(); fig.text(0.5, 0.5, txt, transform=fig.transFigure, size=size, ha="center", va='center', **kwargs); return fig
     @staticmethod
-    def activate_latex(size=20):
+    def activate_latex(size: int = 20):
         plt.rc('xtick', labelsize=size); plt.rc('ytick', labelsize=size)
         plt.rc('axes', titlesize=size); plt.rc('legend', fontsize=size / 1.5)  # rc('text', usetex=True)
         plt.rcParams['text.usetex'] = True; plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
     @staticmethod
-    def set_linestyles_and_markers_and_colors(test=False):
+    def set_linestyles_and_markers_and_colors(test: bool = False):
         from cycler import cycler; from matplotlib import lines
         markers = list(lines.lineMarkers.keys())[:-4]  # ignore the None
         linestyles = (list(lines.lineStyles.keys())[:-3] * 10)[:len(markers)]
@@ -343,17 +348,17 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
 
 
 class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
-    def __init__(self, ax=None, figname='Graph', title='', label='curve', style='seaborn', figpolicy=FigurePolicy.add_new, figsize=(14, 8)):
+    def __init__(self, ax=None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn', figpolicy=FigurePolicy.add_new, figsize=(14, 8)):
         super().__init__(figpolicy=figpolicy)
         self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
         if ax is None:  # create a figure
             with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
         else: self.ax = ax; self.fig = ax.figure  # use the passed axis
         self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
-    def plot(self, *args, legends=None, title=None, **kwargs): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
-    def plot_dict(self, adict, title='', xlabel='', ylabel=''): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); self.ax.set_title(title); self.ax.set_xlabel(xlabel); self.ax.set_ylabel(ylabel); return self
-    def plot_twin(self, c1, c2, x=None, l1='', l2='', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
-    def suptitle(self, title): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
+    def plot(self, *args, legends=None, title: Optional[str] = None, **kwargs: Any): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
+    def plot_dict(self, adict, title: str = '', xlabel: str = '', ylabel: str = ''): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); self.ax.set_title(title); self.ax.set_xlabel(xlabel); self.ax.set_ylabel(ylabel); return self
+    def plot_twin(self, c1, c2, x=None, l1: str = '', l2: str = '', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
+    def suptitle(self, title: str): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
     def clear(self): self.fig.clf()  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     def axes(self): return [self.ax]  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     def visibility(self):
@@ -373,8 +378,8 @@ class VisibilityViewerAuto(VisibilityViewer):
     artist = ['internal', 'external'][1]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][0:2]
-    def __init__(self, data=None, artist=None, stream='clear', save_type=FigureSave.Null, save_dir=None, save_name=None, delay=1,
-                 titles=None, legends=None, x_labels=None, pause=True, **kwargs):
+    def __init__(self, data=None, artist=None, stream: str = 'clear', save_type=FigureSave.Null, save_dir: PLike = None, save_name: Optional[str] = None, delay: int = 1,
+                 titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
         self.data = data; self.artist = artist or Artist()
@@ -397,9 +402,9 @@ class ImShow(FigureManager):
     artist = ['internal', 'external'][0]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, img_tensor, sup_titles=None, sub_labels=None, save_type=FigureSave.Null, save_name=None, save_dir=None, save_kwargs=None,
-                 subplots_adjust=None, gridspec=None, tight=True, info_loc=None, nrows=None, ncols=None, ax=None,
-                 figsize=None, figname='im_show', auto_brightness=True, delay=200, pause=False, **kwargs):
+    def __init__(self, img_tensor: 'np.ndarray', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir=None, save_kwargs=None,
+                 subplots_adjust=None, gridspec=None, tight: bool = True, info_loc=None, nrows:Optional[int] = None, ncols:Optional[int] = None, ax=None,
+                 figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs):
         """
         :param img_tensor: size N x M x W x H [x C]  # M used spatially, N for animation.
         :param sup_titles: Titles for frames (N)
@@ -433,8 +438,8 @@ class ImShow(FigureManager):
             else: self.idx_cycle.set_index(i)
         if self.idx_cycle.get_index() == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
     @staticmethod
-    def try_cmaps(im, nrows=3, ncols=7, **kwargs): _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
-    def annotate(self, event, axis=None, data=None): [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
+    def try_cmaps(im, nrows: int = 3, ncols: int = 7, **kwargs: Any): _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
+    def annotate(self, event: Event, axis=None, data=None): _ = [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
     from_img_paths = staticmethod(lambda paths, **kwargs: ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs))
     from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
     test = staticmethod(lambda: ImShow(np.random.rand(12, 10, 80, 120, 3)))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f

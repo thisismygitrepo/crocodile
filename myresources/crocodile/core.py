@@ -135,7 +135,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def len(self) -> int: return len(self.list)
     # ================= call methods =====================================
     def __getattr__(self, name: str) -> 'List[T]': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args: list[Any], **kwargs: dict[str, Any]) -> 'List[Any]': return List(i(*args, **kwargs) for i in self.list)
+    def __call__(self, *args: list[Any], **kwargs: Any) -> 'List[Any]': return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
     def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
@@ -158,16 +158,16 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def remove(self, value: Optional[T] = None, values: Optional[list[T]] = None, strict: bool = True) -> 'List[T]': _ = [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list[T]: return self.list
-    def to_numpy(self, **kwargs: dict[str, Any]): import numpy as np; return np.array(self.list, **kwargs)
+    def to_numpy(self, **kwargs: Any) -> 'np.ndarray': import numpy as np; return np.array(self.list, **kwargs)
     def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
     # def index(self, val: int) -> int: return self.list.index(val)
     def slice(self, start: Optional[int] = None, stop: Optional[int] = None, step: Optional[int] = None) -> 'List[T]': return List(self.list[start:stop:step])
     def __getitem__(self, key: Union[int, list[int], 'slice']) -> Union[T, 'List[T]']:
-        if isinstance(key, list): return List(self[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
+        if isinstance(key, (list, Iterable, Iterator)): return List(self.list[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         # elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
         elif isinstance(key, int): return self.list[key]
-        assert isinstance(key, slice)
-        return List(self.list[key])  # for slices
+        # assert isinstance(key, slice)
+        return List(self.list[key])  # for slices  # type: ignore
     def apply(self, func: Callable[[T], T2], *args: Any, other: Optional['List[T]'] = None, filt: Optional[Callable[[T], bool]] = lambda x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], depth: int = 1, verbose: bool = False, desc: Optional[str] = None, **kwargs: Any) -> 'List[T2]':
         if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
         iterator = (self.list if not verbose else install_n_import("tqdm").tqdm(self.list, desc=desc)) if other is None else (zip(self.list, other) if not verbose else install_n_import("tqdm").tqdm(zip(self.list, other), desc=desc))
@@ -236,11 +236,25 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
             for k, v in self.items():
                 if kv_func(k, v): self.__dict__.__delitem__(k)
         return self
-    def _pandas_repr(self, justify: int, return_str: bool = False, limit: int = 30): res = __import__("pandas").DataFrame(__import__("numpy").array([self.keys(), self.values().apply(lambda x: str(type(x)).split("'")[1]), self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))]).T, columns=["key", "dtype", "details"]); return res if not return_str else str(res)
-    def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False, limit: int = 50, title: str = "", **kwargs: Any) -> Union[str, 'Struct']:
+    def _pandas_repr(self, justify: int, return_str: bool = False, limit: int = 30):
+        import pandas as pd
+        import numpy as np
+        col2 = self.values().apply(lambda x: str(type(x)).split("'")[1])
+        col3 = self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))
+        array = np.array([self.keys(), col2, col3]).T
+        res: pd.DataFrame = pd.DataFrame(array, columns=["key", "dtype", "details"])
+        return res if not return_str else str(res)
+    def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False, limit: int = 50, title: str = "", attrs: bool = False, **kwargs: Any) -> Union[str, 'Struct']:
+        _ = attrs
         if as_config and not return_str: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
-        res = f"Empty Struct." if not bool(self) else ((__import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)) if as_yaml or as_config else self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"]))
-        _ = (install_n_import("rich").print(res.to_markdown()) if ("DataFrame" in res.__class__.__name__ and install_n_import("tabulate")) else print(res)) if not return_str else None; return str(res) if return_str else self
+        if not bool(self): res = f"Empty Struct."
+        else:
+            if as_yaml or as_config: res = __import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
+            else: res = self._pandas_repr(justify=justify, return_str=False, limit=limit).drop(columns=[] if dtype else ["dtype"])
+        if not return_str:
+            if ("DataFrame" in res.__class__.__name__ and install_n_import("tabulate")): install_n_import("rich").print(res.to_markdown())
+            else: print(res)
+        return str(res) if return_str else self
     @staticmethod
     def concat_values(*dicts: dict[Any, Any], orient: str = 'List[Any]') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, use_plt: bool = True, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):

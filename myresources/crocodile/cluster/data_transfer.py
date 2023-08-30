@@ -1,4 +1,7 @@
 
+"""DS
+"""
+
 import crocodile.toolbox as tb
 from crocodile.cluster.remote_machine import RemoteMachine, ResourceManager
 
@@ -38,27 +41,23 @@ class Submission:
 
     @staticmethod
     def gdrive(rm: RemoteMachine):
-        from crocodile.comms.gdrive import GDriveAPI
-        api = GDriveAPI()
         paths = [rm.resources.kwargs_path]
-        if rm.config.copy_repo: api.upload(local_path=rm.job_params.repo_path_rh, rel2home=True, overwrite=True, zip_first=True, encrypt_first=True)
-        if rm.data is not None:
-            tb.L(rm.data).apply(lambda x: api.upload(local_path=x, rel2home=True, overwrite=True))
+        if rm.config.copy_repo: tb.P(rm.job_params.repo_path_rh).to_cloud(cloud="", rel2home=True, zip=True, encrypt=True)
+        for x in rm.data:
+            x.to_cloud(cloud="", rel2home=True)
             paths += list(rm.data)
-        downloads = '\n'.join([f"api.download(fpath=r'{item.collapseuser().as_posix()}', rel2home=True)" for item in paths])
+        downloads = '\n'.join([f"P(r'{item.collapseuser().as_posix()}').from_cloud(cloud="", rel2home=True)" for item in paths])
         py_download_script = f"""
-from crocodile.comms.gdrive import GDriveAPI
 from crocodile.file_management import P
-api = GDriveAPI()
 {downloads}
-{'' if not rm.config.copy_repo else f'api.download(fpath=r"{tb.P(rm.job_params.repo_path_rh).collapseuser().as_posix()}", unzip=True, decrypt=True)'}
+{'' if not rm.config.copy_repo else f'P(r"{tb.P(rm.job_params.repo_path_rh).collapseuser().as_posix()}").from_cloud(cloud="", unzip=True, decrypt=True)'}
 """
         shell_script_modified = rm.resources.shell_script_path.expanduser().read_text().replace("# EXTRA-PLACEHOLDER-POST", f"bu_gdrive_rx -R {rm.resources.py_script_path.collapseuser().as_posix()}")
         with open(file=rm.resources.shell_script_path.expanduser(), mode='w', newline={"Windows": None, "Linux": "\n"}[rm.ssh.get_remote_machine()], encoding="utf-8") as file: file.write(shell_script_modified)
         py_script_modified = rm.resources.py_script_path.expanduser().read_text().replace("# EXTRA-PLACEHOLDER-PRE", py_download_script)
         rm.resources.py_script_path.expanduser().write_text(py_script_modified, encoding="utf-8")
 
-        api.upload(rm.resources.root_dir, zip_first=True)
+        tb.P(rm.resources.root_dir).to_cloud(cloud="", zip=True)
         tb.install_n_import("clipboard").copy((f"bu_gdrive_rx -R {rm.resources.shell_script_path.collapseuser().as_posix()}; " + ("source " if rm.ssh.get_remote_machine() != "Windows" else "")) + f"{rm.resources.shell_script_path.collapseuser().as_posix()}")
         print("Finished uploading to cloud. Please run the clipboard command on the remote machine:")
 

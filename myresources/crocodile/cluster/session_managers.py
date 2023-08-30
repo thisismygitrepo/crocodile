@@ -91,7 +91,9 @@ class WindowsTerminal:
     def get_new_session_name(self): return f"mprocs{self.id}"
     def get_new_session_string(self): return f"lol"
     def get_ssh_command(self): return ""
-    def open_console(self, cmd: str,  shell: str = "powershell"): return "wt -w 0 -d ."
+    def open_console(self, cmd: str, shell: str = "powershell"): 
+        _ = cmd, shell
+        return "wt -w 0 -d ."
     # def get_layout(self):
     #     temp = self.get_template()
     #     temp.procs['main']['shell']['windows'] = "croshell"
@@ -117,11 +119,13 @@ class Mprocs:
     def get_new_session_name(self): return f"mprocs{self.id}"
     def get_new_session_string(self): return f"lol"
     def get_ssh_command(self): return ""
-    def open_console(self, cmd, shell="powershell"): return "wt -w 0 -d ."
+    def open_console(self, cmd: str, shell: str = "powershell"): 
+        _ = cmd, shell
+        return "wt -w 0 -d ."
     def get_layout(self):
         temp = self.get_template()
         temp.procs['main']['shell']['windows'] = "croshell"
-        template_file = tb.Save.yaml(obj=temp, path=tb.P.tmpfile(suffix=".yaml"))
+        _template_file = tb.Save.yaml(obj=temp, path=tb.P.tmpfile(suffix=".yaml"))
     def asssert_session_started(self):
         time.sleep(3)
         return True

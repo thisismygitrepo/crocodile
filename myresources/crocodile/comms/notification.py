@@ -9,7 +9,7 @@ import imaplib
 # from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+from typing import Optional, Any
 
 """
 
@@ -29,7 +29,7 @@ class Email:
         elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"]) 
         self.server.login(self.config['email_add'], password=self.config["password"])
 
-    def send_message(self, to, subject, body, txt_to_html=True, attachments=None):
+    def send_message(self, to: str, subject: str, body: str, txt_to_html: bool = True, attachments: Optional[list[Any]] = None):
         body += "\n\nThis is an automated email sent via crocodile.comms script."
         # msg = message.EmailMessage()
         msg = MIMEMultipart("alternative")
@@ -74,16 +74,16 @@ class Email:
         self.server.send_message(msg)
 
     @staticmethod
-    def manage_folders(email_add, pwd):
+    def manage_folders(email_add: str, pwd: str):
         server = imaplib.IMAP4()
         server.starttls()
         server.login(email_add, password=pwd)
 
-    def send_email(self, to_addrs, msg): return self.server.sendmail(from_addr=self.config['email_add'], to_addrs=to_addrs, msg=msg)
+    def send_email(self, to_addrs: str, msg: str): return self.server.sendmail(from_addr=self.config['email_add'], to_addrs=to_addrs, msg=msg)
     def close(self): self.server.quit()    # Closing is vital as many servers do not allow mutiple connections.
 
     @staticmethod
-    def send_and_close(config_name, to, subject, msg):
+    def send_and_close(config_name: str, to: str, subject: str, msg: str):
         tmp = Email(config=Email.get_source_of_truth()[config_name]); tmp.send_message(to, subject, msg); tmp.close()
 
 
@@ -91,7 +91,7 @@ class PhoneNotification:  # security concerns: avoid using this.
     def __init__(self, bulletpoint_token):
         pushbullet = tb.install_n_import("pushbullet")
         self.api = pushbullet.Pushbullet(bulletpoint_token)
-    def send_notification(self, title="Note From Python", body="A notfication"): self.api.push_note(title=title, body=body)
+    def send_notification(self, title: str="Note From Python", body: str="A notfication"): self.api.push_note(title=title, body=body)
     @staticmethod
     def open_website(): tb.P(r"https://www.pushbullet.com/").readit()
     @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
