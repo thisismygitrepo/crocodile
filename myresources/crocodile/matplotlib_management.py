@@ -30,24 +30,24 @@ class FigurePolicy(enum.Enum):
 
 def assert_requirements():
     try: subprocess.check_output(['where.exe' if platform.system() == 'Windows' else 'which', 'magick'])
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, subprocess.CalledProcessError) as err:
         # P(r"https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z").download().unzip().search()[0].rename("ffmpeg").move(r"C://")  # P("C:\\ffmpeg\\bin")  # add to PATH
         print("Installinng image magick")
         if __import__("platform").system() == "Windows":
             Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
             print("You might need to restart your machine before PATH change impact takes place.")
-        else: raise NotImplementedError
+        else: raise NotImplementedError from err
 
 
 class FigureSave:
     class GenericSave:
         stream = ['clear', 'accumulate', 'update'][0]
-        def __init__(self, save_dir: PLike = None, save_name: Optional[str] = None, watch_figs: list or None = None, max_calls: int = 2000, delay: int = 100, **kwargs: Any):
+        def __init__(self, save_dir: PLike = None, save_name: Optional[str] = None, watch_figs: Optional[list[Any]] = None, max_calls: int = 2000, delay: int = 100, **kwargs: Any):
             """How to control what to be saved: you can either pass the figures to be tracked at init time, pass them dynamically at add time, or, add method will capture every figure and axis"""
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
             self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_fig_save")
             self.kwargs, self.counter, self.delay, self.max = kwargs, 0, delay, max_calls
-        def add(self, fignames=None, names=None, **kwargs):  # generic method used at runtime, never changed.
+        def add(self, fignames: Optional[list[str]] = None, names: Optional[list[str]] = None, **kwargs: Any):  # generic method used at runtime, never changed.
             print(f"Saver added frame number {self.counter}", end='\r')
             self.counter += 1; plt.pause(self.delay * 0.001); print('Turning off IO') if self.counter > self.max else None; plt.ioff()
             self.watch_figs = [plt.figure(figname) for figname in fignames] if fignames else ([plt.figure(k) for k in plt.get_figlabels()] if self.watch_figs is None else self.watch_figs)  # path sent explicitly, # None exist ==> add all else # they exist already.
@@ -65,8 +65,8 @@ class FigureSave:
         def _save(self, a_fig, a_name: str, bbox_inches: str = 'tight', pad_inches: float = 0.3, **kwargs): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
         def finish(self): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); return self
     class PNG(GenericSave):
-        def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
-        def _save(self, afigure, aname, dpi=150, **kwargs):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
+        def _save(self, afigure: str, aname: str, dpi: int = 150, **kwargs: Any):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
         def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
     class GIF(GenericSave):  # NOT RECOMMENDED, used GIFFileBased instead.
         """This class uses ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc (limitation).
@@ -75,10 +75,10 @@ class FigureSave:
         Works for images only. Add more .imshow to the same axis, and that's it. imshow will conver up previous images. For lines, it will superimpose it and will look ugly.
         The class will automatically detect new lines by their "neo" labels and add them then hide them for the next round.
         """
-        def __init__(self, interval: int = 100, **kwargs):
+        def __init__(self, interval: int = 100, **kwargs: Any):
             super().__init__(**kwargs); from collections import defaultdict
             self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time.
-        def _save(self, afigure, aname, cla=False, **kwargs):
+        def _save(self, afigure, aname, cla=False, **kwargs: Any):
             fig_list, subcontainer = self.container[afigure.get_label()], []
             for item in FigureManager.findobj(afigure, 'neo'): item.set_label('processed'); item.set_visible(False); subcontainer += [item]
             fig_list.append(subcontainer)  # if you want the method coupled with cla being used in main, then it add_line is required for axes.
@@ -115,7 +115,7 @@ class FigureSave:
     class GenericAuto(GenericSave):
         """Parses the data internally, hence requires artist with animate method implemetend. Artist needs to have .fig attribute."""
         save_type = 'auto'
-        def __init__(self, plotter_class, data, names_list: Optional[list[str]] = None, **kwargs):
+        def __init__(self, plotter_class, data, names_list: Optional[list[str]] = None, **kwargs: Any):
             super().__init__(**kwargs); self.saver, self.plotter = None, None; assert_requirements()
             self.plotter_class, self.data, self.names_list, self.kwargs = plotter_class, data, names_list, kwargs
         def animate(self):
@@ -123,7 +123,7 @@ class FigureSave:
             for idx, datum in __import__("tqdm").tqdm(enumerate(self.data)): self.plotter.animate(datum); self.saver.add(names=[self.names_list[idx] if self.names_list is not None else str(idx)])
             self.saver.finish()
     class GIFAuto(GenericAuto):
-        def __init__(self, plotter_class, data, interval: int = 500, extension: str = 'gif', fps: int = 4, metadata=None, **kwargs):
+        def __init__(self, plotter_class, data, interval: int = 500, extension: str = 'gif', fps: int = 4, metadata=None, **kwargs: Any):
             super().__init__(plotter_class, data, **kwargs)
             writer = animation.PillowWriter(fps=fps) if extension == '.mp4' else animation.FFMpegWriter(fps=fps, metadata=metadata, bitrate=2500)
             self.plotter = self.plotter_class(**kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
@@ -138,7 +138,7 @@ class FigureSave:
     class NullAuto(GenericAuto):
         def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.Null(**kwargs); self.fname = self.saver.fname; self.animate()
     class GIFFileBasedAuto(GenericAuto):
-        def __init__(self, plotter_class, data, fps=4, dpi=150, bitrate=2500, _type='GIFFileBasedAuto', **kwargs):
+        def __init__(self, plotter_class, data, fps: int = 4, dpi: int = 150, bitrate: int = 2500, _type='GIFFileBasedAuto', **kwargs):
             super().__init__(**kwargs)
             if _type == 'GIFPipeBasedAuto': writer = animation.ImageMagickFileWriter; extension = '.gif'
             elif _type == 'MPEGFileBasedAuto': writer = animation.FFMpegFileWriter; extension = '.mp4'
@@ -200,7 +200,10 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def process_key(self, event: Event):
         self.event = event  # useful for debugging.
         for key in self.help_menu.keys():
-            if event.key in key: self.help_menu[key]['func'](event); self.update_info_text(self.message); break
+            if event.key in key:
+                self.help_menu[key]['func'](event)
+                self.update_info_text(self.message)
+                break
         if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
     def toggle_annotate(self, event: Event):
         self.annot_flag = not self.annot_flag
@@ -399,7 +402,7 @@ class ImShow(FigureManager):
     artist = ['internal', 'external'][0]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, img_tensor, sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir=None, save_kwargs=None,
+    def __init__(self, img_tensor: 'np.ndarray', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir=None, save_kwargs=None,
                  subplots_adjust=None, gridspec=None, tight: bool = True, info_loc=None, nrows:Optional[int] = None, ncols:Optional[int] = None, ax=None,
                  figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs):
         """

@@ -68,14 +68,14 @@ class RemoteMachine:
         self.config = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
-        if self.config.install_repo is None: self.config.install_repo = self.job_params.is_installabe()
+        if self.config.install_repo is True: assert self.job_params.is_installabe()
 
-        self.kwargs = func_kwargs or tb.S()
+        self.kwargs = func_kwargs or {}
         self.data = data if data is not None else []
         # conn
         self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)
         self.session_manager = Zellij(self.ssh) if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal(self.ssh)
-        self.session_name = None
+        self.session_name: Optional[str] = None
         # scripts
         self.resources = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
@@ -135,7 +135,7 @@ class RemoteMachine:
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
         py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
-            if self.func is not None: executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
+            if isinstance(self.func, Callable): executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
             else: executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
             assert self.config.email_config_name is not None, "Email config name is not provided. 🤷‍♂️"
             assert self.config.to_email is not None, "Email address is not provided. 🤷‍♂️"
@@ -240,10 +240,8 @@ deactivate
     def download_results(self, target: Optional[str] = None, r: bool = True, zip_first: bool = False):
         assert self.results_path is not None, "Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first."
         if self.results_downloaded: print(f"Results already downloaded. 🤔\nSee `{self.results_path.expanduser().absolute()}`"); return
-        if self.results_path is not None:
-            self.ssh.copy_to_here(source=self.results_path.collapseuser().as_posix(), target=target, r=r, z=zip_first)
-            self.results_downloaded = True
-        else: print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
+        self.ssh.copy_to_here(source=self.results_path.collapseuser().as_posix(), target=target, r=r, z=zip_first)
+        self.results_downloaded = True
         return self
     def delete_remote_results(self):
         if self.results_path is not None:

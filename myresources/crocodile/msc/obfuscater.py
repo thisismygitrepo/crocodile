@@ -1,10 +1,13 @@
 
+"""FM
+"""
+
 import crocodile.toolbox as tb
 from typing import Any, Optional
 
 
 class Obfuscator(tb.Base):
-    def __init__(self, directory: str = "", noun: bool = False, suffix: str = "same", *args: Any, **kwargs: Any) -> None:
+    def __init__(self, directory: str, noun: bool = False, suffix: str = "same", *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.directory = tb.P(directory).expanduser().absolute()
         assert self.directory.is_dir()
@@ -35,7 +38,7 @@ class Obfuscator(tb.Base):
         root = self.directory if forward else self.obfuscate(self.directory)
         self._execute_map(root, forward=forward)
 
-    def symlink_to_phoney(self, base=None):
+    def symlink_to_phoney(self, base: Optional[tb.P] = None):
         base = tb.P(base).expanduser().absolute() if base is not None else self.directory
         directory_obf = self.obfuscate(self.directory)
         for path_obf in directory_obf.search("*", r=True):
@@ -44,7 +47,7 @@ class Obfuscator(tb.Base):
             base.joinpath(path_real.relative_to(self.directory)).symlink_to(path_obf)
 
     @staticmethod
-    def lcd(path1, path2): return tb.P("/".join([part1 for part1, part2 in zip(tb.P(path1).expanduser().absolute().parts, tb.P(path2).expanduser().absolute().parts) if part1 == part2]))
+    def lcd(path1: tb.P, path2: tb.P): return tb.P("/".join([part1 for part1, part2 in zip(tb.P(path1).expanduser().absolute().parts, tb.P(path2).expanduser().absolute().parts) if part1 == part2]))
 
     def _execute_map(self, path: tb.P, forward: bool) -> None:
         assert path.is_dir()
