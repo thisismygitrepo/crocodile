@@ -196,7 +196,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     # def recursive_dict(struct) -> 'Struct': _ = [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path: Optional[PLike] = None, indent: Optional[str] = None): return Save.json(obj=self.__dict__, path=path, indent=indent)
     @classmethod
-    def from_keys_values(cls, k: list[str], v: list[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
+    def from_keys_values(cls, k: Iterable[str], v: Iterable[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
     from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
     @classmethod
     def from_names(cls, names: list[str], default_: Optional[Any] = None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
