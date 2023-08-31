@@ -136,6 +136,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def __len__(self) -> int: return len(self.list)
     def __iter__(self) -> Iterator[T]: return iter(self.list)
     def __array__(self): import numpy as np; return np.array(self.list)  # compatibility with numpy
+    # def __next__(self) -> T: return next(self.list)
     @property
     def len(self) -> int: return len(self.list)
     # ================= call methods =====================================

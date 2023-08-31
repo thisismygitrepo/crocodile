@@ -358,7 +358,7 @@ class BaseModel(ABC):
     def load_model(directory: Union[str, Path, P]): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
     def load_weights(self, directory: Union[str, Path, P]):
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
-        self.model.load_weights(P(directory).search('*.data*').__next__().__str__().split('.data')[0]).expect_partial()  # requires path to file path.
+        self.model.load_weights(P(directory).search('*.data*').list[0].__str__().split('.data')[0]).expect_partial()  # requires path to file path.
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
@@ -732,16 +732,16 @@ class HPTuning:
     # def optimize(self): self.gen_writer(); self.loop()
 
 
-class KerasOptimizer:
-    def __init__(self, d):
-        self.data = d
-        self.tuner = None
+# class KerasOptimizer:
+#     def __init__(self, d):
+#         self.data = d
+#         self.tuner = None
 
-    def __call__(self, ktp): pass
+#     def __call__(self, ktp): pass
 
-    def tune(self):
-        kt = tb.core.install_n_import("kerastuner")
-        self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=tb.P.tmp('my_dir'), project_name='intro_to_kt')
+#     def tune(self):
+#         kt = tb.install_n_import("kerastuner")
+#         self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=tb.P.tmp('my_dir'), project_name='intro_to_kt')
 
 
 def batcher(func_type: str = 'function'):
@@ -765,19 +765,19 @@ def batcher(func_type: str = 'function'):
         return Batch
 
 
-def batcherv2(func_type='function', order=1):
+def batcherv2(func_type: str = 'function', order: int = 1):
     if func_type == 'method':
         def batch(func):
             # from functools import wraps
             # @wraps(func)
-            def wrapper(self, *args, **kwargs): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+            def wrapper(self, *args: Any, **kwargs: Any): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
             return wrapper
         return batch
     elif func_type == 'class': raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
             def __init__(self, func): self.func = func
-            def __call__(self, *args, **kwargs): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+            def __call__(self, *args: Any, **kwargs: Any): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
         return Batch
 
 
