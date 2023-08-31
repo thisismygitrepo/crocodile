@@ -15,25 +15,40 @@ FILE_MODE: TypeAlias = Literal['r', 'w', 'x', 'a']
 # %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
-def pwd2key(password: str, salt=None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
-    if salt is None: m = __import__("hashlib").sha256(); m.update(password.encode("utf-8")); return __import__("base64").urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
+def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
+    import base64
+    if salt is None:
+        import hashlib
+        m = hashlib.sha256()
+        m.update(password.encode("utf-8"))
+        return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    return __import__("base64").urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
-def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True, iteration: Optional[int] = None, gen_key=False) -> bytes:
-    salt = None  # silence the linter.
+    return base64.urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
+def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True, iteration: Optional[int] = None, gen_key: bool = False) -> bytes:
+    import base64
+    salt, iteration = None, None
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
-        salt, iteration = (__import__('secrets').token_bytes(16), iteration or __import__('secrets').randbelow(1_000_000)) if salted else (None, None); key = pwd2key(pwd, salt, iteration)
+        import secrets
+        iteration = iteration or secrets.randbelow(1_000_000)
+        salt = secrets.token_bytes(16) if salted else None
+        key = pwd2key(pwd, salt, iteration)
     elif key is None:
-        if gen_key: key = __import__("cryptography.fernet").__dict__["fernet"].Fernet.generate_key(); P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes').write_bytes(key, overwrite=False)
+        if gen_key:
+            from cryptography.fernet import Fernet
+            key = Fernet.generate_key()
+            P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes').write_bytes(key, overwrite=False)
         else:
             try: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes(); print(f"Using key from: {P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes')}")
-            except FileNotFoundError as err: print("\n" * 3, "~" * 50, f"""Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~" * 50, "\n" * 3); raise FileNotFoundError(err)
+            except FileNotFoundError as err:
+                print("\n" * 3, "~" * 50, f"""Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~" * 50, "\n" * 3)
+                raise FileNotFoundError(err) from err
     elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"Key must be either a path, bytes object or None.")
     code = __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).encrypt(msg)
-    return __import__("base64").urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), __import__("base64").urlsafe_b64decode(code))) if pwd is not None and salted is True else code
+    if pwd is not None and salt is not None and iteration is not None: return base64.urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), base64.urlsafe_b64decode(code)))
+    return code
 def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True) -> bytes:
     if pwd is not None:
         assert key is None, f"You can either pass key or pwd, or none of them, but not both."
@@ -62,10 +77,12 @@ def read(path: Union[str, Path, 'P'], **kwargs: Any):
 def json(path: Union[str, Path, 'P'], r: bool = False, **kwargs: Any) -> Struct:
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
-    return Struct.recursive_struct(mydict) if r else Struct(mydict)
+    _ = r
+    return mydict  # Struct.recursive_struct(mydict) if r else Struct(mydict)
 def yaml(path: Union[str, Path, 'P'], r: bool = False):
     with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
-    return Struct(mydict) if not r else Struct.recursive_struct(mydict)
+    _ = r
+    return mydict  # Struct(mydict) if not r else Struct.recursive_struct(mydict)
 def ini(path: Union[str, Path, 'P']): import configparser; res = configparser.ConfigParser(); res.read(str(path)); return res
 def toml(path: Union[str, Path, 'P']): return install_n_import("tomli").loads(P(path).read_text())
 def npy(path: Union[str, Path, 'P'], **kwargs: Any): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
@@ -91,16 +108,20 @@ class Read:
     txt = staticmethod(txt)
 
 
-def modify_text(txt_raw: str, txt_search: str, txt_alt: str, replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):
+def modify_text(txt_raw: str, txt_search: str, txt_alt: Union[str, Callable[[str], str]], replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):
     lines, bingo = txt_raw.split("\n"), False
     if not replace_line:  # no need for line splitting
+        assert isinstance(txt_alt, str), f"txt_alt must be a string if notfound_append is True. It is not: {txt_alt}"
         if txt_search in txt_raw: return txt_raw.replace(txt_search, txt_alt)
         return txt_raw + "\n" + txt_alt if notfound_append else txt_raw
     for idx, line in enumerate(lines):
         if txt_search in line:
-            lines[idx], bingo = txt_alt if type(txt_alt) is str else txt_alt(line), True
+            if isinstance(txt_alt, str): lines[idx] = txt_alt
+            elif callable(txt_alt): lines[idx] = txt_alt(line)
+            bingo = True
     if strict and not bingo: raise ValueError(f"txt_search `{txt_search}` not found in txt_raw `{txt_raw}`")
     if bingo is False and notfound_append is True:
+        assert isinstance(txt_alt, str), f"txt_alt must be a string if notfound_append is True. It is not: {txt_alt}"
         if prepend: lines.insert(0, txt_alt)
         else: lines.append(txt_alt)  # txt not found, add it anyway.
     return "\n".join(lines)
@@ -118,9 +139,12 @@ class P(type(Path()), Path):  # type: ignore
         if not self.exists(): self.unlink(missing_ok=True); _ = print(f"Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
         _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); _ = print(f"DELETED {repr(self)}.") if verbose else None; return self
     def send2trash(self, verbose: bool = True) -> 'P':
-        if self.exists(): install_n_import("send2trash").send2trash(self.resolve().str); _ = print(f"TRASHED {repr(self)}") if verbose else None  # do not expand user symlinks.
+        if self.exists():
+            install_n_import("send2trash").send2trash(self.resolve().str)
+            _ = print(f"TRASHED {repr(self)}") if verbose else None; return self  # do not expand user symlinks.
         elif verbose: print(f"Could NOT trash {self}"); return self
-    def move(self, folder: Union[str, 'P', None] = None, name: PLike = None, path: Union[str, 'P', None] = None, rel2it=False, overwrite: bool = False, verbose: bool = True, parents: bool = True, content=False) -> 'P':
+        return self
+    def move(self, folder: PLike = None, name: PLike = None, path: PLike = None, rel2it: bool = False, overwrite: bool = False, verbose: bool = True, parents: bool = True, content: bool = False) -> 'P':
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
         _ = path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
@@ -129,18 +153,18 @@ class P(type(Path()), Path):  # type: ignore
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
         else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
         _ = print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
-    def copy(self, folder: PLike = None, name: PLike = None, path: PLike = None, content: bool = False, verbose: bool = True, append=None, overwrite: bool = False, orig: bool = False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
+    def copy(self, folder: PLike = None, name: PLike = None, path: PLike = None, content: bool = False, verbose: bool = True, append: Optional[str] = None, overwrite: bool = False, orig: bool = False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
         dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
         dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
         _ = dest.delete(sure=True) if not content and overwrite and dest.exists() else None
         if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); _ = print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
-        elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); _ = print(f"COPIED {'Content of ' if False else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
+        elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); _ = print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader=None, strict: bool = True, notfound=None, verbose: bool = False, **kwargs) -> 'Any':
+    def readit(self, reader: Optional[Callable[[Union[str, Path, 'P']], Any]] = None, strict: bool = True, notfound: Optional[Any] = None, verbose: bool = False, **kwargs: Any) -> 'Any':
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else: _ = (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return notfound
@@ -148,7 +172,7 @@ class P(type(Path()), Path):  # type: ignore
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError as ioe: raise IOError from ioe
-    def start(self, opener=None):
+    def start(self, opener: Optional[str] = None):
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
         if __import__("sys").platform == "win32":  # double quotes fail with cmd. # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             __import__("subprocess").Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
@@ -160,11 +184,14 @@ class P(type(Path()), Path):  # type: ignore
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: Optional[str] = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
-    def download(self, folder: PLike = None, name: PLike = None, memory: bool = False, allow_redirects: bool = True, params=None) -> 'P':
-        response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        return response if memory else (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
-    def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg="", __delayed_msg__="") -> 'P':
-        if inlieu: self._str = str(res)  # type: ignore
+    def download(self, folder: PLike = None, name: PLike = None, memory: bool = False, allow_redirects: bool = True, params: Any = None) -> Union['P', 'Response']:
+        import requests
+        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
+        if memory: return response  # r.contents is bytes encoded as per docs of requests.
+        return (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(str(name or self.name))).create(parents_only=True).write_bytes(response.content)
+    def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
+        if inlieu:
+            self._str = str(res)  # type: ignore
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename":
@@ -180,8 +207,11 @@ class P(type(Path()), Path):  # type: ignore
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
         `orig`: whether the method returns the original path object or a new one."""
-    def prepend(self, prefix: str, suffix: Optional[str] = None, verbose: bool = True, **kwargs: Any): return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
-    def append(self, name: str = '', index: bool = False, suffix: Optional[str] = None, verbose: bool = True, **kwargs: Any) -> 'P': return self.append(name=f'_{len(self.parent.search(f"*{self.trunk}*"))}', index=False, verbose=verbose, suffix=suffix, **kwargs) if index else self._return(self.parent.joinpath(self.trunk + (name or "_" + timestamp()) + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)
+    def prepend(self, prefix: str, suffix: Optional[str] = None, verbose: bool = True, **kwargs: Any):
+        return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
+    def append(self, name: str = '', index: bool = False, suffix: Optional[str] = None, verbose: bool = True, **kwargs: Any) -> 'P':
+        if index: return self.append(name=f'_{len(self.parent.search(f"*{self.trunk}*"))}', index=False, verbose=verbose, suffix=suffix, **kwargs)
+        return self._return(self.parent.joinpath(self.trunk + (name or "_" + str(timestamp())) + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)
     def with_trunk(self, name: str, verbose: bool = True, **kwargs: Any): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", verbose=verbose, **kwargs)  # Complementary to `with_stem` and `with_suffix`
     def with_name(self, name: str, verbose: bool = True, **kwargs: Any): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", **kwargs)
     def switch(self, key: str, val: str, verbose: bool = True, **kwargs: Any): return self._return(P(str(self).replace(key, val)), operation="rename", verbose=verbose, **kwargs)  # Like string replce method, but `replace` is an already defined method."""
@@ -207,7 +237,8 @@ class P(type(Path()), Path):  # type: ignore
     def collapseuser(self, strict: bool = True):  # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
         return self if (str(self).startswith("~") or P.home().as_posix() not in self.resolve().as_posix()) else self._return(P("~") / (self.expanduser().absolute().resolve(strict=strict) - P.home()))  # resolve also solves the problem of Windows case insensitivty.
-    def __getitem__(self, slici: Union[int, slice]): return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
+    def __getitem__(self, slici: Union[int, slice]):
+        return P(*[self[item] for item in slici]) if type(slici) is list else (P(*self.parts[slici]) if type(slici) is slice else P(self.parts[slici]))  # it is an integer
     def __setitem__(self, key: Union['str', int, slice], value: Union['str', Path]):
         fullparts, new = list(self.parts), list(P(value).parts)
         if type(key) is str: idx = fullparts.index(key); fullparts.remove(key); fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
@@ -282,7 +313,8 @@ class P(type(Path()), Path):  # type: ignore
             return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
-        if ".zip" not in slf and compressed: raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]).reduce()
+        if ".zip" not in slf and compressed:
+            raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]).reduce()
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
     def tree(self, *args: Any, **kwargs: Any): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
@@ -333,7 +365,7 @@ class P(type(Path()), Path):  # type: ignore
             if overwrite:
                 if not content: P(folder).joinpath(fname or "").delete(sure=True, verbose=True)  # deletes a specific file / folder that has the same name as the zip file without extension.
                 else: List([x for x in __import__("zipfile").ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(fname or "", item.replace("/", "")).delete(sure=True, verbose=True))
-            result = unzip(zipfile.str, folder, None if fname is None else P(fname).as_posix(), **kwargs)
+            result = unzip(zipfile.str, str(folder), None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
     def tar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()
@@ -384,8 +416,11 @@ class P(type(Path()), Path):  # type: ignore
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username: PLike = None, password: Optional[str] = None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, txt: bool = True, path: Union[str, 'P', None] = None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(str(self) if "http" in str(self) else (self.read_text() if txt else self.read_bytes())); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
-    def get_remote_path(self, root: str, os_specific: bool = False) -> 'P': return P(root) / (__import__('platform').system().lower() if os_specific else 'generic_os') / self.rel2home()
-    def to_cloud(self, cloud: str, remotepath: PLike = None, zip: bool = False, encrypt: bool = False, key: Optional[str] = None, pwd: Optional[str] = None, rel2home: bool = False, share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: str = "myhome") -> 'P':
+    def get_remote_path(self, root: Optional[str], os_specific: bool = False) -> 'P':
+        tmp1 = (__import__('platform').system().lower() if os_specific else 'generic_os')
+        if isinstance(root, str): return P(root) / tmp1 / self.rel2home()
+        return tmp1 / self.rel2home()
+    def to_cloud(self, cloud: str, remotepath: PLike = None, zip: bool = False, encrypt: bool = False, key: Optional[str] = None, pwd: Optional[str] = None, rel2home: bool = False, share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
