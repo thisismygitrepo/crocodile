@@ -83,16 +83,17 @@ class HParams:
     def save(self):
         self.save_dir.joinpath(self.subpath, 'hparams.txt').create(parents_only=True).write_text(str(self))
         try: data = self.__getstate__()
-        except AttributeError: data: dict[str, Any] = self.__dict__
+        except AttributeError:
+            data: dict[str, Any] = self.__dict__
         tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
         tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
-    def __setstate__(self, state: dict): return self.__dict__.update(state)
+    def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
     def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any) -> 'HParams':
         data: dict = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
-    def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
+    def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
     def pkg(self):
         if self.pkg_name not in ("tensorflow", "torch"): raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
@@ -130,7 +131,7 @@ class DataReader:
         tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
         tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
-    def from_saved_data(cls, path: Union[str, tb.P], hp: HParams, *args, **kwargs):
+    def from_saved_data(cls, path: Union[str, tb.P], hp: HParams, *args: Any, **kwargs: Any):
         path = tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
         data: dict = tb.Read.vanilla_pickle(path)
         obj = cls(hp=hp, *args, **kwargs)
@@ -142,7 +143,7 @@ class DataReader:
         for item in items:
             if hasattr(self, item): res[item] = getattr(self, item)
         return res
-    def __setstate__(self, state): return self.__dict__.update(state)
+    def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
     def split_the_data(self, *args: Any, **kwargs: Any) -> None:
@@ -167,12 +168,12 @@ class DataReader:
         print(f"================== Training Data Split ===========================")
         tb.Struct(self.split).print()
 
-    def get_data_strings(self, which_data="ip", which_split="train"):
+    def get_data_strings(self, which_data: str = "ip", which_split: str = "train"):
         strings = {"op": self.specs.op_names, "ip": self.specs.ip_names, "others": self.specs.other_names}[which_data]
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice=None, indices=None, use_slice=False, split="test", size=None):
+    def sample_dataset(self, aslice=None, indices=None, use_slice: bool = False, split: str = "test", size: Optional[int] = None):
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
@@ -227,7 +228,7 @@ class DataReader:
     #     self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
     #     self.split['x_test']= self.scaler.transform(self.split['x_test'])
 
-    def image_viz(self, pred, gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
+    def image_viz(self, pred: 'np.ndarray', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
         """
         Assumes numpy inputs
         """
@@ -337,8 +338,9 @@ class BaseModel(ABC):
         if self.hp.pkg.__name__ == 'tensorflow':
             new_loss = self.hp.pkg.keras.losses.MeanAbsoluteError()
         else:
-            import crocodile.deeplearning_torch as tmp
-            new_loss = tmp.MeanAbsoluteError()
+            raise NotImplementedError
+            # import crocodile.deeplearning_torch as tmp
+            # new_loss = tmp.MeanAbsoluteError()
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
 
@@ -347,7 +349,7 @@ class BaseModel(ABC):
         return self.data.preprocess(*args, **kwargs)
 
     def postprocess(self, *args: Any, **kwargs: Any): return self.data.postprocess(*args, **kwargs)
-    def __call__(self, *arg: Anys, **kwargs: Any): return self.model(*args, **kwargs)
+    def __call__(self, *arg: Any, **kwargs: Any): return self.model(*args, **kwargs)
     def viz(self, *args: Any, **kwargs: Any): return self.data.viz(*args, **kwargs)
     def save_model(self, directory: Union[str, Path, P]): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory: Union[str, Path, P]):
@@ -392,7 +394,8 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test=None, y_test=None, names_test: list[str] = None, aslice=None, indices=None, use_slice: bool = False, size: Optional[int] = None, split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs):
+    def evaluate(self, x_test: Optional['np.ndarray'] = None, y_test: Optional['np.ndarray'] = None, names_test: Optional[list[str]] = None, aslice=None, indices=None, use_slice: bool = False, size: Optional[int] = None,
+                 split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None and x_test is not None: names_test = np.arange(len(x_test))
@@ -414,7 +417,7 @@ class BaseModel(ABC):
             self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **(viz_kwargs or {}))
         return results
 
-    def get_metrics_evaluations(self, prediction, groun_truth) -> Optional[pd.DataFrame]:
+    def get_metrics_evaluations(self, prediction: 'np.ndarray', groun_truth: 'np.ndarray') -> Optional[pd.DataFrame]:
         if self.compiler is None: return None
         metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
         loss_dict: dict[str, list] = dict()
@@ -649,11 +652,11 @@ class Losses:
         import tensorflow as tf
 
         class LogSquareLoss(tf.keras.losses.Loss):
-            def __init__(self, *args, **kwargs):
+            def __init__(self, *args: Any, **kwargs: Any):
                 super().__init__(*args, **kwargs)
                 self.name = "LogSquareLoss"
 
-            def call(self, y_true, y_pred):
+            def call(self, y_true: 'np.ndarray', y_pred: 'np.ndarray'):
                 _ = self
                 tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))
                 factor = tf.Tensor(20) / tmp
@@ -671,7 +674,7 @@ class Losses:
                 self.mme = self.add_weight(name='mme', initializer='zeros')
                 self.__name__ = name
 
-            def update_state(self, y_true, y_pred, sample_weight=None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
+            def update_state(self, y_true: 'np.ndarray', y_pred: 'np.ndarray', sample_weight=None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
             def result(self): return self.mme
             def reset_states(self): self.mme.assign(0.0)
         return MeanMaxError
