@@ -1,4 +1,7 @@
 
+"""Env
+"""
+
 import crocodile.toolbox as tb
 import platform
 import getpass
@@ -75,7 +78,7 @@ def get_network_addresses():
     # default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
     import uuid
     mac = uuid.getnode()
-    mac_address = ":".join(("%012X" % mac)[i:i + 2] for i in range(0, 12, 2))
+    mac_address = ":".join(("%012X" % mac)[i:i + 2] for i in range(0, 12, 2))  # type: ignore
     # elif hex_format: return hex(mac)
     # else: return mac
     import socket
@@ -137,7 +140,7 @@ class EnvVar:
 
 class PathVar:
     @staticmethod
-    def append_temporarily(dirs, kind="append", run=False):
+    def append_temporarily(dirs, kind="append"):
         dirs_ = []
         for path in dirs:
             path_rel = tb.P(path).collapseuser(strict=False)
@@ -153,13 +156,13 @@ class PathVar:
             elif kind == "prefix": command = fr'$env:Path = "{sep.join(dirs)};" + $env:Path'  # Prefix the Path variable in the current window:
             elif kind == "replace": command = fr'$env:Path = "{sep.join(dirs)}"'  # Replace the Path variable in the current window (use with caution!):
             else: raise KeyError
-            return command if run is False else tm.run(command, shell="powershell")
+            return command  # if run is False else tm.run(command, shell="powershell")
         elif system == "Linux": result = f'export PATH="{sep.join(dirs)}:$PATH"'
         else: raise ValueError
-        return result if run is False else tm.run(result, shell="powershell")
+        return result  # if run is False else tm.run(result, shell="powershell")
 
     @staticmethod
-    def append_permanently(path, scope=["User", "system"][0], run=False):
+    def append_permanently(path, scope=["User", "system"][0]):
         if system == "Windows":
             # AVOID THIS AND OPT TO SAVE IT IN $profile.
             tmp_path = tb.P.tmpfile(suffix=".path_backup")
@@ -169,11 +172,11 @@ class PathVar:
             backup = fr'$env:PATH >> {tmp_path}; '
             command = fr'[Environment]::SetEnvironmentVariable("Path", $env:PATH + ";{path}", "{scope}")'
             result = backup + command
-            return result if run is False else tm.run(result, shell="powershell").print()
+            return result  # if run is False else tm.run(result, shell="powershell").print()
         else: tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
 
     @staticmethod
-    def set_permanetly(path, scope=["User", "system"][0], run=False):
+    def set_permanetly(path, scope=["User", "system"][0]):
         """This is useful if path is manipulated with a text editor or Python string manipulation (not recommended programmatically even if original is backed up) and set the final value.
         On a windows machine, system and user variables are kept separately. env:Path returns the combination of both, starting from system then user.
         To see impact of change, you will need to restart the process from which the shell started. This is probably windows explorer.
@@ -183,13 +186,13 @@ class PathVar:
         print(f"Saving original path to {tmpfile}")
         backup = fr'$env:PATH >> {tmpfile}; '
         result = backup + fr'[Environment]::SetEnvironmentVariable("Path", "{path}", "{scope}")'
-        return result if run is False else tm.run(result, shell="powershell")
+        return result  # if run is False else tm.run(result, shell="powershell")
 
     @staticmethod
-    def load_fresh_path(run=False):
+    def load_fresh_path():
         if system == "Windows":
             result = fr'[System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'
-            return result if run is False else tm.run(result, shell="powershell")
+            return result  # if run is False else tm.run(result, shell="powershell")
 
 
 # ============================== Shells =========================================

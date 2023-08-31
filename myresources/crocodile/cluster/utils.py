@@ -9,7 +9,7 @@ from crocodile.cluster.remote_machine import WorkloadParams
 from typing import Optional, Any, Callable
 
 
-def expensive_function(workload_params: WorkloadParams or None, sim_dict: Optional[dict[str, Any]] = None) -> tb.P:
+def expensive_function(workload_params: Optional[WorkloadParams], sim_dict: Optional[dict[str, Any]] = None) -> tb.P:
     import time
     from rich.progress import track
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")

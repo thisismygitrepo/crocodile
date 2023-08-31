@@ -3,11 +3,13 @@
 This file contains a template for a remote machine. It is not meant to be run, but rather to be used as a template for
 """
 
+
 def run_on_remote():
     from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
     from crocodile.cluster.utils import expensive_function
+    from crocodile.file_management import P
     # from crocodile.cluster.self_ssh import SelfSSH
-    data = []
+    data: list[P] = []
     config = RemoteMachineConfig(
         # connection
         #        ssh_obj=SelfSSH(),  # overrides ssh_params

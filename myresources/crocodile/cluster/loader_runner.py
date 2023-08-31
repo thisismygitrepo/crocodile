@@ -192,7 +192,7 @@ class ResourceManager:
         return rm
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
-    def __init__(self, job_id: str, remote_machine_type: str, lock_resources: bool, max_simulataneous_jobs: int = 1, base=None):
+    def __init__(self, job_id: str, remote_machine_type: str, lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, tb.P, None] = None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.
