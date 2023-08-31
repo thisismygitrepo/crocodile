@@ -67,7 +67,7 @@ class FigureSave:
         def finish(self): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); return self
     class PNG(GenericSave):
         def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
-        def _save(self, afigure: str, aname: str, dpi: int = 150, **kwargs: Any):  afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
+        def _save(self, afigure: str, aname: str, dpi: int = 150, **kwargs: Any): afigure.savefig(self.save_dir.joinpath(validate_name(aname)).create(parents_only=True), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
         def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
     class GIF(GenericSave):  # NOT RECOMMENDED, used GIFFileBased instead.
         """This class uses ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc (limitation).
@@ -404,8 +404,8 @@ class ImShow(FigureManager):
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
     def __init__(self, img_tensor: 'np.ndarray', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir=None, save_kwargs=None,
-                 subplots_adjust=None, gridspec=None, tight: bool = True, info_loc=None, nrows:Optional[int] = None, ncols:Optional[int] = None, ax=None,
-                 figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs):
+                 subplots_adjust=None, gridspec=None, tight: bool = True, info_loc=None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax=None,
+                 figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs: Any):
         """
         :param img_tensor: size N x M x W x H [x C]  # M used spatially, N for animation.
         :param sup_titles: Titles for frames (N)

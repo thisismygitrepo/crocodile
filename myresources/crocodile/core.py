@@ -138,7 +138,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def __call__(self, *args: list[Any], **kwargs: Any) -> 'List[Any]': return List(i(*args, **kwargs) for i in self.list)
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
-    def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]': return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
+    def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]':
+        return self[list(__import__("numpy").random.choice(len(self), size, replace=replace, p=p))]
     def split(self, every: int = 1, to: Optional[int] = None) -> 'List[List[T]]':
         every = every if to is None else __import__("math").ceil(len(self) / to)
         return List([(self[ix:ix + every] if ix + every < len(self) else self[ix:len(self)]) for ix in range(0, len(self), every)])
@@ -154,7 +155,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def sort(self, key=None, reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args: list[Any], **kwargs: Any) -> 'List[T]': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
-    def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': _ = [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
+    # def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': _ = [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value: Optional[T] = None, values: Optional[list[T]] = None, strict: bool = True) -> 'List[T]': _ = [self.list.remove(a_val) for a_val in ((values or []) + ([value] if value else [])) if strict or value in self.list]; return self
     def to_series(self): return __import__("pandas").Series(self.list)
     def to_list(self) -> list[T]: return self.list
@@ -270,7 +271,7 @@ def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: b
 def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
 def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
 def outline(array: 'Any', name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; _ = print(str_) if printit else None; return str_
-def get_repr(data: Any, justify: int = 15, limit: Union[int, float] = float('inf'), direc: str = "<") -> str:
+def get_repr(data: Any, justify: int = 15, limit: int = 999999999999, direc: str = "<") -> str:
     if (dtype := data.__class__.__name__) in {'List[Any]', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
     elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
     else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
@@ -278,13 +279,15 @@ def get_repr(data: Any, justify: int = 15, limit: Union[int, float] = float('inf
 def print_string_list(mylist: list[Any], char_per_row: int = 125, sep: str = " ", style: Callable[[Any], str] = str, _counter: int = 0):
     for item in mylist: _ = print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 class Display:
-    set_pandas_display = set_pandas_display
-    set_pandas_auto_width = set_pandas_auto_width
-    set_numpy_display = set_numpy_display
-    config = config; f = f
-    eng = eng; outline = outline
-    get_repr = get_repr
-    print_string_list = print_string_list  # or D = type('D', (object, ), dict(set_pandas_display
+    set_pandas_display = staticmethod(set_pandas_display)
+    set_pandas_auto_width = staticmethod(set_pandas_auto_width)
+    set_numpy_display = staticmethod(set_numpy_display)
+    config = staticmethod(config)
+    f = staticmethod(f)
+    eng = staticmethod(eng)
+    outline = staticmethod(outline)
+    get_repr = staticmethod(get_repr)
+    print_string_list = staticmethod(print_string_list)  # or D = type('D', (object, ), dict(set_pandas_display
 
 
 if __name__ == '__main__':
