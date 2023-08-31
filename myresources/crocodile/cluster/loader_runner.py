@@ -68,7 +68,7 @@ class JobParams:
         return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
     @staticmethod
     def from_func(func: Union[Callable[[Any], Any], tb.P, str]) -> 'JobParams':
-        if isinstance(func, Callable) and not isinstance(func, tb.P):
+        if callable(func) and not isinstance(func, tb.P):
             func_name = func.__name__
             func_module = func.__module__
             assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."

@@ -3,18 +3,19 @@
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name
 from crocodile.file_management import P, PLike
 from crocodile.meta import Terminal
+from crocodile.msc.odds import Cycle
 
 import matplotlib.pyplot as plt
-from matplotlib.backend_bases.Event import Event
-from crocodile.msc.odds import Cycle
+from matplotlib.backend_bases import Event
 from matplotlib import widgets
 import matplotlib.colors as mcolors
 from matplotlib import animation
+import pandas as pd
+import numpy as np
+
 import enum
 import subprocess
 import platform
-import pandas as pd
-import numpy as np
 from typing import Any, Optional, Union
 
 

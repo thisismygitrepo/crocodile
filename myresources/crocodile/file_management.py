@@ -62,7 +62,7 @@ def json(path: Union[str, Path, 'P'], r: bool = False, **kwargs: Any) -> Struct:
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
     return Struct.recursive_struct(mydict) if r else Struct(mydict)
-def yaml(path: Union[str, Path, 'P'], r=False):
+def yaml(path: Union[str, Path, 'P'], r: bool = False):
     with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
     return Struct(mydict) if not r else Struct.recursive_struct(mydict)
 def ini(path: Union[str, Path, 'P']): import configparser; res = configparser.ConfigParser(); res.read(str(path)); return res
@@ -70,24 +70,24 @@ def toml(path: Union[str, Path, 'P']): return install_n_import("tomli").loads(P(
 def npy(path: Union[str, Path, 'P'], **kwargs: Any): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
 # def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 def csv(path: Union[str, Path, 'P'], **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
-def py(path: Union[str, Path, 'P'], init_globals=None, run_name=None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
+def py(path: Union[str, Path, 'P'], init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
 def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
 def pickle(path: Union[str, Path, 'P'], **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
-def vanilla_pickle(path, **kwargs): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
+def vanilla_pickle(path: Union[str, Path, 'P'], **kwargs: Any): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
 def txt(path: Union[Path, str, 'P'], encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
 class Read:
-    read = read
-    json = json
-    yaml = yaml
-    ini = ini
-    npy = npy
-    csv = csv
-    pkl = vanilla_pickle
-    vanilla_pickle = vanilla_pickle
-    pickle = pickle
-    py = py
-    toml = toml
-    txt = txt
+    read = staticmethod(read)
+    json = staticmethod(json)
+    yaml = staticmethod(yaml)
+    ini = staticmethod(ini)
+    npy = staticmethod(npy)
+    csv = staticmethod(csv)
+    pkl = staticmethod(vanilla_pickle)
+    vanilla_pickle = staticmethod(vanilla_pickle)
+    pickle = staticmethod(pickle)
+    py = staticmethod(py)
+    toml = staticmethod(toml)
+    txt = staticmethod(txt)
 
 
 def modify_text(txt_raw: str, txt_search: str, txt_alt: str, replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):
@@ -146,7 +146,7 @@ class P(type(Path()), Path):  # type: ignore
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
-        except IOError: raise IOError
+        except IOError as ioe: raise IOError from ioe
     def start(self, opener=None):
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
         if __import__("sys").platform == "win32":  # double quotes fail with cmd. # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
@@ -155,11 +155,11 @@ class P(type(Path()), Path):  # type: ignore
         else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
     def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
-    def cache_from(self, source_func: Callable[[Any], Any], expire: str = "1w", save: Callable[[Any], Any]=Save.vanilla_pickle, reader: Callable[[Any], Any]=Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
-    def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding=None):
+    def cache_from(self, source_func: Callable[[Any], Any], expire: str = "1w", save: Callable[[Any], Any] = Save.vanilla_pickle, reader: Callable[[Any], Any] = Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
+    def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: Optional[str] = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
-    def download(self, folder:PLike = None, name:PLike = None, memory: bool = False, allow_redirects: bool = True, params=None) -> 'P':
+    def download(self, folder: PLike = None, name: PLike = None, memory: bool = False, allow_redirects: bool = True, params=None) -> 'P':
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
     def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg="", __delayed_msg__="") -> 'P':
@@ -243,7 +243,7 @@ class P(type(Path()), Path):  # type: ignore
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
     def clickable(self, inlieu: bool = False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
-    def as_url_str(self, inlieu: bool = False) -> str: return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
+    def as_url_str(self, inlieu: bool = False) -> 'P': return self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu)
     def as_url_obj(self, inlieu: bool = False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
     def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
@@ -263,7 +263,7 @@ class P(type(Path()), Path):  # type: ignore
         if src_file is not None: assert src_folder is None, "You can only pass source or source_dir, not both."; result = P(src_file).expanduser().absolute()
         else: result = P(src_folder or P.cwd()).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
-    def symlink_to(self, target: PLike = None, verbose: bool = True, overwrite: bool = False, orig=False):
+    def symlink_to(self, target: PLike = None, verbose: bool = True, overwrite: bool = False, orig: bool = False):
         self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         if __import__("platform").system() == "Windows" and not (tm := __import__("crocodile").meta.Terminal).is_user_admin():  # you cannot create symlink without priviliages.
@@ -326,24 +326,38 @@ class P(type(Path()), Path):  # type: ignore
         if slf.suffix == ".7z":
             if overwrite: P(folder).delete(sure=True)
             result = folder
-            with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive: archive.extract(path=folder, targets=[f for f in archive.getnames() if pattern.match(f)]) if pattern is not None else archive.extractall(path=folder)
+            with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive: _ = archive.extract(path=folder, targets=[f for f in archive.getnames() if pattern.match(f)]) if pattern is not None else archive.extractall(path=folder)
         else:
             if overwrite:
                 if not content: P(folder).joinpath(fname or "").delete(sure=True, verbose=True)  # deletes a specific file / folder that has the same name as the zip file without extension.
                 else: List([x for x in __import__("zipfile").ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(fname or "", item.replace("/", "")).delete(sure=True, verbose=True))
-            result = Compression.unzip(zipfile, folder, None if fname is None else P(fname).as_posix(), **kwargs)
+            result = unzip(zipfile.str, folder, None if fname is None else P(fname).as_posix(), **kwargs)
         return self._return(result, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
-    def tar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.tar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
-    def untar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.untar(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".tar", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
-    def gz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.gz(file=self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".gz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
-    def ungz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.ungz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".gz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
-    def xz(self, name: PLike = None, folder: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.xz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
-    def unxz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.unxz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
+    def tar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()
+        tar(self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
+    def untar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name.replace(".tar", "")).expanduser().resolve()
+        untar(self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
+    def gz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name + ".gz").expanduser().resolve()
+        gz(file=self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
+    def ungz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name.replace(".gz", "")).expanduser().resolve()
+        ungz(self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
+    def xz(self, name: PLike = None, folder: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()
+        xz(self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
+    def unxz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()
+        unxz(self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
     def tar_gz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def ungz_untar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': return self.ungz(name=f"tmp_{randstr()}.tar", inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)  # this works for .tgz suffix as well as .tar.gz
     def tar_xz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def unxz_untar(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-    def unbz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': Compression.unbz(self.expanduser().resolve(), op_path := self._resolve_path(folder, name, path, self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
+    def unbz(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
+        op_path = self._resolve_path(folder, name, path, self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()
+        unbz(self.expanduser().resolve().str, op_path=str(op_path)); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
     def decompress(self, folder: PLike = None, name: PLike = None, path: PLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P': raise NotImplementedError("Not implemented yet.")
     def encrypt(self, key: Optional[str] = None, pwd: Optional[str] = None, folder: PLike = None, name: PLike = None, path: PLike = None, verbose: bool = True, suffix: str = ".enc", inplace: bool = False, orig: bool = False) -> 'P':  # see: https://stackoverflow.com/questions/42568262/how-to-encrypt-text-with-a-password-in-python & https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password"""
         slf = self.expanduser().resolve(); path = self._resolve_path(folder, name, path, slf.name + suffix)
@@ -423,20 +437,20 @@ def unzip(ip_path: str, op_path: PLike = None, fname: PLike = None, password: Op
         else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); return P(op_path) / fname
 def gz(file: str, op_path: str):  # see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
     with open(file, 'rb') as f_in:
-        with __import__("gzip").open(op_path, 'wb') as f_out:  __import__("shutil").copyfileobj(f_in, f_out)
+        with __import__("gzip").open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
 def ungz(self: str, op_path: str):
-    with __import__("gzip").open(str(self), 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
+    with __import__("gzip").open(self, 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
     return P(op_path)
 def unbz(self: str, op_path: str):
-    with __import__("bz2").BZ2File(str(self), 'r') as fr, open(str(op_path), 'wb') as fw: __import__("shutil").copyfileobj(fr, fw)
+    with __import__("bz2").BZ2File(self, 'r') as fr, open(str(op_path), 'wb') as fw: __import__("shutil").copyfileobj(fr, fw)
     return P(op_path)
 def xz(self: str, op_path: str):
     with __import__("lzma").open(op_path, "w") as f: f.write(self)
 def unxz(ip_path: str, op_path: str):
     with __import__("lzma").open(ip_path) as file: P(op_path).write_bytes(file.read())
 def tar(self: str, op_path: str):
-    with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(self), arcname=__import__("os").path.basename(str(self)))
+    with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(self), arcname=__import__("os").path.basename(self))
     return P(op_path)
 def untar(self: str, op_path: str, fname: PLike = None, mode: str = 'r', **kwargs: Any):
     with __import__("tarfile").open(str(self), mode) as file:
@@ -444,16 +458,16 @@ def untar(self: str, op_path: str, fname: PLike = None, mode: str = 'r', **kwarg
         else: file.extract(fname, **kwargs)
     return P(op_path)
 class Compression:
-    compress_folder = compress_folder
-    zip_file = zip_file
-    unzip = unzip
-    gz = gz
-    ungz = ungz
-    tar = tar
-    untar = untar
-    xz = xz
-    unxz = unxz
-    unbz = unbz  # Provides consistent behaviour across all methods
+    compress_folder = staticmethod(compress_folder)
+    zip_file = staticmethod(zip_file)
+    unzip = staticmethod(unzip)
+    gz = staticmethod(gz)
+    ungz = staticmethod(ungz)
+    tar = staticmethod(tar)
+    untar = staticmethod(untar)
+    xz = staticmethod(xz)
+    unxz = staticmethod(unxz)
+    unbz = staticmethod(unbz)  # Provides consistent behaviour across all methods
 
 
 T = TypeVar('T')
