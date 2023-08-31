@@ -7,13 +7,13 @@ from typing import Any, Optional
 
 
 class Obfuscator(tb.Base):
-    def __init__(self, directory: str, noun: bool = False, suffix: str = "same", *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, directory: str, noun: bool = False, suffix: str = "same", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self.directory = tb.P(directory).expanduser().absolute()
         assert self.directory.is_dir()
         # self.directory_r_obf = tb.randstr(noun=self.noun)
-        self.real_to_phony = {}  # reltive string -> relative string
-        self.phony_to_real = {}  # reltive string -> relative string
+        self.real_to_phony: dict[str, str] = {}  # reltive string -> relative string
+        self.phony_to_real: dict[str, str] = {}  # reltive string -> relative string
         self.noun = noun
         self.suffix = suffix
 
@@ -106,7 +106,8 @@ class Obfuscator(tb.Base):
         super().save(self.directory.append("_obfuscater.pkl"))
 
     def update_symlinks(self, directory: Optional[str] = None):
-        for path in (directory or self.directory).search("*", r=False):
+        p = tb.P(directory) if directory is not None else self.directory
+        for path in p.search("*", r=False):
             if path.is_symlink(): continue
             if path.is_dir():
                 try:
@@ -114,7 +115,7 @@ class Obfuscator(tb.Base):
                 except KeyError:  # directory has not been obfuscated before
                     path_parent_r_obf = self.real_to_phony[path.parent.relative_to(self.directory).as_posix()]
                     self._add_map(path, path_r_obf=path_parent_r_obf)
-                self.update_symlinks(directory=path)
+                self.update_symlinks(directory=str(path))
                 continue
             self._add_map(path, path_r_obf=self.real_to_phony[path.parent.relative_to(self.directory).as_posix()])
             phony = self.obfuscate(path)

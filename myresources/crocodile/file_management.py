@@ -312,9 +312,12 @@ class P(type(Path()), Path):  # type: ignore
             root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(lambda x: root.joinpath(x))
             return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
-        else: raw = __import__("glob").glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
+        else:
+            from glob import glob
+            raw = glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
         if ".zip" not in slf and compressed:
-            raw += List([P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]).reduce()
+            tmp = [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]
+            raw += List(tmp).reduce()  # type: ignore
         processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
     def tree(self, *args: Any, **kwargs: Any): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
@@ -415,7 +418,11 @@ class P(type(Path()), Path):  # type: ignore
     def get_env(): return __import__("crocodile.environment").environment
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username: PLike = None, password: Optional[str] = None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
-    def to_qr(self, txt: bool = True, path: Union[str, 'P', None] = None): qrcode = install_n_import("qrcode"); qr = qrcode.QRCode(); qr.add_data(str(self) if "http" in str(self) else (self.read_text() if txt else self.read_bytes())); import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0); print(f.read()); qr.make_image().save(path) if path is not None else None
+    def to_qr(self, text: bool = True, path: PLike = None):
+        qrcode = install_n_import("qrcode"); qr = qrcode.QRCode()
+        qr.add_data(str(self) if "http" in str(self) else (self.read_text() if text else self.read_bytes()))
+        import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0)
+        print(f.read()); _ = qr.make_image().save(path) if path is not None else None
     def get_remote_path(self, root: Optional[str], os_specific: bool = False) -> 'P':
         tmp1 = (__import__('platform').system().lower() if os_specific else 'generic_os')
         if isinstance(root, str): return P(root) / tmp1 / self.rel2home()
@@ -471,7 +478,7 @@ def zip_file(ip_path: str, op_path: str, arcname: PLike = None, password: Option
     When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
     import zipfile
     with zipfile.ZipFile(op_path, mode=mode) as jungle_zip:
-        jungle_zip.setpassword(pwd=password) if password is not None else None
+        if password is not None: jungle_zip.setpassword(pwd=password)
         jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
     return P(op_path)
 def unzip(ip_path: str, op_path: str, fname: PLike = None, password: Optional[str] = None, memory: bool = False, **kwargs: Any):
