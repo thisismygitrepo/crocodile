@@ -140,7 +140,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def len(self) -> int: return len(self.list)
     # ================= call methods =====================================
     def __getattr__(self, name: str) -> 'List[T]': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args: Any, **kwargs: Any) -> 'List[Any]': return List([i.__call__(*args, **kwargs) for i in self.list])
+    def __call__(self, *args: Any, **kwargs: Any) -> 'List[Any]': return List([ii.__call__(*args, **kwargs) for ii in self.list])
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
     def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]':
@@ -209,7 +209,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
 class Struct(Base):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
     def __init__(self, dictionary: Union[dict[Any, Any], Type[object], None] = None, **kwargs: Any):
-        if dictionary is None or isinstance(dictionary, dict): final_dict = {} if dictionary is None else dictionary
+        if dictionary is None or isinstance(dictionary, dict): final_dict: dict[str, Any] = {} if dictionary is None else dictionary
         else:
             final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)  # type: ignore
         final_dict.update(kwargs)  # type ignore
@@ -270,17 +270,19 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         return res if not return_str else str(res)
     def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False, limit: int = 50, title: str = "", attrs: bool = False, **kwargs: Any) -> Union[str, 'Struct']:
         _ = attrs
+        import pandas as pd
         if as_config and not return_str: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
         if not bool(self): res = f"Empty Struct."
         else:
             if as_yaml or as_config: res = __import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
             else:
-                import pandas as pd
                 tmp = self._pandas_repr(justify=justify, return_str=False, limit=limit)
-                assert isinstance(tmp, pd.DataFrame)
-                res = tmp.drop(columns=[] if dtype else ["dtype"])
+                if isinstance(tmp, pd.DataFrame):
+                    res = tmp.drop(columns=[] if dtype else ["dtype"])
+                else: raise TypeError(f"Unexpected type {type(tmp)}")
         if not return_str:
-            if ("DataFrame" in res.__class__.__name__ and install_n_import("tabulate")): install_n_import("rich").print(res.to_markdown())
+            if (isinstance(res, pd.DataFrame) and install_n_import("tabulate")):
+                install_n_import("rich").print(res.to_markdown())
             else: print(res)
         return str(res) if return_str else self
     @staticmethod
