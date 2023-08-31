@@ -141,7 +141,7 @@ class Terminal:
             module = P(func.__code__.co_filename)  # module = func.__module__  # fails if the function comes from main as it returns __main__.
             load_func_string = f"tb.sys.path.insert(0, r'{module.parent}')\nimport {module.stem} as m\nobj=m.{func.__name__}"
         else: load_func_string = f"""obj = tb.P(r'{Save.pickle(obj=func, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()"""
-        return Terminal().run_py(load_func_string+load_kwargs_string+f"\n{cmd}\n"+run_string, header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
+        return Terminal().run_py(load_func_string + load_kwargs_string + f"\n{cmd}\n" + run_string, header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
     def replicate_session(cmd: str = ""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}""")
     @staticmethod
@@ -252,7 +252,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
 
 
 class Scheduler:
-    def __init__(self, routine: Callable[[Any], Any], wait: str = "2m", max_cycles: int = 10000000000, exception_handler: Optional[Callable[[Any], Any]] = None, logger: Optional[Log] = None, sess_stats=None):
+    def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000, exception_handler: Optional[[Exception, str, 'Scheduler', ...], Any] = None, logger: Optional[Log] = None, sess_stats=None):
         self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger, self.exception_handler = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True)), exception_handler
@@ -273,7 +273,7 @@ class Scheduler:
         self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((sess_stats := self.sess_stats(sched=self)).values()))
         summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df())); return self
-    def _handle_exceptions(self, ex, during):
+    def _handle_exceptions(self, ex: Exception, during: str) -> None:
         if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         else: self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
