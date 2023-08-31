@@ -1,4 +1,6 @@
 
+"""Notifications
+"""
 # import numpy as np
 # import matplotlib.pyplot as plt
 import crocodile.toolbox as tb
@@ -23,13 +25,14 @@ class Email:
     @staticmethod
     def get_source_of_truth(): return tb.P.home().joinpath("dotfiles/machineconfig/emails.ini").readit()
 
-    def __init__(self, config):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         if config['encryption'].lower() == "ssl": self.server = smtplib.SMTP_SSL(host=self.config["smtp_host"], port=self.config["smtp_port"])
-        elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"]) 
+        elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"])
         self.server.login(self.config['email_add'], password=self.config["password"])
 
     def send_message(self, to: str, subject: str, body: str, txt_to_html: bool = True, attachments: Optional[list[Any]] = None):
+        _ = attachments
         body += "\n\nThis is an automated email sent via crocodile.comms script."
         # msg = message.EmailMessage()
         msg = MIMEMultipart("alternative")
@@ -91,7 +94,7 @@ class PhoneNotification:  # security concerns: avoid using this.
     def __init__(self, bulletpoint_token):
         pushbullet = tb.install_n_import("pushbullet")
         self.api = pushbullet.Pushbullet(bulletpoint_token)
-    def send_notification(self, title: str="Note From Python", body: str="A notfication"): self.api.push_note(title=title, body=body)
+    def send_notification(self, title: str = "Note From Python", body: str = "A notfication"): self.api.push_note(title=title, body=body)
     @staticmethod
     def open_website(): tb.P(r"https://www.pushbullet.com/").readit()
     @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg

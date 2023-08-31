@@ -7,6 +7,7 @@ import platform
 import getpass
 import os
 import sys
+from typing import Union
 
 P = tb.P
 L = tb.L
@@ -112,35 +113,35 @@ class ShellVar(object):
 
 class EnvVar:
     @staticmethod
-    def set(key, val, temp=False, run=False):
+    def set(key: str, val: Union[int, str], temp: bool = False):
         if system == "Windows":
             if temp is False:
                 res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters # in case the variable included ";" separated paths, this limit can be exceeded.
-                return res if not run else tm.run(res, shell="powershell")
+                return res  # if not run else tm.run(res, shell="powershell")
             else: raise NotImplementedError
         elif system == "Linux": return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
         else: raise NotImplementedError
     @staticmethod
-    def get(key, run=False):
+    def get(key: str):
         result = f"${key}"  # works in powershell and bash
-        return result if run is False else tm.run(result, shell="powershell")
+        return result  # if run is False else tm.run(result, shell="powershell")
     # in windows cmd `%key%`
     @staticmethod
-    def delete(key, temp=True, scope=["User", "system"][0], run=False):
+    def delete(key: str, temp: bool = True, scope: str = ["User", "system"][0]):
         if system == "Windows":
             if temp:
                 result = fr"Remove-Item Env:\{key}"  # temporary removal (session)
-                return result if run is False else tm.run(result, shell="powershell")
+                return result  # if run is False else tm.run(result, shell="powershell")
             else:
                 result = fr'[Environment]::SetEnvironmentVariable("{key}",$null,"{scope}")'
-                return result if run is False else tm.run(result, shell="powershell")
+                return result  # if run is False else tm.run(result, shell="powershell")
         else:
             raise NotImplementedError
 
 
 class PathVar:
     @staticmethod
-    def append_temporarily(dirs, kind="append"):
+    def append_temporarily(dirs: list[str], kind: str = "append"):
         dirs_ = []
         for path in dirs:
             path_rel = tb.P(path).collapseuser(strict=False)
@@ -162,7 +163,7 @@ class PathVar:
         return result  # if run is False else tm.run(result, shell="powershell")
 
     @staticmethod
-    def append_permanently(path, scope=["User", "system"][0]):
+    def append_permanently(path: str, scope: str = ["User", "system"][0]):
         if system == "Windows":
             # AVOID THIS AND OPT TO SAVE IT IN $profile.
             tmp_path = tb.P.tmpfile(suffix=".path_backup")
@@ -176,7 +177,7 @@ class PathVar:
         else: tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
 
     @staticmethod
-    def set_permanetly(path, scope=["User", "system"][0]):
+    def set_permanetly(path: str, scope: str = ["User", "system"][0]):
         """This is useful if path is manipulated with a text editor or Python string manipulation (not recommended programmatically even if original is backed up) and set the final value.
         On a windows machine, system and user variables are kept separately. env:Path returns the combination of both, starting from system then user.
         To see impact of change, you will need to restart the process from which the shell started. This is probably windows explorer.
@@ -198,7 +199,7 @@ class PathVar:
 # ============================== Shells =========================================
 
 
-def get_shell_profiles(shell):
+def get_shell_profiles(shell: str):
     # following this: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.2
     # https://devblogs.microsoft.com/scripting/understanding-the-six-powershell-profiles/
     # Dynmaically obtained:
@@ -210,8 +211,8 @@ def get_shell_profiles(shell):
     )
 
 
-def construct_path(path_list): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
-def get_path_defined_files(string_="*.exe"): res = Path.search(string_).reduce(lambda x, y: x + y); res.print(); return res
+def construct_path(path_list: list[str]): return tb.L(__import__("pd").unique(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
+def get_path_defined_files(string_: str = "*.exe"): res = Path.search(string_).reduce(lambda x, y: x + y); res.print(); return res
 
 
 if __name__ == '__main__':

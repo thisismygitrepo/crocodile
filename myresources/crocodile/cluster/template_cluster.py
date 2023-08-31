@@ -17,9 +17,9 @@ class ExpensiveComputation:
         return res
 
     @staticmethod
-    def func(workload_params: WorkloadParams, *args: Any, **kwargs: Any) -> tb.P:
+    def func(workload_params: WorkloadParams, **kwargs: Any) -> tb.P:
         per_job_workload_params = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=workload_params.idx_max, jobs=workload_params.jobs))
-        res: list[tb.P] = tb.L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(*args, workload_params=a_workload_params, **kwargs), jobs=workload_params.jobs).list
+        res: list[tb.P] = tb.L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(workload_params=a_workload_params, **kwargs), jobs=workload_params.jobs).list
         return res[0]
 
     @staticmethod

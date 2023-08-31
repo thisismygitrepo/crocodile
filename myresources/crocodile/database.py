@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.sql.schema import MetaData
 from crocodile.core import Struct, Display
-from crocodile.file_management import List as L, P
+from crocodile.file_management import List as L, P, PLike
 
 _ = create_engine, text
 
@@ -77,7 +77,7 @@ class DBMS:
         else: return table
 
     @staticmethod
-    def make_sql_engine(path=None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
+    def make_sql_engine(path: PLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
         """Establish lazy initialization with database"""
         if str(path) == "memory":
             print("Linking to in-memory database.")
@@ -90,23 +90,23 @@ class DBMS:
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
 
     # ==================== QUERIES =====================================
-    def execute_as_you_go(self, *commands, res_func=lambda x: x.all(), df=False):
+    def execute_as_you_go(self, *commands, res_func=lambda x: x.all(), df: bool = False):
         with self.eng.connect() as conn:
             for command in commands: result = conn.execute(text(command))
             conn.commit()  # if driver is sqlite3, the connection is autocommitting. # this commit is only needed in case of DBAPI driver.
         return res_func(result) if not df else pd.DataFrame(res_func(result))
 
-    def execute_begin_once(self, command, res_func=lambda x: x.all(), df=False):
+    def execute_begin_once(self, command, res_func=lambda x: x.all(), df: bool = False):
         with self.eng.begin() as conn:
             result = conn.execute(text(command))  # no need for commit regardless of driver
             result = res_func(result)
         return result if not df else pd.DataFrame(result)
 
-    def execute(self, command: str, df=False):
+    def execute(self, command: str, df: bool = False):
         with self.eng.begin() as conn: result = conn.execute(text(command))
         return result if not df else pd.DataFrame(result)
 
-    def execute_script(self, command: str, df=False):
+    def execute_script(self, command: str, df: bool = False):
         with self.eng.begin() as conn: result = conn.executescript(text(command))
         return result if not df else pd.DataFrame(result)
 
@@ -115,12 +115,12 @@ class DBMS:
         res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
         return pd.DataFrame(res.fetchmany(size))
 
-    def insert_dicts(self, table: str, *mydicts):
+    def insert_dicts(self, table: str, *mydicts: dict[str, Any]):
         cmd = f"""INSERT INTO {table} VALUES """
         for mydict in mydicts: cmd += f"""({tuple(mydict)}), """
         self.execute_begin_once(cmd)
 
-    def describe_table(self, table: str, sch=None, dtype=True):
+    def describe_table(self, table: str, sch=None, dtype: bool = True):
         print(table.center(100, "="))
         self.refresh()
         tbl = self.meta.tables[table]

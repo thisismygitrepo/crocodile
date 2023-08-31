@@ -43,7 +43,7 @@ class DataReader(dl.DataReader):
         self.dataset = None
         if load_trianing_data: self.load_trianing_data()  # make sure that DataReader can be instantiated cheaply without loading data.
 
-    def load_trianing_data(self, profile_df=False):
+    def load_trianing_data(self, profile_df: bool = False):
         self.dataset = dict(x=np.random.randn(1000, 10).astype(self.hp.precision),
                             y=np.random.randn(1000, 1).astype(self.hp.precision),
                             names=np.arange(1000))

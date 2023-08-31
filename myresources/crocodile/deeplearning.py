@@ -4,12 +4,13 @@ dl
 """
 
 import crocodile.toolbox as tb
+from crocodile.file_management import P, Path
 from crocodile.matplotlib_management import ImShow, FigureSave
 # from matplotlib.pyplot import hist
 import numpy as np
 import pandas as pd
 from abc import ABC
-from typing import Generic, TypeVar, Type, Any, Optional, Union
+from typing import Generic, TypeVar, Type, Any, Optional, Union, Callable
 import enum
 from tqdm import tqdm
 import copy
@@ -88,7 +89,7 @@ class HParams:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict): return self.__dict__.update(state)
     @classmethod
-    def from_saved_data(cls, path, *args: Any, **kwargs: Any) -> 'HParams':
+    def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any) -> 'HParams':
         data: dict = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
     def __repr__(self, **kwargs): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
@@ -207,7 +208,7 @@ class DataReader:
                 others = selection
         return x, y, others
 
-    def get_random_inputs_outputs(self, ip_shapes=None, op_shapes=None):
+    def get_random_inputs_outputs(self, ip_shapes: Optional[list[tuple[int, ...]]] = None, op_shapes: Optional[list[tuple[int, ...]]] = None):
         if ip_shapes is None: ip_shapes = self.specs.ip_shapes
         if op_shapes is None: op_shapes = self.specs.op_shapes
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
@@ -217,8 +218,8 @@ class DataReader:
         y = y[0] if len(self.specs.op_names) == 1 else y
         return x, y
 
-    def preprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity.
-    def postprocess(self, *args, **kwargs): _ = args, kwargs, self; return args[0]  # acts like identity
+    def preprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity.
+    def postprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity
 
     # def standardize(self):
     #     assert self.split is not None, "Load up the data first before you standardize it."
@@ -226,14 +227,14 @@ class DataReader:
     #     self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
     #     self.split['x_test']= self.scaler.transform(self.split['x_test'])
 
-    def image_viz(self, pred, gt=None, names=None, **kwargs):
+    def image_viz(self, pred, gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
         """
         Assumes numpy inputs
         """
         if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
         else: self.plotter = ImShow(img_tensor=pred, sup_titles=names, labels=['Reconstruction', 'Ground Truth'], origin='lower', **kwargs)
 
-    def viz(self, *args, **kwargs):
+    def viz(self, *args: Any, **kwargs: Any):
         """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
         _ = self, args, kwargs
         return None
@@ -276,7 +277,7 @@ class BaseModel(ABC):
     def get_model(self):
         raise NotImplementedError
         # pass
-    def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model=True):
+    def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model: bool = True):
         """ Updates compiler attributes. This acts like a setter.
         .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
                   * In case of TF, this is not the case as TF requires actual futher different
@@ -300,7 +301,7 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz: bool = True, val_sample_weights: Optional[np.ndarray] = None, **kwargs):
+    def fit(self, viz: bool = True, val_sample_weights: Optional['np.ndarray'] = None, **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
         x_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="train")]
         y_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="train")]
@@ -341,21 +342,21 @@ class BaseModel(ABC):
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
 
-    def preprocess(self, *args, **kwargs):
+    def preprocess(self, *args: Any, **kwargs: Any):
         """Converts an object to a numerical form consumable by the NN."""
         return self.data.preprocess(*args, **kwargs)
 
-    def postprocess(self, *args, **kwargs): return self.data.postprocess(*args, **kwargs)
-    def __call__(self, *args, **kwargs): return self.model(*args, **kwargs)
-    def viz(self, *args, **kwargs): return self.data.viz(*args, **kwargs)
-    def save_model(self, directory): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
-    def save_weights(self, directory):
-        self.model.save_weights(directory.joinpath(self.model.name))  # TF: last part of path is file path.
+    def postprocess(self, *args: Any, **kwargs: Any): return self.data.postprocess(*args, **kwargs)
+    def __call__(self, *arg: Anys, **kwargs: Any): return self.model(*args, **kwargs)
+    def viz(self, *args: Any, **kwargs: Any): return self.data.viz(*args, **kwargs)
+    def save_model(self, directory: Union[str, Path, P]): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
+    def save_weights(self, directory: Union[str, Path, P]):
+        self.model.save_weights(P(directory).joinpath(self.model.name))  # TF: last part of path is file path.
     @staticmethod
-    def load_model(directory: tb.P): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
-    def load_weights(self, directory):
+    def load_model(directory: Union[str, Path, P]): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
+    def load_weights(self, directory: Union[str, Path, P]):
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
-        self.model.load_weights(directory.glob('*.data*').__next__().__str__().split('.data')[0]).expect_partial()  # requires path to file path.
+        self.model.load_weights(P(directory).search('*.data*').__next__().__str__().split('.data')[0]).expect_partial()  # requires path to file path.
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
@@ -363,7 +364,7 @@ class BaseModel(ABC):
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
     def config(self): _ = [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-    def plot_loss(self, *args, **kwargs):
+    def plot_loss(self, *args: Any, **kwargs: Any):
         res = tb.Struct.concat_values(*self.history)
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         if hasattr(self.compiler.loss, "name"): y_label = self.compiler.loss.name
@@ -391,7 +392,7 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test=None, y_test=None, names_test=None, aslice=None, indices=None, use_slice=False, size=None, split="test", viz=True, viz_kwargs=None, **kwargs):
+    def evaluate(self, x_test=None, y_test=None, names_test: list[str] = None, aslice=None, indices=None, use_slice: bool = False, size: Optional[int] = None, split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None and x_test is not None: names_test = np.arange(len(x_test))
@@ -431,7 +432,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only: bool = True, version: str = '0', **kwargs):
+    def save_class(self, weights_only: bool = True, version: str = '0', **kwargs: Any):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -474,7 +475,7 @@ class BaseModel(ABC):
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path, hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool = True):
+    def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool = True):
         path = tb.P(path)
         if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
         else: hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
@@ -496,7 +497,7 @@ class BaseModel(ABC):
         return model_obj
 
     @classmethod
-    def from_class_model(cls, path):
+    def from_class_model(cls, path: Union[str, Path, P]):
         path = tb.P(path)
         hp_obj = HParams.from_saved_data(path)
         data_obj = DataReader.from_saved_data(path, hp=hp_obj)
@@ -506,7 +507,7 @@ class BaseModel(ABC):
         return wrapper_class
 
     @staticmethod
-    def from_path(path_model, **kwargs):
+    def from_path(path_model: Union[str, Path, P], **kwargs: Any):
         path_model = tb.P(path_model).expanduser().absolute()
         specs = tb.Read.json(path=path_model.joinpath('metadata/code_specs.json'))
         print(f"Loading up module: `{specs['__module__']}`.")
@@ -529,14 +530,14 @@ class BaseModel(ABC):
         hp_class: HParams = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
-    def plot_model(self, dpi=150, **kwargs):  # alternative viz via tf2onnx then Netron.
+    def plot_model(self, dpi: int = 150, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
         import tensorflow as tf
         path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
         tf.keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
-    def build(self, sample_dataset=False, ip_shapes=None, ip=None, verbose=True):
+    def build(self, sample_dataset: bool = False, ip_shapes=None, ip=None, verbose: bool = True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
@@ -581,7 +582,7 @@ SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound=BaseModel)
 
 
 class Ensemble(tb.Base):
-    def __init__(self, hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader], model_class: Type[SubclassedBaseModel], size=10, **kwargs):
+    def __init__(self, hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader], model_class: Type[SubclassedBaseModel], size: int = 10, **kwargs: Any):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
@@ -611,22 +612,22 @@ class Ensemble(tb.Base):
         self.performance = None
 
     @classmethod
-    def from_saved_models(cls, parent_dir, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+    def from_saved_models(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
         obj.models = list(tb.P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
-    def from_saved_weights(cls, parent_dir, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+    def from_saved_weights(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
         obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))
         return obj
 
     @staticmethod
-    def from_path(path) -> list[SubclassedBaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(BaseModel.from_path))
+    def from_path(path: Union[str, Path, P]) -> list[SubclassedBaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(BaseModel.from_path))
 
-    def fit(self, shuffle_train_test=True, save=True, **kwargs):
-        self.performance = []
+    def fit(self, shuffle_train_test: bool = True, save: bool = True, **kwargs: Any):
+        self.performance: list[Any] = []
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
             if shuffle_train_test:
@@ -701,7 +702,7 @@ class HPTuning:
         """
         pass
 
-    def run(self, param_dict):
+    def run(self, param_dict: dict[str, Any]):
         _, _ = self, param_dict
         # should return a result that you want to maximize
         return _
@@ -740,9 +741,9 @@ class KerasOptimizer:
         self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=tb.P.tmp('my_dir'), project_name='intro_to_kt')
 
 
-def batcher(func_type='function'):
+def batcher(func_type: str = 'function'):
     if func_type == 'method':
-        def batch(func):
+        def batch(func: Callable[[Any], Any]):
             # from functools import wraps
             # @wraps(func)
             def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):

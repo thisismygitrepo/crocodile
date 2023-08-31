@@ -163,7 +163,7 @@ class P(type(Path()), Path):  # type: ignore
         response = __import__("requests").get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         return response if memory else (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(name or self.name)).create(parents_only=True).write_bytes(response.content)  # r.contents is bytes encoded as per docs of requests.
     def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg="", __delayed_msg__="") -> 'P':
-        if inlieu: self._str = str(res)
+        if inlieu: self._str = str(res)  # type: ignore
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename":
@@ -172,7 +172,7 @@ class P(type(Path()), Path):  # type: ignore
                     if strict: raise FileExistsError(f"File {res} already exists.")
                     else: _ = print(f"SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res); msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
-            elif operation == "delete": self.delete(sure=True, verbose=False);  __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
+            elif operation == "delete": self.delete(sure=True, verbose=False); __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
         _ = print(msg) if verbose and msg != "" else None; _ = print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
@@ -252,7 +252,7 @@ class P(type(Path()), Path):  # type: ignore
     def validate_name(self, replace: Optional[str] = '_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
     def write_text(self, data: str, encoding: Optional[str] = 'utf-8') -> 'P': super(P, self).write_text(data, encoding=encoding); return self
-    def read_text(self, encoding: Optional[str] = 'utf-8', lines: bool = False, printit: bool = False) -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); print(res) if printit else None; return res
+    def read_text(self, encoding: Optional[str] = 'utf-8', lines: bool = False) -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); return res
     def write_bytes(self, data: bytes, overwrite: bool = False) -> 'P':
         slf = self.expanduser().absolute(); _ = slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
@@ -479,13 +479,17 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
         self.cache = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path: P | None = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
-        self.time_produced, self.save, self.reader, self.logger, self.expire = None, save, reader, logger, expire
-    age = property(lambda self: datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time)
+        self.time_produced = datetime.now()  # if path is None else
+        self.save, self.reader, self.logger, self.expire = save, reader, logger, expire
+    @property
+    def age(self): return datetime.now() - self.time_produced if self.path is None else datetime.now() - self.path.stats().content_mod_time
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     def __getstate__(self) -> dict[str, Any]: state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh: bool = False) -> T:
         if self.path is None:  # Memory Cache
-            if self.cache is None or fresh is True or self.age > str2timedelta(self.expire): self.cache, self.time_produced = self.source_func(), datetime.now(); self.logger.debug(f"Updating / Saving data from {self.source_func}") if self.logger else None
+            if self.cache is None or fresh is True or self.age > str2timedelta(self.expire):
+                self.cache, self.time_produced = self.source_func(), datetime.now()
+                if self.logger: self.logger.debug(f"Updating / Saving data from {self.source_func}")
             elif self.logger: self.logger.debug(f"Using cached values. Lag = {self.age}.")
         elif fresh or not self.path.exists() or self.age > str2timedelta(self.expire):  # disk fridge
             if self.logger: self.logger.debug(f"Updating & Saving {self.path} ...")

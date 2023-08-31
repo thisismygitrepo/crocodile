@@ -121,8 +121,11 @@ T2 = TypeVar('T2')
 class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list: Union[ListType[T], None, Iterator[T], Iterable[T]] = None) -> None: super().__init__(); self.list = list(obj_list) if obj_list is not None else []
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
-    def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]): res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)]); print(res) if not return_str else None; return res if return_str else None
-    def __deepcopy__(self, arg: Any) -> "List[T]": return List([__import__("copy").deepcopy(i) for i in self.list])
+    def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]):
+        res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)])
+        _ = print(res) if not return_str else None
+        return res if return_str else None
+    def __deepcopy__(self, arg: Any) -> "List[T]": _ = arg; return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self) -> bool: return bool(self.list)
     def __contains__(self, key: str) -> bool: return key in self.list
     def __copy__(self) -> 'List[T]': return List(self.list.copy())
@@ -135,7 +138,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def len(self) -> int: return len(self.list)
     # ================= call methods =====================================
     def __getattr__(self, name: str) -> 'List[T]': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args: list[Any], **kwargs: Any) -> 'List[Any]': return List(i(*args, **kwargs) for i in self.list)
+    def __call__(self, *args: Any, **kwargs: Any) -> 'List[Any]': return List([i.__call__(*args, **kwargs) for i in self.list])
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
     def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]':
