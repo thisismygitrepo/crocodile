@@ -123,7 +123,7 @@ class DataReader:
         self.plotter = None
         self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
         # self.df_handler = df_handler
-    def save(self, path: Optional[str] = None, **kwargs) -> None:
+    def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
         try: data = self.__getstate__()
@@ -264,7 +264,7 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader, compiler: Optional[Compiler] = None, history: Optional[list[dict]] = None):
+    def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader, compiler: Optional[Compiler] = None, history: Optional[list[dict[str, Any]]] = None):
         # : Optional[list]
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
@@ -373,7 +373,7 @@ class BaseModel(ABC):
         else: y_label = self.compiler.loss.__name__
         return res.plot(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
 
-    def infer(self, x) -> np.ndarray:
+    def infer(self, x) -> 'np.ndarray':
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
         NN is put in eval mode.
         :param x:
@@ -381,11 +381,11 @@ class BaseModel(ABC):
         """
         return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
 
-    def predict(self, x, **kwargs):
+    def predict(self, x, **kwargs: Any):
         """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
         return self.postprocess(self.infer(x), **kwargs)
 
-    def deduce(self, obj, viz=True, **kwargs) -> DeductionResult:
+    def deduce(self, obj, viz: bool = True, **kwargs: Any) -> DeductionResult:
         """Assumes that contents of the object are in the form of a batch."""
         preprocessed = self.preprocess(obj, **kwargs)
         prediction = self.infer(preprocessed)
@@ -493,7 +493,7 @@ class BaseModel(ABC):
         model_obj: 'BaseModel' = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
         history_path = path / "metadata/training/history.pkl"
-        if history_path.exists(): history: list = tb.Read.vanilla_pickle(path=history_path)
+        if history_path.exists(): history: list[dict[str, Any]] = tb.Read.vanilla_pickle(path=history_path)
         else: history = []
         model_obj.history = history
         _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
@@ -669,12 +669,12 @@ class Losses:
         For Tensorflow
         """
         class MeanMaxError(tf.keras.metrics.Metric):
-            def __init__(self, name='MeanMaximumError', **kwargs):
+            def __init__(self, name='MeanMaximumError', **kwargs: Any):
                 super(MeanMaxError, self).__init__(name=name, **kwargs)
                 self.mme = self.add_weight(name='mme', initializer='zeros')
                 self.__name__ = name
 
-            def update_state(self, y_true: 'np.ndarray', y_pred: 'np.ndarray', sample_weight=None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
+            def update_state(self, y_true: 'np.ndarray', y_pred: 'np.ndarray', sample_weight: Optional['np.ndarray'] = None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
             def result(self): return self.mme
             def reset_states(self): self.mme.assign(0.0)
         return MeanMaxError
