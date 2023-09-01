@@ -5,7 +5,7 @@ https://docs.sqlalchemy.org/en/14/tutorial/index.html#a-note-on-the-future
 """
 
 import time
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 import pandas as pd
 
@@ -90,7 +90,7 @@ class DBMS:
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
 
     # ==================== QUERIES =====================================
-    def execute_as_you_go(self, *commands, res_func=lambda x: x.all(), df: bool = False):
+    def execute_as_you_go(self, *commands: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
         with self.eng.connect() as conn:
             for command in commands: result = conn.execute(text(command))
             conn.commit()  # if driver is sqlite3, the connection is autocommitting. # this commit is only needed in case of DBAPI driver.
