@@ -4,7 +4,7 @@
 
 import os
 from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
-from crocodile.file_management import P, datetime, PLike, Path
+from crocodile.file_management import P, datetime, OPLike, Path, PLike
 import time
 import logging
 import subprocess
@@ -24,7 +24,7 @@ class Null:
 
 
 class Log(logging.Logger):  #
-    def __init__(self, dialect: str = ["colorlog", "logging", "coloredlogs"][0], name: Optional[str] = None, file: bool = False, file_path: PLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
+    def __init__(self, dialect: str = ["colorlog", "logging", "coloredlogs"][0], name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
                  s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False, log_colors=None):
         if name is None:
             name = randstr(noun=True)
@@ -41,9 +41,9 @@ class Log(logging.Logger):  #
     def __reduce_ex__(self, protocol): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. Its lower than getstate and setstate. It uses init method to create an instance.
     def __repr__(self): return "".join([f"Logger {self.name} (level {self.level}) with handlers: \n"] + [repr(h) + f"" + "\n" for h in self.handlers])
     get_format = staticmethod(lambda sep=' | ': f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
-    def manual_degug(self, path: Union[str, Path, P]): _ = self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+    def manual_degug(self, path: PLike): _ = self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
-    def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: PLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
+    def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
                         'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}  # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         field_styles = {'asctime': {'color': 'green'}, 'hostname': {'color': 'magenta'}, 'levelname': {'color': 'black', 'bold': True}, 'path': {'color': 'blue'}, 'programname': {'color': 'cyan'}, 'username': {'color': 'yellow'}}
@@ -52,7 +52,7 @@ class Log(logging.Logger):  #
         install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
     def add_streamhandler(self, s_level: int = logging.DEBUG, fmt: Optional[str] = None, module: Any = logging, name: str = "myStreamHandler"):
         shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); self.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{self.name}` is created.")
-    def add_filehandler(self, file_path: PLike = None, fmt: str = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
+    def add_filehandler(self, file_path: OPLike = None, fmt: str = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
         fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self): List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message")); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
@@ -106,7 +106,7 @@ class Terminal:
             except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
-    def run_as_admin(file: Union[str, P, Path], params, wait: bool = False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
+    def run_as_admin(file: PLike, params, wait: bool = False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
     def run_async(self, *cmds: str, new_window: bool = True, shell: Optional[str] = None, terminal: Optional[str] = None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
@@ -117,7 +117,7 @@ class Terminal:
         if self.machine == "Windows": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
-    def run_py(self, script: str, wdir: PLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, delete: bool = False, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
+    def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, delete: bool = False, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
         script = ((Terminal.get_header(wdir=wdir) if header else "") + script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", py_script.absolute().as_uri())
@@ -145,7 +145,7 @@ class Terminal:
     @staticmethod
     def replicate_session(cmd: str = ""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}""")
     @staticmethod
-    def get_header(wdir: PLike = None): return f"""\n# >> Code prepended\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# >> End of header, start of script passed\n"""
+    def get_header(wdir: OPLike = None): return f"""\n# >> Code prepended\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# >> End of header, start of script passed\n"""
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
@@ -203,7 +203,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
     def run_locally(self, command: str): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
     def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_repr('remote').replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
-    def open_console(self, cmd: str = '', new_window: bool = True, terminal=None, shell: str="pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
+    def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
     def run(self, cmd: str, verbose: bool = True, desc: str = "", strict_err: bool = False, strict_returncode: bool = False, env_prefix: bool = False) -> Terminal.Response:  # most central method.
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)
         _ = res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
@@ -211,27 +211,36 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
         else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
-    def copy_from_here(self, source: Union[str, P, Path], target: PLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
+    def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
         if init: print(f"{'>'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
-        if not z and (source := P(source).expanduser().absolute()).is_dir(): return source.search("*", folders=False, r=True).apply(lambda file: self.copy_from_here(source=file, target=target)) if r is True else print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+        source_ = P(source).expanduser().absolute()
+        if not z and source_.is_dir():
+            if r is True:
+                tmp = source_.search("*", folders=False, r=True)
+                tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
+                return list(tmp)
+            print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
         if z: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source).expanduser().absolute().collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''; remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
+        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''
+        remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)
-        if z: resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True); source.delete(sure=True); print("\n"); return resp
-    def copy_to_here(self, source: Union[str, P, Path], target: PLike = None, z: bool = False, r: bool = False, init=True) -> P:
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore
+        if z: _resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True); source.delete(sure=True); print("\n")
+        return source_
+    def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
-            return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True, verbose=False).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+            if r: return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True, verbose=False).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
+            print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
         if z: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False).op2path(strict_returncode=True, strict_err=True)
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)  # type: ignore
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
         print("\n"); return target
-    def receieve(self, source: Union[str, P, Path], target: PLike = None, z: bool = False, r: bool = False) -> P:
+    def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
         scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", return_obj=True, verbose=False)
         if not z and scout["is_dir"]: return scout["files"].apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         target = P(target).expanduser().absolute().create(parents_only=True) if target else scout["source_rel2home"].expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout["source_full"]
@@ -239,7 +248,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
         print("\n"); return target
     @staticmethod
-    def scout(source: Union[str, P, Path], z: bool = False, r: bool = False):
+    def scout(source: PLike, z: bool = False, r: bool = False):
         source_full = P(source).expanduser().absolute(); source_rel2home = source_full.collapseuser(); exists = source_full.exists(); is_dir = source_full.is_dir() if exists else None
         if z and exists:
             try: source_full = source_full.zip()
@@ -255,27 +264,38 @@ class Scheduler:
     def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000, exception_handler: Optional[Callable[[Exception, str, 'Scheduler'], Any]] = None, logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None):
         self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
-        self.logger, self.exception_handler = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True)), exception_handler
-        self.sess_start_time, self.records, self.cycle, self.max_cycles, self.sess_stats = None, List([]), 0, max_cycles, sess_stats or (lambda sched: {})
+        self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
+        self.exception_handler = exception_handler if exception_handler is not None else self.default_exception_handler
+        self.sess_start_time = datetime.now()  # to be reset at .run
+        self.records = List([])
+        self.cycle = 0
+        self.max_cycles = max_cycles
+        self.sess_stats = sess_stats or (lambda _sched: {})
     def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
-            try: self.routine(sched=self)
-            except BaseException as ex: self._handle_exceptions(ex=ex, during="routine")  # 2- Perform logic
+            try: self.routine(self)
+            except BaseException as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex: self._handle_exceptions(ex, during="sleep")  # that's probably the only kind of exception that can rise during sleep.
+            except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self)  # that's probably the only kind of exception that can rise during sleep.
         else: _ = self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
     def get_records_df(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
     def record_session_end(self, reason: str = "Not passed to function."):
-        self.records.append([self.sess_start_time, end_time := datetime.now(), duration := end_time-self.sess_start_time, self.cycle, reason, self.logger.file_path] + list((sess_stats := self.sess_stats(sched=self)).values()))
+        end_time = datetime.now()
+        duration = end_time - self.sess_start_time
+        sess_stats = self.sess_stats(self)
+        self.records.append([self.sess_start_time, end_time, duration, self.cycle, reason, self.logger.file_path] + list(sess_stats.values()))
         summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False) + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df())); return self
-    def _handle_exceptions(self, ex: Exception, during: str) -> None:
-        if self.exception_handler is not None: self.exception_handler(ex, during=during, sched=self)  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
-        else: self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
+        tmp = Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False)
+        assert isinstance(tmp, str)
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df()))
+        return self
+    def default_exception_handler(self, ex: Exception, during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
+        print(sched)
+        self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
 
 # def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):
@@ -285,53 +305,59 @@ class Scheduler:
 #         if raise_ is not None: raise raise_
 #         if handle is not None: return handle(ex, **kwargs)
 #         return run() if run is not None else return_
-def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
-def monkey_patch(class_inst: Any, func: Callable[[Any], Any]): setattr(class_inst.__class__, func.__name__, func)
-def capture_locals(func: Callable[[Any], Any], scope: dict[str, Any], args: Optional[Any] = None, self: Optional[str] = None, update_scope: bool = True): res = dict(); exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res); scope.update(res) if update_scope else None; return Struct(res)
 def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_code: bool = True, verbose: bool = True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
     text = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
     obj_path = P(__import__('inspect').getfile(obj)) if obj is not None else None
     path = P(path)
-    if obj_path is not None: 
+    if obj_path is not None:
         text += f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator
         try:
             repo = install_n_import("git", "gitpython").Repo(obj_path.parent, search_parent_directories=True)
             text += f"# Last Commit\n{repo.git.execute('git log -1')}{separator}# Remote Repo\n{repo.git.execute('git remote -v')}{separator}"
-            text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{Experimental.try_this(lambda: obj_path.relative_to(repo.working_dir).as_posix(), return_='')}{separator}"
-        except: text += f"Could not read git repository @ `{obj_path.parent}`.\n"
+            try: tmppp = obj_path.relative_to(repo.working_dir).as_posix()
+            except Exception: tmppp = ""  # type: ignore
+            text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{tmppp}{separator}"
+        except Exception: text += f"Could not read git repository @ `{obj_path.parent}`.\n"
     text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
-    readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8"); print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
+    readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
+    _ = print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
-def load_from_source_code(directory: str, obj: Optional[Any] = None, delete: bool = False):
-    P(directory).search("source_code*", r=True)[0].unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
-    sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
-    return getattr(sourcefile, obj) if obj is not None else sourcefile
-def extract_code(func, code: Optional[str] = None, include_args: bool = True, verbose: bool = True, copy2clipboard: bool = False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
-    import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
-    raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
-    code_string = '\n'.join([aline if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") for aline in lines])  # remove return statements if there else keep line as is.
-    title, args_header, injection_header, body_header, suffix = ((f"\n# " + f"{item} {func.__name__}".center(50, "=") + "\n") for item in ["CODE EXTRACTED FROM", "ARGS KWARGS OF", "INJECTED CODE INTO", "BODY OF", "BODY END OF"])
-    code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix  # added later so it has more overwrite authority.
-    _ = install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
-def extract_arguments(func: Callable[[Any], Any], copy2clipboard: bool = False, **kwargs: Any):
-    ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and func_kwargs.
-    res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(as_config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
-    ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and func_kwargs = {}
-    _ = install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
-def run_cell(pointer, module=sys.modules[__name__]):
-    for cell in P(module.__file__).read_text().split("#%%"):
-        if pointer in cell.split('\n')[0]: break  # bingo
-    else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
-    print(cell); install_n_import("clipboard").copy(cell); return cell
+def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
+def monkey_patch(class_inst: Any, func: Callable[[Any], Any]): setattr(class_inst.__class__, func.__name__, func)
+# def capture_locals(func: Callable[[Any], Any], scope: dict[str, Any], args: Optional[Any] = None, self: Optional[str] = None, update_scope: bool = True):
+#     res: dict[str, Any] = {}
+#     exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res)  # type: ignore
+#     _ = scope.update(res) if update_scope else None; return Struct(res)
+# def load_from_source_code(directory: str, obj: Optional[Any] = None, delete: bool = False):
+#     P(directory).search("source_code*", r=True)[0].unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
+#     sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
+#     return getattr(sourcefile, obj) if obj is not None else sourcefile
+# def extract_code(func, code: Optional[str] = None, include_args: bool = True, verbose: bool = True, copy2clipboard: bool = False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
+#     import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
+#     raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
+#     code_string = '\n'.join([aline if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") for aline in lines])  # remove return statements if there else keep line as is.
+#     title, args_header, injection_header, body_header, suffix = ((f"\n# " + f"{item} {func.__name__}".center(50, "=") + "\n") for item in ["CODE EXTRACTED FROM", "ARGS KWARGS OF", "INJECTED CODE INTO", "BODY OF", "BODY END OF"])
+#     code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix  # added later so it has more overwrite authority.
+#     _ = install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
+# def extract_arguments(func: Callable[[Any], Any], copy2clipboard: bool = False, **kwargs: Any):
+#     ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and func_kwargs.
+#     res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(as_config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
+#     ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and func_kwargs = {}
+#     _ = install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
+# def run_cell(pointer, module=sys.modules[__name__]):
+#     for cell in P(module.__file__).read_text().split("#%%"):
+#         if pointer in cell.split('\n')[0]: break  # bingo
+#     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
+    # print(cell); install_n_import("clipboard").copy(cell); return cell
 class Experimental:
     show_globals = staticmethod(show_globals)
     monkey_patch = staticmethod(monkey_patch)
-    capture_locals = staticmethod(capture_locals)
+    # capture_locals = staticmethod(capture_locals)
     generate_readme = staticmethod(generate_readme)
-    load_from_source_code = staticmethod(load_from_source_code)
-    extract_code = staticmethod(extract_code)
-    extract_arguments = staticmethod(extract_arguments)
-    run_cell = staticmethod(run_cell)  # Debugging and Meta programming tools"""
+    # load_from_source_code = staticmethod(load_from_source_code)
+    # extract_code = staticmethod(extract_code)
+    # extract_arguments = staticmethod(extract_arguments)
+    # run_cell = staticmethod(run_cell)  # Debugging and Meta programming tools"""
 
 
 if __name__ == '__main__':

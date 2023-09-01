@@ -1,7 +1,7 @@
 
 
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name
-from crocodile.file_management import P, PLike
+from crocodile.file_management import P, OPLike
 from crocodile.meta import Terminal
 from crocodile.msc.odds import Cycle
 
@@ -43,7 +43,7 @@ def assert_requirements():
 class FigureSave:
     class GenericSave:
         stream = ['clear', 'accumulate', 'update'][0]
-        def __init__(self, save_dir: PLike = None, save_name: Optional[str] = None, watch_figs: Optional[list[Any]] = None, max_calls: int = 2000, delay: int = 100, **kwargs: Any):
+        def __init__(self, save_dir: OPLike = None, save_name: Optional[str] = None, watch_figs: Optional[list[Any]] = None, max_calls: int = 2000, delay: int = 100, **kwargs: Any):
             """How to control what to be saved: you can either pass the figures to be tracked at init time, pass them dynamically at add time, or, add method will capture every figure and axis"""
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
             self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_fig_save")
@@ -379,7 +379,7 @@ class VisibilityViewerAuto(VisibilityViewer):
     artist = ['internal', 'external'][1]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][0:2]
-    def __init__(self, data=None, artist=None, stream: str = 'clear', save_type=FigureSave.Null, save_dir: PLike = None, save_name: Optional[str] = None, delay: int = 1,
+    def __init__(self, data=None, artist=None, stream: str = 'clear', save_type=FigureSave.Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
                  titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""

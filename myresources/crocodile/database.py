@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, text, inspect, Engine
 from sqlalchemy.sql.schema import MetaData
 from crocodile.core import Struct, Display
-from crocodile.file_management import List as L, P, PLike
+from crocodile.file_management import List as L, P, OPLike
 
 _ = create_engine, text
 
@@ -77,7 +77,7 @@ class DBMS:
         else: return table
 
     @staticmethod
-    def make_sql_engine(path: PLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
+    def make_sql_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
         """Establish lazy initialization with database"""
         if str(path) == "memory":
             print("Linking to in-memory database.")
