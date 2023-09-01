@@ -128,7 +128,7 @@ def modify_text(txt_raw: str, txt_search: str, txt_alt: Union[str, Callable[[str
     return "\n".join(lines)
 
 
-class P(type(Path()), Path):  # type: ignore
+class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     # ============= Path management ==================
     """ The default behaviour of methods acting on underlying disk object is to perform the action and return a new path referring to the mutated object in disk drive.
     However, there is a flag `orig` that makes the function return orignal path object `self` as opposed to the new one pointing to new object.
@@ -181,18 +181,18 @@ class P(type(Path()), Path):  # type: ignore
         else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
     def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
-    def cache_from(self, source_func: Callable[[], 'T'], expire: str = "1w", save: Callable[[Any], Any] = Save.vanilla_pickle, reader: Callable[[Any], Any] = Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
-    def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: Optional[str] = 'utf-8'):
+    def cache_from(self, source_func: Callable[[], 'T'], expire: str = "1w", save: Callable[['T', PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], Any] = Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
+    def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
-    def download(self, folder: OPLike = None, name: OPLike = None, memory: bool = False, allow_redirects: bool = True, params: Any = None) -> Union['P', 'Response']:
+    def download(self, folder: OPLike = None, name: OPLike = None, memory: bool = False, allow_redirects: bool = True, timeout: Optional[int] = None, params: Any = None) -> Union['P', 'Response']:
         import requests
-        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
+        response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, timeout=timeout, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         if memory: return response  # r.contents is bytes encoded as per docs of requests.
         return (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(str(name or self.name))).create(parents_only=True).write_bytes(response.content)
     def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
         if inlieu:
-            self._str = str(res)  # type: ignore
+            self._str = str(res)  # type: ignore # pylint: disable=W0201
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename":
@@ -245,15 +245,16 @@ class P(type(Path()), Path):  # type: ignore
         if type(key) is str: idx = fullparts.index(key); fullparts.remove(key); fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
         elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
         elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
-        self._str = str(P(*fullparts))  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
-    def split(self, at: Optional['str'] = None, index: Optional[int] = None, sep: int = -1, strict: bool = True):
-        if index is None and (at is not None):  # at is provided  # ====================================   Splitting
+        self._str = str(P(*fullparts))  # pylint: disable=W0201  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
+    def split(self, at: Optional[str] = None, index: Optional[int] = None, sep: int = -1, strict: bool = True):
+        if index is None and at is not None:  # at is provided  # ====================================   Splitting
             if not strict:  # behaves like split method of string
                 one, two = (items := str(self).split(sep=str(at)))[0], items[1]; one, two = P(one[:-1]) if one.endswith("/") else P(one), P(two[1:]) if two.startswith("/") else P(two)
             else:  # "strict": # raises an error if exact match is not found.
                 index = self.parts.index(str(at)); one, two = self[0:index], self[index + 1:]  # both one and two do not include the split item.
-        elif index is not None and (at is None):  # index is provided
-            one, two = self[:index], P(*self.parts[index + 1:]); at = self[index]  # this is needed below.
+        elif index is not None and at is None:  # index is provided
+            one, two = self[:index], P(*self.parts[index + 1:])
+            at = self.parts[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
         if sep == 0: return one, two  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
         elif sep == 1: return one, at / two   # append it to right portion
@@ -268,24 +269,28 @@ class P(type(Path()), Path):  # type: ignore
         elif "http" in str(self): return "P: URL " + self.as_url_str()
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
     # def __str__(self): return self.as_url_str() if "http" in self else self._str
-    def size(self, units: Optional[str] = 'mb'):  # ===================================== File Specs ==========================================================================================
+    def size(self, units: str = 'mb'):  # ===================================== File Specs ==========================================================================================
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
-        return round(total_size / dict(zip(List(['b', 'kb', 'mb', 'gb', 'B', 'KB', 'MB', 'GB']), 2 * [1024 ** item for item in range(4)]))[units], 1)
-    def time(self, which: Optional[str] = ["m", "c", "a"][0], **kwargs: Any): return datetime.fromtimestamp({"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which], **kwargs)  # m last mofidication of content, i.e. the time it was created. c last status change (its inode is changed, permissions, path, but not content) a: last access
+        tmp: int = {k: v for k, v in zip(['b', 'kb', 'mb', 'gb', 'B', 'KB', 'MB', 'GB'], 2 * [1024 ** item for item in range(4)])}[units]
+        return round(total_size / tmp, 1)
+    def time(self, which: str = ["m", "c", "a"][0], **kwargs: Any):
+        tmp = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
+        return datetime.fromtimestamp(tmp, **kwargs)  # m last mofidication of content, i.e. the time it was created. c last status change (its inode is changed, permissions, path, but not content) a: last access
     def stats(self) -> dict[str, Any]: return dict(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
-    def clickable(self, inlieu: bool = False) -> 'P': return self._return(self.expanduser().resolve().as_uri(), inlieu)
-    def as_url_str(self, inlieu: bool = False) -> str: return str(self._return(self.as_posix().replace("https:/", "https://").replace("http:/", "http://"), inlieu))
+    def clickable(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().resolve().as_uri()), inlieu)
+    def as_url_str(self, inlieu: bool = False) -> str: return str(self._return(P(self.as_posix().replace("https:/", "https://").replace("http:/", "http://")), inlieu))
     def as_url_obj(self, inlieu: bool = False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
     def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def as_str(self) -> str: return str(self)
     def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
-    def validate_name(self, replace: Optional[str] = '_'): return validate_name(self.trunk, replace=replace)
+    def validate_name(self, replace: str = '_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
-    def write_text(self, data: str, encoding: Optional[str] = 'utf-8') -> 'P': super(P, self).write_text(data, encoding=encoding); return self
-    def read_text(self, encoding: Optional[str] = 'utf-8', lines: bool = False) -> str: res = super(P, self).read_text(encoding=encoding) if not lines else List(super(P, self).read_text(encoding=encoding).splitlines()); return res
+    def write_text(self, data: str, encoding: str = 'utf-8') -> 'P':
+        super(P, self).write_text(data, encoding=encoding); return self
+    def read_text(self, encoding: Optional[str] = 'utf-8') -> str: return super(P, self).read_text(encoding=encoding)
     def write_bytes(self, data: bytes, overwrite: bool = False) -> 'P':
         slf = self.expanduser().absolute(); _ = slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
@@ -337,7 +342,9 @@ class P(type(Path()), Path):  # type: ignore
     @staticmethod
     def tmpdir(prefix: str = "") -> 'P': return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     @staticmethod
-    def tmpfile(name: OPLike = None, suffix: str = "", folder: OPLike = None, tstamp: bool = False, noun: bool = False) -> 'P': return P.tmp(file=(name or randstr(noun=noun)) + "_" + randstr() + (("_" + timestamp()) if tstamp else "") + suffix, folder=folder or "tmp_files")
+    def tmpfile(name: OPLike = None, suffix: str = "", folder: OPLike = None, tstamp: bool = False, noun: bool = False) -> 'P':
+        tmp = randstr(noun=noun) if name is not None else str(name)
+        return P.tmp(file=tmp + "_" + randstr() + (("_" + str(timestamp())) if tstamp else "") + suffix, folder=folder or "tmp_files")
     @staticmethod
     def tmp(folder: OPLike = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P': return P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
     # ====================================== Compression & Encryption ===========================================
@@ -419,7 +426,7 @@ class P(type(Path()), Path):  # type: ignore
     @staticmethod
     def get_env(): return __import__("crocodile.environment").environment
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
-    def share_on_network(self, username: OPLike = None, password: Optional[str] = None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + username) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
+    def share_on_network(self, username: OPLike = None, password: Optional[str] = None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + str(username)) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, text: bool = True, path: OPLike = None):
         qrcode = install_n_import("qrcode"); qr = qrcode.QRCode()
         qr.add_data(str(self) if "http" in str(self) else (self.read_text() if text else self.read_bytes()))
@@ -447,7 +454,8 @@ class P(type(Path()), Path):  # type: ignore
             assert isinstance(tmp, P), f"Could not get link for {self}."
             return tmp
         return self
-    def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore
+    def from_cloud(self, cloud: str, localpath: OPLike = None,
+                   decrypt: bool = False, unzip: bool = False,  # type: ignore
                    key: Optional[str] = None, pwd: Optional[str] = None, rel2home: bool = False, overwrite: bool = True, merge: bool = False, os_specific: bool = False, transfers: int = 10, root: str = "myhome"):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())

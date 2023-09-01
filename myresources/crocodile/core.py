@@ -11,9 +11,9 @@ PLike = Union[str, Path]
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace: str = '_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
-def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> datetime.datetime: return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
+def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> str: return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift: str) -> datetime.timedelta:  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
-    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])  # type: ignore
+    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], float(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 def install_n_import(library: str, package: Optional[str] = None, **kwargs: Any):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(library, **kwargs)
@@ -126,7 +126,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
     def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]):
         res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)])
-        _ = print(res) if not return_str else None
+        _ = print(res) if not return_str else None; _ = kwargs
         return res if return_str else None
     def __deepcopy__(self, arg: Any) -> "List[T]": _ = arg; return List([__import__("copy").deepcopy(i) for i in self.list])
     def __bool__(self) -> bool: return bool(self.list)
@@ -159,7 +159,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
                 tmp = self.list[ix:len(self)]
             res.append(List(tmp))
         return List(res)
-    def filter(self, func: Callable[[T], bool], which: Callable[[int, T], T2] = lambda _idx, _x: x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
+    def filter(self, func: Callable[[T], bool], which: Callable[[int, T], T2] = lambda _idx, _x: _x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]:
         args = (func, self.list) + ((default,) if default is not None else ())
@@ -198,7 +198,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
             from joblib import Parallel, delayed
             if other is None: return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator))  # type: ignore
             return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
-        if other is None: return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) 
+        if other is None: return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
         return List([func(x, y) for x, y in iterator])
     def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
         df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
@@ -250,7 +250,10 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def keys(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
     def values(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
     def items(self, verbose: bool = False, desc: str = "") -> 'List[Any]': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
-    def get(self, key: Optional[Hashable] = None, default: Optional[Any] = None, strict: bool = False, keys: Union[None, list[str], list[Hashable]] = None) -> 'List[Any]': return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])]) if keys is not None else (self.__dict__.get(key, default) if not strict else self[key])
+    def get(self, key: Optional[str] = None, default: Optional[Any] = None, strict: bool = False, keys: Union[None, list[str]] = None) -> 'Union[Any, List[Any]]':
+        if keys is not None: return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])])
+        if key is not None: return (self.__dict__.get(key, default) if not strict else self[key])
+        else: raise ValueError("Either key or keys should be passed.")
     def apply2keys(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
     def apply2values(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': _ = [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
     def apply(self, kv_func: Callable[[Any, Any], Any]) -> 'List[Any]': return self.items().apply(lambda item: kv_func(item[0], item[1]))
