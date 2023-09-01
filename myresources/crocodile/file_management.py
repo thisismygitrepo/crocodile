@@ -9,7 +9,7 @@ from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal
 
 
 OPLike: TypeAlias = Union[str, 'P', Path, None]
-PLike: TypeAlias = PLike
+PLike: TypeAlias = Union[str, 'P', Path]
 FILE_MODE: TypeAlias = Literal['r', 'w', 'x', 'a']
 
 
