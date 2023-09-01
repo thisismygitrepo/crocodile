@@ -26,7 +26,7 @@ class DBMS:
     * Always use sqlalchemy API and avoid sql-dielect specific language.
     * Engine is provided externally. It is the end-user's business to make this engine.
     """
-    def __init__(self, engine: Engine, db=None, sch: Optional[str] = None, vws=False):
+    def __init__(self, engine: Engine, db=None, sch: Optional[str] = None, vws: bool = False):
         self.eng: Engine = engine
         self.con = None
         self.ses = None

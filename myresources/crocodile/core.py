@@ -13,7 +13,7 @@ PLike = Union[str, Path]
 def validate_name(astring: str, replace: str = '_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
 def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> datetime.datetime: return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift: str) -> datetime.timedelta:  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
-    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])
+    key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], eval(shift[:-1])  # type: ignore
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 def install_n_import(library: str, package: Optional[str] = None, **kwargs: Any):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(library, **kwargs)
@@ -118,6 +118,7 @@ class Base(object):
 
 T = TypeVar('T')
 T2 = TypeVar('T2')
+T3 = TypeVar('T3')
 
 
 class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
@@ -158,7 +159,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
                 tmp = self.list[ix:len(self)]
             res.append(List(tmp))
         return List(res)
-    def filter(self, func: Callable[[T], bool], which: Callable[[int, T], T2] = lambda _idx, x: x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
+    def filter(self, func: Callable[[T], bool], which: Callable[[int, T], T2] = lambda _idx, _x: x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
     def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]:
         args = (func, self.list) + ((default,) if default is not None else ())
@@ -187,8 +188,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         elif isinstance(key, int): return self.list[key]
         # assert isinstance(key, slice)
         return List(self.list[key])  # for slices  # type: ignore
-    def apply(self, func: Callable[[T], T2], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], depth: int = 1, verbose: bool = False, desc: Optional[str] = None, **kwargs: Any) -> 'List[T2]':
-        if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
+    def apply(self, func: Union[Callable[[T], T2], Callable[[T, T2], T3]], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda _x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], verbose: bool = False, desc: Optional[str] = None, **kwargs: Any) -> 'List[T2]':
+        # if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
         from tqdm import tqdm
         if other is None:
             iterator = (self.list if not verbose else tqdm(self.list, desc=desc))
@@ -197,7 +198,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
             from joblib import Parallel, delayed
             if other is None: return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator))  # type: ignore
             return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
-        return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) if other is None else List([func(x, y) for x, y in iterator])
+        if other is None: return List([func(x, *args, **kwargs) for x in iterator if filt(x)]) 
+        return List([func(x, y) for x, y in iterator])
     def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
         df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
         if minimal: return df

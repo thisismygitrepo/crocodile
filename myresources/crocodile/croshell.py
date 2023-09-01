@@ -6,15 +6,18 @@
 import argparse
 import os
 import random
-from rich import pretty, inspect, progress, traceback, print
+from rich import pretty, inspect, progress, traceback, print as pprint
 from rich.text import Text
 from rich.console import Console
 
-from crocodile.core import *
-from crocodile.file_management import *
+from crocodile.core import *  # type: ignore
+from crocodile.file_management import P
+import crocodile.core as core
+from crocodile.file_management import *  # type: ignore
 from crocodile.meta import *
+from crocodile import meta
 # import crocodile.environment as env
-from crocodile.matplotlib_management import *
+from crocodile.matplotlib_management import *  # type: ignore
 import crocodile.toolbox as tb
 import numpy as np
 import pandas as pd
@@ -35,7 +38,11 @@ print("Made with 🐍 | Built with ❤️")
 
 tb.D.set_numpy_display()
 tb.D.set_pandas_display()
-D = Display; L = List; E = Experimental; S = Struct
+D = core.Display
+L = core.List
+E = meta.Experimental
+S = core.Struct
+_ = D, L, E, S, inspect, progress, pprint, traceback, pd, np
 
 
 if platform.system() == "Windows":
@@ -106,10 +113,10 @@ def build_parser():
     if args.file:
         code = P(args.file).read_text()
         print(code)
-        exec(code, globals())
+        exec(code, globals())  # type: ignore
     elif args.cmd:
         print(args.cmd)
-        exec(args.cmd, globals())
+        exec(args.cmd, globals())  # type: ignore
 
 
 if __name__ == "__main__":
