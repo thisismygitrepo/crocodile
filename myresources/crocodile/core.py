@@ -116,7 +116,7 @@ class Base(object):
         _ = __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
-T = TypeVar('T')
+T = TypeVar('T',)
 T2 = TypeVar('T2')
 T3 = TypeVar('T3')
 
@@ -168,7 +168,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other: 'List[T]') -> 'List[T]': return List(list(other) + self.list)
     def __iadd__(self, other: 'List[T]') -> 'List[T]': self.list = self.list + list(other); return self  # inplace add.
-    def sort(self, key=None, reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
+    def sort(self, key: Optional[Any] = None, reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args: list[Any], **kwargs: Any) -> 'List[T]': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
     # def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': _ = [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self

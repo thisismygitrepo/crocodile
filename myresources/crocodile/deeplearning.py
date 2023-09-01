@@ -8,9 +8,10 @@ from crocodile.file_management import P, Path
 from crocodile.matplotlib_management import ImShow, FigureSave
 # from matplotlib.pyplot import hist
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from abc import ABC
-from typing import Generic, TypeVar, Type, Any, Optional, Union, Callable
+from typing import TypeVar, Type, Any, Optional, Union, Callable
 import enum
 from tqdm import tqdm
 import copy
@@ -44,10 +45,10 @@ class EvaluationData:
 
 @dataclass
 class DeductionResult:
-    input: np.ndarray
-    preprocessed: np.ndarray
-    postprocessed: np.ndarray
-    prediction: np.ndarray
+    input: 'npt.NDArray[np.float64]'
+    preprocessed: 'npt.NDArray[np.float64]'
+    postprocessed: 'npt.NDArray[np.float64]'
+    prediction: 'npt.NDArray[np.float64]'
 
 
 class Device(enum.Enum):
@@ -82,18 +83,18 @@ class HParams:
 
     def save(self):
         self.save_dir.joinpath(self.subpath, 'hparams.txt').create(parents_only=True).write_text(str(self))
-        try: data = self.__getstate__()
+        try: data: dict[str, Any] = self.__getstate__()
         except AttributeError:
-            data: dict[str, Any] = self.__dict__
+            data = self.__dict__
         tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
         tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
     def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any) -> 'HParams':
-        data: dict = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+        data: dict[str, Any] = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
-    def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
+    # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
     @property
     def pkg(self):
         if self.pkg_name not in ("tensorflow", "torch"): raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
@@ -104,6 +105,7 @@ class HParams:
 
 SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
 def _silence_pylance(hp: SubclassedHParams) -> SubclassedHParams: return hp
+_ = _silence_pylance
 
 
 class DataReader:
@@ -116,7 +118,7 @@ class DataReader:
     need to reference `.dataspects`.
     """
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
-    def __init__(self, hp: SubclassedHParams, specs: Optional[Specs] = None, split: Optional[dict[str, np.ndarray]] = None) -> None:
+    def __init__(self, hp: SubclassedHParams, specs: Optional[Specs] = None, split: Optional[dict[str, 'npt.NDArray[np.float64]']] = None) -> None:
         super().__init__()
         self.hp = hp
         self.split = split
@@ -126,14 +128,14 @@ class DataReader:
     def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
         base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
-        try: data = self.__getstate__()
-        except AttributeError: data: dict[str, Any] = self.__dict__
+        try: data: dict[str, Any] = self.__getstate__()
+        except AttributeError: data = self.__dict__
         tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
         tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
     def from_saved_data(cls, path: Union[str, tb.P], hp: HParams, *args: Any, **kwargs: Any):
         path = tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
-        data: dict = tb.Read.vanilla_pickle(path)
+        data: dict[str, Any] = tb.Read.vanilla_pickle(path)
         obj = cls(hp=hp, *args, **kwargs)
         obj.__setstate__(data)
         return obj
@@ -144,18 +146,12 @@ class DataReader:
             if hasattr(self, item): res[item] = getattr(self, item)
         return res
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
-    def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
+    # def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
     def split_the_data(self, *args: Any, **kwargs: Any) -> None:
         from sklearn.model_selection import train_test_split
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
         self.split = dict(train_loader=None, test_loader=None)
-        if self.specs.ip_names is None:
-            ip_names: list[str] = [f"x_{i}" for i in range(len(args) - 1)]
-            if len(ip_names) == 1: ip_names = ["x"]
-            self.specs.ip_names = ip_names
-        if self.specs.op_names is None: self.specs.op_names = ["y"]
-        if self.specs.other_names is None: self.specs.other_names = []
         strings = self.specs.get_all_strings()
         assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
         for an_arg, key in zip(args, strings):
@@ -173,7 +169,7 @@ class DataReader:
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice=None, indices=None, use_slice: bool = False, split: str = "test", size: Optional[int] = None):
+    def sample_dataset(self, aslice=None, indices: Optional[list[int]] = None, use_slice: bool = False, split: str = "test", size: Optional[int] = None):
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
@@ -228,7 +224,7 @@ class DataReader:
     #     self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
     #     self.split['x_test']= self.scaler.transform(self.split['x_test'])
 
-    def image_viz(self, pred: 'np.ndarray', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
+    def image_viz(self, pred: 'npt.NDArray[np.float64]', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
         """
         Assumes numpy inputs
         """
@@ -302,7 +298,7 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz: bool = True, val_sample_weights: Optional['np.ndarray'] = None, **kwargs: Any):
+    def fit(self, viz: bool = True, val_sample_weights: Optional['npt.NDArray[np.float64]'] = None, **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
         x_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="train")]
         y_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="train")]
@@ -373,7 +369,7 @@ class BaseModel(ABC):
         else: y_label = self.compiler.loss.__name__
         return res.plot(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
 
-    def infer(self, x) -> 'np.ndarray':
+    def infer(self, x: Any) -> 'npt.NDArray[np.float64]':
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
         NN is put in eval mode.
         :param x:
@@ -381,11 +377,11 @@ class BaseModel(ABC):
         """
         return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
 
-    def predict(self, x, **kwargs: Any):
+    def predict(self, x: Any, **kwargs: Any):
         """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
         return self.postprocess(self.infer(x), **kwargs)
 
-    def deduce(self, obj, viz: bool = True, **kwargs: Any) -> DeductionResult:
+    def deduce(self, obj: Any, viz: bool = True, **kwargs: Any) -> DeductionResult:
         """Assumes that contents of the object are in the form of a batch."""
         preprocessed = self.preprocess(obj, **kwargs)
         prediction = self.infer(preprocessed)
@@ -394,7 +390,8 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test: Optional['np.ndarray'] = None, y_test: Optional['np.ndarray'] = None, names_test: Optional[list[str]] = None, aslice=None, indices=None, use_slice: bool = False, size: Optional[int] = None,
+    def evaluate(self, x_test: Optional['npt.NDArray[np.float64]'] = None, y_test: Optional['npt.NDArray[np.float64]'] = None, names_test: Optional[list[str]] = None,
+                 aslice=None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
                  split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
@@ -417,10 +414,10 @@ class BaseModel(ABC):
             self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **(viz_kwargs or {}))
         return results
 
-    def get_metrics_evaluations(self, prediction: 'np.ndarray', groun_truth: 'np.ndarray') -> Optional[pd.DataFrame]:
+    def get_metrics_evaluations(self, prediction: 'npt.NDArray[np.float64]', groun_truth: 'npt.NDArray[np.float64]') -> Optional[pd.DataFrame]:
         if self.compiler is None: return None
-        metrics = tb.L([self.compiler.loss]) + self.compiler.metrics
-        loss_dict: dict[str, list] = dict()
+        metrics = [self.compiler.loss] + self.compiler.metrics
+        loss_dict: dict[str, list[Any]] = dict()
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
@@ -612,7 +609,7 @@ class Ensemble(tb.Base):
                 datacopy: SubclassedDataReader = copy.copy(self.data)  # shallow copy
                 datacopy.hp = hp  # type: ignore
                 self.models.append(model_class(hp, datacopy))
-        self.performance = None
+        self.performance: list[Any] = []
 
     @classmethod
     def from_saved_models(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
@@ -630,7 +627,7 @@ class Ensemble(tb.Base):
     def from_path(path: Union[str, Path, P]) -> list[SubclassedBaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(BaseModel.from_path))
 
     def fit(self, shuffle_train_test: bool = True, save: bool = True, **kwargs: Any):
-        self.performance: list[Any] = []
+        self.performance = []
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
             if shuffle_train_test:
@@ -656,7 +653,7 @@ class Losses:
                 super().__init__(*args, **kwargs)
                 self.name = "LogSquareLoss"
 
-            def call(self, y_true: 'np.ndarray', y_pred: 'np.ndarray'):
+            def call(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]'):
                 _ = self
                 tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))
                 factor = tf.Tensor(20) / tmp
@@ -664,17 +661,17 @@ class Losses:
         return LogSquareLoss
 
     @staticmethod
-    def get_mean_max_error(tf):
+    def get_mean_max_error(tf: Any):
         """
         For Tensorflow
         """
         class MeanMaxError(tf.keras.metrics.Metric):
-            def __init__(self, name='MeanMaximumError', **kwargs: Any):
+            def __init__(self, name: str = 'MeanMaximumError', **kwargs: Any):
                 super(MeanMaxError, self).__init__(name=name, **kwargs)
                 self.mme = self.add_weight(name='mme', initializer='zeros')
                 self.__name__ = name
 
-            def update_state(self, y_true: 'np.ndarray', y_pred: 'np.ndarray', sample_weight: Optional['np.ndarray'] = None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
+            def update_state(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]', sample_weight: Optional['npt.NDArray[np.float64]'] = None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
             def result(self): return self.mme
             def reset_states(self): self.mme.assign(0.0)
         return MeanMaxError
@@ -746,10 +743,10 @@ class HPTuning:
 
 def batcher(func_type: str = 'function'):
     if func_type == 'method':
-        def batch(func: Callable[[Any], Any]):
+        def batch(func: Callable[..., Any]):
             # from functools import wraps
             # @wraps(func)
-            def wrapper(self, x, *args, per_instance_kwargs=None, **kwargs):
+            def wrapper(self: Any, x: Any, *args: Any, per_instance_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
                 output = []
                 for counter, item in enumerate(x):
                     mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()} if per_instance_kwargs is not None else {}
@@ -767,16 +764,16 @@ def batcher(func_type: str = 'function'):
 
 def batcherv2(func_type: str = 'function', order: int = 1):
     if func_type == 'method':
-        def batch(func):
+        def batch(func: Callable[[Any], Any]):
             # from functools import wraps
             # @wraps(func)
-            def wrapper(self, *args: Any, **kwargs: Any): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
+            def wrapper(self: Any, *args: Any, **kwargs: Any): return np.array([func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
             return wrapper
         return batch
     elif func_type == 'class': raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
-            def __init__(self, func): self.func = func
+            def __init__(self, func: Callable[[Any], Any]): self.func = func
             def __call__(self, *args: Any, **kwargs: Any): return np.array([self.func(self, *items, *args[order:], **kwargs) for items in zip(*args[:order])])
         return Batch
 

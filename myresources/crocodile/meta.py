@@ -94,10 +94,14 @@ class Response:
     def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]:
         _ = args, kwargs
         return self.op.rstrip() if type(self.op) is str else None
-    op = property(lambda self: self.output["stdout"])
-    ip = property(lambda self: self.output["stdin"])
-    err = property(lambda self: self.output["stderr"])
-    returncode = property(lambda self: self.output["returncode"])
+    @property
+    def op(self) -> str: return self.output["stdout"]
+    @property
+    def ip(self) -> str: return self.output["stdin"]
+    @property
+    def err(self) -> str: return self.output["stderr"]
+    @property
+    def returncode(self): return self.output["returncode"]
     def op2path(self, strict_returncode: bool = True, strict_err: bool = False) -> Union[P, None]:
         return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
     def op_if_successfull_or_default(self, strict_returcode: bool = True, strict_err: bool = False, default: Any = None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
@@ -211,7 +215,6 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if ":" in self.hostname:
                 self.hostname, port_ = self.hostname.split(":")
                 self.port = int(port_)
-        
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
@@ -288,7 +291,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         source_full = P(source).expanduser().absolute(); source_rel2home = source_full.collapseuser(); exists = source_full.exists(); is_dir = source_full.is_dir() if exists else None
         if z and exists:
             try: source_full = source_full.zip()
-            except Exception as ex: raise Exception(f"Could not zip {source_full} due to {ex}") from ex  # type: ignore
+            except Exception as ex: raise Exception(f"Could not zip {source_full} due to {ex}") from ex  # type: ignore # pylint disable=W0719
             source_rel2home = source_full.zip()
         files = source_full.search(folders=False, r=True).collapseuser() if r and exists and is_dir else None; return dict(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):   # ip=rsp.ip, op=rsp.op
@@ -312,7 +315,7 @@ class Scheduler:
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
             try: self.routine(self)
-            except BaseException as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
+            except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
@@ -329,7 +332,7 @@ class Scheduler:
         assert isinstance(tmp, str)
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df()))
         return self
-    def default_exception_handler(self, ex: Exception, during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
+    def default_exception_handler(self, ex: BaseException, during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
         self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
