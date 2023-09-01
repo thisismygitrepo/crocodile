@@ -3,8 +3,8 @@
 """
 
 import os
-from crocodile.core import timestamp, randstr, str2timedelta, Save, install_n_import, List, Struct
-from crocodile.file_management import P, datetime, OPLike, Path, PLike
+from crocodile.core import randstr, str2timedelta, Save, install_n_import, List, Struct
+from crocodile.file_management import P, datetime, OPLike, PLike
 import time
 import logging
 import subprocess
@@ -32,7 +32,7 @@ class Log(logging.Logger):  #
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path  # proper update to this value by self.add_filehandler()
         if dialect == "colorlog": module = install_n_import("colorlog"); processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
-        else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep, datefmt="%d %H:%M:%S"))
+        else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
         _ = self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level) if file or file_path else None; self.add_streamhandler(s_level, fmt=processed_fmt, module=module) if stream else None
         self.specs = dict(dialect=dialect, name=self.name, file=file, file_path=self.file_path, stream=bool(self.get_shandler()), fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # # this way of creating relative path makes transferrable across machines.
     def get_shandler(self): return List(handler for handler in self.handlers if "StreamHandler" in str(handler))
@@ -40,10 +40,13 @@ class Log(logging.Logger):  #
     def set_level(self, level: int, which: str = ["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
     def __reduce_ex__(self, protocol): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. Its lower than getstate and setstate. It uses init method to create an instance.
     def __repr__(self): return "".join([f"Logger {self.name} (level {self.level}) with handlers: \n"] + [repr(h) + f"" + "\n" for h in self.handlers])
-    get_format = staticmethod(lambda sep=' | ': f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}")  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
-    def manual_degug(self, path: PLike): _ = self; sys.stdout = open(path, 'w'); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
-    def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level=logging.DEBUG, f_level=logging.DEBUG, l_level=logging.DEBUG, verbose=False):
+    def get_format(sep: str = ' | ', datefmt: str = "%d %H:%M:%S"):
+        _ = datefmt  # TODO: add datefmt to the format string
+        return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}"  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
+    def manual_degug(self, path: PLike): _ = self; sys.stdout = open(path, 'w', encoding="utf-8"); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+    @staticmethod
+    def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
                         'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}  # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         field_styles = {'asctime': {'color': 'green'}, 'hostname': {'color': 'magenta'}, 'levelname': {'color': 'black', 'bold': True}, 'path': {'color': 'blue'}, 'programname': {'color': 'cyan'}, 'username': {'color': 'yellow'}}
@@ -59,30 +62,32 @@ class Log(logging.Logger):  #
     def get_history(self, lines: int = 200, to_html: bool = False): logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
 
+class Response:
+    @staticmethod
+    def from_completed_process(cp: subprocess.CompletedProcess): (resp := Response(cmd=cp.args)).output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)); return resp
+    def __init__(self, stdin=None, stdout=None, stderr=None, cmd: Optional[str] = None, desc: str = ""): self.std, self.output, self.input, self.desc = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd, desc  # input command
+    def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]: return self.op.rstrip() if type(self.op) is str else None
+    op = property(lambda self: self.output["stdout"])
+    ip = property(lambda self: self.output["stdin"])
+    err = property(lambda self: self.output["stderr"])
+    returncode = property(lambda self: self.output["returncode"])
+    def op2path(self, strict_returncode: bool = True, strict_err: bool = False) -> Union[P, None]:
+        return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
+    def op_if_successfull_or_default(self, strict_returcode: bool = True, strict_err: bool = False, default: Any = None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
+    def is_successful(self, strict_returcode: bool = True, strict_err: bool = False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
+    def capture(self): _ = [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
+    def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", capture: bool = True, strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
+        _ = self.capture() if capture else None; success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
+        if assert_success: assert success, self.print(capture=False, desc=desc)
+        _ = print(desc) if success else self.print(capture=False, desc=desc); return self
+    def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
+        _ = self.capture() if capture else None; install_n_import("rich"); from rich import console; con = console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
+        tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
+        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]), style="white")
+        con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black")); return self
+
+
 class Terminal:
-    class Response:
-        @staticmethod
-        def from_completed_process(cp: subprocess.CompletedProcess): (resp := Terminal.Response(cmd=cp.args)).output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)); return resp
-        def __init__(self, stdin=None, stdout=None, stderr=None, cmd: Optional[str] = None, desc: str = ""): self.std, self.output, self.input, self.desc = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd, desc  # input command
-        def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]: return self.op.rstrip() if type(self.op) is str else None
-        op = property(lambda self: self.output["stdout"])
-        ip = property(lambda self: self.output["stdin"])
-        err = property(lambda self: self.output["stderr"])
-        returncode = property(lambda self: self.output["returncode"])
-        def op2path(self, strict_returncode: bool = True, strict_err: bool = False) -> Union[P, None]:
-            return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
-        def op_if_successfull_or_default(self, strict_returcode: bool = True, strict_err: bool = False, default=None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
-        def is_successful(self, strict_returcode: bool = True, strict_err: bool = False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
-        def capture(self): _ = [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
-        def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", capture: bool = True, strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
-            _ = self.capture() if capture else None; success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
-            if assert_success: assert success, self.print(capture=False, desc=desc)
-            _ = print(desc) if success else self.print(capture=False, desc=desc); return self
-        def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
-            _ = self.capture() if capture else None; install_n_import("rich"); from rich import console; con = console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
-            tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
-            txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]), style="white")
-            con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black")); return self
     def __init__(self, stdout: Optional[int] = subprocess.PIPE, stderr: Optional[int] = subprocess.PIPE, stdin: Optional[int] = subprocess.PIPE, elevated: bool = False):
         self.available_consoles, self.machine = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"], __import__("platform").system()
         self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
@@ -98,12 +103,12 @@ class Terminal:
         if self.machine == "Windows" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
         if self.elevated is False or self.is_user_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-        return self.Response.from_completed_process(resp)
+        return Response.from_completed_process(resp)
     @staticmethod
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name == 'nt':
             try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
-            except: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
+            except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
     def run_as_admin(file: PLike, params, wait: bool = False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
@@ -159,7 +164,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.hostname: str
         self.username: str
         self.port: int = port
-
+        import platform
         username_ = username or str(__import__("getpass").getuser())
         if "@" not in username_ and hostname is None:  # then, username is probably a Host profile
             try:
@@ -186,13 +191,17 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=paramiko.proxy.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None)
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
-        def view_bar(slf, a, b): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
+        def view_bar(slf: Any, a: Any, b: Any): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
         self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
-        self._local_distro, self._remote_distro, self._remote_machine, self.terminal_responses, self.platform = None, None, None, [], __import__("platform")
+        self._local_distro: Optional[str] = None
+        self._remote_distro: Optional[str] = None
+        self._remote_machine: Optional[str] = None
+        self.terminal_responses: list[Response] = []
+        self.platform = platform
         self.remote_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""  # works for both cmd and pwsh
     def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "tmate_sess", "port", "sshkey", "compress", "pwd", "ve"]}
-    def __setstate__(self, state: dict[str, Any]): self.__init__(**state)
+    def __setstate__(self, state: dict[str, Any]): SSH(**state)
     def get_remote_machine(self): self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
     def get_remote_distro(self): self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default(default="") if self._remote_distro is None else self._remote_distro; return self._remote_distro
@@ -201,11 +210,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def get_repr(self, which: str = "remote", add_machine: bool = False): return (f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")) if which == "remote" else f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
-    def run_locally(self, command: str): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Terminal.Response(__import__('os').system(command))
+    def run_locally(self, command: str): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Response(__import__('os').system(command))
     def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_repr('remote').replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
-    def run(self, cmd: str, verbose: bool = True, desc: str = "", strict_err: bool = False, strict_returncode: bool = False, env_prefix: bool = False) -> Terminal.Response:  # most central method.
-        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Terminal.Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)
+    def run(self, cmd: str, verbose: bool = True, desc: str = "", strict_err: bool = False, strict_returncode: bool = False, env_prefix: bool = False) -> Response:  # most central method.
+        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)
         _ = res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False):
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
@@ -252,7 +261,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         source_full = P(source).expanduser().absolute(); source_rel2home = source_full.collapseuser(); exists = source_full.exists(); is_dir = source_full.is_dir() if exists else None
         if z and exists:
             try: source_full = source_full.zip()
-            except Exception as ex: raise Exception(f"Could not zip {source_full} due to {ex}") from ex
+            except Exception as ex: raise Exception(f"Could not zip {source_full} due to {ex}") from ex  # type: ignore
             source_rel2home = source_full.zip()
         files = source_full.search(folders=False, r=True).collapseuser() if r and exists and is_dir else None; return dict(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):   # ip=rsp.ip, op=rsp.op
