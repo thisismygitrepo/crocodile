@@ -264,9 +264,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if self.is_symlink():
             try: target = self.resolve()  # broken symolinks are funny, and almost always fail `resolve` method.
             except Exception: target = "BROKEN LINK " + str(self)  # avoid infinite recursions for broken links.
-            return "P: Symlink '" + str(self) + "' ==> " + repr(str(target) if target == self else target)
-        elif self.is_absolute(): return "P: " + self._type() + " '" + self.clickable() + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
-        elif "http" in str(self): return "P: URL " + self.as_url_str()
+            return "P: Symlink '" + str(self) + "' ==> " + (str(target) if target == self else str(target))
+        elif self.is_absolute(): return "P: " + self._type() + " '" + str(self.clickable()) + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
+        elif "http" in str(self): return "P: URL " + str(self.as_url_str())
         else: return "P: Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
     # def __str__(self): return self.as_url_str() if "http" in self else self._str
     def size(self, units: str = 'mb'):  # ===================================== File Specs ==========================================================================================
@@ -280,8 +280,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     # ================================ String Nature management ====================================
     def _type(self): return ("File" if self.is_file() else ("Dir" if self.is_dir() else "NotExist")) if self.absolute() else "Relative"
     def clickable(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().resolve().as_uri()), inlieu)
-    def as_url_str(self, inlieu: bool = False) -> str: return str(self._return(P(self.as_posix().replace("https:/", "https://").replace("http:/", "http://")), inlieu))
-    def as_url_obj(self, inlieu: bool = False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(self), inlieu)
+    def as_url_str(self) -> 'str': return self.as_posix().replace("https:/", "https://").replace("http:/", "http://")
+    def as_url_obj(self, inlieu: bool = False) -> 'P': return self._return(install_n_import("urllib3").connection_from_url(str(self)), inlieu)
     def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def as_str(self) -> str: return str(self)
