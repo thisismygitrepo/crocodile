@@ -46,7 +46,7 @@ class DBMS:
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
 
-    def refresh(self, sch: Optional[str] = None) -> 'Self':  # fails if multiple schemas are there and None is specified
+    def refresh(self, sch: Optional[str] = None) -> 'DBMS':  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
         self.meta = MetaData()

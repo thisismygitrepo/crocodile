@@ -10,7 +10,7 @@ import logging
 import subprocess
 import sys
 from typing import Union, Any, Optional, Callable
-
+from dataclasses import dataclass
 
 class Null:
     def __init__(self, return_: Any = 'self'): self.return_ = return_
@@ -31,14 +31,24 @@ class Log(logging.Logger):  #
             print(f"Logger name not passed. It is recommended to pass a name indicating the owner.")
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path  # proper update to this value by self.add_filehandler()
-        if dialect == "colorlog": module = install_n_import("colorlog"); processed_fmt = module.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
-        else: module = logging; processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
-        _ = self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level) if file or file_path else None; self.add_streamhandler(s_level, fmt=processed_fmt, module=module) if stream else None
+        if dialect == "colorlog":
+            install_n_import("colorlog")
+            import colorlog
+            module: Any = colorlog
+            processed_fmt: Any = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
+        else:
+            module = logging
+            processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
+        if file or file_path: self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level)
+        if stream: self.add_streamhandler(s_level, fmt=processed_fmt, module=module)
         self.specs = dict(dialect=dialect, name=self.name, file=file, file_path=self.file_path, stream=bool(self.get_shandler()), fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # # this way of creating relative path makes transferrable across machines.
     def get_shandler(self): return List(handler for handler in self.handlers if "StreamHandler" in str(handler))
     def get_fhandler(self): return List(handler for handler in self.handlers if "FileHandler" in str(handler))
-    def set_level(self, level: int, which: str = ["logger", "stream", "file", "all"][0]): self.setLevel(level) if which in {"logger", "all"} else None; self.get_shandler().setLevel(level) if which in {"stream", "all"} else None; self.get_fhandler().setLevel(level) if which in {"file", "all"} else None
-    def __reduce_ex__(self, protocol): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. Its lower than getstate and setstate. It uses init method to create an instance.
+    def set_level(self, level: int, which: str = ["logger", "stream", "file", "all"][0]):
+        if which in {"logger", "all"}: self.setLevel(level)
+        if which in {"stream", "all"}: self.get_shandler().setLevel(level)
+        if which in {"file", "all"}: self.get_fhandler().setLevel(level)
+    def __reduce_ex__(self, protocol: Any): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. It is lower than getstate and setstate. It uses init method to create an instance.
     def __repr__(self): return "".join([f"Logger {self.name} (level {self.level}) with handlers: \n"] + [repr(h) + f"" + "\n" for h in self.handlers])
     @staticmethod
     def get_format(sep: str = ' | ', datefmt: str = "%d %H:%M:%S"):
@@ -53,20 +63,37 @@ class Log(logging.Logger):  #
         if verbose: logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
         else: logger = Log(name=name, dialect="logging", l_level=l_level, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
         install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
-    def add_streamhandler(self, s_level: int = logging.DEBUG, fmt: Optional[str] = None, module: Any = logging, name: str = "myStreamHandler"):
+    def add_streamhandler(self, s_level: int = logging.DEBUG, fmt: Optional[Any] = None, module: Any = logging, name: str = "myStreamHandler"):
         shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); self.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{self.name}` is created.")
-    def add_filehandler(self, file_path: OPLike = None, fmt: str = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
+    def add_filehandler(self, file_path: OPLike = None, fmt: Optional[Any] = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
         fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self): List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message")); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
     def get_history(self, lines: int = 200, to_html: bool = False): logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
 
+@dataclass
+class STD:
+    stdin: str
+    stdout: str
+    stderr: str
+    returncode: int
+
+
 class Response:
     @staticmethod
-    def from_completed_process(cp: subprocess.CompletedProcess): (resp := Response(cmd=cp.args)).output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode)); return resp
-    def __init__(self, stdin=None, stdout=None, stderr=None, cmd: Optional[str] = None, desc: str = ""): self.std, self.output, self.input, self.desc = dict(stdin=stdin, stdout=stdout, stderr=stderr), dict(stdin="", stdout="", stderr="", returncode=None), cmd, desc  # input command
-    def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]: return self.op.rstrip() if type(self.op) is str else None
+    def from_completed_process(cp: subprocess.CompletedProcess[str]):
+        resp = Response(cmd=cp.args)
+        resp.output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode))
+        return resp
+    def __init__(self, stdin: Optional[str] = None, stdout: Optional[str] = None, stderr: Optional[str] = None, cmd: Optional[str] = None, desc: str = ""):
+        self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)
+        self.output = dict(stdin="", stdout="", stderr="", returncode=None)
+        self.input = cmd
+        self.desc = desc  # input command
+    def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]:
+        _ = args, kwargs
+        return self.op.rstrip() if type(self.op) is str else None
     op = property(lambda self: self.output["stdout"])
     ip = property(lambda self: self.output["stdin"])
     err = property(lambda self: self.output["stderr"])
@@ -101,7 +128,7 @@ class Terminal:
         * `capture_output` prevents the stdout to redirect to the stdout of the script automatically, instead it will be stored in the Response object returned. # `capture_output=True` same as `stdout=subprocess.PIPE, stderr=subprocess.PIPE`"""
         my_list = list(cmds)  # `subprocess.Popen` (process open) is the most general command. Used here to create asynchronous job. `subprocess.run` is a thin wrapper around Popen that makes it wait until it finishes the task. `suprocess.call` is an archaic command for pre-Python-3.5.
         if self.machine == "Windows" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
-        if self.elevated is False or self.is_user_admin(): resp = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
+        if self.elevated is False or self.is_user_admin(): resp: subprocess.CompletedProcess[str] = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return Response.from_completed_process(resp)
     @staticmethod
@@ -111,15 +138,15 @@ class Terminal:
             except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
-    def run_as_admin(file: PLike, params, wait: bool = False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
+    def run_as_admin(file: PLike, params: Any, wait: bool = False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
     def run_async(self, *cmds: str, new_window: bool = True, shell: Optional[str] = None, terminal: Optional[str] = None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
         if terminal is None: terminal = ""  # this means that cmd is the default console. alternative is "wt"
         if shell is None: shell = "" if self.machine == "Windows" else ""  # other options are "powershell" and "cmd". # if terminal is wt, then it will pick powershell by default anyway.
-        new_window = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.  adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from e.g. conda
+        new_window_cmd = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.  adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from e.g. conda
         extra, my_list = ("-Command" if shell in {"powershell", "pwsh"} and len(cmds) else ""), list(cmds)
-        if self.machine == "Windows": my_list = [new_window, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
+        if self.machine == "Windows": my_list = [new_window_cmd, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, delete: bool = False, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
@@ -136,7 +163,7 @@ class Terminal:
         os.system(f"{window} {terminal} {shell} {shell_script}")
     pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal().run_py(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
     @staticmethod
-    def import_to_new_session(func=None, cmd: str = "", header: bool = True, interactive: bool = True, ipython: bool = True, run: bool = False, **kwargs):
+    def import_to_new_session(func: Union[None, Callable[[Any], Any]] = None, cmd: str = "", header: bool = True, interactive: bool = True, ipython: bool = True, run: bool = False, **kwargs):
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
         run_string = "\nobj(**loaded_kwargs)\n" if run else "\n"
         if callable(func) and func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
