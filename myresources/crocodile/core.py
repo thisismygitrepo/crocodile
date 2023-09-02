@@ -89,7 +89,7 @@ class Save:
 # ====================================== Object Management ====================================
 class Base(object):
     def __init__(self, *args: Any, **kwargs: Any): _ = args, kwargs
-    def __getstate__(self): return self.__dict__.copy()
+    def __getstate__(self) -> dict[str, Any]: return self.__dict__.copy()
     def __setstate__(self, state: dict[str, Any]): self.__dict__.update(state)
     def __deepcopy__(self, *args: Any, **kwargs: Any):
         obj = self.__class__(*args, **kwargs)

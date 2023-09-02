@@ -91,7 +91,7 @@ class HParams:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
-    def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any) -> 'HParams':
+    def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any):
         data: dict[str, Any] = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
     # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
@@ -104,10 +104,6 @@ class HParams:
 
 
 SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
-def _silence_pylance(hp: SubclassedHParams) -> SubclassedHParams: return hp
-
-
-_ = _silence_pylance
 
 
 class DataReader:
@@ -120,7 +116,8 @@ class DataReader:
     need to reference `.dataspects`.
     """
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
-    def __init__(self, hp: SubclassedHParams, specs: Optional[Specs] = None,
+    def __init__(self, hp: SubclassedHParams,  # type: ignore
+                 specs: Optional[Specs] = None,
                  split: Optional[dict[str, Union[None, 'npt.NDArray[np.float64]']]] = None) -> None:
         super().__init__()
         self.hp = hp
@@ -136,19 +133,20 @@ class DataReader:
         tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
         tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
-    def from_saved_data(cls, path: Union[str, tb.P], hp: HParams, *args: Any, **kwargs: Any):
+    def from_saved_data(cls, path: Union[str, tb.P], hp: SubclassedHParams,  # type: ignore
+                        **kwargs: Any):
         path = tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
         data: dict[str, Any] = tb.Read.vanilla_pickle(path)
-        obj = cls(hp=hp, *args, **kwargs)
+        obj = cls(hp=hp, **kwargs)
         obj.__setstate__(data)
         return obj
     def __getstate__(self) -> dict[str, Any]:
-        items = ["specs"]
+        items: list[str] = ["specs"]
         res = {}
         for item in items:
             if hasattr(self, item): res[item] = getattr(self, item)
         return res
-    def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
+    def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
     # def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
     def split_the_data(self, *args: Any, **kwargs: Any) -> None:
@@ -172,7 +170,8 @@ class DataReader:
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None, use_slice: bool = False, split: str = "test", size: Optional[int] = None):
+    def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
+                       use_slice: bool = False, split: str = "test", size: Optional[int] = None):
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
@@ -190,8 +189,9 @@ class DataReader:
         else:
             tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
             selection = tmp2
-
-        x, y, others = [], [], []
+        x: list[Any] = []
+        y: list[Any] = []
+        others: list[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp = self.split[key]
             if isinstance(tmp, (pd.DataFrame, pd.Series)):
@@ -267,7 +267,8 @@ class BaseModel(ABC):
     Functionally or Sequentually built models are much more powerful than Subclassed models. They are faster, have more features, can be plotted, serialized, correspond to computational graphs etc.
     """
     # @abstractmethod
-    def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader, compiler: Optional[Compiler] = None, history: Optional[list[dict[str, Any]]] = None):
+    def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader,  # type: ignore
+                 compiler: Optional[Compiler] = None, history: Optional[list[dict[str, Any]]] = None):
         # : Optional[list]
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
@@ -313,10 +314,10 @@ class BaseModel(ABC):
         y_test = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="test")]
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
-        default_settings = dict(x=x_train[0] if len(x_train) == 1 else x_train,
-                                y=y_train[0] if len(y_train) == 1 else y_train,
-                                validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
-                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
+        default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
+                                                y=y_train[0] if len(y_train) == 1 else y_train,
+                                                validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
+                                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings)
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
@@ -353,7 +354,7 @@ class BaseModel(ABC):
 
     def postprocess(self, *args: Any, **kwargs: Any):
         return self.data.postprocess(*args, **kwargs)
-    def __call__(self, *arg: Any, **kwargs: Any):
+    def __call__(self, *args: Any, **kwargs: Any):
         return self.model(*args, **kwargs)
     def viz(self, *args: Any, **kwargs: Any):
         return self.data.viz(*args, **kwargs)
@@ -400,12 +401,10 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test: Optional['npt.NDArray[np.float64]'] = None, y_test: Optional['npt.NDArray[np.float64]'] = None, names_test: Optional[list[str]] = None,
+    def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None, y_test: Optional['npt.NDArray[np.float64]'] = None, names_test: Optional[list[str]] = None,
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
                  split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
         if x_test is None and y_test is None and names_test is None:
-            a = indices
-            b = aslice
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None and x_test is not None:
             names_test = [str(item) for item in np.arange(len(x_test))]
@@ -488,19 +487,25 @@ class BaseModel(ABC):
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None, device_name: Optional[Device] = None, verbose: bool = True):
+    def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None,
+                           device_name: Optional[Device] = None, verbose: bool = True):
         path = tb.P(path)
-        if hparam_class is not None: hp_obj = hparam_class.from_saved_data(path)
-        else: hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
+        if hparam_class is not None:
+            hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
+        else:
+            hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
         if device_name: hp_obj.device_name = device_name
-        if data_class is not None: d_obj = data_class.from_saved_data(path, hp=hp_obj)
-        else: d_obj = tb.Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
-        if hp_obj.root != path.parent: hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
+        if hp_obj.root != path.parent:
+            hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
+
+        if data_class is not None: d_obj: SubclassedDataReader = data_class.from_saved_data(path, hp=hp_obj)
+        else:
+            d_obj = tb.Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
         # if type(hp_obj) is Generic[HParams]:
-        d_obj.hp = hp_obj
+        d_obj.hp = hp_obj  # type: ignore
         # else:rd
             # raise ValueError(f"hp_obj must be of type `HParams` or `Generic[HParams]`. Got {type(hp_obj)}")
-        model_obj: 'BaseModel' = cls(hp_obj, d_obj)
+        model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
         history_path = path / "metadata/training/history.pkl"
         if history_path.exists(): history: list[dict[str, Any]] = tb.Read.vanilla_pickle(path=history_path)
@@ -550,7 +555,7 @@ class BaseModel(ABC):
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
-    def build(self, sample_dataset: bool = False, ip_shapes=None, ip=None, verbose: bool = True):
+    def build(self, sample_dataset: bool = False, ip_shapes: Optional[tuple[int]] = None, ip: Optional['npt.NDArray[np.float64]'] = None, verbose: bool = True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
@@ -568,8 +573,10 @@ class BaseModel(ABC):
             raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
         if ip is None:
-            if sample_dataset: ip, _, _ = self.data.sample_dataset()
-            else: ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
+            if sample_dataset:
+                ip, _, _ = self.data.sample_dataset()
+            else:
+                ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
         op = self.model(inputs=ip)
         ops = [op] if len(keys_op) == 1 else op
         ips = [ip] if len(keys_ip) == 1 else ip
@@ -614,10 +621,10 @@ class Ensemble(tb.Base):
         # self.data = None  # one data object for all models (so that it can fit in the memory)
         if hp_class and data_class and model_class:
             # only generate the dataset once and attach it to the ensemble to be reused by models.
-            self.data = self.data_class(hp=hp_class())
+            self.data = self.data_class(hp=hp_class())  # type: ignore
             print("Creating Models".center(100, "="))
             for i in tqdm(range(size)):
-                hp = self.hp_class()
+                hp = self.hp_class()  # type: ignore
                 hp.name = str(hp.name) + f'__model__{i}'
                 datacopy: SubclassedDataReader = copy.copy(self.data)  # shallow copy
                 datacopy.hp = hp  # type: ignore
@@ -626,18 +633,23 @@ class Ensemble(tb.Base):
 
     @classmethod
     def from_saved_models(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
-        obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
+        obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class,  # type: ignore
+                        path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
         obj.models = list(tb.P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
     def from_saved_weights(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
-        obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class, path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
-        obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))
+        obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class,  # type: ignore
+                        path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
+        obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))  # type: ignore
         return obj
 
     @staticmethod
-    def from_path(path: Union[str, Path, P]) -> list[SubclassedBaseModel]: return list(tb.P(path).expanduser().absolute().search("*").apply(BaseModel.from_path))
+    def from_path(path: Union[str, Path, P]) -> list[SubclassedBaseModel]:  # type: ignore
+        tmp = tb.P(path).expanduser().absolute().search("*")
+        tmp2 = tmp.apply(BaseModel.from_path)
+        return list(tmp2)  # type: ignore
 
     def fit(self, shuffle_train_test: bool = True, save: bool = True, **kwargs: Any):
         self.performance = []
