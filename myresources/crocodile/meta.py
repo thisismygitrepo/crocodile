@@ -12,6 +12,10 @@ import sys
 from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO
 from dataclasses import dataclass
 
+
+_ = IO, TextIO
+
+
 class Null:
     def __init__(self, return_: Any = 'self'): self.return_ = return_
     def __getattr__(self, item: str) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
@@ -184,7 +188,9 @@ class Terminal:
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
         run_string = "\nobj(**loaded_kwargs)\n" if run else "\n"
         if callable(func) and func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
-            module = P(sys.modules['__main__'].__file__).rel2cwd().stem if (module := func.__module__) == "__main__" else module
+            tmp = sys.modules['__main__'].__file__
+            assert isinstance(tmp, str), f"Cannot import a function from a module that is not a file. The module is: {tmp}"
+            module = P(tmp).rel2cwd().stem if (module := func.__module__) == "__main__" else module
             load_func_string = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}"
         elif callable(func) and hasattr(func, "__code__"):  # it is a standalone function...
             module = P(func.__code__.co_filename)  # module = func.__module__  # fails if the function comes from main as it returns __main__.
@@ -283,7 +289,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z: _resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True); source.delete(sure=True); print("\n")
         return source_
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
@@ -295,14 +301,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         target = P(target).expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''
         source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)  # type: ignore
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)  # type: ignore: # pylint: disable=E1129
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
         print("\n"); return target
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
         scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", return_obj=True, verbose=False)
         if not z and scout["is_dir"]: return scout["files"].apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
         target = P(target).expanduser().absolute().create(parents_only=True) if target else scout["source_rel2home"].expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout["source_full"]
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
         print("\n"); return target
     @staticmethod

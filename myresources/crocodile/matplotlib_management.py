@@ -1,7 +1,7 @@
 
 
 from crocodile.core import List, timestamp, Save, install_n_import, validate_name
-from crocodile.file_management import P, OPLike
+from crocodile.file_management import P, OPLike, PLike
 from crocodile.meta import Terminal
 from crocodile.msc.odds import Cycle
 
@@ -10,6 +10,8 @@ from matplotlib.backend_bases import Event
 from matplotlib import widgets
 import matplotlib.colors as mcolors
 from matplotlib import animation
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 import pandas as pd
 import numpy as np
 
@@ -54,16 +56,16 @@ class FigureSave:
             self.watch_figs = [plt.figure(figname) for figname in fignames] if fignames else ([plt.figure(k) for k in plt.get_figlabels()] if self.watch_figs is None else self.watch_figs)  # path sent explicitly, # None exist ==> add all else # they exist already.
             if names is None: names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]  # individual save path, useful for PNG.
             for afig, aname in zip(self.watch_figs, names): self._save(afig, aname, **kwargs)
-        def _save(self, *args, **kwargs): pass  # called by generic method `add`, to be implemented when subclassing.
+        def _save(self, *args: Any, **kwargs: Any): pass  # called by generic method `add`, to be implemented when subclassing.
     class Null(GenericSave):  # serves as a filler.
-        def __init__(self, *args, **kwargs): super().__init__(*args, **kwargs); self.fname = self.save_dir
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, **kwargs); self.fname = self.save_dir
         def finish(self): print(f"Nothing saved by {self}"); return self.fname
     class PDF(GenericSave):  # For pdf, you just need any stream [update, clear, accumalate], preferabbly the fastest."""
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any):
             super().__init__(*args, **kwargs)
             from matplotlib.backends.backend_pdf import PdfPages
             self.fname = self.save_dir.joinpath(self.save_name + ('.pdf' if '.pdf' not in str(self.save_name) else '')); self.pp = PdfPages(self.fname)
-        def _save(self, a_fig, a_name: str, bbox_inches: str = 'tight', pad_inches: float = 0.3, **kwargs): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
+        def _save(self, a_fig: Figure, a_name: str, bbox_inches: str = 'tight', pad_inches: float = 0.3, **kwargs: Any): self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
         def finish(self): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); return self
     class PNG(GenericSave):
         def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, **kwargs); self.fname = self.save_dir = self.save_dir.joinpath(self.save_name)
@@ -79,7 +81,7 @@ class FigureSave:
         def __init__(self, interval: int = 100, **kwargs: Any):
             super().__init__(**kwargs); from collections import defaultdict
             self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time.
-        def _save(self, afigure, aname, cla=False, **kwargs: Any):
+        def _save(self, afigure, aname: str, cla: bool = False, **kwargs: Any):
             fig_list, subcontainer = self.container[afigure.get_label()], []
             for item in FigureManager.findobj(afigure, 'neo'): item.set_label('processed'); item.set_visible(False); subcontainer += [item]
             fig_list.append(subcontainer)  # if you want the method coupled with cla being used in main, then it add_line is required for axes.
@@ -108,11 +110,11 @@ class FigureSave:
         def _save(self, afig: str, aname: str, **kwargs: Any): self.writer.grab_frame(**kwargs)
         def finish(self): print('Saving results ...'); self.writer.finish(); print(f"SAVED GIF @", P(self.fname).absolute().as_uri()); return self
     class GIFPipeBased(GIFFileBased):
-        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class MPEGFileBased(GIFFileBased):
-        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class MPEGPipeBased(GIFFileBased):
-        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class GenericAuto(GenericSave):
         """Parses the data internally, hence requires artist with animate method implemetend. Artist needs to have .fig attribute."""
         save_type = 'auto'
@@ -133,11 +135,11 @@ class FigureSave:
             self.fname = self.save_dir.joinpath(self.save_name + f".{extension}")
             self.ani.save(filename=self.fname, writer=writer); print(f"SAVED GIF @ ", P(self.fname).absolute().as_uri())
     class PDFAuto(GenericAuto):
-        def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.PDF(**kwargs); self.animate()
+        def __init__(self, **kwargs: Any): super().__init__(**kwargs); self.saver = FigureSave.PDF(**kwargs); self.animate()
     class PNGAuto(GenericAuto):
-        def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.PNG(**kwargs); self.save_dir = self.saver.save_dir; self.animate(); self.fname = self.saver.fname
+        def __init__(self, **kwargs: Any): super().__init__(**kwargs); self.saver = FigureSave.PNG(**kwargs); self.save_dir = self.saver.save_dir; self.animate(); self.fname = self.saver.fname
     class NullAuto(GenericAuto):
-        def __init__(self, **kwargs): super().__init__(**kwargs); self.saver = FigureSave.Null(**kwargs); self.fname = self.saver.fname; self.animate()
+        def __init__(self, **kwargs: Any): super().__init__(**kwargs); self.saver = FigureSave.Null(**kwargs); self.fname = self.saver.fname; self.animate()
     class GIFFileBasedAuto(GenericAuto):
         def __init__(self, plotter_class, data, fps: int = 4, dpi: int = 150, bitrate: int = 2500, _type='GIFFileBasedAuto', **kwargs):
             super().__init__(**kwargs)
@@ -152,11 +154,11 @@ class FigureSave:
                 for datum in tqdm(self.data()): self.plotter.animate(datum); self.saver.grab_frame(); plt.pause(self.delay * 0.001)
             print(f"SAVED GIF successfully @ {self.fname}")
     class GIFPipeBasedAuto(GIFFileBasedAuto):
-        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class MPEGFileBasedAuto(GIFFileBasedAuto):
-        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
     class MPEGPipeBasedAuto(GIFFileBasedAuto):
-        def __init__(self, *args, **kwargs): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
+        def __init__(self, *args: Any, **kwargs: Any): super().__init__(*args, _type=self.__class__.__name__, **kwargs)
 
 
 class FigureManager:  # use as base class for Artist & Viewers to give it free animation powers.
@@ -270,32 +272,32 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def close(self): plt.close(self.fig)
     # ====================== axis helpers ========================
     @staticmethod
-    def grid(ax, factor: int = 5, x_or_y: str = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
+    def grid(ax: Axes, factor: int = 5, x_or_y: str = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
         if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]  # Turning on major grid for both axes.
         ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
         if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(plt.MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
         if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(plt.MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
     @staticmethod
-    def set_ax_size(ax, w, h, units: str = 'inches'):
+    def set_ax_size(ax: Axes, w, h, units: str = 'inches'):
         l, r, t, b, _ = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom, units
         ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
     @staticmethod
-    def get_ax_size(ax, units="inches"):
+    def get_ax_size(ax: Axes, units: str = "inches"):
         w, h = ax.figure.get_size_inches() if units == "inches" else ax.figure.get_size_pixels()
         width, height = ax.figure.subplotpars.right - ax.figure.subplotpars.left, ax.figure.subplotpars.top - ax.figure.subplotpars.bottom
         return w * width, h * height
     @staticmethod
-    def toggle_ticks(an_ax, state=None): [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
+    def toggle_ticks(an_ax: Axes, state: Optional[bool] = None): _ = [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
     @staticmethod
-    def set_ax_to_real_life_size(ax, inch_per_unit=1 / 25.4): FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
+    def set_ax_to_real_life_size(ax: Axes, inch_per_unit: float = 1 / 25.4): FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
     @staticmethod
-    def show_pixels_values(ax):
+    def show_pixels_values(ax: Axes):
         xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
         if ymin > ymax: ymin, ymax = ymax, ymin  # default imshow settings
-        [ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8) for (j, i), label in np.ndenumerate(ax.images[0].get_array()) if (xmin < i < xmax) and (ymin < j < ymax)]
+        _ = [ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8) for (j, i), label in np.ndenumerate(ax.images[0].get_array()) if (xmin < i < xmax) and (ymin < j < ymax)]
     # ============================ matplotlib setup ==============================
     @staticmethod
-    def get_nrows_ncols(num_plots, nrows=None, ncols=None):
+    def get_nrows_ncols(num_plots: int, nrows: Optional[int] = None, ncols: Optional[int] = None):
         if not nrows and not ncols:
             nrows, ncols = int(np.floor(np.sqrt(num_plots))), int(np.ceil(np.sqrt(num_plots)))
             while nrows * ncols < num_plots: ncols += 1
@@ -333,7 +335,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         colors = (plt.rcParams['axes.prop_cycle'].by_key()['color'] * 10)[:len(markers)]
         default_cycler = (cycler(linestyle=linestyles) + cycler(marker=markers) + cycler(color=colors))
         plt.rc('axes', prop_cycle=default_cycler)
-        if test: [plt.plot(aq + idx * 2) for idx, aq in enumerate(np.random.randn(10, 10))]
+        if test: _ = [plt.plot(aq + idx * 2) for idx, aq in enumerate(np.random.randn(10, 10))]
 
 
 class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as opposed to saving.
@@ -345,25 +347,26 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
         super().__init__(); self.objs_repo = []  # list of lists of axes and texts.
         self.fig = fig; self.connect(); self.idx_cycle = Cycle([])
     def add(self, objs): self.idx_cycle.expand(); self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
-    def animate(self): [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]; self.fig.canvas.draw()
+    def animate(self): _ = [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]; self.fig.canvas.draw()
 
 
 class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
-    def __init__(self, ax=None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn', figpolicy=FigurePolicy.add_new, figsize=(14, 8)):
+    def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn', figpolicy=FigurePolicy.add_new, figsize=(14, 8)):
         super().__init__(figpolicy=figpolicy)
         self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
         if ax is None:  # create a figure
             with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
         else: self.ax = ax; self.fig = ax.figure  # use the passed axis
         self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
-    def plot(self, *args, legends=None, title: Optional[str] = None, **kwargs: Any): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
+    def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
     def plot_dict(self, adict, title: str = '', xlabel: str = '', ylabel: str = ''): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); self.ax.set_title(title); self.ax.set_xlabel(xlabel); self.ax.set_ylabel(ylabel); return self
-    def plot_twin(self, c1, c2, x=None, l1: str = '', l2: str = '', ax=None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
+    def plot_twin(self, c1, c2, x=None, l1: str = '', l2: str = '', ax: Optional[Axes] = None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
     def suptitle(self, title: str): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
     def clear(self): self.fig.clf()  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     def axes(self): return [self.ax]  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     def visibility(self):
-        from matplotlib.widgets import CheckButtons; self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
+        from matplotlib.widgets import CheckButtons
+        self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
         rax = self.fig.add_axes(self.visibility_ax)
         labels, visibility = [str(line.get_label()) for line in self.ax.lines], [line.get_visible() for line in self.ax.lines]
         self.check_b = CheckButtons(rax, labels, visibility)
@@ -403,8 +406,8 @@ class ImShow(FigureManager):
     artist = ['internal', 'external'][0]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, img_tensor: 'np.ndarray', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir=None, save_kwargs=None,
-                 subplots_adjust=None, gridspec=None, tight: bool = True, info_loc=None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax=None,
+    def __init__(self, img_tensor: 'np.ndarray', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir: OPLike = None, save_kwargs: Optional[dict[str, Any]] = None,
+                 subplots_adjust=None, gridspec=None, tight: bool = True, info_loc: Optional[str] = None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax: Optional[Axes] = None,
                  figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs: Any):
         """
         :param img_tensor: size N x M x W x H [x C]  # M used spatially, N for animation.
@@ -426,7 +429,7 @@ class ImShow(FigureManager):
         self.fig.tight_layout() if tight else None; self.fig.subplots_adjust(**subplots_adjust) if subplots_adjust is not None else None
         self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
         self.ax = [self.ax] if nrows == 1 and ncols == 1 else self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
-        [self.toggle_ticks(an_ax, state=False) for an_ax in self.ax]; self.idx_cycle = Cycle(max_idx=len(self.img_tensor))  # self.animate()
+        _ = [self.toggle_ticks(an_ax, state=False) for an_ax in self.ax]; self.idx_cycle = Cycle(max_idx=len(self.img_tensor))  # self.animate()
     def animate(self):
         for i in range(self.idx_cycle.get_index(), self.n):
             for j, (an_image, a_label, an_ax) in enumerate(zip(self.img_tensor[i], self.sub_labels[i], self.ax)):  # with zipping, the shortest of the three, will stop the loop.
@@ -440,11 +443,15 @@ class ImShow(FigureManager):
         if self.idx_cycle.get_index() == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
     @staticmethod
     def try_cmaps(im, nrows: int = 3, ncols: int = 7, **kwargs: Any): _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
-    def annotate(self, event: Event, axis=None, data=None): _ = [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
-    from_img_paths = staticmethod(lambda paths, **kwargs: ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs))
-    from_complex = staticmethod(lambda data, pause=True, **kwargs: ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs))
-    test = staticmethod(lambda: ImShow(np.random.rand(12, 10, 80, 120, 3)))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-    resize = staticmethod(lambda path, m, n: plt.imsave(path, install_n_import(library="skimage", name="scikit-image").transform.resize(plt.imread(path), (m, n), anti_aliasing=True)))
+    def annotate(self, event: Event, axis: Optional[Axes] = None, data=None): _ = [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
+    @staticmethod
+    def from_img_paths(paths: list[PLike], **kwargs: Any): ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs)
+    @staticmethod
+    def from_complex(data, pause: bool = True, **kwargs: Any): ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs)
+    @staticmethod
+    def test(): ImShow(np.random.rand(12, 10, 80, 120, 3))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
+    @staticmethod
+    def resize(path: PLike, m: int, n: int): plt.imsave(path, install_n_import(library="skimage", name="scikit-image").transform.resize(plt.imread(path), (m, n), anti_aliasing=True))
 
 
 if __name__ == '__main__':
