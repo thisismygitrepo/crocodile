@@ -9,7 +9,7 @@ import time
 import logging
 import subprocess
 import sys
-from typing import Union, Any, Optional, Callable
+from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO
 from dataclasses import dataclass
 
 class Null:
@@ -25,7 +25,8 @@ class Null:
 
 class Log(logging.Logger):  #
     def __init__(self, dialect: str = ["colorlog", "logging", "coloredlogs"][0], name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
-                 s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False, log_colors=None):
+                 s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False,
+                 log_colors: Optional[dict[str, str]] = None):
         if name is None:
             name = randstr(noun=True)
             print(f"Logger name not passed. It is recommended to pass a name indicating the owner.")
@@ -68,8 +69,12 @@ class Log(logging.Logger):  #
     def add_filehandler(self, file_path: OPLike = None, fmt: Optional[Any] = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
         fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
         fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
-    def test(self): List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message")); [self.log(msg=f"This is a message of level {level}", level=level) for level in range(0, 60, 5)]
-    def get_history(self, lines: int = 200, to_html: bool = False): logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
+    def test(self):
+        List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message"))
+        for level in range(0, 60, 5): self.log(msg=f"This is a message of level {level}", level=level)
+    def get_history(self, lines: int = 200, to_html: bool = False):
+        assert isinstance(self.file_path, P), f"Logger `{self.name}` does not have a file handler. Thus, no history is available."
+        logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
 
 @dataclass
@@ -84,29 +89,37 @@ class Response:
     @staticmethod
     def from_completed_process(cp: subprocess.CompletedProcess[str]):
         resp = Response(cmd=cp.args)
-        resp.output.update(dict(stdout=cp.stdout, stderr=cp.stderr, returncode=cp.returncode))
+        resp.output.stdout = cp.stdout
+        resp.output.stderr = cp.stderr
+        resp.output.returncode = cp.returncode
         return resp
-    def __init__(self, stdin: Optional[str] = None, stdout: Optional[str] = None, stderr: Optional[str] = None, cmd: Optional[str] = None, desc: str = ""):
+    def __init__(self, stdin: Optional[BinaryIO] = None, stdout: Optional[BinaryIO] = None, stderr: Optional[BinaryIO] = None, cmd: Optional[str] = None, desc: str = ""):
         self.std = dict(stdin=stdin, stdout=stdout, stderr=stderr)
-        self.output = dict(stdin="", stdout="", stderr="", returncode=None)
+        self.output = STD(stdin="", stdout="", stderr="", returncode=0)
         self.input = cmd
         self.desc = desc  # input command
     def __call__(self, *args: Any, **kwargs: Any) -> Optional[str]:
         _ = args, kwargs
         return self.op.rstrip() if type(self.op) is str else None
     @property
-    def op(self) -> str: return self.output["stdout"]
+    def op(self) -> str: return self.output.stdout
     @property
-    def ip(self) -> str: return self.output["stdin"]
+    def ip(self) -> str: return self.output.stdin
     @property
-    def err(self) -> str: return self.output["stderr"]
+    def err(self) -> str: return self.output.stderr
     @property
-    def returncode(self): return self.output["returncode"]
+    def returncode(self): return self.output.returncode
     def op2path(self, strict_returncode: bool = True, strict_err: bool = False) -> Union[P, None]:
         return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
     def op_if_successfull_or_default(self, strict_returcode: bool = True, strict_err: bool = False, default: Any = None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
-    def is_successful(self, strict_returcode: bool = True, strict_err: bool = False): return ((self.output["returncode"] in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
-    def capture(self): _ = [self.output.__setitem__(key, val.read().decode().rstrip()) for key, val in self.std.items() if val is not None and val.readable()]; return self
+    def is_successful(self, strict_returcode: bool = True, strict_err: bool = False):
+        return ((self.output.returncode in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
+    def capture(self):
+        for key in ["stdin", "stdout", "stderr"]:
+            val: Optional[BinaryIO] = self.std[key]
+            if val is not None and val.readable():
+                self.output.__dict__[key] = val.read().decode().rstrip()
+        return self
     def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", capture: bool = True, strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
         _ = self.capture() if capture else None; success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
         if assert_success: assert success, self.print(capture=False, desc=desc)
@@ -114,7 +127,7 @@ class Response:
     def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
         _ = self.capture() if capture else None; install_n_import("rich"); from rich import console; con = console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
         tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
-        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.items())]), style="white")
+        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]), style="white")
         con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black")); return self
 
 
@@ -167,7 +180,7 @@ class Terminal:
         os.system(f"{window} {terminal} {shell} {shell_script}")
     pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal().run_py(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
     @staticmethod
-    def import_to_new_session(func: Union[None, Callable[[Any], Any]] = None, cmd: str = "", header: bool = True, interactive: bool = True, ipython: bool = True, run: bool = False, **kwargs):
+    def import_to_new_session(func: Union[None, Callable[[Any], Any]] = None, cmd: str = "", header: bool = True, interactive: bool = True, ipython: bool = True, run: bool = False, **kwargs: Any):
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
         run_string = "\nobj(**loaded_kwargs)\n" if run else "\n"
         if callable(func) and func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
@@ -216,7 +229,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 self.hostname, port_ = self.hostname.split(":")
                 self.port = int(port_)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
-        self.ssh = (paramiko := __import__("paramiko")).SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        import paramiko
+        self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=paramiko.proxy.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None)
         try: self.sftp = self.ssh.open_sftp()
@@ -240,11 +254,16 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
     def get_repr(self, which: str = "remote", add_machine: bool = False): return (f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")) if which == "remote" else f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
-    def run_locally(self, command: str): print(f"Executing Locally @ {self.platform.node()}:\n{command}"); return Response(__import__('os').system(command))
+    def run_locally(self, command: str):
+        print(f"Executing Locally @ {self.platform.node()}:\n{command}")
+        res = Response(cmd=command); res.output.returncode = os.system(command)
+        return res
     def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_repr('remote').replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
     def run(self, cmd: str, verbose: bool = True, desc: str = "", strict_err: bool = False, strict_returncode: bool = False, env_prefix: bool = False) -> Response:  # most central method.
-        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd; res = Response(stdin=(raw := self.ssh.exec_command(cmd))[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)
+        cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd
+        raw = self.ssh.exec_command(cmd)
+        res = Response(stdin=raw[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)  # type: ignore
         _ = res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False):
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
