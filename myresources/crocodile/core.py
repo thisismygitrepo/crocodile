@@ -4,8 +4,13 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union, Generic, TypeVar, Type, List as ListType, Any, Iterator, Callable, Iterable, Hashable
+from typing import Optional, Union, Generic, TypeVar, Type, List as ListType, Any, Iterator, Callable, Iterable, Hashable, Protocol
 import datetime
+
+_Slice = TypeVar('_Slice', bound='Slicable')
+class Slicable(Protocol):
+    def __getitem__(self: _Slice, i: slice) -> _Slice: ...
+
 
 PLike = Union[str, Path]
 
@@ -103,7 +108,9 @@ class Base(object):
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8')); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
     def get_attributes(self, remove_base_attrs: bool = True, return_objects: bool = False, fields: bool = True, methods: bool = True):
-        attrs: List[Any] = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=Base().get_attributes(remove_base_attrs=False)if remove_base_attrs else []); import inspect
+        import inspect
+        remove_vals = Base().get_attributes(remove_base_attrs=False) if remove_base_attrs else []
+        attrs: List[Any] = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=remove_vals)
         attrs: List[Any] = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     def print(self, dtype: bool = False, attrs: bool = False, **kwargs: Any): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
@@ -142,7 +149,9 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def len(self) -> int: return len(self.list)
     # ================= call methods =====================================
     def __getattr__(self, name: str) -> 'List[T]': return List(getattr(i, name) for i in self.list)  # fallback position when __getattribute__ mechanism fails.
-    def __call__(self, *args: Any, **kwargs: Any) -> 'List[Any]': return List([ii.__call__(*args, **kwargs) for ii in self.list])
+    def __call__(self, *args: Any, **kwargs: Any) -> 'List[Any]':
+        items = self.list
+        return List([ii.__call__(*args, **kwargs) for ii in items])  # type: ignore
     # ======================== Access Methods ==========================================
     def __setitem__(self, key: int, value: T) -> None: self.list[key] = value
     def sample(self, size: int = 1, replace: bool = False, p: Optional[list[float]] = None) -> 'List[T]':
@@ -159,16 +168,17 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
                 tmp = self.list[ix:len(self)]
             res.append(List(tmp))
         return List(res)
-    def filter(self, func: Callable[[T], bool], which: Callable[[int, T], T2] = lambda _idx, _x: _x) -> 'List[T2]': return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
+    def filter(self, func: Callable[[T], bool], which: Callable[[int, T], Union[T, T2]] = lambda _idx, _x: _x) -> 'List[Union[T2, T]]':
+        return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]:
+    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> list[T]:  # type: ignore
         args = (func, self.list) + ((default,) if default is not None else ())
         return __import__("functools").reduce(*args)
     def append(self, item: T) -> 'List[T]': self.list.append(item); return self
     def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other: 'List[T]') -> 'List[T]': return List(list(other) + self.list)
     def __iadd__(self, other: 'List[T]') -> 'List[T]': self.list = self.list + list(other); return self  # inplace add.
-    def sort(self, key: Optional[Any] = None, reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
+    def sort(self, key: Callable[[T], float], reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args: list[Any], **kwargs: Any) -> 'List[T]': return List(sorted(self.list, *args, **kwargs))
     def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
     # def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': _ = [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
@@ -182,15 +192,18 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
     # def index(self, val: int) -> int: return self.list.index(val)
     def slice(self, start: Optional[int] = None, stop: Optional[int] = None, step: Optional[int] = None) -> 'List[T]': return List(self.list[start:stop:step])
-    def __getitem__(self, key: Union[int, list[int], 'slice']) -> Union[T, 'List[T]']:
+    def __getitem__(self, key: Union[int, list[int], '_Slice']) -> Union[T, 'List[T]']:
         if isinstance(key, (list, Iterable, Iterator)): return List(self.list[item] for item in key)  # to allow fancy indexing like List[1, 5, 6]
         # elif isinstance(key, str): return List(item[key] for item in self.list)  # access keys like dictionaries.
         elif isinstance(key, int): return self.list[key]
         # assert isinstance(key, slice)
-        return List(self.list[key])  # for slices  # type: ignore
-    def apply(self, func: Union[Callable[[T], T2], Callable[[T, T2], T3]], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda _x: True, jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], verbose: bool = False, desc: Optional[str] = None, **kwargs: Any) -> 'List[T2]':
+        return List(self.list[key])  # type: ignore # noqa: call-overload  # slices
+    def apply(self, func: Union[Callable[[T], T2], Callable[[T, T2], T3]], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda _x: True,
+              jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], verbose: bool = False, desc: Optional[str] = None, **kwargs: Any,
+              ) -> 'Union[List[Union[T2, T3]], List[T3]]':
         # if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
         from tqdm import tqdm
+        iterator: Iterable[Any]
         if other is None:
             iterator = (self.list if not verbose else tqdm(self.list, desc=desc))
         else: iterator = (zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc))
@@ -198,14 +211,20 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
             from joblib import Parallel, delayed
             if other is None: return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator))  # type: ignore
             return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
-        if other is None: return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
-        return List([func(x, y) for x, y in iterator])
+        if other is None:
+            return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
+        # func_: Callable[[T, T2], T3]
+        return List([func(x, y) for x, y in iterator])  # type: ignore
     def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
-        df = __import__("pandas").DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
+        import pandas as pd
+        df = pd.DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
         if minimal: return df
         for i, obj in enumerate(self.list):  # Populate the dataframe:
-            if obj_included or names: df.loc[i] = ([obj] if names is None else [names[i]]) + list(self.list[i].__dict__.values())
-            else: df.loc[i] = list(self.list[i].__dict__.values())
+            if obj_included or names:
+                tmp: list[Any] = list(self.list[i].__dict__.values())
+                data: list[Any] = [obj] if names is None else [names[i]]
+                df.iloc[i] = pd.Series(data + tmp)
+            else: df.iloc[i] = pd.Series(self.list[i].__dict__.values())
         return df
 
 
@@ -251,7 +270,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def values(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
     def items(self, verbose: bool = False, desc: str = "") -> 'List[Any]': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
     def get(self, key: Optional[str] = None, default: Optional[Any] = None, strict: bool = False, keys: Union[None, list[str]] = None) -> 'Union[Any, List[Any]]':
-        if keys is not None: return List([self.__dict__.get(key, default) if not strict else self[key] for key in (keys if keys is not None else [])])
+        if keys is not None: return List([self.__dict__.get(key, default) if not strict else self[key] for key in keys])
         if key is not None: return (self.__dict__.get(key, default) if not strict else self[key])
         else: raise ValueError("Either key or keys should be passed.")
     def apply2keys(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
@@ -269,28 +288,37 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def _pandas_repr(self, justify: int, return_str: bool = False, limit: int = 30):
         import pandas as pd
         import numpy as np
-        col2 = self.values().apply(lambda x: str(type(x)).split("'")[1])
-        col3 = self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))
+        col2: List[Any] = self.values().apply(lambda x: str(type(x)).split("'")[1])
+        col3: List[Any] = self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))
         array = np.array([self.keys(), col2, col3]).T
         res: pd.DataFrame = pd.DataFrame(array, columns=["key", "dtype", "details"])
         return res if not return_str else str(res)
-    def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False, limit: int = 50, title: str = "", attrs: bool = False, **kwargs: Any) -> Union[str, 'Struct']:
+    def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False,  # type: ignore # pylint: disable=W0237
+              limit: int = 50, title: str = "", attrs: bool = False, **kwargs: Any) -> Union[str, None]:  # type: ignore
         _ = attrs
         import pandas as pd
-        if as_config and not return_str: install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False); return self
-        if not bool(self): res = f"Empty Struct."
+        if as_config and not return_str:
+            install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False)
+            return None
+        if not bool(self):
+            if return_str: return f"Empty Struct."
+            else: print(f"Empty Struct."); return None
         else:
-            if as_yaml or as_config: res = __import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
+            if as_yaml or as_config:
+                tmp: str = __import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
+                if return_str: return tmp
+                else: print(tmp); return None
             else:
-                tmp = self._pandas_repr(justify=justify, return_str=False, limit=limit)
-                if isinstance(tmp, pd.DataFrame):
-                    res = tmp.drop(columns=[] if dtype else ["dtype"])
-                else: raise TypeError(f"Unexpected type {type(tmp)}")
-        if not return_str:
-            if (isinstance(res, pd.DataFrame) and install_n_import("tabulate")):
-                install_n_import("rich").print(res.to_markdown())
-            else: print(res)
-        return str(res) if return_str else self
+                tmp2 = self._pandas_repr(justify=justify, return_str=False, limit=limit)
+                if isinstance(tmp2, pd.DataFrame):
+                    res = tmp2.drop(columns=[] if dtype else ["dtype"])
+                else: raise TypeError(f"Unexpected type {type(tmp2)}")
+                if not return_str:
+                    if install_n_import("tabulate"):
+                        install_n_import("rich").print(res.to_markdown())
+                    else: print(res)
+                return str(res) if return_str else str(self)
+
     @staticmethod
     def concat_values(*dicts: dict[Any, Any], orient: str = 'List[Any]') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
     def plot(self, use_plt: bool = True, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
