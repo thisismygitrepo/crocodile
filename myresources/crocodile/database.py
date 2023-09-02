@@ -9,8 +9,9 @@ from typing import Optional, Any, Callable
 
 import pandas as pd
 
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, text, inspect, Engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import create_engine, text, inspect, Engine, Connection
+from sqlalchemy.engine import Inspector
 from sqlalchemy.sql.schema import MetaData
 from crocodile.core import Struct, Display
 from crocodile.file_management import List as L, P, OPLike
@@ -26,18 +27,18 @@ class DBMS:
     * Always use sqlalchemy API and avoid sql-dielect specific language.
     * Engine is provided externally. It is the end-user's business to make this engine.
     """
-    def __init__(self, engine: Engine, db=None, sch: Optional[str] = None, vws: bool = False):
+    def __init__(self, engine: Engine, sch: Optional[str] = None, vws: bool = False):
         self.eng: Engine = engine
-        self.con = None
-        self.ses = None
-        self.insp = None
-        self.meta = None
-        self.path = P(self.eng.url.database)
+        self.con: Optional[Connection] = None
+        self.ses: Optional[Session] = None
+        self.insp: Optional[Inspector] = None
+        self.meta: Optional[MetaData] = None
+        self.path = P(self.eng.url.database) if self.eng.url.database else None  # memory db
 
-        self.db = db
+        # self.db = db
         self.sch = sch
         self.vws = vws
-        self.schema = None
+        self.schema: Optional[L[str]] = None
         # self.tables = None
         # self.views = None
         # self.sch_tab: Optional[Struct] = None
@@ -51,29 +52,42 @@ class DBMS:
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
         self.meta = MetaData()
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
-        self.insp = inspect(subject=self.eng)
-        self.schema = L(self.insp.get_schema_names())
-        self.sch_tab: dict[str, list[str]] = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x)))  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
-        self.sch_vws: dict[str, list[str]] = Struct.from_keys_values(self.schema, self.schema.apply(lambda x: self.insp.get_view_names(schema=x)))
+        insp = inspect(subject=self.eng)
+        self.insp = insp
+        self.schema = L(obj_list=self.insp.get_schema_names())
+        self.sch_tab: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_table_names(schema=x)))}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
+        self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_view_names(schema=x)))}
         return self
 
-    def __getstate__(self): return Struct(self.__dict__.copy()).delete(keys=["eng", "con", "ses", "insp", "meta"]).update(path=self.path.collapseuser(strict=False)).__dict__
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["con"]
+        del state["ses"]
+        del state["meta"]
+        del state["insp"]
+        del state["eng"]
+        if self.path:
+            state['path'] = self.path.collapseuser()
+        return state
     def __setstate__(self, state: dict[str, Any]): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
 
     @classmethod
-    def from_local_db(cls, path=None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
+    def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
-    def get_columns(self, table: str, sch=None):
+    def get_columns(self, table: str, sch: Optional[str] = None):
+        assert self.meta is not None
         return self.meta.tables[self._get_table_identifier(table=table, sch=sch)].exported_columns.keys()
     def close(self, sleep: int = 2):
-        print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
-        self.con.close()
-        self.ses.close()
+        if self.path:
+            print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
+        if self.con: self.con.close()
+        if self.ses: self.ses.close()
         self.eng.dispose()
         time.sleep(sleep)
-    def _get_table_identifier(self, table, sch):
+    def _get_table_identifier(self, table: str, sch: Optional[str]):
         if sch is None: sch = self.sch
-        if sch is not None: return sch + "." + table
+        if sch is not None:
+            return sch + "." + table
         else: return table
 
     @staticmethod
@@ -92,11 +106,13 @@ class DBMS:
     # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
         with self.eng.connect() as conn:
-            for command in commands: result = conn.execute(text(command))
+            result = None
+            for command in commands:
+                result = conn.execute(text(command))
             conn.commit()  # if driver is sqlite3, the connection is autocommitting. # this commit is only needed in case of DBAPI driver.
-        return res_func(result) if not df else pd.DataFrame(res_func(result))
+            return res_func(result) if not df else pd.DataFrame(res_func(result))
 
-    def execute_begin_once(self, command, res_func=lambda x: x.all(), df: bool = False):
+    def execute_begin_once(self, command: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
         with self.eng.begin() as conn:
             result = conn.execute(text(command))  # no need for commit regardless of driver
             result = res_func(result)
@@ -106,24 +122,27 @@ class DBMS:
         with self.eng.begin() as conn: result = conn.execute(text(command))
         return result if not df else pd.DataFrame(result)
 
-    def execute_script(self, command: str, df: bool = False):
-        with self.eng.begin() as conn: result = conn.executescript(text(command))
-        return result if not df else pd.DataFrame(result)
+    # def execute_script(self, command: str, df: bool = False):
+    #     with self.eng.begin() as conn: result = conn.executescript(text(command))
+    #     return result if not df else pd.DataFrame(result)
 
     # ========================== TABLES =====================================
     def read_table(self, table: str, sch: Optional[str] = None, size: int = 100):
-        res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
-        return pd.DataFrame(res.fetchmany(size))
+        if self.con:
+            res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
+            return pd.DataFrame(res.fetchmany(size))
 
     def insert_dicts(self, table: str, *mydicts: dict[str, Any]):
         cmd = f"""INSERT INTO {table} VALUES """
         for mydict in mydicts: cmd += f"""({tuple(mydict)}), """
         self.execute_begin_once(cmd)
 
-    def describe_table(self, table: str, sch=None, dtype: bool = True):
+    def describe_table(self, table: str, sch: Optional[str] = None, dtype: bool = True):
         print(table.center(100, "="))
         self.refresh()
+        assert self.meta is not None
         tbl = self.meta.tables[table]
+        assert self.ses is not None
         count = self.ses.query(tbl).count()
         res = Struct(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
         res.print(dtype=False, as_config=True)
@@ -131,6 +150,7 @@ class DBMS:
         cols = self.get_columns(table, sch=sch)
         df = pd.DataFrame.from_records(dat, columns=cols)
         print("SAMPLE:\n", df)
+        assert self.insp is not None
         if dtype: print("\nDETAILED COLUMNS:\n", pd.DataFrame(self.insp.get_columns(table)))
         print("\n" * 3)
 

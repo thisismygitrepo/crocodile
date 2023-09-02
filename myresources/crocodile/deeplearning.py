@@ -105,6 +105,8 @@ class HParams:
 
 SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
 def _silence_pylance(hp: SubclassedHParams) -> SubclassedHParams: return hp
+
+
 _ = _silence_pylance
 
 
@@ -118,7 +120,8 @@ class DataReader:
     need to reference `.dataspects`.
     """
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
-    def __init__(self, hp: SubclassedHParams, specs: Optional[Specs] = None, split: Optional[dict[str, 'npt.NDArray[np.float64]']] = None) -> None:
+    def __init__(self, hp: SubclassedHParams, specs: Optional[Specs] = None,
+                 split: Optional[dict[str, Union[None, 'npt.NDArray[np.float64]']]] = None) -> None:
         super().__init__()
         self.hp = hp
         self.split = split
@@ -169,11 +172,12 @@ class DataReader:
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
-    def sample_dataset(self, aslice=None, indices: Optional[list[int]] = None, use_slice: bool = False, split: str = "test", size: Optional[int] = None):
+    def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None, use_slice: bool = False, split: str = "test", size: Optional[int] = None):
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = self.get_data_strings(which_data="ip", which_split=split)
         keys_op = self.get_data_strings(which_data="op", which_split=split)
         keys_others = self.get_data_strings(which_data="others", which_split=split)
+
         tmp = self.split[keys_ip[0]]
         assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
         ds_size = len(tmp)
@@ -181,14 +185,17 @@ class DataReader:
         start_idx = np.random.choice(ds_size - select_size)
 
         if indices is not None: selection = indices
-        elif aslice is not None: selection = aslice
-        elif use_slice: selection = slice(start_idx, start_idx + select_size)  # ragged tensors don't support indexing, this can be handy in that case.
-        else: selection = np.random.choice(ds_size, size=select_size, replace=False)
+        elif aslice is not None: selection = list(range(aslice.start, aslice.stop, aslice.step))
+        elif use_slice: selection = list(range(start_idx, start_idx + select_size))  # ragged tensors don't support indexing, this can be handy in that case.
+        else:
+            tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
+            selection = tmp2
 
         x, y, others = [], [], []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp = self.split[key]
-            if isinstance(tmp, (pd.DataFrame, pd.Series)): item = tmp.iloc[selection]
+            if isinstance(tmp, (pd.DataFrame, pd.Series)):
+                item = tmp.iloc[np.array(selection)]
             elif tmp is not None: item = tmp[selection]
             else: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
             if idx == 0: x.append(item)
@@ -197,7 +204,7 @@ class DataReader:
         x = x[0] if len(self.specs.ip_names) == 1 else x
         y = y[0] if len(self.specs.op_names) == 1 else y
         others = others[0] if len(self.specs.other_names) == 1 else others
-        if len(others) == 0:
+        if len(others) == 0:  # type: ignore
             # others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
             if type(selection) is slice:
                 others = np.arange(*selection.indices(10000000000000))
@@ -344,9 +351,12 @@ class BaseModel(ABC):
         """Converts an object to a numerical form consumable by the NN."""
         return self.data.preprocess(*args, **kwargs)
 
-    def postprocess(self, *args: Any, **kwargs: Any): return self.data.postprocess(*args, **kwargs)
-    def __call__(self, *arg: Any, **kwargs: Any): return self.model(*args, **kwargs)
-    def viz(self, *args: Any, **kwargs: Any): return self.data.viz(*args, **kwargs)
+    def postprocess(self, *args: Any, **kwargs: Any):
+        return self.data.postprocess(*args, **kwargs)
+    def __call__(self, *arg: Any, **kwargs: Any):
+        return self.model(*args, **kwargs)
+    def viz(self, *args: Any, **kwargs: Any):
+        return self.data.viz(*args, **kwargs)
     def save_model(self, directory: Union[str, Path, P]): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory: Union[str, Path, P]):
         self.model.save_weights(P(directory).joinpath(self.model.name))  # TF: last part of path is file path.
@@ -391,11 +401,14 @@ class BaseModel(ABC):
         return result
 
     def evaluate(self, x_test: Optional['npt.NDArray[np.float64]'] = None, y_test: Optional['npt.NDArray[np.float64]'] = None, names_test: Optional[list[str]] = None,
-                 aslice=None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
+                 aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
                  split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
         if x_test is None and y_test is None and names_test is None:
+            a = indices
+            b = aslice
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
-        elif names_test is None and x_test is not None: names_test = np.arange(len(x_test))
+        elif names_test is None and x_test is not None:
+            names_test = [str(item) for item in np.arange(len(x_test))]
         else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
         # ==========================================================================
         y_pred = self.infer(x_test)
@@ -757,8 +770,8 @@ def batcher(func_type: str = 'function'):
     elif func_type == 'class': raise NotImplementedError
     elif func_type == 'function':
         class Batch(object):
-            def __init__(self, func): self.func = func
-            def __call__(self, x, **kwargs): return np.array([self.func(item, **kwargs) for item in x])
+            def __init__(self, func: Callable[[Any], Any]): self.func = func
+            def __call__(self, x: Any, **kwargs: Any): return np.array([self.func(item, **kwargs) for item in x])
         return Batch
 
 

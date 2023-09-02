@@ -328,7 +328,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: tmp2 = []
         filters = (filters or []) + tmp + tmp2
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
-            root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(lambda x: root.joinpath(x))
+            root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(root.joinpath)
             return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else:
@@ -370,17 +370,18 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     @staticmethod
     def tmp(folder: OPLike = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P': return P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
     # ====================================== Compression & Encryption ===========================================
-    def zip(self, path: OPLike = None, folder: OPLike = None, name: OPLike = None, arcname: Optional[str] = None, inplace: bool = False, verbose: bool = True, content: bool = False, orig: bool = False, use_7z: bool = False, pwd: Optional[str] = None, mode: str = 'w', **kwargs: Any) -> 'P':
+    def zip(self, path: OPLike = None, folder: OPLike = None, name: OPLike = None, arcname: Optional[str] = None, inplace: bool = False, verbose: bool = True, content: bool = False, orig: bool = False, use_7z: bool = False, pwd: Optional[str] = None, mode: FILE_MODE = 'w', **kwargs: Any) -> 'P':
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         if use_7z:  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
             path = path + '.7z' if not path.suffix == '.7z' else path
             with install_n_import("py7zr").SevenZipFile(file=path, mode=mode, password=pwd) as archive: archive.writeall(path=str(slf), arcname=None)
         else:
-            if (arcname := P(arcname or slf.name)).name != slf.name: arcname /= slf.name  # arcname has to start from somewhere and end with filename
-            if slf.is_file(): path = Compression.zip_file(ip_path=slf, op_path=path + f".zip" if path.suffix != ".zip" else path, arcname=arcname, mode=mode, **kwargs)
+            arcname_obj = P(arcname or slf.name)
+            if arcname_obj.name != slf.name: arcname_obj /= slf.name  # arcname has to start from somewhere and end with filename
+            if slf.is_file(): path = Compression.zip_file(ip_path=str(slf), op_path=str(path + f".zip" if path.suffix != ".zip" else path), arcname=arcname_obj, mode=mode, **kwargs)
             else:
-                root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname[0]))[0], arcname)
-                path = Compression.compress_folder(root_dir=root_dir, op_path=path, base_dir=base_dir, fmt='zip', **kwargs)  # TODO: see if this supports mode
+                root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname_obj[0]))[0], arcname_obj)
+                path = Compression.compress_folder(root_dir=str(root_dir), op_path=str(path), base_dir=str(base_dir), fmt='zip', **kwargs)  # TODO: see if this supports mode
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder: OPLike = None, fname: OPLike = None, verbose: bool = True, content: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False,
               pwd: Optional[str] = None, tmp: bool = False, pattern: Optional[str] = None, merge: bool = False, **kwargs: Any) -> 'P':
@@ -395,7 +396,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if slf.suffix == ".7z":
             if overwrite: P(folder).delete(sure=True)
             result = folder
-            with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive: _ = archive.extract(path=folder, targets=[f for f in archive.getnames() if pattern.match(f)]) if pattern is not None else archive.extractall(path=folder)
+            with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive:
+                if pattern is not None:
+                    import re
+                    pat = re.compile(pattern)
+                    archive.extract(path=folder, targets=[f for f in archive.getnames() if pat.match(f)])
+                else: archive.extractall(path=folder)
         else:
             if overwrite:
                 if not content: P(folder).joinpath(fname or "").delete(sure=True, verbose=True)  # deletes a specific file / folder that has the same name as the zip file without extension.
