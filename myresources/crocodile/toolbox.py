@@ -15,9 +15,9 @@ from crocodile.core import List, Base, Struct, Display, Save
 from crocodile.core import str2timedelta, timestamp, randstr, validate_name, install_n_import
 
 _ = str2timedelta, timestamp, randstr, validate_name, install_n_import
-_ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
-_ = Experimental, Terminal, Log, Null, Scheduler, SSH
-_ = logging, subprocess, sys, time
+__ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
+___ = Experimental, Terminal, Log, Null, Scheduler, SSH
+____ = logging, subprocess, sys, time
 
 Path = P
 L = List
@@ -27,7 +27,7 @@ T = Terminal
 E = Experimental
 tmp = P.tmp
 
-_ = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
+_1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
 
 

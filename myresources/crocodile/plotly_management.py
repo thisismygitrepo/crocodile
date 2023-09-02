@@ -1,4 +1,7 @@
 
+"""P
+"""
+
 import crocodile.toolbox as tb
 # import pandas as pd
 
@@ -13,14 +16,15 @@ from dash import Input, Output, State, callback_context as ctx
 from dash import dcc
 from dash import html
 import dash_daq as daq
+from typing import Any
 
 from types import SimpleNamespace
 import sys
 
 pio.renderers.default = "browser"
 tm = tb.Terminal()
-_ = Input, Output, State, dcc, html, daq
-_ = go, px, make_subplots
+_ = Input, Output, State, dcc, html, daq, ctx, sys, dbc
+__ = go, px, make_subplots
 
 
 CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
@@ -46,7 +50,7 @@ CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
 
 class App:
     @staticmethod
-    def run(app, debug=False, random_port=True):
+    def run(app: Any, debug: bool = False, random_port: bool = True):
         host = "localhost"  # 0.0.0.0"  #  "127.0.0.1"
         port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
@@ -56,19 +60,19 @@ class App:
         app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
 
     @staticmethod
-    def get_app(name=""):
-        theme = {
+    def get_app(name: str = ""):
+        _theme = {
             'dark': True,
             'detail': '#007439',
             'primary': '#00EA64',
             'secondary': '#6E6E6E',
         }
-        return dash.Dash(name=name+tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
+        return dash.Dash(name=name + tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
         # [dbc.themes.DARKLY])
         #
-    @staticmethod
-    def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
-        raise NotImplementedError
+    # @staticmethod
+    # def run_async_decorator(func):  # Decorate functions with this to make them run_command asynchornously."""
+    #     raise NotImplementedError
 
 
 if __name__ == '__main__':

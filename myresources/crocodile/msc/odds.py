@@ -6,7 +6,7 @@ from crocodile.file_management import P, install_n_import
 from crocodile.core import List
 # from crocodile.meta import Scheduler, Log
 # import time
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 
 def share(path: P):
@@ -23,9 +23,9 @@ def capture_from_webcam(show: bool = True, wait: bool = True, save: bool = False
     cam = cv2.VideoCapture(0)
     cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3000)
     cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000)
-    ret, frame = cam.read()
+    _ret, frame = cam.read()
     while True and wait:
-        ret, frame = cam.read()
+        _ret, frame = cam.read()
         if show: cv2.imshow('frame', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'): break
     cam.release()
@@ -39,7 +39,12 @@ def capture_from_webcam(show: bool = True, wait: bool = True, save: bool = False
 
 def qr(txt: str): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
 def count_number_of_lines_of_code_in_repo(path: P = P.cwd(), extension: str = ".py", r: bool = True, **kwargs: Any): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
-def profile_memory(command: str): psutil = install_n_import("psutil"); before = psutil.virtual_memory(); exec(command); after = psutil.virtual_memory(); print(f"Memory used = {(after.used - before.used) / 1e6}")
+def profile_memory(command: str):
+    psutil = install_n_import("psutil")
+    before = psutil.virtual_memory()
+    exec(command)  # type: ignore # pylint: disable=W0122
+    after = psutil.virtual_memory()
+    print(f"Memory used = {(after.used - before.used) / 1e6}")
 
 
 class Cycle:
@@ -64,15 +69,15 @@ class Cycle:
     def __add__(self, other: 'Cycle'): pass  # see behviour of matplotlib cyclers.
     def __repr__(self): return f"Cycler @ {self.index}: {self.list[self.index]}"
 class DictCycle(Cycle):
-    def __init__(self, strct): super(DictCycle, self).__init__(iterable=strct.items()); self.keys = strct.keys()
-    def set_key(self, key): self.index = list(self.keys).index(key)
+    def __init__(self, strct: dict[str, Any]): super(DictCycle, self).__init__(iterable=list(strct.items())); self.keys = strct.keys()
+    def set_key(self, key: Any): self.index = list(self.keys).index(key)
 
 
-def tree(self: P, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats=False, desc=None):
+def tree(self: P, level: int = -1, limit_to_directories: bool = False, length_limit: int = 1000, stats: bool = False, desc: Optional[Callable[[Any], str]] = None):
     # Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
     space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
-    def get_stats(apath): return (f" {(sts := apath.stats(printit=False)).size} MB. {sts.content_mod_time}. " + desc(apath) if desc is not None else "") if stats or desc else ""
-    def inner(apath: P, prefix: str = '', level_=-1):
+    def get_stats(apath: P): return (f" {(sts := apath.stats())['size']} MB. {sts['content_mod_time']}. " + desc(apath) if desc is not None else "") if stats or desc else ""
+    def inner(apath: P, prefix: str = '', level_: int = -1):
         nonlocal files, directories
         if not level_: return  # 0, stop iterating
         pointers = [tee] * (len(content := apath.search("*", files=not limit_to_directories)) - 1) + [last]
@@ -89,7 +94,7 @@ def tree(self: P, level: int = -1, limit_to_directories: bool = False, length_li
     print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
 
-def get_compressable_directories(path, max_size_mb: float = 15_000.0):
+def get_compressable_directories(path: P, max_size_mb: float = 15_000.0):
     tmp_results = path.search("*", r=False)
     dirs2compress = List()
     dirs_violating = List()

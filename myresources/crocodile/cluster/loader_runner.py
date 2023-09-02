@@ -26,7 +26,7 @@ class WorkloadParams:
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
     def split_to_jobs(self, jobs: Optional[int] = None):
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
-        return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list[0], idx_end=sub_list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
+        return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
     def get_section_from_series(self, series: list[pd.Timestamp]):
         from math import floor
         min_idx_start = int(floor((len(series) - 1) * self.idx_start / self.idx_max))
@@ -48,19 +48,19 @@ class Lock:
 
 @dataclass
 class JobParams:
-    repo_path_rh: str
-    file_path_rh: str
-    file_path_r: str
-    func_module: str
-    func_class: Optional[str]  # the callable might be a function on its own, not a method of a class.
-    func_name: Optional[str]  # the job might be running a script as is, no particular method.
-
     description: str
     ssh_repr: str
     ssh_repr_remote: str
     error_message: str
     session_name: str
     resource_manager_path: str
+
+    repo_path_rh: str
+    file_path_rh: str
+    file_path_r: str
+    func_module: str
+    func_class: Optional[str] = None  # the callable might be a function on its own, not a method of a class.
+    func_name: Optional[str] = None  # the job might be running a script as is, no particular method.
 
     def is_installabe(self) -> bool: return True if "setup.py" in tb.P(self.repo_path_rh).expanduser().absolute().listdir().apply(str) else False
     @staticmethod
@@ -124,7 +124,8 @@ tb.sys.path.insert(0, file_root.str)
             if self.func_class is None: base += f"""
 from {self.func_module.replace('.py', '')} import {self.func_name} as func
 """
-            elif self.func_class is not None: base += f"""
+            elif self.func_class is not None:  # type: ignore
+                base += f"""
 from {self.func_module.replace('.py', '')} import {self.func_class} as {self.func_class}
 func = {self.func_class}.{self.func_name}
 """
@@ -337,8 +338,7 @@ echo "Unlocked resources"
 
     def unlock_resources(self):
         if self.lock_resources is False: return True
-        dat = self.running_path.expanduser().readit()
-        dat: Lock
+        dat: Lock = self.running_path.expanduser().readit()
         dat.queue.remove(self.job_id)
         del dat.specs[self.job_id]
         console.print(f"Resources have been released by this job `{self.job_id}`. Saving new running file")

@@ -4,10 +4,14 @@ dl template
 """
 
 import numpy as np
+import numpy.typing as npt
 import crocodile.toolbox as tb
 import crocodile.deeplearning as dl
 import tensorflow as tf
 from dataclasses import field
+from typing import Optional, Any, Union
+# from matplotlib.axis import Axis
+from matplotlib.axes import Axes
 
 
 @dl.dataclass
@@ -31,7 +35,7 @@ class HParams(dl.HParams):
 
 
 class DataReader(dl.DataReader):
-    def __init__(self, hp: HParams, load_trianing_data=False):
+    def __init__(self, hp: HParams, load_trianing_data: bool = False):
         specs = dl.Specs(ip_names=['x'],
                          op_names=["y"],
                          other_names=["idx"],
@@ -40,20 +44,23 @@ class DataReader(dl.DataReader):
                          other_shapes=[])
         super().__init__(hp=hp, specs=specs)
         self.hp: HParams
-        self.dataset = None
+        self.dataset: Optional[dict[str, Any]] = None
         if load_trianing_data: self.load_trianing_data()  # make sure that DataReader can be instantiated cheaply without loading data.
 
-    def load_trianing_data(self, profile_df: bool = False):
-        self.dataset = dict(x=np.random.randn(1000, 10).astype(self.hp.precision),
-                            y=np.random.randn(1000, 1).astype(self.hp.precision),
-                            names=np.arange(1000))
+    def load_trianing_data(self) -> None:
+        self.dataset = {'x': np.random.randn(1000, 10).astype(self.hp.precision),
+                        'y': np.random.randn(1000, 1).astype(self.hp.precision),
+                        'names': np.arange(1000)}
         # if profile_df: self.profile_dataframe(df=self.dataset.x)
         self.split_the_data(self.dataset['x'], self.dataset['y'], self.dataset['names'])
 
-    def viz(self, y_pred: np.ndarray, y_true: np.ndarray, names: list[str], ax=None, title: str = ""):
+    def viz(self, y_pred: 'npt.NDArray[np.float64]', y_true: 'npt.NDArray[np.float64]', names: list[str], ax: Union[Axes, None] = None, title: str = ""):
+        _ = names
         import matplotlib.pyplot as plt
         from crocodile.matplotlib_management import FigureManager
-        if ax is None: fig, ax = plt.subplots(figsize=(14, 10))
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(14, 10))
+            # ax = tmp[0]
         else: fig = ax.get_figure()
         x = np.arange(len(y_true))
         ax.bar(x, y_true.squeeze(), label='y_true', width=0.4)
@@ -66,7 +73,7 @@ class DataReader(dl.DataReader):
 
 
 class Model(dl.BaseModel):
-    def __init__(self, hp: HParams, data: DataReader, plot=False, **kwargs):
+    def __init__(self, hp: HParams, data: DataReader, plot: bool = False, **kwargs: Any):
         super(Model, self).__init__(hp=hp, data=data, **kwargs)
         tf.keras.backend.set_floatx(self.hp.precision)
         self.model = self.get_model()
@@ -90,9 +97,9 @@ def main():
     m = Model(hp, d)
     import matplotlib.pyplot as plt
     _fig, ax = plt.subplots(ncols=2)
-    _ = m.evaluate(indices=np.arange(10), viz_kwargs=dict(title='Before training', ax=ax[0]))
+    _ = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]))
     m.fit()
-    _ = m.evaluate(indices=np.arange(10), viz_kwargs=dict(title='After training', ax=ax[1]))
+    _ = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]))
     m.save_class()
     return m
 

@@ -1,4 +1,6 @@
 
+"""Notifications Module
+"""
 # import numpy as np
 # import matplotlib.pyplot as plt
 import crocodile.toolbox as tb
@@ -9,14 +11,14 @@ import imaplib
 # from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 """
 
 """
 
 
-def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download(memory=True).text
+def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download_to_memory().text
 
 
 class Email:
@@ -25,8 +27,10 @@ class Email:
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
+        from smtplib import SMTP_SSL, SMTP
+        self.server: Union[SMTP_SSL, SMTP]
         if config['encryption'].lower() == "ssl": self.server = smtplib.SMTP_SSL(host=self.config["smtp_host"], port=self.config["smtp_port"])
-        elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"]) 
+        elif config['encryption'].lower() == "tls": self.server = smtplib.SMTP(host=self.config["smtp_host"], port=self.config["smtp_port"])
         self.server.login(self.config['email_add'], password=self.config["password"])
 
     def send_message(self, to: str, subject: str, body: str, txt_to_html: bool = True, attachments: Optional[list[Any]] = None):
@@ -89,14 +93,14 @@ class Email:
 
 
 class PhoneNotification:  # security concerns: avoid using this.
-    def __init__(self, bulletpoint_token):
+    def __init__(self, bulletpoint_token: str):
         pushbullet = tb.install_n_import("pushbullet")
         self.api = pushbullet.Pushbullet(bulletpoint_token)
-    def send_notification(self, title: str="Note From Python", body: str = "A notfication"): self.api.push_note(title=title, body=body)
+    def send_notification(self, title: str = "Note From Python", body: str = "A notfication"): self.api.push_note(title=title, body=body)
     @staticmethod
     def open_website(): tb.P(r"https://www.pushbullet.com/").readit()
     @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
-    def try_me(bulletpoint_token): n = PhoneNotification(bulletpoint_token); n.send_notification()
+    def try_me(bulletpoint_token: str): n = PhoneNotification(bulletpoint_token); n.send_notification()
 
 
 if __name__ == '__main__':

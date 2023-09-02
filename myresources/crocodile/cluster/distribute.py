@@ -130,7 +130,7 @@ class Cluster:
             except Exception as ex:
                 print(f"Couldn't connect to {an_ssh_params}")
                 if ditch_unavailable_machines: continue
-                else: raise Exception(f"Couldn't connect to {an_ssh_params}") from ex  # type: ignore
+                else: raise Exception(f"Couldn't connect to {an_ssh_params}") from ex  # type: ignore # pylint: disable=W0719
 
         # lists of similar length:
         self.sshz: list[tb.SSH] = sshz
@@ -195,7 +195,9 @@ class Cluster:
         plt.simple_bar(names, self.machine_load_calc.load_ratios, width=100, title=f"Load distribution for machines using criterion `{self.machine_load_calc.load_criterion}`")
         plt.show()
 
-        self.machine_load_calc.load_ratios_repr = tb.S(dict(zip(names, tb.L((np.array(self.machine_load_calc.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
+        tmp = tb.S(dict(zip(names, tb.L((np.array(self.machine_load_calc.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
+        assert isinstance(tmp, str)
+        self.machine_load_calc.load_ratios_repr = tmp
         print(self.machine_load_calc.load_ratios_repr)
         # self.workload_params.
         print("\n")

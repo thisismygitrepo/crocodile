@@ -10,20 +10,20 @@ from rich import pretty, inspect, progress, traceback, print as pprint
 from rich.text import Text
 from rich.console import Console
 
-from crocodile.core import *  # type: ignore
+from crocodile.core import *  # type: ignore # pylint: disable=W0401,W0614 # noqa: F403,F401
 from crocodile.file_management import P
 import crocodile.core as core
-from crocodile.file_management import *  # type: ignore
-from crocodile.meta import *
+from crocodile.file_management import *  # type: ignore # noqa: F403,F401 # pylint: disable=W0401,W0614
+from crocodile.meta import *  # type: ignore # noqa: F403,F401 # pylint: disable=W0401,W0614
 from crocodile import meta
 # import crocodile.environment as env
-from crocodile.matplotlib_management import *  # type: ignore
+from crocodile.matplotlib_management import *  # noqa: F403,F401 # type: ignore # pylint: disable=W0401,W0614
 import crocodile.toolbox as tb
 import numpy as np
 import pandas as pd
 import platform
 
-
+# __ = PLike, vali
 console = Console()
 pretty.install()
 
@@ -52,7 +52,7 @@ if platform.system() == "Windows":
 
     if _1x and _2x and _3x:
         if random.choice([True, True, False]):
-            from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles
+            from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles # pylint: disable=C0412
             font = random.choice(FIGJS_FONTS)
             # print(f"{font}\n")
             box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
@@ -75,7 +75,7 @@ else:
     # _x2 = P.home().joinpath(".nix-profile/bin/lolcat").exists()  # P(r"/usr/games/lolcat").exists()
     # _x3 = P.home().joinpath(".nix-profile/bin/boxes").exists()  # P(r"/usr/bin/boxes").exists()
     # _x4 = P.home().joinpath(".nix-profile/bin/figlet").exists()  # P(r"/usr/bin/figlet").exists()
-    def is_executable_in_path(executable_name):
+    def is_executable_in_path(executable_name: str) -> bool:
         path_dirs = os.environ['PATH'].split(os.pathsep)
         for path_dir in path_dirs:
             path_to_executable = os.path.join(path_dir, executable_name)
@@ -91,7 +91,7 @@ else:
         if _dynamic_art:
             from crocodile.msc.ascii_art import get_art
             _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
-            get_art("crocodile", artlib=None, file=_new_art, verbose=False)
+            get_art("crocodile", artlib=None, file=str(_new_art), verbose=False)
             os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
         else:
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
@@ -113,10 +113,10 @@ def build_parser():
     if args.file:
         code = P(args.file).read_text()
         print(code)
-        exec(code, globals())  # type: ignore
+        exec(code, globals())  # type: ignore # pylint: disable=W0122
     elif args.cmd:
         print(args.cmd)
-        exec(args.cmd, globals())  # type: ignore
+        exec(args.cmd, globals())  # type: ignore # pylint: disable=W0122
 
 
 if __name__ == "__main__":

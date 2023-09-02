@@ -185,7 +185,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
-    def download(self, folder: OPLike = None, name: OPLike = None, memory: bool = False, allow_redirects: bool = True, timeout: Optional[int] = None, params: Any = None) -> Union['P', 'Response']:
+    def download_to_memory(self, allow_redirects: bool = True, timeout: Optional[int] = None, params: Any = None) -> 'Any':
+        import requests
+        return requests.get(self.as_url_str(), allow_redirects=allow_redirects, timeout=timeout, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
+    def download(self, folder: OPLike = None, name: OPLike = None, memory: bool = False, allow_redirects: bool = True, timeout: Optional[int] = None, params: Any = None) -> Union['P', 'Any']:
         import requests
         response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, timeout=timeout, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         if memory: return response  # r.contents is bytes encoded as per docs of requests.
@@ -235,7 +238,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def __sub__(self, other: PLike) -> 'P': res = P(str(self).replace(str(other), "")); return (res[1:] if str(res[0]) in {"\\", "/"} else res) if len(res) else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
-    def collapseuser(self, strict: bool = True):  # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
+    def collapseuser(self, strict: bool = True) -> 'P':  # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
         return self if (str(self).startswith("~") or P.home().as_posix() not in self.resolve().as_posix()) else self._return(P("~") / (self.expanduser().absolute().resolve(strict=strict) - P.home()))  # resolve also solves the problem of Windows case insensitivty.
     def __getitem__(self, slici: Union[int, slice]):

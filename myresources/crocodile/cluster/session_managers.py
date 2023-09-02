@@ -13,20 +13,16 @@ class Zellij:
         """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
         self.ssh = ssh
         self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
-        self._new_sess_name = None
+        self._new_sess_name: Optional[str] = None
     @property
     def new_sess_name(self) -> str:
         if isinstance(self._new_sess_name, str): tmp = self._new_sess_name
         else: tmp = self.get_new_session_name()
         return tmp
-    # def __getstate__(self): return self.__dict__
-    # def __setstate__(self, state): self.__dict__.update(state)
-    def get_ssh_command(self, sess_name: Optional[str] = None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
-    def get_new_session_string(self): return f"{self.ssh.get_ssh_conn_str()} -t {self.get_ssh_command()}"
-    def open_console(self): return tb.Terminal().run_async(self.get_new_session_string(), shell="pwsh")
     def get_new_session_name(self):
         # if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
+        sess_name: str
         resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_repr(which='remote')}` for new session name", verbose=False)
         if resp.err == "No active zellij sessions found.":
             sess_name = "ms0"
@@ -38,6 +34,11 @@ class Zellij:
             else: sess_name = f"ms{1+sess[-1]}"
         self._new_sess_name = sess_name
         return sess_name
+    # def __getstate__(self): return self.__dict__
+    # def __setstate__(self, state): self.__dict__.update(state)
+    def get_ssh_command(self, sess_name: Optional[str] = None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
+    def get_new_session_string(self): return f"{self.ssh.get_ssh_conn_str()} -t {self.get_ssh_command()}"
+    def open_console(self): return tb.Terminal().run_async(self.get_new_session_string(), shell="pwsh")
     def asssert_session_started(self):
         while True:
             resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
@@ -48,7 +49,7 @@ class Zellij:
             time.sleep(2)
             print(f"--> Waiting for zellij session {self.new_sess_name} to start before sending fire commands ...")
     def setup_layout(self, sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "~/tmp_results/remote_mahcines"):
-        if self.new_sess_name is None: self.get_new_session_name()
+        # if self.new_sess_name is None: self.get_new_session_name()
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]

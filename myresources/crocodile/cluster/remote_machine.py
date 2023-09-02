@@ -73,7 +73,7 @@ class RemoteMachine:
         self.kwargs = func_kwargs or {}
         self.data = data if data is not None else []
         # conn
-        self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)
+        self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)  # type: ignore
         self.session_manager = Zellij(self.ssh) if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal(self.ssh)
         self.session_name: Optional[str] = None
         # scripts
