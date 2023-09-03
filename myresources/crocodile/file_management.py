@@ -251,7 +251,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
         elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
         self._str = str(P(*fullparts))  # pylint: disable=W0201  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
-    def split(self, at: Optional[str] = None, index: Optional[int] = None, sep: int = -1, strict: bool = True):
+    def split(self, at: Optional[str] = None, index: Optional[int] = None, sep: Literal[-1, 0, 1] = -1, strict: bool = True):
         if index is None and at is not None:  # at is provided  # ====================================   Splitting
             if not strict:  # behaves like split method of string
                 one, two = (items := str(self).split(sep=str(at)))[0], items[1]; one, two = P(one[:-1]) if one.endswith("/") else P(one), P(two[1:]) if two.startswith("/") else P(two)
@@ -370,7 +370,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     @staticmethod
     def tmp(folder: OPLike = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P': return P(root).expanduser().create().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
     # ====================================== Compression & Encryption ===========================================
-    def zip(self, path: OPLike = None, folder: OPLike = None, name: OPLike = None, arcname: Optional[str] = None, inplace: bool = False, verbose: bool = True, content: bool = False, orig: bool = False, use_7z: bool = False, pwd: Optional[str] = None, mode: FILE_MODE = 'w', **kwargs: Any) -> 'P':
+    def zip(self, path: OPLike = None, folder: OPLike = None, name: OPLike = None, arcname: Optional[str] = None, inplace: bool = False, verbose: bool = True,
+            content: bool = False, orig: bool = False, use_7z: bool = False, pwd: Optional[str] = None, mode: FILE_MODE = 'w', **kwargs: Any) -> 'P':
         path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         if use_7z:  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
             path = path + '.7z' if not path.suffix == '.7z' else path
@@ -380,8 +381,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             if arcname_obj.name != slf.name: arcname_obj /= slf.name  # arcname has to start from somewhere and end with filename
             if slf.is_file(): path = Compression.zip_file(ip_path=str(slf), op_path=str(path + f".zip" if path.suffix != ".zip" else path), arcname=arcname_obj, mode=mode, **kwargs)
             else:
-                root_dir, base_dir = (slf, ".") if content else (slf.split(at=str(arcname_obj[0]))[0], arcname_obj)
-                path = Compression.compress_folder(root_dir=str(root_dir), op_path=str(path), base_dir=str(base_dir), fmt='zip', **kwargs)  # TODO: see if this supports mode
+                # print(f"{slf=}   {arcname_obj=}")
+                if content: root_dir, base_dir = slf, "."
+                else: root_dir, base_dir = slf.split(at=str(arcname_obj[0]))[0], str(arcname_obj)
+                # print(f"{root_dir=}   {base_dir=}")
+                path = P(Compression.compress_folder(root_dir=str(root_dir), op_path=str(path), base_dir=base_dir, fmt='zip', **kwargs))  # TODO: see if this supports mode
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder: OPLike = None, fname: OPLike = None, verbose: bool = True, content: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False,
               pwd: Optional[str] = None, tmp: bool = False, pattern: Optional[str] = None, merge: bool = False, **kwargs: Any) -> 'P':
@@ -510,9 +514,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def str(self) -> str: return str(self)  # or self._str
 
 
-def compress_folder(root_dir: str, op_path: str, base_dir: str, fmt: str = 'zip', **kwargs: Any):  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
-    assert fmt in {"zip", "tar", "gztar", "bztar", "xztar"}  # .zip is added automatically by library, hence we'd like to avoid repeating it if user sent it.
-    return P(__import__('shutil').make_archive(base_name=str(op_path)[:-4] if str(op_path).endswith(".zip") else str(op_path), format=fmt, root_dir=str(root_dir), base_dir=str(base_dir), **kwargs))  # returned path possible have added extension.
+SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
+
+
+def compress_folder(root_dir: str, op_path: str, base_dir: str, fmt: SHUTIL_FORMATS = 'zip', verbose: bool = False, **kwargs: Any) -> str:  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""
+    base_name = op_path[:-4] if op_path.endswith(".zip") else op_path  # .zip is added automatically by library, hence we'd like to avoid repeating it if user sent it.
+    import shutil; return shutil.make_archive(base_name=base_name, format=fmt, root_dir=root_dir, base_dir=base_dir, verbose=verbose, **kwargs)  # returned path possible have added extension.
 def zip_file(ip_path: str, op_path: str, arcname: OPLike = None, password: Optional[bytes] = None, mode: FILE_MODE = "w", **kwargs: Any):
     """arcname determines the directory of the file being archived inside the archive. Defaults to same as original directory except for drive.
     When changed, it should still include the file path in its end. If arcname = filename without any path, then, it will be in the root of the archive."""
