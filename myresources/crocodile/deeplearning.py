@@ -5,7 +5,7 @@ dl
 
 import crocodile.toolbox as tb
 from crocodile.file_management import P, Path
-from crocodile.matplotlib_management import ImShow, FigureSave
+from crocodile.matplotlib_management import ImShow, NullAuto
 # from matplotlib.pyplot import hist
 import numpy as np
 import numpy.typing as npt
@@ -273,7 +273,7 @@ class BaseModel(ABC):
         self.model: Any = self.get_model()  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
-        self.plotter = FigureSave.NullAuto
+        self.plotter = NullAuto
         self.fig = None
         self.kwargs = None
         self.tmp = None
