@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backend_bases import Event
 from matplotlib import widgets
 import matplotlib.colors as mcolors
+from matplotlib.colors import CSS4_COLORS
 from matplotlib import animation
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
@@ -263,8 +264,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.event: Optional[Event] = None
         self.cmaps = Cycle(plt.colormaps())
         self.colors = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-        self.mcolors = list(mcolors.CSS4_COLORS.keys())
-        self.facecolor = Cycle(list(mcolors.CSS4_COLORS.values()))
+        self.mcolors = list(CSS4_COLORS.keys())
+        self.facecolor = Cycle(list(CSS4_COLORS.values()))
         self.cmaps.set_value('viridis')
         self.idx_cycle = Cycle([]); self.pause = None  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
@@ -414,7 +415,9 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         exist = True if figname in plt.get_figlabels() else False
         if figpolicy is FigurePolicy.same: return plt.figure(num=figname, **kwargs)
         elif figpolicy is FigurePolicy.add_new: return plt.figure(num=(timestamp(name=figname) if suffix is None else figname + suffix) if exist else figname, **kwargs)
-        elif figpolicy is FigurePolicy.close_create_new: plt.close(figname) if exist else None; return plt.figure(num=figname, **kwargs)
+        elif figpolicy is FigurePolicy.close_create_new:
+            _ = plt.close(figname) if exist else None
+            return plt.figure(num=figname, **kwargs)
     @staticmethod
     def try_figure_size():
         fig, ax = plt.subplots()

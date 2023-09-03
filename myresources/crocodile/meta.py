@@ -301,23 +301,23 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
         if init: print(f"{'>'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
-        source_ = P(source).expanduser().absolute()
-        if not z and source_.is_dir():
+        source_obj = P(source).expanduser().absolute()
+        if not z and source_obj.is_dir():
             if r is True:
-                tmp = source_.search("*", folders=False, r=True)
+                tmp = source_obj.search("*", folders=False, r=True)
                 tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
                 return list(tmp)
             print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
-        if z: print(f"ZIPPING ..."); source = P(source).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
-        if target is None: target = P(source).expanduser().absolute().collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        if z: print(f"ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
+        if target is None: target = P(source_obj).expanduser().absolute().collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
-        print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
+        print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z:
             _resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True)
-            source_.delete(sure=True); print("\n")
-        return source_
+            source_obj.delete(sure=True); print("\n")
+        return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
