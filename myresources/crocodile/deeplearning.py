@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from abc import ABC
-from typing import TypeVar, Type, Any, Optional, Union, Callable
+from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal
 import enum
 from tqdm import tqdm
 import copy
@@ -27,6 +27,9 @@ class Specs:
     op_names: list[str]  # e.g.: ["y1", "y2"]
     other_names: list[str]  # e.g.: indices or names
     def get_all_strings(self): return self.ip_names + self.op_names + self.other_names
+    def get_split_strings(self, strings: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
+        keys_ip = [item + f"_{which_split}" for item in strings]
+        return keys_ip
 
 
 @dataclass
@@ -150,9 +153,8 @@ class DataReader:
     # def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
     def split_the_data(self, *args: Any, **kwargs: Any) -> None:
-        from sklearn.model_selection import train_test_split
-        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
-        self.split = dict(train_loader=None, test_loader=None)
+
+        # populating data specs ip / op shapes based on arguments sent to this method.
         strings = self.specs.get_all_strings()
         assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
         for an_arg, key in zip(args, strings):
@@ -160,22 +162,21 @@ class DataReader:
             if key in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
             elif key in self.specs.op_names: self.specs.op_shapes.append(a_shape)
             elif key in self.specs.other_names: self.specs.other_shapes.append(a_shape)
+
+        from sklearn.model_selection import train_test_split
+        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
+        self.split = {}  # dict(train_loader=None, test_loader=None)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
         tb.Struct(self.split).print()
 
-    def get_data_strings(self, which_data: str = "ip", which_split: str = "train"):
-        strings = {"op": self.specs.op_names, "ip": self.specs.ip_names, "others": self.specs.other_names}[which_data]
-        keys_ip = [item + f"_{which_split}" for item in strings]
-        return keys_ip
-
     def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
-                       use_slice: bool = False, split: str = "test", size: Optional[int] = None):
+                       use_slice: bool = False, split: Literal["train", "test"] = "test", size: Optional[int] = None) -> tuple[list[Any], list[Any], list[Any]]:
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
-        keys_ip = self.get_data_strings(which_data="ip", which_split=split)
-        keys_op = self.get_data_strings(which_data="op", which_split=split)
-        keys_others = self.get_data_strings(which_data="others", which_split=split)
+        keys_ip = self.specs.get_split_strings(self.specs.ip_names, which_split=split)
+        keys_op = self.specs.get_split_strings(self.specs.op_names, which_split=split)
+        keys_others = self.specs.get_split_strings(self.specs.other_names, which_split=split)
 
         tmp = self.split[keys_ip[0]]
         assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
@@ -201,15 +202,12 @@ class DataReader:
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
-        x = x[0] if len(self.specs.ip_names) == 1 else x
-        y = y[0] if len(self.specs.op_names) == 1 else y
-        others = others[0] if len(self.specs.other_names) == 1 else others
-        if len(others) == 0:  # type: ignore
-            # others = np.arange(len(x if len(self.ip_strings) == 1 else x[0]))
-            if type(selection) is slice:
-                others = np.arange(*selection.indices(10000000000000))
-            else:
-                others = selection
+        # x = x[0] if len(self.specs.ip_names) == 1 else x
+        # y = y[0] if len(self.specs.op_names) == 1 else y
+        # others = others[0] if len(self.specs.other_names) == 1 else others
+        # if len(others) == 0:
+        #     if type(selection) is slice: others = np.arange(*selection.indices(10000000000000)).tolist()
+        #     else: others = selection
         return x, y, others
 
     def get_random_inputs_outputs(self, ip_shapes: Optional[list[tuple[int, ...]]] = None, op_shapes: Optional[list[tuple[int, ...]]] = None):
@@ -218,8 +216,8 @@ class DataReader:
         dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
         x = [np.random.randn(self.hp.batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes]
         y = [np.random.randn(self.hp.batch_size, * op_shape).astype(dtype) for op_shape in op_shapes]
-        x = x[0] if len(self.specs.ip_names) == 1 else x
-        y = y[0] if len(self.specs.op_names) == 1 else y
+        # x = x[0] if len(self.specs.ip_names) == 1 else x
+        # y = y[0] if len(self.specs.op_names) == 1 else y
         return x, y
 
     def preprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity.
@@ -308,10 +306,11 @@ class BaseModel(ABC):
 
     def fit(self, viz: bool = True, val_sample_weights: Optional['npt.NDArray[np.float64]'] = None, **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
-        x_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="train")]
-        y_train = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="train")]
-        x_test = [self.data.split[item] for item in self.data.get_data_strings(which_data="ip", which_split="test")]
-        y_test = [self.data.split[item] for item in self.data.get_data_strings(which_data="op", which_split="test")]
+        x_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="train")]
+        y_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="train")]
+        x_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="test")]
+        y_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="test")]
+
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
         default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
@@ -401,16 +400,19 @@ class BaseModel(ABC):
         if viz: self.viz(postprocessed, **kwargs)
         return result
 
-    def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None, y_test: Optional['npt.NDArray[np.float64]'] = None, names_test: Optional[list[str]] = None,
+    def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None, y_test: Optional[list['npt.NDArray[np.float64]']] = None, names_test: Optional[list[str]] = None,
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
-                 split: str = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
+                 split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None and x_test is not None:
             names_test = [str(item) for item in np.arange(len(x_test))]
         else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
         # ==========================================================================
-        y_pred = self.infer(x_test)
+        y_pred_raw = self.infer(x_test)
+        if not isinstance(y_pred_raw, list): y_pred = [y_pred_raw]
+        else: y_pred = y_pred_raw
+        assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
         if loss_df is not None:
             if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
@@ -422,11 +424,11 @@ class BaseModel(ABC):
         if viz:
             loss_name = results.loss_df.columns.to_list()[0]  # first loss path
             loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
-            names = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
+            names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
             self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **(viz_kwargs or {}))
         return results
 
-    def get_metrics_evaluations(self, prediction: 'npt.NDArray[np.float64]', groun_truth: 'npt.NDArray[np.float64]') -> Optional[pd.DataFrame]:
+    def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> Optional[pd.DataFrame]:
         if self.compiler is None: return None
         metrics = [self.compiler.loss] + self.compiler.metrics
         loss_dict: dict[str, list[Any]] = dict()
@@ -438,7 +440,7 @@ class BaseModel(ABC):
             #     path = a_metric.path  # works for subclasses Metrics
             # except AttributeError: path = a_metric.__name__  # works for functions.
             loss_dict[name] = []
-            for a_prediction, a_y_test in zip(prediction, groun_truth):
+            for a_prediction, a_y_test in zip(prediction[0], groun_truth[0]):
                 if hasattr(a_metric, "reset_states"): a_metric.reset_states()
                 loss = a_metric(y_pred=a_prediction[None], y_true=a_y_test[None])
                 loss_dict[name].append(np.array(loss).item())
@@ -493,7 +495,7 @@ class BaseModel(ABC):
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
-            hp_obj = tb.Read.vanilla_pickle(path=(path / HParams.subpath + "hparams.HyperParam.pkl"))
+            hp_obj = tb.Read.vanilla_pickle(path=path / HParams.subpath + "hparams.HyperParam.pkl")
         if device_name: hp_obj.device_name = device_name
         if hp_obj.root != path.parent:
             hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
@@ -555,7 +557,7 @@ class BaseModel(ABC):
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
-    def build(self, sample_dataset: bool = False, ip_shapes: Optional[tuple[int]] = None, ip: Optional['npt.NDArray[np.float64]'] = None, verbose: bool = True):
+    def build(self, sample_dataset: bool = False, ip_shapes: Optional[list[tuple[int, ...]]] = None, ip: Optional[list['npt.NDArray[np.float64]']] = None, verbose: bool = True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
@@ -567,8 +569,8 @@ class BaseModel(ABC):
         :return:
         """
         try:
-            keys_ip = self.data.get_data_strings(which_data="ip", which_split="test")
-            keys_op = self.data.get_data_strings(which_data="op", which_split="test")
+            keys_ip = self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="test")
+            keys_op = self.data.specs.get_split_strings(self.data.specs.op_names, which_split="test")
         except TypeError as te:
             raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
@@ -577,9 +579,11 @@ class BaseModel(ABC):
                 ip, _, _ = self.data.sample_dataset()
             else:
                 ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
-        op = self.model(inputs=ip)
-        ops = [op] if len(keys_op) == 1 else op
-        ips = [ip] if len(keys_ip) == 1 else ip
+        op = self.model(inputs=ip[0] if len(ip) == 1 else ip)
+        ops = op
+        ips = ip
+        # ops = [op] if len(keys_op) == 1 else op
+        # ips = [ip] if len(keys_ip) == 1 else ip
         if verbose:
             print("\n")
             print("Build Test".center(50, '-'))

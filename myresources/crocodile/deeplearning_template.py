@@ -54,7 +54,7 @@ class DataReader(dl.DataReader):
         # if profile_df: self.profile_dataframe(df=self.dataset.x)
         self.split_the_data(self.dataset['x'], self.dataset['y'], self.dataset['names'])
 
-    def viz(self, y_pred: 'npt.NDArray[np.float64]', y_true: 'npt.NDArray[np.float64]', names: list[str], ax: Union[Axes, None] = None, title: str = ""):
+    def viz(self, y_pred: list['npt.NDArray[np.float64]'], y_true: list['npt.NDArray[np.float64]'], names: list[str], ax: Union[Axes, None] = None, title: str = ""):
         _ = names
         import matplotlib.pyplot as plt
         from crocodile.matplotlib_management import FigureManager
@@ -62,9 +62,9 @@ class DataReader(dl.DataReader):
             fig, ax = plt.subplots(figsize=(14, 10))
             # ax = tmp[0]
         else: fig = ax.get_figure()
-        x = np.arange(len(y_true))
-        ax.bar(x, y_true.squeeze(), label='y_true', width=0.4)
-        ax.bar(x + 0.4, y_pred.squeeze(), label='y_pred', width=0.4)
+        x = np.arange(len(y_true[0]))
+        ax.bar(x, y_true[0].squeeze(), label='y_true', width=0.4)
+        ax.bar(x + 0.4, y_pred[0].squeeze(), label='y_pred', width=0.4)
         ax.legend()
         ax.set_title(title or 'Predicted vs True')
         FigureManager.grid(ax)
@@ -97,9 +97,9 @@ def main():
     m = Model(hp, d)
     import matplotlib.pyplot as plt
     _fig, ax = plt.subplots(ncols=2)
-    _ = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]))
+    _ed = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]))
     m.fit()
-    _ = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]))
+    _ed = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]))
     m.save_class()
     return m
 

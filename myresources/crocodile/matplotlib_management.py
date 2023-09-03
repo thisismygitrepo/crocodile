@@ -14,11 +14,12 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 
 import enum
 import subprocess
 import platform
-from typing import Any, Optional, Union
+from typing import Any, Optional  # , Union
 
 
 """TODO: add implementation https://github.com/gustavovelascoh/plot_update
@@ -48,7 +49,8 @@ class FigureSave:
         def __init__(self, save_dir: OPLike = None, save_name: Optional[str] = None, watch_figs: Optional[list[Any]] = None, max_calls: int = 2000, delay: int = 100, **kwargs: Any):
             """How to control what to be saved: you can either pass the figures to be tracked at init time, pass them dynamically at add time, or, add method will capture every figure and axis"""
             self.watch_figs = watch_figs if watch_figs is None else ([plt.figure(num=afig) for afig in watch_figs] if type(watch_figs[0]) is str else watch_figs)
-            self.save_name, self.save_dir = timestamp(name=save_name), save_dir or P.tmpdir(prefix="tmp_fig_save")
+            self.save_name = timestamp(name=save_name)
+            self.save_dir = P(save_dir) if save_dir is not None else P.tmpdir(prefix="tmp_fig_save")
             self.kwargs, self.counter, self.delay, self.max = kwargs, 0, delay, max_calls
         def add(self, fignames: Optional[list[str]] = None, names: Optional[list[str]] = None, **kwargs: Any):  # generic method used at runtime, never changed.
             print(f"Saver added frame number {self.counter}", end='\r')
@@ -81,13 +83,13 @@ class FigureSave:
         def __init__(self, interval: int = 100, **kwargs: Any):
             super().__init__(**kwargs); from collections import defaultdict
             self.container, self.interval, self.fname = defaultdict(lambda: []), interval, None  # determined at finish time.
-        def _save(self, afigure, aname: str, cla: bool = False, **kwargs: Any):
+        def _save(self, afigure: str, aname: str, cla: bool = False, **kwargs: Any):
             fig_list, subcontainer = self.container[afigure.get_label()], []
             for item in FigureManager.findobj(afigure, 'neo'): item.set_label('processed'); item.set_visible(False); subcontainer += [item]
             fig_list.append(subcontainer)  # if you want the method coupled with cla being used in main, then it add_line is required for axes.
         def finish(self):
             print("Saving the GIF ....")
-            for idx, a_fig in enumerate(self.watch_figs):
+            for _idx, a_fig in enumerate(self.watch_figs):
                 if ims := self.container[a_fig.get_label()]:
                     self.fname = self.save_dir.joinpath(f'{a_fig.get_label()}_{self.save_name}.gif')
                     ani = animation.ArtistAnimation(a_fig, ims, interval=self.interval, blit=True, repeat_delay=1000)
@@ -118,7 +120,7 @@ class FigureSave:
     class GenericAuto(GenericSave):
         """Parses the data internally, hence requires artist with animate method implemetend. Artist needs to have .fig attribute."""
         save_type = 'auto'
-        def __init__(self, plotter_class, data, names_list: Optional[list[str]] = None, **kwargs: Any):
+        def __init__(self, plotter_class, data: 'npt.NDArray[np.float64]', names_list: Optional[list[str]] = None, **kwargs: Any):
             super().__init__(**kwargs); self.saver, self.plotter = None, None; assert_requirements()
             self.plotter_class, self.data, self.names_list, self.kwargs = plotter_class, data, names_list, kwargs
         def animate(self):
@@ -126,7 +128,7 @@ class FigureSave:
             for idx, datum in __import__("tqdm").tqdm(enumerate(self.data)): self.plotter.animate(datum); self.saver.add(names=[self.names_list[idx] if self.names_list is not None else str(idx)])
             self.saver.finish()
     class GIFAuto(GenericAuto):
-        def __init__(self, plotter_class, data, interval: int = 500, extension: str = 'gif', fps: int = 4, metadata=None, **kwargs: Any):
+        def __init__(self, plotter_class, data: 'npt.NDArray[np.float64]', interval: int = 500, extension: str = 'gif', fps: int = 4, metadata=None, **kwargs: Any):
             super().__init__(plotter_class, data, **kwargs)
             writer = animation.PillowWriter(fps=fps) if extension == '.mp4' else animation.FFMpegWriter(fps=fps, metadata=metadata, bitrate=2500)
             self.plotter = self.plotter_class(**kwargs); plt.pause(self.delay * 0.001)  # give time for figures to show up before updating them
@@ -141,7 +143,7 @@ class FigureSave:
     class NullAuto(GenericAuto):
         def __init__(self, **kwargs: Any): super().__init__(**kwargs); self.saver = FigureSave.Null(**kwargs); self.fname = self.saver.fname; self.animate()
     class GIFFileBasedAuto(GenericAuto):
-        def __init__(self, plotter_class, data, fps: int = 4, dpi: int = 150, bitrate: int = 2500, _type='GIFFileBasedAuto', **kwargs):
+        def __init__(self, plotter_class, data: 'npt.NDArray[np.float64]', fps: int = 4, dpi: int = 150, bitrate: int = 2500, _type: str = 'GIFFileBasedAuto', **kwargs):
             super().__init__(**kwargs)
             if _type == 'GIFPipeBasedAuto': writer = animation.ImageMagickFileWriter; extension = '.gif'
             elif _type == 'MPEGFileBasedAuto': writer = animation.FFMpegFileWriter; extension = '.mp4'
@@ -162,10 +164,13 @@ class FigureSave:
 
 
 class FigureManager:  # use as base class for Artist & Viewers to give it free animation powers.
-    def __init__(self, info_loc=None, figpolicy: FigurePolicy = FigurePolicy.same):
+    def __init__(self, info_loc: Optional[str] = None, figpolicy: FigurePolicy = FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig = self.ax = self.event = None
-        self.cmaps, self.colors, self.mcolors, self.facecolor = Cycle(plt.colormaps()), Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color']), list(mcolors.CSS4_COLORS.keys()), Cycle(list(mcolors.CSS4_COLORS.values()))
+        self.cmaps = Cycle(plt.colormaps())
+        self.colors = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+        self.mcolors = list(mcolors.CSS4_COLORS.keys())
+        self.facecolor = Cycle(list(mcolors.CSS4_COLORS.values()))
         self.cmaps.set_value('viridis')
         self.idx_cycle = Cycle([]); self.pause = None  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
@@ -227,7 +232,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def next(self, event: Event): _ = event; self.idx_cycle.next(); self.message = f'Next {self.idx_cycle}'; self.animate()
     def text_info(self, event: Event): _ = event; self.message = ''
     def change_facecolor(self, event: Event): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
-    def adjust_brightness(self, event: Event):
+    def adjust_brightness(self, event: Any):
         ax, message = event.inaxes, "None"
         if ax is None or not ax.images: return None
         if event.key == '\\':
@@ -343,11 +348,14 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
     parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
     stream = ['clear', 'accumulate', 'update'][1]  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
     """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`"""
-    def __init__(self, fig):  # Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
-        super().__init__(); self.objs_repo = []  # list of lists of axes and texts.
+    def __init__(self, fig: Figure):  # Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
+        super().__init__()
+        self.objs_repo: list[Any] = []  # list of lists of axes and texts.
         self.fig = fig; self.connect(); self.idx_cycle = Cycle([])
-    def add(self, objs): self.idx_cycle.expand(); self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
-    def animate(self): _ = [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]; self.fig.canvas.draw()
+    def add(self, objs: Any): self.idx_cycle.expand(); self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
+    def animate(self):
+        _ = [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]
+        self.fig.canvas.draw()  # type: ignore
 
 
 class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
@@ -382,7 +390,7 @@ class VisibilityViewerAuto(VisibilityViewer):
     artist = ['internal', 'external'][1]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][0:2]
-    def __init__(self, data=None, artist=None, stream: str = 'clear', save_type=FigureSave.Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
+    def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist=None, stream: str = 'clear', save_type=FigureSave.Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
                  titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
@@ -406,7 +414,7 @@ class ImShow(FigureManager):
     artist = ['internal', 'external'][0]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, img_tensor: 'np.ndarray', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir: OPLike = None, save_kwargs: Optional[dict[str, Any]] = None,
+    def __init__(self, img_tensor: 'npt.NDArray[np.float64]', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[str]] = None, save_type=FigureSave.Null, save_name=None, save_dir: OPLike = None, save_kwargs: Optional[dict[str, Any]] = None,
                  subplots_adjust=None, gridspec=None, tight: bool = True, info_loc: Optional[str] = None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax: Optional[Axes] = None,
                  figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs: Any):
         """
@@ -442,12 +450,15 @@ class ImShow(FigureManager):
             else: self.idx_cycle.set_index(i)
         if self.idx_cycle.get_index() == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
     @staticmethod
-    def try_cmaps(im, nrows: int = 3, ncols: int = 7, **kwargs: Any): _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols, sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
-    def annotate(self, event: Event, axis: Optional[Axes] = None, data=None): _ = [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
+    def try_cmaps(im: 'npt.NDArray[np.float64]', nrows: int = 3, ncols: int = 7, **kwargs: Any):
+         _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols,
+                    sub_labels=np.array_split(plt.colormaps(), nrows * ncols), **kwargs); return [plt.get_cmap(style)(im) for style in plt.colormaps()]
+    def annotate(self, event: Event, axis: Optional[Axes] = None):
+        _ = [super().annotate(event, axis=ax, data=ax.images[0].get_array()) for ax in self.ax]
     @staticmethod
     def from_img_paths(paths: list[PLike], **kwargs: Any): ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs)
     @staticmethod
-    def from_complex(data, pause: bool = True, **kwargs: Any): ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs)
+    def from_complex(data: 'npt.NDArray[np.float64]', pause: bool = True, **kwargs: Any): ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs)
     @staticmethod
     def test(): ImShow(np.random.rand(12, 10, 80, 120, 3))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
     @staticmethod

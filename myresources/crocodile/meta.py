@@ -16,6 +16,15 @@ from dataclasses import dataclass
 _ = IO, TextIO
 
 
+@dataclass
+class Scout:
+    source_full: P
+    source_rel2home: P
+    exists: bool
+    is_dir: bool
+    files: Optional[List[P]]
+
+
 class Null:
     def __init__(self, return_: Any = 'self'): self.return_ = return_
     def __getattr__(self, item: str) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
@@ -112,12 +121,13 @@ class Response:
     @property
     def err(self) -> str: return self.output.stderr
     @property
-    def returncode(self): return self.output.returncode
+    def returncode(self) -> int: return self.output.returncode
     def op2path(self, strict_returncode: bool = True, strict_err: bool = False) -> Union[P, None]:
-        return P(self.op.rstrip()) if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err) else None
-    def op_if_successfull_or_default(self, strict_returcode: bool = True, strict_err: bool = False, default: Any = None): return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else default
-    def is_successful(self, strict_returcode: bool = True, strict_err: bool = False):
-        return ((self.output.returncode in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
+        if self.is_successful(strict_returcode=strict_returncode, strict_err=strict_err): return P(self.op.rstrip())
+        return None
+    def op_if_successfull_or_default(self, strict_returcode: bool = True, strict_err: bool = False) -> Optional[str]: return self.op if self.is_successful(strict_returcode=strict_returcode, strict_err=strict_err) else None
+    def is_successful(self, strict_returcode: bool = True, strict_err: bool = False) -> bool:
+        return ((self.returncode in {0, None}) if strict_returcode else True) and (self.err == "" if strict_err else True)
     def capture(self):
         for key in ["stdin", "stdout", "stderr"]:
             val: Optional[BinaryIO] = self.std[key]
@@ -137,9 +147,13 @@ class Response:
 
 class Terminal:
     def __init__(self, stdout: Optional[int] = subprocess.PIPE, stderr: Optional[int] = subprocess.PIPE, stdin: Optional[int] = subprocess.PIPE, elevated: bool = False):
-        self.available_consoles, self.machine = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"], __import__("platform").system()
-        self.elevated, self.stdout, self.stderr, self.stdin = elevated, stdout, stderr, stdin
-    def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
+        self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
+        self.machine: str = __import__("platform").system()
+        self.elevated: bool = elevated
+        self.stdout = stdout
+        self.stderr = stderr
+        self.stdin = stdin
+    # def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
     def run(self, *cmds: str, shell: Optional[str] = None, check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
@@ -159,7 +173,10 @@ class Terminal:
             except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
-    def run_as_admin(file: PLike, params: Any, wait: bool = False): proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params); time.sleep(wait) if wait is not False and wait is not True else None; return proce_info
+    def run_as_admin(file: PLike, params: Any, wait: bool = False):
+        proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)
+        if wait: time.sleep(1)
+        return proce_info
     def run_async(self, *cmds: str, new_window: bool = True, shell: Optional[str] = None, terminal: Optional[str] = None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
@@ -188,7 +205,7 @@ class Terminal:
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
         run_string = "\nobj(**loaded_kwargs)\n" if run else "\n"
         if callable(func) and func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
-            tmp = sys.modules['__main__'].__file__
+            tmp = sys.modules['__main__'].__file__  # type: ignore
             assert isinstance(tmp, str), f"Cannot import a function from a module that is not a file. The module is: {tmp}"
             module = P(tmp).rel2cwd().stem if (module := func.__module__) == "__main__" else module
             load_func_string = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}"
@@ -227,7 +244,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             except (FileNotFoundError, KeyError): self.hostname, self.username, self.proxycommand = str(__import__("platform").node()), username_, None
         else:
             if "@" in username_: self.username, self.hostname = username_.split("@")
-            else: self.username, self.hostname = username_, hostname
+            else:
+                assert hostname is not None, f"Hostname is not provided. It is required to create an SSH connection. Either pass it as a parameter or as part of the username. The username is: {username_}"
+                self.username, self.hostname = username_, hostname
             self.proxycommand = None
 
         if isinstance(self.hostname, str):
@@ -238,7 +257,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         import paramiko
         self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
-        self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=paramiko.proxy.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None)
+        sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
+        self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
         try: self.sftp = self.ssh.open_sftp()
         except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
         def view_bar(slf: Any, a: Any, b: Any): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
@@ -254,7 +274,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __setstate__(self, state: dict[str, Any]): SSH(**state)
     def get_remote_machine(self): self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
-    def get_remote_distro(self): self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default(default="") if self._remote_distro is None else self._remote_distro; return self._remote_distro
+    def get_remote_distro(self):
+        if self._remote_distro is None: self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
+        return self._remote_distro
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
     def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
@@ -271,10 +293,12 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         raw = self.ssh.exec_command(cmd)
         res = Response(stdin=raw[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)  # type: ignore
         _ = res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
-    def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False):
+    def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False) -> Union[Any, Response]:
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
-        else: assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"; source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]; return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
+        assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"
+        source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]
+        return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
         if init: print(f"{'>'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         source_ = P(source).expanduser().absolute()
@@ -290,42 +314,73 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
-        if z: _resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True); source.delete(sure=True); print("\n")
+        if z:
+            _resp = self.run_py(f"""tb.P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True)
+            source_.delete(sure=True); print("\n")
         return source_
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
-            if r: return self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True, verbose=False).apply(lambda file: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
+            if r:
+                tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True, verbose=False)
+                assert isinstance(tmp11, List), f"Could not resolve source path {source} due to error"
+                for file in tmp11:
+                    self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
             print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
-        if z: source = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False).op2path(strict_returncode=True, strict_err=True)
-        if target is None: target = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        target = P(target).expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''
-        source = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path() if "~" in str(source) else P(source); print(f"RECEVING `{source}` ==> `{target}`")
-        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=str(target), callback=pbar.view_bar)  # type: ignore: # pylint: disable=E1129
-        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
-        print("\n"); return target
+        if z:
+            tmp: Response = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False)
+            tmp2 = tmp.op2path(strict_returncode=True, strict_err=True)
+            if not isinstance(tmp2, P): raise RuntimeError(f"Could not zip {source} due to {tmp.err}")
+            else: source = tmp2
+        if target is None:
+            tmpx = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
+            if isinstance(tmpx, P): target = tmpx
+            else: raise RuntimeError(f"Could not resolve target path {target} due to error")
+            assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        target_obj = P(target).expanduser().absolute().create(parents_only=True); target_obj += '.zip' if z and '.zip' not in target_obj.suffix else ''
+        if "~" in str(source):
+            tmp3 = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path()
+            if isinstance(tmp3, P): source = tmp3
+            else: raise RuntimeError(f"Could not resolve source path {source} due to")
+        else: source = P(source)
+        print(f"RECEVING `{source}` ==> `{target_obj}`")
+        with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar:  # type: ignore # pylint: disable=E1129
+            assert self.sftp is not None, f"Could not establish SFTP connection to {self.hostname}."
+            self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)
+        if z: target_obj = target_obj.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
+        print("\n"); return target_obj
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
         scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", return_obj=True, verbose=False)
-        if not z and scout["is_dir"]: return scout["files"].apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)) if r else print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
-        target = P(target).expanduser().absolute().create(parents_only=True) if target else scout["source_rel2home"].expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout["source_full"]
+        assert isinstance(scout, Scout)
+        if not z and scout.is_dir and scout.files is not None:
+            if r:
+                tmp: List[P] = scout.files.apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
+                return tmp.list[0]
+            else: print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+        target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout.source_full
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
         print("\n"); return target
     @staticmethod
-    def scout(source: PLike, z: bool = False, r: bool = False):
-        source_full = P(source).expanduser().absolute(); source_rel2home = source_full.collapseuser(); exists = source_full.exists(); is_dir = source_full.is_dir() if exists else None
+    def scout(source: PLike, z: bool = False, r: bool = False) -> Scout:
+        source_full = P(source).expanduser().absolute()
+        source_rel2home = source_full.collapseuser()
+        exists = source_full.exists()
+        is_dir = source_full.is_dir() if exists else False
         if z and exists:
             try: source_full = source_full.zip()
-            except Exception as ex: raise Exception(f"Could not zip {source_full} due to {ex}") from ex  # type: ignore # pylint disable=W0719
+            except Exception as ex:
+                raise Exception(f"Could not zip {source_full} due to {ex}") from ex  # type: ignore # pylint: disable=W0719
             source_rel2home = source_full.zip()
-        files = source_full.search(folders=False, r=True).collapseuser() if r and exists and is_dir else None; return dict(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
+        files = source_full.search(folders=False, r=True).apply(lambda x: x.collapseuser()) if r and exists and is_dir else None
+        return Scout(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):   # ip=rsp.ip, op=rsp.op
         install_n_import("tabulate"); df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode))); print("\nSummary of operations performed:"); print(df.to_markdown())
         _ = print("\nAll operations completed successfully.\n") if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))) else print("\nSome operations failed. \n"); return df
 
 
 class Scheduler:
-    def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000, exception_handler: Optional[Callable[[Exception, str, 'Scheduler'], Any]] = None, logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None):
+    def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000, exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'Scheduler'], Any]] = None, logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None):
         self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
@@ -346,7 +401,7 @@ class Scheduler:
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self)  # that's probably the only kind of exception that can rise during sleep.
         else: _ = self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
-    def get_records_df(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(sched=self).keys()))
+    def get_records_df(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(self).keys()))
     def record_session_end(self, reason: str = "Not passed to function."):
         end_time = datetime.now()
         duration = end_time - self.sess_start_time
@@ -357,7 +412,7 @@ class Scheduler:
         assert isinstance(tmp, str)
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df()))
         return self
-    def default_exception_handler(self, ex: BaseException, during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
+    def default_exception_handler(self, ex: Union[BaseException, InterruptedError], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
         self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 

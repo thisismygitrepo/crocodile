@@ -320,7 +320,10 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                 return str(res) if return_str else str(self)
 
     @staticmethod
-    def concat_values(*dicts: dict[Any, Any], orient: str = 'List[Any]') -> 'Struct': return Struct(__import__("pandas").concat(List(dicts).apply(lambda x: Struct(x).to_dataframe())).to_dict(orient=orient))
+    def concat_values(*dicts: dict[Any, Any], orient: str = 'list') -> 'Struct':
+        import pandas as pd
+        assert orient in ["dict", "list", "series", "split", "tight", "index"]
+        return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe()).list).to_dict(orient=orient))  # type: ignore
     def plot(self, use_plt: bool = True, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
         if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
         else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel); return artist
