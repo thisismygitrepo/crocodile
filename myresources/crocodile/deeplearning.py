@@ -574,12 +574,13 @@ class BaseModel(ABC):
         except TypeError as te:
             raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
+        # sample_dataset = True
         if ip is None:
             if sample_dataset:
                 ip, _, _ = self.data.sample_dataset()
             else:
                 ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
-        op = self.model(inputs=ip[0] if len(ip) == 1 else ip)
+        op = self.model(ip[0] if len(self.data.specs.ip_names) == 1 else ip)
         ops = op
         ips = ip
         # ops = [op] if len(keys_op) == 1 else op
