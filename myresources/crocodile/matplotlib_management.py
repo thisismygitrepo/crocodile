@@ -8,10 +8,14 @@ from crocodile.meta import Terminal
 from crocodile.msc.odds import Cycle
 
 import matplotlib.pyplot as plt
+# import matplotlib
 from matplotlib.backend_bases import Event
 from matplotlib import widgets
-import matplotlib.colors as mcolors
-from matplotlib.colors import CSS4_COLORS
+from matplotlib.ticker import MultipleLocator
+import matplotlib.colors as mcolors  # type: ignore # noqa 
+from matplotlib.colors import CSS4_COLORS  # type: ignore
+from matplotlib.image import AxesImage
+# from matplotlib.colorbar import vi
 from matplotlib import animation
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
@@ -22,7 +26,7 @@ import numpy.typing as npt
 import enum
 import subprocess
 import platform
-from typing import Any, Optional, Literal, TypeAlias, Callable, Union  # , Union
+from typing import Any, Optional, Literal, TypeAlias, Callable, Union, Type  # , Union
 
 
 _ = install_n_import, PLike
@@ -31,6 +35,7 @@ _ = install_n_import, PLike
 
 STREAM: TypeAlias = Literal['clear', 'accumulate', 'update']
 SAVE_TYPE: TypeAlias = Literal['MPEGPipeBased', 'MPEGFileBased', 'GIFFileBased', 'GIFPipeBased']
+PLT_CMAPS: list[str] = plt.colormaps()  # type: ignore
 
 
 class FigurePolicy(enum.Enum):
@@ -256,16 +261,17 @@ class NullAuto(GenericAuto):
 # q = Colormap()
 # mcolors.
 
+
 class FigureManager:  # use as base class for Artist & Viewers to give it free animation powers.
     def __init__(self, info_loc: Optional[tuple[float, float]] = None, figpolicy: FigurePolicy = FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig: Optional[Figure] = None
         self.ax: Optional[list[Axes]] = None
         self.event: Optional[Event] = None
-        self.cmaps = Cycle(plt.colormaps())
-        self.colors = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-        self.mcolors = list(CSS4_COLORS.keys())
-        self.facecolor = Cycle(list(CSS4_COLORS.values()))
+        self.cmaps: Cycle[str] = Cycle(PLT_CMAPS)
+        self.colors: Cycle[str] = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+        self.mcolors: list[str] = list(CSS4_COLORS.keys())
+        self.facecolor: Cycle[str] = Cycle(list(CSS4_COLORS.values()))
         self.cmaps.set_value('viridis')
         self.idx_cycle = Cycle([])
         self.pause: bool = False  # animation
@@ -314,28 +320,39 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def toggle_annotate(self, event: Any):
         self.annot_flag = not self.annot_flag
         if event.inaxes and event.inaxes.imageevent.inaxes.images[0].set_picker(True): self.message = f"Annotation flag is toggled to {self.annot_flag}"
-    def annotate(self, event: Any, axis: Optional[Axes] = None, data: Optional[list[Any]] = None):
-        self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
-        if not ax: return None
-        if not hasattr(ax, 'annot_obj'): ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
-                                                                    va="bottom", ha="left", fontsize=10, bbox=dict(boxstyle="round", fc="w"), )
-        else: ax.annot_obj.set_visible(self.annot_flag)
-        x, y = int(np.round(e.xdata)), int(np.round(e.ydata))
-        z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
-        ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}'); ax.annot_obj.xy = (x, y); self.fig.canvas.draw_idle()
+    # def annotate(self, event: Any, axis: Optional[Axes] = None, data: Optional[list[Any]] = None):
+    #     self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
+    #     if not ax: return None
+    #     if not hasattr(ax, 'annot_obj'):
+    #         ax.annot_obj = ax.annotate("", xy=(0, 0), xytext=(-30, 30), textcoords="offset points", arrowprops=dict(arrowstyle="->", color="w", connectionstyle="arc3"),
+    #                                    va="bottom", ha="left", fontsize=10, bbox=dict(boxstyle="round", fc="w"), )
+    #     else: ax.annot_obj.set_visible(self.annot_flag)
+    #     x, y = int(np.round(e.xdata)), int(np.round(e.ydata))
+    #     z = e.inaxes.images[0].get_array()[y, x] if data is None else data[y, x]
+    #     ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}')
+    #     ax.annot_obj.xy = (x, y)
+    #     self.fig.canvas.draw_idle()
     def save(self, event: Any): _ = event; Save.pickle(path=P.tmpfile(name="figure_manager"), obj=self)
     def replay(self, event: Any): _ = event; self.pause = False; self.idx_cycle.set_index(0); self.message = 'Replaying'; self.animate()
     def pause_func(self, event: Any): _ = event; self.pause = not self.pause; self.message = f'Pause flag is set to {self.pause}'; self.animate()
     def previous(self, event: Any): _ = event; self.idx_cycle.previous(); self.message = f'Previous {self.idx_cycle}'; self.animate()
     def next(self, event: Any): _ = event; self.idx_cycle.next(); self.message = f'Next {self.idx_cycle}'; self.animate()
     def text_info(self, event: Any): _ = event; self.message = ''
-    def change_facecolor(self, event: Any): self.fig.set_facecolor(self.facecolor.next() if event.key == '>' else self.facecolor.previous()); self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
+    def change_facecolor(self, event: Any):
+        assert self.fig is not None, "Figure is not defined yet."
+        if event.key == '>': tmp = self.facecolor.next()
+        else: tmp = self.facecolor.previous()
+        self.fig.set_facecolor(tmp)
+        self.message = f"Figure facecolor was set to {self.mcolors[self.facecolor.get_index()]}"
     def adjust_brightness(self, event: Any):
         ax, message = event.inaxes, "None"
         if ax is None or not ax.images: return None
         if event.key == '\\':
             self.auto_brightness = not self.auto_brightness; message = f"Auto-brightness flag is toggled to {self.auto_brightness}"
-            if self.auto_brightness: im = self.ax[0].images[0]; im.norm.autoscale(im.get_array())  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
+            if self.auto_brightness:
+                if self.ax is not None:
+                    im = self.ax[0].images[0]
+                    im.norm.autoscale(im.get_array())  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
         vmin, vmax = ax.images[0].get_clim()
         if event.key in '-_': message = 'increase vmin'; vmin += 1
         elif event.key in '[{': message = 'decrease vmin'; vmin -= 1
@@ -346,7 +363,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
             [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
         else: ax.images[0].set_clim((vmin, vmax)) if ax.images else None
     def change_cmap(self, event: Any):
-        if ax := event.inaxes is not None:
+        ax = event.inaxes
+        if ax is not None:
             assert self.fig is not None, "Figure is not defined yet."
             cmap = self.cmaps.next() if event.key in 'tT' else self.cmaps.previous()
             [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axes] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
@@ -376,27 +394,30 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         assert self.fig is not None, "Figure is not defined yet."
         self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
     @staticmethod
-    def maximize_fig(): plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
-    def clear_axes(self):
+    def maximize_fig() -> None: plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
+    def clear_axes(self) -> None:
         if self.ax is not None: [ax.cla() for ax in self.ax]
-    def transperent_fig(self):
+    def transperent_fig(self) -> None:
         assert self.fig is not None, "Figure is not defined yet."
-        self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
+        self.fig.canvas.manager.window.attributes("-transparentcolor", "white")  # type: ignore
     def close(self): plt.close(self.fig)
     # ====================== axis helpers ========================
     @staticmethod
     def grid(ax: Axes, factor: int = 5, x_or_y: str = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
         ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
-        if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(plt.MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
-        if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(plt.MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
+        if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
+        if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
     @staticmethod
-    def set_ax_size(ax: Axes, w: float, h: float, units: str = 'inches'):
-        l, r, t, b, _ = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom, units
+    def set_ax_size(ax: Axes, w: float, h: float, units: Literal["inches", "pixels"] = 'inches'):
+        l, r, t, b = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom  # type: ignore
+        _ = units
         ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
     @staticmethod
-    def get_ax_size(ax: Axes, units: str = "inches"):
-        w, h = ax.figure.get_size_inches() if units == "inches" else ax.figure.get_size_pixels()
-        width, height = ax.figure.subplotpars.right - ax.figure.subplotpars.left, ax.figure.subplotpars.top - ax.figure.subplotpars.bottom
+    def get_ax_size(ax: Axes, units: Literal["inches", "pixels"] = "inches"):
+        w, h = ax.figure.get_size_inches()
+        if units == "pixels":
+            w, h = ax.figure.get_size_inches() * ax.figure.dpi
+        width, height = ax.figure.subplotpars.right - ax.figure.subplotpars.left, ax.figure.subplotpars.top - ax.figure.subplotpars.bottom  # type: ignore
         return w * width, h * height
     @staticmethod
     def toggle_ticks(an_ax: Axes, state: Optional[bool] = None): _ = [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
@@ -422,7 +443,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         else: raise ValueError("Both nrows and ncols are defined, which is not allowed.")
         return nrows_res, ncols_res
     @staticmethod
-    def findobj(figname: str, obj_name: str): return (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
+    def findobj(figname: str, obj_name: str): return plt.figure(num=figname).findobj(lambda x: x.get_label() == obj_name)
     @staticmethod
     def get_fig_static(figpolicy: FigurePolicy, figname: str = '', suffix: Optional[str] = None, **kwargs: Any):
         exist = True if figname in plt.get_figlabels() else False
@@ -436,12 +457,15 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         fig, ax = plt.subplots()
         y = np.sin(x := np.arange(0, 100, 0.01)) * 100
         ax.plot(x, y); ax.axis("square"); ax.set_xlim(0, 100); ax.set_ylim(-100, 100)
-        FigureManager.set_ax_to_real_life_size(ax); fig.savefig(P.tmp() / "trial.png", dpi=250)
+        FigureManager.set_ax_to_real_life_size(ax); fig.savefig(str(P.tmp() / "trial.png"), dpi=250)
     @staticmethod
     def write(txt: str, name: str = "text", size: int = 8, **kwargs: Any) -> Figure:
         fig = plt.figure(figsize=(11.69, 8.27), num=name)
         FigureManager.maximize_fig()
-        fig.clf(); fig.text(0.5, 0.5, txt, transform=fig.transFigure, size=size, ha="center", va='center', **kwargs); return fig
+        fig.clf()
+        # transform=fig.transFigure
+        fig.text(0.5, 0.5, txt, size=size, ha="center", va='center', **kwargs)
+        return fig
     @staticmethod
     def activate_latex(size: int = 20) -> None:
         plt.rc('xtick', labelsize=size); plt.rc('ytick', labelsize=size)
@@ -459,15 +483,19 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
 
 
 class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as opposed to saving.
-    artist = ['internal', 'external'][1]  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
+    # artist = ['internal', 'external'][1]  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
     parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
     stream = ['clear', 'accumulate', 'update'][1]  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
     """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`"""
     def __init__(self, fig: Figure):  # Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
         super().__init__()
         self.objs_repo: list[Any] = []  # list of lists of axes and texts.
-        self.fig = fig; self.connect(); self.idx_cycle = Cycle([])
-    def add(self, objs: Any): self.idx_cycle.expand(); self.objs_repo.append(objs); [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]; print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
+        self.fig = fig; self.connect(); self.idx_cycle = Cycle([0])
+    def add(self, objs: Any) -> None:
+        self.idx_cycle.expand(val=len(self.idx_cycle.list))
+        self.objs_repo.append(objs)
+        [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]
+        print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
     def animate(self):
         _ = [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]
         self.fig.canvas.draw()  # type: ignore
@@ -476,21 +504,60 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
 class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
     def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn', figpolicy: FigurePolicy = FigurePolicy.add_new, figsize: tuple[int, int] = (14, 8)):
         super().__init__(figpolicy=figpolicy)
-        self.style, self.title = style, title; self.line = self.cursor = self.check_b = None
+        self.style = style
+        self.title = title
+        self.line = None
+        self.cursor = None
+        self.check_b = None
         if ax is None:  # create a figure
-            with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
-        else: self.ax = ax; self.fig = ax.figure  # use the passed axis
-        self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
+            with plt.style.context(style=self.style):  # type: ignore
+                self.fig = self.get_fig(figname, figsize=figsize)
+                tmp = self.fig.subplots()
+                assert tmp is not None, "Subplots failed to create axes."
+                if isinstance(tmp, list): self.ax = tmp
+                else:
+                    self.ax = [tmp]
+        else:
+            self.ax = [ax]
+            self.fig: Figure = ax.figure  # use the passed axis
+        self.visibility_ax = [0.01, 0.05, 0.2, 0.15]
+        self.txt: list[str] = []
+        self.label: str = label
     def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any):
-        self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
+        assert self.ax is not None, "Axes is not defined yet."
+        for ax in self.ax:
+            self.line = ax.plot(*args, **kwargs)
+            ax.legend(legends or [])
+            ax.set_title(title) if title is not None else None
+            ax.grid(visible=True)
     def plot_dict(self, adict: dict[str, Any], title: str = '', xlabel: str = '', ylabel: str = ''):
-        [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); self.ax.set_title(title); self.ax.set_xlabel(xlabel); self.ax.set_ylabel(ylabel); return self
+        [self.plot(val, label=key) for key, val in adict.items()]
+        assert self.ax is not None, "Axes is not defined yet."
+        for ax in self.ax:
+            ax.legend()
+            ax.set_title(title)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+        return self
     def plot_twin(self, c1: Any, c2: Any, x: Optional[Any] = None, l1: str = '', l2: str = '', ax: Optional[Axes] = None):
-        ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
+        if ax is None:
+            if self.ax is not None:
+                ax = self.ax[0]
+            else: raise ValueError("No axes to plot on.")
+        else: raise ValueError("Not implemented yet.")
+        twin_ax = ax.twinx()
+        line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]
+        line2 = twin_ax.plot(c2, color="red", label=l2)[0]
+        twin_ax.legend([line1, line2], [l1, l2])
+        ax.set_ylabel(l1); twin_ax.set_ylabel(l2)
+        plt.show()
     def suptitle(self, title: str):
-        self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
-    def clear(self): self.fig.clf()  # objects that use this class will demand that the artist expose this method, in addition to .plot()
-    def axes(self): return [self.ax]  # objects that use this class will demand that the artist expose this method, in addition to .plot()
+        assert self.fig is not None, "Figure is not defined yet."
+        self.txt = [str(self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9))]
+    def clear(self):
+        assert self.fig is not None, "Figure is not defined yet."
+        self.fig.clf()  # objects that use this class will demand that the artist expose this method, in addition to .plot()
+    def axes(self): return self.ax  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     # def visibility(self):
     #     from matplotlib.widgets import CheckButtons
     #     self.fig.subplots_adjust(left=0.3); self.visibility_ax[-1] = 0.05 * len(self.ax.lines)
@@ -505,74 +572,90 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
     #         with plt.style.context(style=astyle): plot_gen(); plt.title(astyle); plt.pause(1); plt.cla()
 
 
-class VisibilityViewerAuto(VisibilityViewer):
-    artist = ['internal', 'external'][1]
-    parser = ['internal', 'external'][0]
-    stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist: Optional[Artist] = None, stream: STREAM = 'clear', save_type: Saver = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
-                 titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
-        """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
-        stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
-        self.data = data; self.artist = artist or Artist()
-        self.legends = [f"Plot {i}" for i in range(len(self.data))] if legends is None else legends; self.titles = titles if titles is not None else np.arange(len(self.data))
-        super().__init__(fig=self.artist.fig); _ = kwargs
-        self.saver = save_type(watch_figs=[self.artist.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay)
-        self.index_max, self.pause, self.stream, self.lables = len(self.data), pause, stream, x_labels
-    test = staticmethod(lambda: VisibilityViewerAuto(data=np.random.randn(10, 1, 10, 3)))
-    def animate(self):
-        for i in range(0, self.index_max):
-            self.artist.plot(*self.data[i], title=self.titles[i], legends=self.legends)  # replot the new data point on a new axis.
-            super().add(self.artist.axes()) if self.stream == 'accumulate' else self.artist.clear()
-            self.saver.add()
-            if self.pause: break
-            else: self.idx_cycle.set_index(i)
-        return self.saver.finish()  # arrived at last image and not in manual mode
+# class VisibilityViewerAuto(VisibilityViewer):
+#     # artist = ['internal', 'external'][1]
+#     parser = ['internal', 'external'][0]
+#     stream = ['clear', 'accumulate', 'update'][2]
+#     def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist: Optional[Artist] = None, stream: STREAM = 'clear', save_type: Type[Saver] = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
+#                  titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
+#         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
+#         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
+#         self.data = data
+#         self.artist: Artist = artist or Artist()
+#         self.legends = [f"Plot {i}" for i in range(len(self.data))] if legends is None else legends; self.titles = titles if titles is not None else np.arange(len(self.data))
+#         super().__init__(fig=self.artist.fig); _ = kwargs
+#         self.saver = save_type(watch_figs=[self.artist.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay)
+#         self.index_max, self.pause, self.stream, self.lables = len(self.data), pause, stream, x_labels
+#     test = staticmethod(lambda: VisibilityViewerAuto(data=np.random.randn(10, 1, 10, 3)))
+#     def animate(self):
+#         for i in range(0, self.index_max):
+#             self.artist.plot(*self.data[i], title=self.titles[i], legends=self.legends)  # replot the new data point on a new axis.
+#             super().add(self.artist.axes()) if self.stream == 'accumulate' else self.artist.clear()
+#             self.saver.add()
+#             if self.pause: break
+#             else: self.idx_cycle.set_index(i)
+#         return self.saver.finish()  # arrived at last image and not in manual mode
 
 
 class ImShow(FigureManager):
     artist = ['internal', 'external'][0]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, img_tensor: 'npt.NDArray[np.float64]', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[list[str]]] = None, save_type: Saver = Null, save_name: Optional[str] = None,
+    def __init__(self, img_tensor: 'npt.NDArray[np.float64]', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[list[str]]] = None, save_type: Type[Saver] = Null, save_name: Optional[str] = None,
                  save_dir: OPLike = None, save_kwargs: Optional[dict[str, Any]] = None,
-                 subplots_adjust: Any = None, gridspec: Any = None, tight: bool = True, info_loc: Optional[str] = None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax: Optional[Axes] = None,
+                 subplots_adjust: Any = None, gridspec: Any = None, tight: bool = True, info_loc: Optional[tuple[float, float]] = None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax: Optional[Axes] = None,
                  figsize: Optional[tuple[int, int]] = None, figname: str = 'im_show', auto_brightness: bool = True, delay: int = 200, pause: bool = False, **kwargs: Any):
         """
         :param img_tensor: size N x M x W x H [x C]  # M used spatially, N for animation.
         :param sup_titles: Titles for frames (N)
         :param sub_labels: M x N. If shape sent is M
         """
-        n, m = len(img_tensor), len(img_tensor[0]); self.m, self.n = m, n; super(ImShow, self).__init__(info_loc=info_loc)
+        n, m = len(img_tensor), len(img_tensor[0])
+        self.m, self.n = m, n
+        super(ImShow, self).__init__(info_loc=info_loc)
         nrows, ncols = self.get_nrows_ncols(m, nrows, ncols)
         self.img_tensor = img_tensor
         self.sub_labels = sub_labels if sub_labels is not None else [[f"{i}-{j}" for j in range(m)] for i in range(n)]
-        self.sup_titles = sup_titles if sup_titles is not None else np.arange(n)
+        self.sup_titles = sup_titles if sup_titles is not None else [str(item) for item in np.arange(n)]
         self.pause, self.kwargs, self.delay, self.auto_brightness = pause, kwargs, delay, auto_brightness
         self.fname = self.event = None
-        self.ims: list['npt.NDArray[np.float64]'] = []  # container for images.
-        self.cmaps = Cycle(plt.colormaps()); self.cmaps.set_value('viridis')
+        self.ims: list[AxesImage] = []  # container for images.
+        self.cmaps = Cycle(PLT_CMAPS); self.cmaps.set_value('viridis')
         if ax is None:
             self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white'); self.maximize_fig() if figsize is None else None
-            if gridspec is not None: gs = self.fig.add_gridspec(gridspec[0]); self.ax = [self.fig.add_subplot(gs[ags[0], ags[1]]) for ags in gs[1:]]
+            if gridspec is not None:
+                gs = self.fig.add_gridspec(gridspec[0])
+                self.ax = [self.fig.add_subplot(gs[ags[0], ags[1]]) for ags in gridspec[1:]]
             else: self.ax = self.fig.subplots(nrows=nrows, ncols=ncols)
-        else: self.ax = ax; self.fig = ax[0].figure if type(ax) is list else ax.figure
-        self.connect(); self.fig.canvas.mpl_connect("pick_event", self.annotate)
+        else:
+            self.ax = [ax]
+            self.fig = ax[0].figure if type(ax) is list else ax.figure
+        # if nrows == 1 and ncols == 1: pass
+        # else: self.ax = self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
+
+        self.connect()
+        # self.fig.canvas.mpl_connect("pick_event", self.annotate)
         self.fig.tight_layout() if tight else None; self.fig.subplots_adjust(**subplots_adjust) if subplots_adjust is not None else None
-        self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
-        self.ax = [self.ax] if nrows == 1 and ncols == 1 else self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
-        _ = [self.toggle_ticks(an_ax, state=False) for an_ax in self.ax]; self.idx_cycle = Cycle(max_idx=len(self.img_tensor))  # self.animate()
+        # self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
+        assert self.ax is not None, "Axes is not defined yet."
+        for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)
+        self.idx_cycle = Cycle([item for item in range(len(self.img_tensor))])  # self.animate()
     def animate(self):
         for i in range(self.idx_cycle.get_index(), self.n):
+            assert self.ax is not None, "Axes is not defined yet."
             for j, (an_image, a_label, an_ax) in enumerate(zip(self.img_tensor[i], self.sub_labels[i], self.ax)):  # with zipping, the shortest of the three, will stop the loop.
                 if i == 0 and self.ims.__len__() < self.m: self.ims.append(an_ax.imshow(an_image, animated=True, **self.kwargs))
                 else: self.ims[j].set_data(an_image)
                 if self.auto_brightness: self.ims[j].norm.autoscale(an_image)
                 an_ax.set_xlabel(f'{a_label}')
             assert isinstance(self.fig, Figure)
-            self.fig.suptitle(self.sup_titles[i], fontsize=8); self.saver.add(names=[self.sup_titles[i]])
+            self.fig.suptitle(self.sup_titles[i], fontsize=8)
+            # self.saver.add(names=[self.sup_titles[i]])
             if self.pause: break
             else: self.idx_cycle.set_index(i)
-        if self.idx_cycle.get_index() == self.n - 1 and not self.pause: self.fname = self.saver.finish()  # arrived at last image and not in manual mode
+        if self.idx_cycle.get_index() == self.n - 1 and not self.pause:
+            # self.fname = self.saver.finish()  # arrived at last image and not in manual mode
+            pass
     # @staticmethod
     # def try_cmaps(im: 'npt.NDArray[np.float64]', nrows: int = 3, ncols: int = 7, **kwargs: Any):
     #      _ = ImShow(*np.array_split([plt.get_cmap(style)(im) for style in plt.colormaps()], nrows * ncols), nrows=nrows, ncols=ncols,

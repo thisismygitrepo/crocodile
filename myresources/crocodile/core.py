@@ -123,7 +123,7 @@ class Base(object):
         _ = __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
 
 
-T = TypeVar('T',)
+T = TypeVar('T')
 T2 = TypeVar('T2')
 T3 = TypeVar('T3')
 
@@ -324,9 +324,16 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         import pandas as pd
         assert orient in ["dict", "list", "series", "split", "tight", "index"]
         return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe()).list).to_dict(orient=orient))  # type: ignore
-    def plot(self, use_plt: bool = True, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
-        if not use_plt: fig = __import__("crocodile.plotly_management").px.line(self.__dict__); fig.show(); return fig
-        else: artist = __import__("crocodile").matplotlib_management.Artist(figname='Structure Plot', **kwargs); artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel); return artist
+    def plot_plt(self, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
+        from crocodile.matplotlib_management import Artist
+        artist = Artist(figname='Structure Plot', **kwargs)
+        artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel)
+        return artist
+    def plot_plotly(self):
+        from crocodile.plotly_management import px
+        fig = px.line(self.__dict__)
+        fig.show()
+        return fig
 
 
 def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None:

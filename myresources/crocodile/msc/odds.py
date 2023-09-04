@@ -6,7 +6,7 @@ from crocodile.file_management import P, install_n_import
 from crocodile.core import List
 # from crocodile.meta import Scheduler, Log
 # import time
-from typing import Optional, Any, Callable
+from typing import Optional, Any, Callable, TypeVar, Generic
 
 
 def share(path: P):
@@ -47,29 +47,26 @@ def profile_memory(command: str):
     print(f"Memory used = {(after.used - before.used) / 1e6}")
 
 
-class Cycle:
-    def __init__(self, iterable: Optional[list[Any]] = None, max_idx: Optional[int] = None):
-        if iterable is not None:
-            self.list = iterable
-            self.index, self.prev_index = 0, -1
-        else:
-            if max_idx is not None:
-                self.list = list(range(max_idx))
-                self.index, self.prev_index = 0, -1
-            else:
-                self.list = []
-                self.index, self.prev_index = -1, -2
-    def next(self): self.prev_index = self.index; self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index; return self.list[self.index]
-    def previous(self): self.prev_index = self.index; self.index -= 1; self.index = len(self.list) - 1 if self.index < 0 else self.index; return self.list[self.index]
-    def set_value(self, value: Any): self.prev_index = self.index; self.index = self.list.index(value)
-    def get_value(self): return self.list[self.index]
-    def get_index(self): return self.index
+T = TypeVar('T')
+
+
+class Cycle(Generic[T]):
+    def __init__(self, iterable: list[T]):
+        self.list = iterable
+        self.index, self.prev_index = 0, -1
+    def next(self) -> T: self.prev_index = self.index; self.index += 1; self.index = 0 if self.index >= len(self.list) else self.index; return self.list[self.index]
+    def previous(self) -> T: self.prev_index = self.index; self.index -= 1; self.index = len(self.list) - 1 if self.index < 0 else self.index; return self.list[self.index]
+    def set_value(self, value: T): self.prev_index = self.index; self.index = self.list.index(value)
+    def get_value(self) -> T: return self.list[self.index]
+    def get_index(self) -> int: return self.index
     def set_index(self, index: int): self.prev_index = self.index; self.index = index
-    def expand(self, val: Optional[Any] = None): self.list += (val if type(val) is list else (([self.list[-1] + 1]) if len(self.list) else [0]))
-    def __add__(self, other: 'Cycle'): pass  # see behviour of matplotlib cyclers.
+    def expand(self, val: T): self.list.append(val)
+    def __add__(self, other: 'Cycle[T]'): pass  # see behviour of matplotlib cyclers.
     def __repr__(self): return f"Cycler @ {self.index}: {self.list[self.index]}"
-class DictCycle(Cycle):
-    def __init__(self, strct: dict[str, Any]): super(DictCycle, self).__init__(iterable=list(strct.items())); self.keys = strct.keys()
+class DictCycle(Cycle[tuple[str, T]]):
+    def __init__(self, strct: dict[str, T]):
+        super(DictCycle, self).__init__(iterable=list(strct.items()))
+        self.keys = strct.keys()
     def set_key(self, key: Any): self.index = list(self.keys).index(key)
 
 

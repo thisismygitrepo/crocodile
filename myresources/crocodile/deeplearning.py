@@ -340,7 +340,7 @@ class BaseModel(ABC):
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
-            artist.fig.savefig(self.hp.save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True))
+            artist.fig.savefig(str(self.hp.save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)))
         return self
 
     def switch_to_sgd(self, epochs: int = 10):
@@ -395,7 +395,7 @@ class BaseModel(ABC):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         if hasattr(self.compiler.loss, "name"): y_label = self.compiler.loss.name
         else: y_label = self.compiler.loss.__name__
-        return res.plot(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
+        return res.plot_plt(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
 
     def infer(self, x: Any) -> 'npt.NDArray[np.float64]':
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
