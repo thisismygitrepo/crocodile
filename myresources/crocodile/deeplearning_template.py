@@ -4,9 +4,10 @@ dl template
 """
 
 import numpy as np
-import numpy.typing as npt
+# import numpy.typing as npt
 import crocodile.toolbox as tb
 import crocodile.deeplearning as dl
+from crocodile.deeplearning import EvaluationData
 import tensorflow as tf
 from dataclasses import field
 import matplotlib.pyplot as plt
@@ -56,13 +57,13 @@ class DataReader(dl.DataReader):
         _ = profile_df
         self.split_the_data(data_dict=self.dataset, populate_shapes=True)
 
-    def viz(self, y_pred: list['npt.NDArray[np.float64]'], y_true: list['npt.NDArray[np.float64]'], names: list[str], ax: Optional[Axes] = None, title: str = ""):
-        _ = names
+    def viz(self, eval_data: EvaluationData, ax: Optional[Axes] = None, title: str = ""):
+        # _ = names
         if ax is None: fig, ax = plt.subplots(figsize=(14, 10))
         else: fig = ax.get_figure()
-        x = np.arange(len(y_true))
-        ax.bar(x, y_true[0].squeeze(), label='y_true', width=0.4)
-        ax.bar(x + 0.4, y_pred[0].squeeze(), label='y_pred', width=0.4)
+        x = np.arange(len(eval_data.y_true[0]))
+        ax.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
+        ax.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
         ax.legend()
         ax.set_title(title or 'Predicted vs True')
         FigureManager.grid(ax)
@@ -94,9 +95,9 @@ def main():
     d.load_trianing_data()
     m = Model(hp, d)
     _fig, ax = plt.subplots(ncols=2)
-    _ = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]))
+    _res_before = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]))
     m.fit()
-    _ = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]))
+    _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]))
     m.save_class()
     return m
 

@@ -5,7 +5,7 @@ dl
 
 import crocodile.toolbox as tb
 from crocodile.file_management import P, Path
-from crocodile.matplotlib_management import ImShow, NullAuto
+from crocodile.matplotlib_management import ImShow
 # from matplotlib.pyplot import hist
 import numpy as np
 import numpy.typing as npt
@@ -34,13 +34,13 @@ class Specs:
 
 @dataclass
 class EvaluationData:
-    x: Any
-    y_pred: Any
+    x: list[Any]
+    y_pred: list[Any]
     y_pred_pp: Any
-    y_true: Any
-    y_true_pp: Any
+    y_true: list[Any]
+    y_true_pp: list[Any]
     names: list[str]
-    loss_df: Any
+    loss_df: Optional['pd.DataFrame']
 
 
 # %% ========================== DeepLearning Accessories =================================
@@ -258,9 +258,9 @@ class DataReader:
         if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
         else: self.plotter = ImShow(img_tensor=pred, sup_titles=names, labels=['Reconstruction', 'Ground Truth'], origin='lower', **kwargs)
 
-    def viz(self, *args: Any, **kwargs: Any):
+    def viz(self, eval_data: EvaluationData, **kwargs: Any):
         """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
-        _ = self, args, kwargs
+        _ = self, eval_data, kwargs
         return None
 
 
@@ -295,10 +295,10 @@ class BaseModel(ABC):
         self.model: Any = self.get_model()  # should be populated upon instantiation.
         self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
-        self.plotter = NullAuto
-        self.fig = None
-        self.kwargs = None
-        self.tmp = None
+        # self.plotter = NullAuto
+        # self.fig = None
+        # self.kwargs = None
+        # self.tmp = None
     def get_model(self):
         raise NotImplementedError
         # pass
@@ -377,8 +377,8 @@ class BaseModel(ABC):
         return self.data.postprocess(*args, **kwargs)
     def __call__(self, *args: Any, **kwargs: Any):
         return self.model(*args, **kwargs)
-    def viz(self, *args: Any, **kwargs: Any):
-        return self.data.viz(*args, **kwargs)
+    def viz(self, eval_data: EvaluationData, **kwargs: Any):
+        return self.data.viz(eval_data, **kwargs)
     def save_model(self, directory: Union[str, Path, P]): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
     def save_weights(self, directory: Union[str, Path, P]):
         self.model.save_weights(P(directory).joinpath(self.model.name))  # TF: last part of path is file path.
@@ -436,18 +436,18 @@ class BaseModel(ABC):
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
+        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
+        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         # if loss_df is not None:
             # if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
             # else:
             #     for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
-        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
-        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
+        # loss_name = results.loss_df.columns.to_list()[0]  # first loss path
+        # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
+        # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
         results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
         if viz:
-            loss_name = results.loss_df.columns.to_list()[0]  # first loss path
-            loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
-            names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
-            self.fig = self.viz(y_pred_pp, y_true_pp, names=names, **(viz_kwargs or {}))
+            self.fig = self.viz(results, **(viz_kwargs or {}))
         return results
 
     def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> Optional[pd.DataFrame]:
