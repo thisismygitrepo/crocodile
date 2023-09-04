@@ -9,11 +9,12 @@ import time
 import logging
 import subprocess
 import sys
-from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO
+from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO, TypeAlias, Literal
 from dataclasses import dataclass
 
 
 _ = IO, TextIO
+SHELLS: TypeAlias = Literal["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
 
 
 @dataclass
@@ -147,7 +148,6 @@ class Response:
 
 class Terminal:
     def __init__(self, stdout: Optional[int] = subprocess.PIPE, stderr: Optional[int] = subprocess.PIPE, stdin: Optional[int] = subprocess.PIPE, elevated: bool = False):
-        self.available_consoles = ["cmd", "Command Prompt", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
         self.machine: str = __import__("platform").system()
         self.elevated: bool = elevated
         self.stdout = stdout
@@ -187,7 +187,7 @@ class Terminal:
         if self.machine == "Windows": my_list = [new_window_cmd, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
-    def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, delete: bool = False, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
+    def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
         script = ((Terminal.get_header(wdir=wdir) if header else "") + script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", py_script.absolute().as_uri())
@@ -380,15 +380,17 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
 
 
 class Scheduler:
-    def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000, exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'Scheduler'], Any]] = None, logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None):
+    def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000,
+                 exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'Scheduler'], Any]] = None,
+                 logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None):
         self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
         self.exception_handler = exception_handler if exception_handler is not None else self.default_exception_handler
         self.sess_start_time = datetime.now()  # to be reset at .run
         self.records = List([])
-        self.cycle = 0
-        self.max_cycles = max_cycles
+        self.cycle: int = 0
+        self.max_cycles: int = max_cycles
         self.sess_stats = sess_stats or (lambda _sched: {})
     def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01"):
         self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
@@ -399,8 +401,8 @@ class Scheduler:
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self)  # that's probably the only kind of exception that can rise during sleep.
-        else: _ = self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})"); return self
+            except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self); return  # that's probably the only kind of exception that can rise during sleep.
+        self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
     def get_records_df(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(self).keys()))
     def record_session_end(self, reason: str = "Not passed to function."):
         end_time = datetime.now()
@@ -412,7 +414,7 @@ class Scheduler:
         assert isinstance(tmp, str)
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df()))
         return self
-    def default_exception_handler(self, ex: Union[BaseException, InterruptedError], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
+    def default_exception_handler(self, ex: Union[Exception, InterruptedError], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
         self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
@@ -425,7 +427,7 @@ class Scheduler:
 #         if handle is not None: return handle(ex, **kwargs)
 #         return run() if run is not None else return_
 def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_code: bool = True, verbose: bool = True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
-    text = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
+    text: str = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
     obj_path = P(__import__('inspect').getfile(obj)) if obj is not None else None
     path = P(path)
     if obj_path is not None:
