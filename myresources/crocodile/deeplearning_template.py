@@ -5,13 +5,13 @@ dl template
 
 import numpy as np
 # import numpy.typing as npt
+import matplotlib.pyplot as plt
 import crocodile.toolbox as tb
 import crocodile.deeplearning as dl
 from crocodile.deeplearning import EvaluationData
+from crocodile.matplotlib_management import FigureManager, Axes
 import tensorflow as tf
 from dataclasses import field
-import matplotlib.pyplot as plt
-from crocodile.matplotlib_management import FigureManager, Axes
 from typing import Optional, Any
 
 

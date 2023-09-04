@@ -420,7 +420,7 @@ class BaseModel(ABC):
 
     def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None, y_test: Optional[list['npt.NDArray[np.float64]']] = None, names_test: Optional[list[str]] = None,
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
-                 split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
+                 split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None and x_test is not None:
@@ -432,8 +432,8 @@ class BaseModel(ABC):
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
-        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
-        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
+        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction")
+        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth")
         # if loss_df is not None:
             # if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
             # else:
@@ -599,7 +599,8 @@ class BaseModel(ABC):
             else:
                 ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
         op = self.model(ip[0] if len(self.data.specs.ip_names) == 1 else ip)
-        ops = op
+        if not isinstance(op, list): ops = [op]
+        else: ops = op
         ips = ip
         # ops = [op] if len(keys_op) == 1 else op
         # ips = [ip] if len(keys_ip) == 1 else ip
@@ -679,7 +680,7 @@ class Ensemble(tb.Base):
                 self.models[i].hp.seed = np.random.randint(0, 1000)
                 self.data.split_the_data(data_dict=data_dict, populate_shapes=populate_shapes)  # shuffle data (shared among models)
             self.models[i].fit(**kwargs)
-            self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
+            self.performance.append(self.models[i].evaluate(aslice=slice(0, -1), viz=False))
             if save:
                 self.models[i].save_class()
                 tb.Save.vanilla_pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")

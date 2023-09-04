@@ -2,7 +2,7 @@
 """plots
 """
 
-from crocodile.core import List, timestamp, Save, install_n_import, validate_name
+from crocodile.core import timestamp, Save, install_n_import, validate_name
 from crocodile.file_management import P, OPLike, PLike
 from crocodile.meta import Terminal
 from crocodile.msc.odds import Cycle
@@ -257,7 +257,7 @@ class NullAuto(GenericAuto):
 # mcolors.
 
 class FigureManager:  # use as base class for Artist & Viewers to give it free animation powers.
-    def __init__(self, info_loc: Optional[str] = None, figpolicy: FigurePolicy = FigurePolicy.same):
+    def __init__(self, info_loc: Optional[tuple[float, float]] = None, figpolicy: FigurePolicy = FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig: Optional[Figure] = None
         self.ax: Optional[list[Axes]] = None
@@ -283,7 +283,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
                           'aA': {'help': 'Show/Hide ticks and their labels', 'func': self.show_ticks},
                           'alt+a': {'help': 'Show/Hide annotations', 'func': self.toggle_annotate}}  # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before, otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
         self.auto_brightness, self.pix_vals = False, False; self.boundaries_flag, self.annot_flag = True, False
-        self.info_loc = [0.8, 0.01] if info_loc is None else info_loc
+        self.info_loc = (0.8, 0.01) if info_loc is None else info_loc
         self.message, self.message_obj, self.cursor = '', None, None
     def show_help(self, event: Any):
         default_plt = {"q ": {'help': "Quit Figure."},
@@ -370,12 +370,18 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         elif self.ax is not None: [self.toggle_ticks(ax) for ax in self.ax]
     # ====================== class methods ===============================
     def get_fig(self, figname: str = '', suffix: Optional[str] = None, **kwargs: Any): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
-    def update_info_text(self, message: str): self.message_obj.remove() if self.message_obj else None; self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
+    def update_info_text(self, message: str):
+        assert self.message_obj is not None, "Message object is not defined yet."
+        _ = self.message_obj.remove() if self.message_obj else None
+        assert self.fig is not None, "Figure is not defined yet."
+        self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
     @staticmethod
     def maximize_fig(): plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
     def clear_axes(self):
         if self.ax is not None: [ax.cla() for ax in self.ax]
-    def transperent_fig(self): self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
+    def transperent_fig(self):
+        assert self.fig is not None, "Figure is not defined yet."
+        self.fig.canvas.manager.window.attributes("-transparentcolor", "white")
     def close(self): plt.close(self.fig)
     # ====================== axis helpers ========================
     @staticmethod
@@ -403,13 +409,18 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         _ = [ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8) for (j, i), label in np.ndenumerate(ax.images[0].get_array()) if (xmin < i < xmax) and (ymin < j < ymax)]
     # ============================ matplotlib setup ==============================
     @staticmethod
-    def get_nrows_ncols(num_plots: int, nrows: Optional[int] = None, ncols: Optional[int] = None):
+    def get_nrows_ncols(num_plots: int, nrows: Optional[int] = None, ncols: Optional[int] = None) -> tuple[int, int]:
         if not nrows and not ncols:
-            nrows, ncols = int(np.floor(np.sqrt(num_plots))), int(np.ceil(np.sqrt(num_plots)))
-            while nrows * ncols < num_plots: ncols += 1
-        elif not ncols and nrows: ncols = int(np.ceil(num_plots / nrows))
-        elif not nrows and ncols: nrows = int(np.ceil(num_plots / ncols))
-        return nrows, ncols
+            nrows_res, ncols_res = int(np.floor(np.sqrt(num_plots))), int(np.ceil(np.sqrt(num_plots)))
+            while nrows_res * ncols_res < num_plots: ncols_res += 1
+        elif not ncols and nrows:
+            ncols_res = int(np.ceil(num_plots / nrows))
+            nrows_res = nrows
+        elif not nrows and ncols:
+            nrows_res = int(np.ceil(num_plots / ncols))
+            ncols_res = ncols
+        else: raise ValueError("Both nrows and ncols are defined, which is not allowed.")
+        return nrows_res, ncols_res
     @staticmethod
     def findobj(figname: str, obj_name: str): return (plt.figure(num=figname) if type(figname) is str else figname).findobj(lambda x: x.get_label() == obj_name)
     @staticmethod
@@ -421,18 +432,18 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
             _ = plt.close(figname) if exist else None
             return plt.figure(num=figname, **kwargs)
     @staticmethod
-    def try_figure_size():
+    def try_figure_size() -> None:
         fig, ax = plt.subplots()
         y = np.sin(x := np.arange(0, 100, 0.01)) * 100
         ax.plot(x, y); ax.axis("square"); ax.set_xlim(0, 100); ax.set_ylim(-100, 100)
         FigureManager.set_ax_to_real_life_size(ax); fig.savefig(P.tmp() / "trial.png", dpi=250)
     @staticmethod
-    def write(txt: str, name: str = "text", size: int = 8, **kwargs: Any):
+    def write(txt: str, name: str = "text", size: int = 8, **kwargs: Any) -> Figure:
         fig = plt.figure(figsize=(11.69, 8.27), num=name)
-        FigureManager.maximize_fig(fig)
+        FigureManager.maximize_fig()
         fig.clf(); fig.text(0.5, 0.5, txt, transform=fig.transFigure, size=size, ha="center", va='center', **kwargs); return fig
     @staticmethod
-    def activate_latex(size: int = 20):
+    def activate_latex(size: int = 20) -> None:
         plt.rc('xtick', labelsize=size); plt.rc('ytick', labelsize=size)
         plt.rc('axes', titlesize=size); plt.rc('legend', fontsize=size / 1.5)  # rc('text', usetex=True)
         plt.rcParams['text.usetex'] = True; plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
@@ -498,7 +509,7 @@ class VisibilityViewerAuto(VisibilityViewer):
     artist = ['internal', 'external'][1]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist=None, stream: STREAM = 'clear', save_type: Saver = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
+    def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist: Optional[Artist] = None, stream: STREAM = 'clear', save_type: Saver = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
                  titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
