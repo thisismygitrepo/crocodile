@@ -44,7 +44,7 @@ func_kwargs = manager.kwargs_path.readit()
 print("\n" * 2)
 console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
-console.print(f"Executing {tb.P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_rh} : {params.func_name}", style="bold blue")
+console.print(f"Executing {tb.P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_r} : {params.func_name}", style="bold blue")
 inspect(func_kwargs, value=False, title=f"kwargs from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
@@ -112,7 +112,7 @@ exec_times.print(title="Execution Times", as_config=True)
 print("\n" * 1)
 ssh_repr_remote = params.ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
 console.print(Panel(Text(f'''
-ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r 
+ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
 ''', style="bold blue on white"), title="Pull results with this line:", border_style="bold red"))
 
 

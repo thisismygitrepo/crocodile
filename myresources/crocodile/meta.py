@@ -205,7 +205,7 @@ class Terminal:
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
         run_string = "\nobj(**loaded_kwargs)\n" if run else "\n"
         if callable(func) and func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
-            tmp = sys.modules['__main__'].__file__  # type: ignore  # pylint: disable=E11-1
+            tmp = sys.modules['__main__'].__file__  # type: ignore  # pylint: disable=E1101
             assert isinstance(tmp, str), f"Cannot import a function from a module that is not a file. The module is: {tmp}"
             module = P(tmp).rel2cwd().stem if (module := func.__module__) == "__main__" else module
             load_func_string = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}"
@@ -265,14 +265,15 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
         self._local_distro: Optional[str] = None
         self._remote_distro: Optional[str] = None
-        self._remote_machine: Optional[str] = None
+        self._remote_machine: Optional[Literal['Windows', 'Linux']] = None
         self.terminal_responses: list[Response] = []
         self.platform = platform
         self.remote_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""  # works for both cmd and pwsh
     def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "tmate_sess", "port", "sshkey", "compress", "pwd", "ve"]}
     def __setstate__(self, state: dict[str, Any]): SSH(**state)
-    def get_remote_machine(self): self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
+    def get_remote_machine(self) -> Literal['Windows', 'Linux']:
+        self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
     def get_remote_distro(self):
         if self._remote_distro is None: self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""

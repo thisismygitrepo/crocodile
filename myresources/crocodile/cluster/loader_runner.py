@@ -9,7 +9,7 @@ import os
 from rich import inspect
 from rich.console import Console
 import time
-from typing import Optional, Callable, Union, Any
+from typing import Optional, Callable, Union, Any, Literal
 import pandas as pd
 
 
@@ -183,9 +183,10 @@ class EmailParams:
 
 class ResourceManager:
     running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running.pkl")
-    queue_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/queue.pkl")
+    queue_path   = tb.P(f"~/tmp_results/remote_machines/resource_manager/queue.pkl")
     history_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/history.pkl")
-    shell_script_path_log = rf"~/tmp_results/cluster/last_cluster_script.txt"
+    base_path    = tb.P(f"~/tmp_results/remote_machines/jobs")
+    shell_script_path_log = rf"~/tmp_results/remote_machines/resource_manager/last_cluster_script.txt"
 
     @staticmethod
     def from_pickle(path: Union[str, tb.P]):
@@ -194,7 +195,7 @@ class ResourceManager:
         return rm
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
-    def __init__(self, job_id: str, remote_machine_type: str, lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, tb.P, None] = None):
+    def __init__(self, job_id: str, remote_machine_type: Literal['Windows', 'Linux'], lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, tb.P, None] = None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.
@@ -207,14 +208,14 @@ class ResourceManager:
 
         self.submission_time = pd.Timestamp.now()
 
-        self.base = tb.P(base).collapseuser() if bool(base) else tb.P(f"~/tmp_results/remote_machines/jobs")
-        self.root_dir = self.base.joinpath(f"{self.job_id}")
+        self.base = tb.P(base).collapseuser() if bool(base) else ResourceManager.base_path
+        self.root_dir = self.base.joinpath(f"current/{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
         self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py")
         self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
-        self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.Struct.pkl")
+        self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.pkl")
         self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
