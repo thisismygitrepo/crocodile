@@ -21,7 +21,7 @@ class WorkloadParams:
     idx_start: int = 0
     idx_end: int = 1000
     idx_max: int = 1000
-    jobs: int = 3
+    jobs: int = 1
     job_id: int = 0
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
