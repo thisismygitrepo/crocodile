@@ -15,17 +15,17 @@ from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal
 import enum
 from tqdm import tqdm
 import copy
-from dataclasses import dataclass  # , field
+from dataclasses import dataclass, field
 
 
 @dataclass
 class Specs:
-    ip_shapes: list[tuple[int, ...]]
-    op_shapes: list[tuple[int, ...]]
-    other_shapes: list[tuple[int, ...]]
     ip_names: list[str]  # e.g.: ["x1", "x2"]
     op_names: list[str]  # e.g.: ["y1", "y2"]
-    other_names: list[str]  # e.g.: indices or names
+    other_names: list[str] = field(default_factory=list)  # e.g.: indices or names
+    ip_shapes: list[tuple[int, ...]] = field(default_factory=list)
+    op_shapes: list[tuple[int, ...]] = field(default_factory=list)
+    other_shapes: list[tuple[int, ...]] = field(default_factory=list)
     def get_all_strings(self): return self.ip_names + self.op_names + self.other_names
     def get_split_strings(self, strings: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
         keys_ip = [item + f"_{which_split}" for item in strings]
@@ -152,19 +152,40 @@ class DataReader:
     def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
     # def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
 
-    def split_the_data(self, *args: Any, **kwargs: Any) -> None:
-
+    def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
         # populating data specs ip / op shapes based on arguments sent to this method.
         strings = self.specs.get_all_strings()
-        assert len(strings) == len(args), f"Number of strings must match number of args. Got {len(strings)} strings and {len(args)} args."
-        for an_arg, key in zip(args, strings):
-            a_shape = an_arg.iloc[0].shape if type(an_arg) in {pd.DataFrame, pd.Series} else np.array(an_arg[0]).shape
-            if key in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
-            elif key in self.specs.op_names: self.specs.op_shapes.append(a_shape)
-            elif key in self.specs.other_names: self.specs.other_shapes.append(a_shape)
+        keys = list(data_dict.keys())
+        if len(strings) != len(keys) or set(keys) != set(strings):
+            tb.S(self.specs.__dict__).print(as_config=True, title="Specs Declared")
+            # tb.S(data_dict).print(as_config=True, title="Specs Declared")
+            print(f"data_dict keys: {keys}")
+            raise ValueError(f"Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
+
+        if populate_shapes:
+            delcared_ip_shapes = self.specs.ip_shapes
+            delcared_op_shapes = self.specs.op_shapes
+            delcared_other_shapes = self.specs.other_shapes
+            self.specs.ip_shapes = []
+            self.specs.op_shapes = []
+            self.specs.other_shapes = []
+            for data_name, data_value in data_dict.items():
+                a_shape = data_value.iloc[0].shape if type(data_value) in {pd.DataFrame, pd.Series} else np.array(data_value[0]).shape
+                if data_name in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
+                elif data_name in self.specs.op_names: self.specs.op_shapes.append(a_shape)
+                elif data_name in self.specs.other_names: self.specs.other_shapes.append(a_shape)
+            if delcared_ip_shapes != self.specs.ip_shapes or delcared_op_shapes != self.specs.op_shapes or delcared_other_shapes != self.specs.other_shapes:
+                print(f"Declared ip shapes: {delcared_ip_shapes}")
+                print(f"Declared op shapes: {delcared_op_shapes}")
+                print(f"Declared other shapes: {delcared_other_shapes}")
+                print(f"Populated ip shapes: {self.specs.ip_shapes}")
+                print(f"Populated op shapes: {self.specs.op_shapes}")
+                print(f"Populated other shapes: {self.specs.other_shapes}")
+                raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
 
         from sklearn.model_selection import train_test_split
-        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **kwargs)
+        args = [data_dict[item] for item in strings]
+        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **split_kwargs if split_kwargs is not None else {})
         self.split = {}  # dict(train_loader=None, test_loader=None)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
@@ -656,13 +677,13 @@ class Ensemble(tb.Base):
         tmp2 = tmp.apply(BaseModel.from_path)
         return list(tmp2)  # type: ignore
 
-    def fit(self, shuffle_train_test: bool = True, save: bool = True, **kwargs: Any):
+    def fit(self, data_dict: dict[str, Any], populate_shapes: bool, shuffle_train_test: bool = True, save: bool = True, **kwargs: Any):
         self.performance = []
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
             if shuffle_train_test:
                 self.models[i].hp.seed = np.random.randint(0, 1000)
-                self.data.split_the_data()  # shuffle data (shared among models)
+                self.data.split_the_data(data_dict=data_dict, populate_shapes=populate_shapes)  # shuffle data (shared among models)
             self.models[i].fit(**kwargs)
             self.performance.append(self.models[i].evaluate(idx=slice(0, -1), viz=False))
             if save:

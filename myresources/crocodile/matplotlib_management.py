@@ -267,7 +267,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.mcolors = list(CSS4_COLORS.keys())
         self.facecolor = Cycle(list(CSS4_COLORS.values()))
         self.cmaps.set_value('viridis')
-        self.idx_cycle = Cycle([]); self.pause = None  # animation
+        self.idx_cycle = Cycle([])
+        self.pause: bool = False  # animation
         self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
                           "/": {'help': 'Show/Hide info text', 'func': self.text_info},
                           "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
@@ -468,10 +469,14 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
             with plt.style.context(style=self.style): self.fig = self.get_fig(figname, figsize=figsize); self.ax = self.fig.subplots()
         else: self.ax = ax; self.fig = ax.figure  # use the passed axis
         self.visibility_ax, self.txt, self.label = [0.01, 0.05, 0.2, 0.15], [], label
-    def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any): self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
-    def plot_dict(self, adict, title: str = '', xlabel: str = '', ylabel: str = ''): [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); self.ax.set_title(title); self.ax.set_xlabel(xlabel); self.ax.set_ylabel(ylabel); return self
-    def plot_twin(self, c1, c2, x=None, l1: str = '', l2: str = '', ax: Optional[Axes] = None): ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
-    def suptitle(self, title: str): self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
+    def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any):
+        self.line = self.ax.plot(*args, **kwargs); self.ax.legend(legends or []); self.ax.set_title(title) if title is not None else None; self.ax.grid('on')
+    def plot_dict(self, adict: dict[str, Any], title: str = '', xlabel: str = '', ylabel: str = ''):
+        [self.plot(val, label=key) for key, val in adict.items()]; self.ax.legend(); self.ax.set_title(title); self.ax.set_xlabel(xlabel); self.ax.set_ylabel(ylabel); return self
+    def plot_twin(self, c1: Any, c2: Any, x: Optional[Any] = None, l1: str = '', l2: str = '', ax: Optional[Axes] = None):
+        ax = ax or self.ax; twin_ax = ax.twinx(); line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]; line2 = twin_ax.plot(c2, color="red", label=l2)[0]; twin_ax.legend([line1, line2], [l1, l2]); ax.set_ylabel(l1); twin_ax.set_ylabel(l2); plt.show()
+    def suptitle(self, title: str):
+        self.txt = [self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9)]
     def clear(self): self.fig.clf()  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     def axes(self): return [self.ax]  # objects that use this class will demand that the artist expose this method, in addition to .plot()
     # def visibility(self):
@@ -492,7 +497,7 @@ class VisibilityViewerAuto(VisibilityViewer):
     artist = ['internal', 'external'][1]
     parser = ['internal', 'external'][0]
     stream = ['clear', 'accumulate', 'update'][2]
-    def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist=None, stream: STREAM = 'clear', save_type = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
+    def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist=None, stream: STREAM = 'clear', save_type: Saver = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
                  titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
         stream: ensure that behaviour of artist is consistent with stream. When `cccumulate`, artist should create new axes whenever plot is called."""
