@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backend_bases import Event
 from matplotlib import widgets
 from matplotlib.ticker import MultipleLocator
-import matplotlib.colors as mcolors  # type: ignore # noqa 
-from matplotlib.colors import CSS4_COLORS  # type: ignore
+import matplotlib.colors as mcolors  # type: ignore # noqa # pylint: disable=unused-import
+from matplotlib.colors import CSS4_COLORS  # type: ignore # pylint: disable=unused-import
 from matplotlib.image import AxesImage
 # from matplotlib.colorbar import vi
 from matplotlib import animation

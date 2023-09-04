@@ -12,6 +12,7 @@ import time
 from typing import Optional, Callable, Union, Any
 import pandas as pd
 
+
 console = Console()
 
 
@@ -24,7 +25,7 @@ class WorkloadParams:
     job_id: int = 0
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
-    def split_to_jobs(self, jobs: Optional[int] = None):
+    def split_to_jobs(self, jobs: Optional[int] = None) -> tb.List['WorkloadParams']:
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
         return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
     def get_section_from_series(self, series: list[pd.Timestamp]):

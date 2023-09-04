@@ -403,7 +403,10 @@ class BaseModel(ABC):
         :param x:
         :return: prediction as numpy
         """
-        return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
+        # return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
+        # https://stackoverflow.com/questions/64199384/tf-keras-model-predict-results-in-memory-leak
+        # https://github.com/tensorflow/tensorflow/issues/44711
+        return self.model(x, training=False)
 
     def predict(self, x: Any, **kwargs: Any):
         """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
