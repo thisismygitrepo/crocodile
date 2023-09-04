@@ -21,7 +21,7 @@ class WorkloadParams:
     idx_start: int = 0
     idx_end: int = 1000
     idx_max: int = 1000
-    jobs: int = 1
+    jobs: int = 3
     job_id: int = 0
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
@@ -138,7 +138,7 @@ res = None  # in case the file did not define it.
 """
 
         if workload_params is not None and parallelize is False: base += f"""
-res = func(workload_params=workload_params, **func_kwargs.__dict__)
+res = func(workload_params=workload_params, **func_kwargs)
 """
         elif workload_params is not None and parallelize is True: base += f"""
 kwargs_workload = {list(workload_params.split_to_jobs().apply(lambda a_kwargs: a_kwargs.__dict__))}

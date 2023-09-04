@@ -205,7 +205,7 @@ class Terminal:
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
         run_string = "\nobj(**loaded_kwargs)\n" if run else "\n"
         if callable(func) and func.__name__ != func.__qualname__:  # it is a method of a class, must be instantiated first.
-            tmp = sys.modules['__main__'].__file__  # type: ignore
+            tmp = sys.modules['__main__'].__file__  # type: ignore  # pylint: disable=E11-1
             assert isinstance(tmp, str), f"Cannot import a function from a module that is not a file. The module is: {tmp}"
             module = P(tmp).rel2cwd().stem if (module := func.__module__) == "__main__" else module
             load_func_string = f"import {module} as m\ninst=m.{func.__qualname__.split('.')[0]}()\nobj = inst.{func.__name__}"
@@ -414,7 +414,7 @@ class Scheduler:
         assert isinstance(tmp, str)
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df()))
         return self
-    def default_exception_handler(self, ex: Union[Exception, InterruptedError], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
+    def default_exception_handler(self, ex: Union[Exception, KeyboardInterrupt], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
         self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
 
