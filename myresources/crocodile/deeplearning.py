@@ -174,14 +174,15 @@ class DataReader:
                 if data_name in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
                 elif data_name in self.specs.op_names: self.specs.op_shapes.append(a_shape)
                 elif data_name in self.specs.other_names: self.specs.other_shapes.append(a_shape)
-            if delcared_ip_shapes != self.specs.ip_shapes or delcared_op_shapes != self.specs.op_shapes or delcared_other_shapes != self.specs.other_shapes:
-                print(f"Declared ip shapes: {delcared_ip_shapes}")
-                print(f"Declared op shapes: {delcared_op_shapes}")
-                print(f"Declared other shapes: {delcared_other_shapes}")
-                print(f"Populated ip shapes: {self.specs.ip_shapes}")
-                print(f"Populated op shapes: {self.specs.op_shapes}")
-                print(f"Populated other shapes: {self.specs.other_shapes}")
-                raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
+            if len(delcared_ip_shapes) != 0 and len(delcared_op_shapes) != 0:
+                if delcared_ip_shapes != self.specs.ip_shapes or delcared_op_shapes != self.specs.op_shapes or delcared_other_shapes != self.specs.other_shapes:
+                    print(f"Declared ip shapes: {delcared_ip_shapes}")
+                    print(f"Declared op shapes: {delcared_op_shapes}")
+                    print(f"Declared other shapes: {delcared_other_shapes}")
+                    print(f"Populated ip shapes: {self.specs.ip_shapes}")
+                    print(f"Populated op shapes: {self.specs.op_shapes}")
+                    print(f"Populated other shapes: {self.specs.other_shapes}")
+                    raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
 
         from sklearn.model_selection import train_test_split
         args = [data_dict[item] for item in strings]
@@ -435,10 +436,10 @@ class BaseModel(ABC):
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
-        if loss_df is not None:
-            if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
-            else:
-                for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
+        # if loss_df is not None:
+            # if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
+            # else:
+            #     for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
         y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction", **kwargs)
         y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth", **kwargs)
         results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
