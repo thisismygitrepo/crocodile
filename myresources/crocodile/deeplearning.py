@@ -43,9 +43,6 @@ class EvaluationData:
     loss_df: Optional['pd.DataFrame']
 
 
-# %% ========================== DeepLearning Accessories =================================
-
-
 @dataclass
 class DeductionResult:
     input: 'npt.NDArray[np.float64]'
@@ -60,6 +57,11 @@ class Device(enum.Enum):
     cpu = 'cpu'
     two_gpus = '2gpus'
     auto = 'auto'
+
+
+SubclassedHParams = TypeVar("SubclassedHParams", bound='HParams')
+SubclassedDataReader = TypeVar("SubclassedDataReader", bound='DataReader')
+SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 
 @dataclass
@@ -104,9 +106,6 @@ class HParams:
         return __import__("tensorflow") if self.pkg_name == "tensorflow" else __import__("torch")
     @property
     def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
-
-
-SubclassedHParams = TypeVar("SubclassedHParams", bound=HParams)
 
 
 class DataReader:
@@ -262,9 +261,6 @@ class DataReader:
         """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
         _ = self, eval_data, kwargs
         return None
-
-
-SubclassedDataReader = TypeVar("SubclassedDataReader", bound=DataReader)
 
 
 @dataclass
@@ -548,8 +544,8 @@ class BaseModel(ABC):
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
-    @staticmethod
-    def from_path(path_model: Union[str, Path, P], **kwargs: Any):
+    @classmethod
+    def from_path(cls, path_model: Union[str, Path, P], **kwargs: Any) -> 'SubclassedBaseModel':  # type: ignore
         path_model = tb.P(path_model).expanduser().absolute()
         specs = tb.Read.json(path=path_model.joinpath('metadata/code_specs.json'))
         print(f"Loading up module: `{specs['__module__']}`.")
@@ -567,7 +563,7 @@ class BaseModel(ABC):
                 print(ex2)
                 print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
                 module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute().as_posix())
-        model_class: BaseModel = getattr(module, specs['model_class'])
+        model_class: SubclassedBaseModel = getattr(module, specs['model_class'])
         data_class: DataReader = getattr(module, specs['data_class'])
         hp_class: HParams = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
@@ -623,9 +619,6 @@ class BaseModel(ABC):
                 print(f"Could not do stats on outputs and inputs. Error: {ex}")
             print("Build Test Finished".center(50, '-'))
             print("\n")
-
-
-SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound=BaseModel)
 
 
 class Ensemble(tb.Base):

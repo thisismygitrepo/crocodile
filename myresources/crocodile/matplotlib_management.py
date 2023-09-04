@@ -342,12 +342,14 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         elif event.key in '=+': message = 'increase vmax'; vmax += 1
         elif event.key in ']}': message = 'decrease vmax'; vmax -= 1
         self.message = message + '  ' + str(round(vmin, 1)) + '  ' + str(round(vmax, 1))
-        if event.key in '_+}{': [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
+        if event.key in '_+}{' and self.fig is not None:
+            [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
         else: ax.images[0].set_clim((vmin, vmax)) if ax.images else None
     def change_cmap(self, event: Any):
         if ax := event.inaxes is not None:
+            assert self.fig is not None, "Figure is not defined yet."
             cmap = self.cmaps.next() if event.key in 'tT' else self.cmaps.previous()
-            [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axe] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
+            [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axes] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
             self.message = f"Color map changed to {ax.images[0].cmap.name}"
     def show_pix_val(self, event: Any):
         if (ax := event.inaxes) is not None:
@@ -365,7 +367,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def show_ticks(self, event: Any):
         self.boundaries_flag = not self.boundaries_flag
         if event.key == 'a' and (axis := event.inaxes): self.toggle_ticks(axis); self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
-        else: [self.toggle_ticks(ax) for ax in self.ax]
+        elif self.ax is not None: [self.toggle_ticks(ax) for ax in self.ax]
     # ====================== class methods ===============================
     def get_fig(self, figname: str = '', suffix: Optional[str] = None, **kwargs: Any): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
     def update_info_text(self, message: str): self.message_obj.remove() if self.message_obj else None; self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
@@ -378,7 +380,6 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     # ====================== axis helpers ========================
     @staticmethod
     def grid(ax: Axes, factor: int = 5, x_or_y: str = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
-        if type(ax) in {list, List, np.ndarray}: [FigureManager.grid(an_ax, factor=factor, x_or_y=x_or_y, color=color, alpha1=alpha1, alpha2=alpha2) for an_ax in ax]  # Turning on major grid for both axes.
         ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
         if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(plt.MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
         if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(plt.MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
