@@ -248,18 +248,18 @@ echo "Unlocked resources"
         sleep_time_mins = 10
         lock_status = 'locked'
         while lock_status == 'locked':
+
             try: running_file: list[JobStatus] = self.running_path.expanduser().readit()
             except FileNotFoundError:
                 print(f"Running file was deleted by the locking job, making one.")
                 running_file = []
                 tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
 
+            queue_file = self.add_to_queue(job_status=this_job)
+
             if len(running_file) < self.max_simulataneous_jobs:
-                # no need to join queue, just add to running file.
                 lock_status = 'unlocked'
                 break
-
-            queue_file = self.add_to_queue(job_status=this_job)
 
             # --------------- Clearning up queue_file from dead processes -----------------
             import psutil

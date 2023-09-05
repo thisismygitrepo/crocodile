@@ -221,42 +221,48 @@ class Terminal:
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
-    def __init__(self, username: Optional[str] = None, hostname: Optional[str] = None, host: Optional[str] = None, tmate_sess: Optional[str] = None, sshkey: Optional[str] = None, pwd: Optional[str] = None, port: int = 22, ve: Optional[str] = "ve", compress: bool = False):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
+    def __init__(self, host: Optional[str] = None, username: Optional[str] = None, hostname: Optional[str] = None, tmate_sess: Optional[str] = None, sshkey: Optional[str] = None, pwd: Optional[str] = None, port: int = 22, ve: Optional[str] = "ve", compress: bool = False):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
         self.tmate_sess = tmate_sess
         self.pwd = pwd
         self.ve = ve
         self.compress = compress  # Defaults: (1) use localhost if nothing provided.
 
-        self.host: Optional[str]
+        self.host: Optional[str] = None
         self.hostname: str
         self.username: str
         self.port: int = port
+        self.proxycommand: Optional[str] = None
         import platform
         import paramiko
-        username_ = username or str(__import__("getpass").getuser())
-        if "@" not in username_ and hostname is None:  # then, username is probably a Host profile
+        # username, hostname = __import__("getpass").getuser(), platform.node()
+        if isinstance(host, str):
             try:
                 import paramiko.config as pconfig
                 config = pconfig.SSHConfig.from_path(P.home().joinpath(".ssh/config").str)
-                config_dict = config.lookup(host or username_)
+                config_dict = config.lookup(host)
                 self.hostname = config_dict["hostname"]
                 self.username = config_dict["user"]
-                self.host = host or username_
+                self.host = host
                 self.port = int(config_dict.get("port", port))
                 sshkey = tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
                 self.proxycommand = config_dict.get("proxycommand", None)
                 if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("identityfile", sshkey)) is list else tmp
-            except (FileNotFoundError, KeyError): self.hostname, self.username, self.proxycommand = str(__import__("platform").node()), username_, None
-        else:
-            if "@" in username_: self.username, self.hostname = username_.split("@")
-            else:
-                assert hostname is not None, f"Hostname is not provided. It is required to create an SSH connection. Either pass it as a parameter or as part of the username. The username is: {username_}"
-                self.username, self.hostname = username_, hostname
+            except (FileNotFoundError, KeyError):
+                assert "@" in host or ":" in host, f"Host must be in the form of `username@hostname:port` or `username@hostname` or `hostname:port`, but it is: {host}"
+                if "@" in host: self.username, self.hostname = host.split("@")
+                else:
+                    self.username = username or __import__("getpass").getuser()
+                    self.hostname = host
+                if ":" in self.hostname:
+                    self.hostname, port_ = self.hostname.split(":")
+                    self.port = int(port_)
+        elif username is not None and hostname is not None:
+            self.username, self.hostname = username, hostname
             self.proxycommand = None
+        else:
+            print(f"Provided values: host={host}, username={username}, hostname={hostname}")
+            raise ValueError("Either host or username and hostname must be provided.")
 
-        if ":" in self.hostname:
-            self.hostname, port_ = self.hostname.split(":")
-            self.port = int(port_)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
         self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
