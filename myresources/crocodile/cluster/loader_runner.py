@@ -185,9 +185,9 @@ class EmailParams:
 
 
 class ResourceManager:
-    running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running.pkl")
-    queue_path   = tb.P(f"~/tmp_results/remote_machines/resource_manager/queue.pkl")
-    history_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/history.pkl")
+    running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running_jobs.pkl")
+    queue_path   = tb.P(f"~/tmp_results/remote_machines/resource_manager/queued_jobs.pkl")
+    history_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/history_jobs.pkl")
     base_path    = tb.P(f"~/tmp_results/remote_machines/jobs")
     shell_script_path_log = rf"~/tmp_results/remote_machines/resource_manager/last_cluster_script.txt"
 
@@ -222,18 +222,17 @@ class ResourceManager:
         self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
-    def add_to_queue(self):
+    def add_to_queue(self, job_status: JobStatus):
         try:
             queue_file: list[JobStatus] = self.queue_path.expanduser().readit()
         except FileNotFoundError:
             print(f"Queue file was deleted by the locking job, creating an empty one and saving it.")
             queue_file = []
             tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
-        
         job_ids = [job.job_id for job in queue_file]
         if self.job_id not in job_ids:
             print(f"Adding this job {self.job_id} to the queue and saving it. {len(queue_file)=}")
-            queue_file.append(JobStatus(job_id=self.job_id, submission_time=self.submission_time, pid=os.getpid(), status='locked'))
+            queue_file.append(job_status)
             tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         return queue_file
 
@@ -242,60 +241,46 @@ class ResourceManager:
 rm {self.running_path.collapseuser().as_posix()}
 echo "Unlocked resources"
 """
+
     def secure_resources(self):
         if self.lock_resources is False: return True
+        this_job = JobStatus(job_id=self.job_id, pid=os.getpid(), submission_time=self.submission_time, start_time=None, status='locked')
         sleep_time_mins = 10
-        # lock_file = None
         lock_status = 'locked'
         while lock_status == 'locked':
-            try:
-                running_file: list[JobStatus] = self.running_path.expanduser().readit()
+            try: running_file: list[JobStatus] = self.running_path.expanduser().readit()
             except FileNotFoundError:
+                print(f"Running file was deleted by the locking job, making one.")
                 running_file = []
-                print(f"Running file was deleted by the locking job, taking hold of it.")
                 tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
-                self.add_to_queue()
 
-            if len(running_file) < self.max_simulataneous_jobs: lock_status = 'unlocked'
-            else:
-                # all_running_job_ids = [job.job_id for job in running_file]
-                for a_job_status in running_file:
-                    # if job_id not in running_file.specs.keys():
-                    #     print(f"Job {job_id} is not in specs, removing it from the queue.")
-                    #     print(f"{running_file.specs=}")
-                    #     running_file.queue.remove(job_id)
-                    #     continue
-                    if a_job_status.status == 'unlocked':
-                        tb.S(a_job_status.__dict__).print(as_config=True, title="Old Lock File Details")
-                        lock_status = 'unlocked'
-                        break
-
-            queue_file = self.add_to_queue()
-            if lock_status == 'unlocked' and queue_file[0].job_id == self.job_id:
+            if len(running_file) < self.max_simulataneous_jobs:
+                # no need to join queue, just add to running file.
+                lock_status = 'unlocked'
                 break
+
+            queue_file = self.add_to_queue(job_status=this_job)
 
             # --------------- Clearning up queue_file from dead processes -----------------
             import psutil
-            next_job_in_queue = queue_file.queue[0]  # only consider the first job in the queue
-            try: _ = psutil.Process(queue_file.specs[next_job_in_queue].pid)
+            next_job_in_queue = queue_file[0]  # only consider the first job in the queue
+            try: _ = psutil.Process(next_job_in_queue.pid)
             except psutil.NoSuchProcess:
                 print(f"Next job in queue {next_job_in_queue} has no associated process, removing it from the queue.")
-                queue_file.queue.pop(0)
-                del queue_file.specs[next_job_in_queue]
+                queue_file.pop(0)
                 tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
                 continue
 
             # --------------- Clearning up running_file from dead processes -----------------
             found_dead_process = False
-            # specs = {}
-            for job_id in running_file.queue:
-                specs = running_file.specs[job_id]
-                try: proc = psutil.Process(pid=specs.pid)
+            assert len(running_file) > 0, f"Running file is empty. This should not happen. There should be a break before this point."
+
+            for running_job in running_file:
+                try: proc = psutil.Process(pid=running_job.pid)
                 except psutil.NoSuchProcess:
-                    print(f"Locking process with pid {specs.pid} is dead. Ignoring this lock file.")
-                    tb.S(specs.__dict__).print(as_config=True, title="Ignored Lock File Details")
-                    running_file.queue.remove(job_id)
-                    del running_file.specs[job_id]
+                    print(f"Locking process with pid {running_job.pid} is dead. Ignoring this lock file.")
+                    tb.S(running_job.__dict__).print(as_config=True, title="Ignored Lock File Details")
+                    running_file.remove(running_job)
                     tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
                     found_dead_process = True
                     continue  # for for loop
@@ -305,50 +290,55 @@ echo "Unlocked resources"
                 if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
                 # environ, memory_maps, 'io_counters'
                 attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {specs.pid})", docs=False, sort=False)
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {specs.pid})", docs=False, sort=False)
-            if found_dead_process: continue  # repeat while loop logic.
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)
 
-            this_specs = {f"Submission time": self.submission_time, f"Time now": pd.Timestamp.now(),
-                          f"Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - self.submission_time,
-                          f"Time consumed by locking job so far (job_id = {specs['job_id']}) so far ⏰": pd.Timestamp.now() - specs['start_time']}
-            tb.S(this_specs).print(as_config=True, title="This Job Details")
-            console.rule(title=f"Resources are locked by another job `{specs['job_id']}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
+            if found_dead_process: continue  # repeat while loop logic.
+            running_job = running_file[0]  # arbitrary job in the running file.
+            assert running_job.start_time is not None, f"Running job {running_job} has no start time. This should not happen."
+
+            this_specs = {f"Submission time": this_job.submission_time, f"Time now": pd.Timestamp.now(),
+                          f"Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - this_job.submission_time,
+                          f"Time consumed by locking job so far (job_id = {running_job.job_id}) so far ⏰": pd.Timestamp.now() - running_job.start_time}
+            tb.S(this_specs).print(as_config=True, title=f"This Job `{this_job.job_id}` Details")
+            console.rule(title=f"Resources are locked by another job `{running_job.job_id}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
             print("\n")
             time.sleep(sleep_time_mins * 60)
-        self.write_lock_file()
+        self.write_lock_file(job_status=this_job)
         console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
-    def write_lock_file(self):
-        specs = dict(status="locked", pid=os.getpid(),
-                     job_id=self.job_id,
-                     start_time=pd.Timestamp.now(),
-                     submission_time=self.submission_time)
+    def write_lock_file(self, job_status: JobStatus):
         queue_path = self.queue_path.expanduser()
-        assert queue_path.exists(), f"Queue file {queue_path} does not exist. This method should not be called in the first place."
-        queue_file: Lock = queue_path.readit()
-        next_job_id = queue_file.queue.pop(0)
-        assert next_job_id == self.job_id, f"Next job in the queue is {next_job_id} but this job is {self.job_id}. If that is the case, which it is, then this method should not be called in the first place."
-        del queue_file.specs[next_job_id]
+        try: queue_file: list[JobStatus] = queue_path.readit()
+        except FileNotFoundError as fne: raise FileNotFoundError(f"Queue file {queue_path} does not exist. This method should not be called in the first place.") from fne
+
+        if job_status in queue_file: queue_file.remove(job_status)
         print(f"Removed current job from waiting queue and added it to the running queue. Saving both files.")
         tb.Save.pickle(obj=queue_file, path=queue_path)
+
         running_path = self.running_path.expanduser()
-        if running_path.exists():
-            running_file: Lock = running_path.readit()
-        else:
-            running_file = Lock(queue=[], specs={})
-        assert len(running_file.queue) < self.max_simulataneous_jobs, f"Number of running jobs ({len(queue_file.queue)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
-        running_file.queue.append(self.job_id)
-        running_file.specs[self.job_id] = specs
+        try: running_file: list[JobStatus] = running_path.readit()
+        except FileNotFoundError as fne: raise FileNotFoundError(f"Queue file {running_path} does not exist. This method should not be called in the first place.") from fne
+
+        assert job_status not in running_file, f"Job status {job_status} is already in the running file. This should not happen."
+        assert len(running_file) < self.max_simulataneous_jobs, f"Number of running jobs ({len(running_file)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
+        running_file.append(job_status)
         tb.Save.pickle(obj=running_file, path=running_path)
 
     def unlock_resources(self):
         if self.lock_resources is False: return True
-        dat: Lock = self.running_path.expanduser().readit()
-        dat.queue.remove(self.job_id)
-        del dat.specs[self.job_id]
+        running_file: list[JobStatus] = self.running_path.expanduser().readit()
+        for job_status in running_file:
+            if job_status.job_id == self.job_id:
+                this_job = job_status
+                break
+        else:
+            print(f"Job {self.job_id} is not in the running file. This should not happen. The file is corrupt.")
+            this_job = None
+        if this_job is not None:
+            running_file.remove(this_job)
         console.print(f"Resources have been released by this job `{self.job_id}`. Saving new running file")
-        tb.Save.pickle(path=self.running_path.expanduser(), obj=dat)
+        tb.Save.pickle(path=self.running_path.expanduser(), obj=running_file)
         start_time = pd.to_datetime(self.execution_log_dir.expanduser().joinpath("start_time.txt").readit(), utc=False)
         end_time = pd.Timestamp.now()
         item = {"job_id": self.job_id, "start_time": start_time, "end_time": end_time, "submission_time": self.submission_time}
