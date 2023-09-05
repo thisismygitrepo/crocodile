@@ -123,4 +123,5 @@ if params.session_name != "":
 
 
 print(f"job {manager.job_id} is completed.")
+manager.root_dir.expanduser().joinpath("status.txt").write_text("completed")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")

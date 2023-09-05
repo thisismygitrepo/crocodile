@@ -17,20 +17,57 @@ from rich import inspect
 # from rich.text import Text
 from rich.console import Console
 import pandas as pd
+import getpass
+import random
 
 
 console = Console()
 
 
-JOB_STATUS: TypeAlias = Literal["current", "completed", "failed"]
+JOB_STATUS: TypeAlias = Literal["queued", "running", "completed", "failed"]
 
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
     cloud = "gdw"
+    @staticmethod
+    def claim_lock() -> Literal[True]:
+        path = CloudManager.base_path.expanduser().create()
+        try:
+            lock_path = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+        except AssertionError as _ae:
+            print(f"Lock doesn't exist on remote, uploading for the first time.")
+            path.joinpath("lock.txt").write_text(getpass.getuser()).to_cloud(cloud=CloudManager.cloud, rel2home=True)
+            return CloudManager.claim_lock()
 
-    # def upload_job_to_cloud(cloud: str = "gdw"):
-    #     pass
+        lock_data = lock_path.read_text()
+        if lock_data != "" and lock_data != getpass.getuser():
+            print(f"CloudManager: Lock already claimed by `{lock_data}`. 🤷‍♂️")
+            wait = int(random.random() * 30)
+            print(f"sleeping for {wait} seconds and trying again.")
+            time.sleep(wait)
+            return CloudManager.claim_lock()
+
+        print("No calims on lock, claiming it...")
+        path.joinpath("lock.txt").write_text(getpass.getuser()).to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        counter: int = 1
+        while counter < 4:
+            lock_path_tmp = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+            lock_data_tmp = lock_path_tmp.read_text()
+            if lock_data_tmp != getpass.getuser():
+                print(f"CloudManager: Lock already claimed by `{lock_data_tmp}`. 🤷‍♂️")
+                print("sleeping for 30 seconds and trying again.")
+                time.sleep(30)
+                return CloudManager.claim_lock()
+            counter += 1
+            print(f"Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter}")
+            time.sleep(10)
+        return True
+
+    @staticmethod
+    def release_lock() -> Literal[True]:
+        CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        return True
 
 
 @dataclass
@@ -190,6 +227,7 @@ deactivate
         self.resources.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         tb.Save.pickle(obj=self.kwargs, path=self.resources.kwargs_path.expanduser(), verbose=False)
         tb.Save.pickle(obj=self.resources.__getstate__(), path=self.resources.resource_manager_path.expanduser(), verbose=False)
+        self.resources.root_dir.expanduser().joinpath("status.txt").write_text("current=queued_or_running")
         print("\n")
         # self.show_scripts()
 

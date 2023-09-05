@@ -119,8 +119,8 @@ class Cluster:
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
 
-        self.thread_load_calc = thread_load_calc or ThreadLoadCalculator()
-        self.machine_load_calc = MachineLoadCalculator(load_criterion=LoadCriterion[self.thread_load_calc.load_criterion.name + "_norm"], )
+        self.thread_load_calc: ThreadLoadCalculator = thread_load_calc or ThreadLoadCalculator()
+        self.machine_load_calc: MachineLoadCalculator = MachineLoadCalculator(load_criterion=LoadCriterion[self.thread_load_calc.load_criterion.name + "_norm"], )
 
         sshz: list[tb.SSH] = []
         for an_ssh_params in ssh_params:
