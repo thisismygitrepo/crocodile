@@ -141,7 +141,9 @@ class GIFFileBased(GenericSave):
         self.fname = self.save_dir.joinpath(self.save_name + extension)
         assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
         self.writer.setup(fig=self.watch_figs[0], outfile=str(self.fname), dpi=dpi)
-    def _save(self, afig: str, aname: str, **kwargs: Any): self.writer.grab_frame(**kwargs)
+    def _save(self, afig: str, aname: str, **kwargs: Any) -> None:
+        _ = aname, afig
+        self.writer.grab_frame(**kwargs)
     def finish(self):
         print('Saving results ...')
         self.writer.finish()

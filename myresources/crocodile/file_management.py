@@ -456,7 +456,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return P(self.joinpath(folder).resolve() if rel2it else folder).expanduser().resolve() / name
     def checksum(self, kind: str = ["md5", "sha256"][1]): import hashlib; myhash = {"md5": hashlib.md5, "sha256": hashlib.sha256}[kind](); myhash.update(self.read_bytes()); return myhash.hexdigest()
     @staticmethod
-    def get_env(): return __import__("crocodile.environment").environment
+    def get_env():
+        import crocodile.environment as env
+        return env
     def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
     def share_on_network(self, username: OPLike = None, password: Optional[str] = None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + str(username)) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, text: bool = True, path: OPLike = None):
