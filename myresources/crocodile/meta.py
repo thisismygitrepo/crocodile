@@ -232,12 +232,17 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.username: str
         self.port: int = port
         import platform
+        import paramiko
         username_ = username or str(__import__("getpass").getuser())
         if "@" not in username_ and hostname is None:  # then, username is probably a Host profile
             try:
-                config = __import__("paramiko.config").config.SSHConfig.from_path(P.home().joinpath(".ssh/config").str)
+                import paramiko.config as pconfig
+                config = pconfig.SSHConfig.from_path(P.home().joinpath(".ssh/config").str)
                 config_dict = config.lookup(host or username_)
-                self.hostname, self.username, self.host, port = config_dict["hostname"], config_dict["user"], host or username_, config_dict.get("port", port)
+                self.hostname = config_dict["hostname"]
+                self.username = config_dict["user"]
+                self.host = host or username_
+                self.port = int(config_dict.get("port", port))
                 sshkey = tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
                 self.proxycommand = config_dict.get("proxycommand", None)
                 if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("identityfile", sshkey)) is list else tmp
@@ -249,12 +254,10 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 self.username, self.hostname = username_, hostname
             self.proxycommand = None
 
-        if isinstance(self.hostname, str):
-            if ":" in self.hostname:
-                self.hostname, port_ = self.hostname.split(":")
-                self.port = int(port_)
+        if ":" in self.hostname:
+            self.hostname, port_ = self.hostname.split(":")
+            self.port = int(port_)
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
-        import paramiko
         self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None

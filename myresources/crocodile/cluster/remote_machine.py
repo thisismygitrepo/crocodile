@@ -3,7 +3,7 @@
 """
 
 from pickle import PickleError
-from typing import Optional, Any, Union, Callable
+from typing import Optional, Any, Union, Callable, TypeAlias, Literal
 from dataclasses import dataclass, field
 import time
 import crocodile.toolbox as tb
@@ -20,6 +20,17 @@ import pandas as pd
 
 
 console = Console()
+
+
+JOB_STATUS: TypeAlias = Literal["current", "completed", "failed"]
+
+
+class CloudManager:
+    base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
+    cloud = "gdw"
+
+    # def upload_job_to_cloud(cloud: str = "gdw"):
+    #     pass
 
 
 @dataclass

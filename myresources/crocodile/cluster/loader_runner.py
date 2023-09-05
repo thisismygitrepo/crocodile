@@ -42,9 +42,12 @@ class WorkloadParams:
 
 
 @dataclass
-class Lock:
-    queue: list[str]
-    specs: dict[str, dict[str, Any]]
+class JobStatus:
+    pid: int
+    job_id: str
+    status: Literal['locked', 'unlocked']
+    submission_time: pd.Timestamp
+    start_time: Optional[pd.Timestamp] = None
 
 
 @dataclass
@@ -150,7 +153,7 @@ print("\\n" * 2)
 res = tb.L(workload_params).apply(lambda a_workload_params: func(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.jobs})
 """
         else: base += f"""
-res = func(**func_kwargs.__dict__)
+res = func(**func_kwargs)
 """
 
         if wrap_in_try_except:
@@ -221,15 +224,16 @@ class ResourceManager:
 
     def add_to_queue(self):
         try:
-            queue_file: Lock = self.queue_path.expanduser().readit()
+            queue_file: list[JobStatus] = self.queue_path.expanduser().readit()
         except FileNotFoundError:
             print(f"Queue file was deleted by the locking job, creating an empty one and saving it.")
-            queue_file = Lock(queue=[], specs={})
+            queue_file = []
             tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
-        if self.job_id not in queue_file.queue:
-            print(f"Adding this job {self.job_id} to the queue and saving it. {queue_file.queue}")
-            queue_file.queue.append(self.job_id)
-            queue_file.specs[self.job_id] = dict(submission_time=self.submission_time, pid=os.getpid())
+        
+        job_ids = [job.job_id for job in queue_file]
+        if self.job_id not in job_ids:
+            print(f"Adding this job {self.job_id} to the queue and saving it. {len(queue_file)=}")
+            queue_file.append(JobStatus(job_id=self.job_id, submission_time=self.submission_time, pid=os.getpid(), status='locked'))
             tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         return queue_file
 
@@ -245,35 +249,35 @@ echo "Unlocked resources"
         lock_status = 'locked'
         while lock_status == 'locked':
             try:
-                running_file: Lock = self.running_path.expanduser().readit()
-                # running_file: Lock
+                running_file: list[JobStatus] = self.running_path.expanduser().readit()
             except FileNotFoundError:
-                running_file = Lock(queue=[], specs={})
+                running_file = []
                 print(f"Running file was deleted by the locking job, taking hold of it.")
                 tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
                 self.add_to_queue()
 
-            if len(running_file.queue) < self.max_simulataneous_jobs: lock_status = 'unlocked'
+            if len(running_file) < self.max_simulataneous_jobs: lock_status = 'unlocked'
             else:
-                for job_id in running_file.queue:
-                    if job_id not in running_file.specs.keys():
-                        print(f"Job {job_id} is not in specs, removing it from the queue.")
-                        print(f"{running_file.specs=}")
-                        running_file.queue.remove(job_id)
-                        continue
-                    if running_file.specs[job_id]['status'] == 'unlocked':
-                        tb.S(running_file.specs[job_id]).print(as_config=True, title="Old Lock File Details")
+                # all_running_job_ids = [job.job_id for job in running_file]
+                for a_job_status in running_file:
+                    # if job_id not in running_file.specs.keys():
+                    #     print(f"Job {job_id} is not in specs, removing it from the queue.")
+                    #     print(f"{running_file.specs=}")
+                    #     running_file.queue.remove(job_id)
+                    #     continue
+                    if a_job_status.status == 'unlocked':
+                        tb.S(a_job_status.__dict__).print(as_config=True, title="Old Lock File Details")
                         lock_status = 'unlocked'
                         break
 
             queue_file = self.add_to_queue()
-            if lock_status == 'unlocked' and queue_file.queue[0] == self.job_id:
+            if lock_status == 'unlocked' and queue_file[0].job_id == self.job_id:
                 break
 
             # --------------- Clearning up queue_file from dead processes -----------------
             import psutil
             next_job_in_queue = queue_file.queue[0]  # only consider the first job in the queue
-            try: _ = psutil.Process(queue_file.specs[next_job_in_queue]['pid'])
+            try: _ = psutil.Process(queue_file.specs[next_job_in_queue].pid)
             except psutil.NoSuchProcess:
                 print(f"Next job in queue {next_job_in_queue} has no associated process, removing it from the queue.")
                 queue_file.queue.pop(0)
@@ -283,13 +287,13 @@ echo "Unlocked resources"
 
             # --------------- Clearning up running_file from dead processes -----------------
             found_dead_process = False
-            specs = {}
+            # specs = {}
             for job_id in running_file.queue:
                 specs = running_file.specs[job_id]
-                try: proc = psutil.Process(specs['pid'])
+                try: proc = psutil.Process(pid=specs.pid)
                 except psutil.NoSuchProcess:
-                    print(f"Locking process with pid {specs['pid']} is dead. Ignoring this lock file.")
-                    tb.S(specs).print(as_config=True, title="Ignored Lock File Details")
+                    print(f"Locking process with pid {specs.pid} is dead. Ignoring this lock file.")
+                    tb.S(specs.__dict__).print(as_config=True, title="Ignored Lock File Details")
                     running_file.queue.remove(job_id)
                     del running_file.specs[job_id]
                     tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
@@ -301,8 +305,8 @@ echo "Unlocked resources"
                 if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
                 # environ, memory_maps, 'io_counters'
                 attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {specs['pid']})", docs=False, sort=False)
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {specs['pid']})", docs=False, sort=False)
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {specs.pid})", docs=False, sort=False)
+                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {specs.pid})", docs=False, sort=False)
             if found_dead_process: continue  # repeat while loop logic.
 
             this_specs = {f"Submission time": self.submission_time, f"Time now": pd.Timestamp.now(),
