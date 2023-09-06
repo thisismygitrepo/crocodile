@@ -122,10 +122,11 @@ class DataReader:
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
     def __init__(self, hp: SubclassedHParams,  # type: ignore
                  specs: Optional[Specs] = None,
-                 split: Optional[dict[str, Union[None, 'npt.NDArray[np.float64]']]] = None) -> None:
+                 split: Optional[dict[str, Any]] = None) -> None:
+        # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'list[Any]', Tf.RaggedTensor etc.
         super().__init__()
         self.hp = hp
-        self.split = split
+        self.split = split if split is not None else {}
         self.plotter = None
         self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
         # self.df_handler = df_handler
