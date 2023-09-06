@@ -64,12 +64,14 @@ SubclassedDataReader = TypeVar("SubclassedDataReader", bound='DataReader')
 SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 
+PRECISON = Literal['float64', 'float32', 'float16']
+
 @dataclass
 class HParams:
     # ===================== Data ==============================
     seed: int
     shuffle: bool
-    precision: str
+    precision: PRECISON
     # ===================== Model =============================
     # depth = 3
     # ===================== Training ==========================
@@ -82,7 +84,7 @@ class HParams:
     root: tb.P  # = tb.P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
-    pkg_name: str = 'tensorflow'
+    pkg_name: Literal['tensorflow', 'torch'] = 'tensorflow'
     device_name: Device = Device.gpu0
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
@@ -446,7 +448,7 @@ class BaseModel(ABC):
         # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
         results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
         if viz:
-            self.fig = self.viz(results, **(viz_kwargs or {}))
+            self.viz(results, **(viz_kwargs or {}))
         return results
 
     def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> Optional[pd.DataFrame]:
