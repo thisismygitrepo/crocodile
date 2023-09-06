@@ -132,6 +132,7 @@ class DataFrameHander:
             if hasattr(self, att):
                 res[att] = getattr(self, att)
         return res
+
     def profile_dataframe(self, df: pd.DataFrame, path: tb.P, silent: bool = False, explorative: bool = True):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib

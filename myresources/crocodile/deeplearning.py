@@ -64,12 +64,14 @@ SubclassedDataReader = TypeVar("SubclassedDataReader", bound='DataReader')
 SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 
+PRECISON = Literal['float64', 'float32', 'float16']
+
 @dataclass
 class HParams:
     # ===================== Data ==============================
     seed: int
     shuffle: bool
-    precision: str
+    precision: PRECISON
     # ===================== Model =============================
     # depth = 3
     # ===================== Training ==========================
@@ -82,7 +84,7 @@ class HParams:
     root: tb.P  # = tb.P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
-    pkg_name: str = 'tensorflow'
+    pkg_name: Literal['tensorflow', 'torch'] = 'tensorflow'
     device_name: Device = Device.gpu0
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
@@ -110,20 +112,16 @@ class HParams:
 
 class DataReader:
     subpath = tb.P("metadata/data_reader")
-    """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
-    and postprocessing. The latter is essential at inference time_produced, but the former need not to be saved. As such,
-    at save time_produced, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
-    such type of data, make sure to keep them inside that `Struct`. Lastly, for convenience purpose, the class has
-    implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the
-    need to reference `.dataspects`.
+    """This class holds the dataset for training and testing.
     """
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
     def __init__(self, hp: SubclassedHParams,  # type: ignore
                  specs: Optional[Specs] = None,
-                 split: Optional[dict[str, Union[None, 'npt.NDArray[np.float64]']]] = None) -> None:
+                 split: Optional[dict[str, Any]] = None) -> None:
+        # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'list[Any]', Tf.RaggedTensor etc.
         super().__init__()
         self.hp = hp
-        self.split = split
+        self.split = split if split is not None else {}
         self.plotter = None
         self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
         # self.df_handler = df_handler
@@ -446,7 +444,7 @@ class BaseModel(ABC):
         # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
         results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
         if viz:
-            self.fig = self.viz(results, **(viz_kwargs or {}))
+            self.viz(results, **(viz_kwargs or {}))
         return results
 
     def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> Optional[pd.DataFrame]:
