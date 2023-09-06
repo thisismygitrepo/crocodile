@@ -50,14 +50,15 @@ CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
 
 class App:
     @staticmethod
-    def run(app: Any, debug: bool = False, random_port: bool = True):
+    def run(app: Any, debug: bool = False, random_port: bool = True, start_browser: bool = True, lan_share: bool = True):
         host = "localhost"  # 0.0.0.0"  #  "127.0.0.1"
         port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
-        try: tb.P(rf'http://{host}:{port}/')()
-        except Exception as ex:
-            print(ex)
-        app.run_server(debug=debug, port=port)  # , processes=2, threaded=False)
+        if start_browser:
+            try: tb.P(rf'http://{host}:{port}/')()
+            except Exception as ex:
+                print(ex)
+        app.run_server(debug=debug, port=port, host="0.0.0.0" if lan_share else "localhost")  # , processes=2, threaded=False)
 
     @staticmethod
     def get_app(name: str = ""):
