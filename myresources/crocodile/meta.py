@@ -38,7 +38,7 @@ class Null:
 
 
 class Log(logging.Logger):  #
-    def __init__(self, dialect: str = ["colorlog", "logging", "coloredlogs"][0], name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
+    def __init__(self, dialect: Literal["colorlog", "logging", "coloredlogs"] = "colorlog", name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
                  s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False,
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
@@ -59,7 +59,7 @@ class Log(logging.Logger):  #
         self.specs = dict(dialect=dialect, name=self.name, file=file, file_path=self.file_path, stream=bool(self.get_shandler()), fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # # this way of creating relative path makes transferrable across machines.
     def get_shandler(self): return List(handler for handler in self.handlers if "StreamHandler" in str(handler))
     def get_fhandler(self): return List(handler for handler in self.handlers if "FileHandler" in str(handler))
-    def set_level(self, level: int, which: str = ["logger", "stream", "file", "all"][0]):
+    def set_level(self, level: int, which: Literal["logger", "stream", "file", "all"] = "logger"):
         if which in {"logger", "all"}: self.setLevel(level)
         if which in {"stream", "all"}: self.get_shandler().setLevel(level)
         if which in {"file", "all"}: self.get_fhandler().setLevel(level)
@@ -156,7 +156,7 @@ class Terminal:
     # def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-    def run(self, *cmds: str, shell: Optional[str] = None, check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
+    def run(self, *cmds: str, shell: Optional[SHELLS] = None, check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.

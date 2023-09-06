@@ -112,12 +112,7 @@ class HParams:
 
 class DataReader:
     subpath = tb.P("metadata/data_reader")
-    """This class holds the dataset for training and testing. However, it also holds meta data for preprocessing
-    and postprocessing. The latter is essential at inference time_produced, but the former need not to be saved. As such,
-    at save time_produced, this class only remember the attributes inside `.specs` `Struct`. Thus, whenever encountering
-    such type of data, make sure to keep them inside that `Struct`. Lastly, for convenience purpose, the class has
-    implemented a fallback `getattr` method that allows accessing those attributes from the class data_only, without the
-    need to reference `.dataspects`.
+    """This class holds the dataset for training and testing.
     """
     def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
     def __init__(self, hp: SubclassedHParams,  # type: ignore

@@ -3,11 +3,14 @@
 """
 
 import crocodile.toolbox as tb
+from crocodile.meta import SHELLS
 import platform
 import getpass
 import os
 import sys
-from typing import Union
+from typing import Union, Literal
+from dataclasses import dataclass
+
 
 P = tb.P
 L = tb.L
@@ -148,7 +151,7 @@ class EnvVar:
 
 class PathVar:
     @staticmethod
-    def append_temporarily(dirs: list[str], kind: str = "append"):
+    def append_temporarily(dirs: list[str], kind: Literal['append', 'prefix', 'replace'] = "append"):
         dirs_ = []
         for path in dirs:
             path_rel = tb.P(path).collapseuser(strict=False)
@@ -170,7 +173,7 @@ class PathVar:
         return result  # if run is False else tm.run(result, shell="powershell")
 
     @staticmethod
-    def append_permanently(path: str, scope: str = ["User", "system"][0]):
+    def append_permanently(path: str, scope: Literal["User", "system"] = "User"):
         if system == "Windows":
             # AVOID THIS AND OPT TO SAVE IT IN $profile.
             a_tmp_path = tb.P.tmpfile(suffix=".path_backup")
@@ -184,7 +187,7 @@ class PathVar:
         else: tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
 
     @staticmethod
-    def set_permanetly(path: str, scope: str = ["User", "system"][0]):
+    def set_permanetly(path: str, scope: Literal["User", "system"] = "User"):
         """This is useful if path is manipulated with a text editor or Python string manipulation (not recommended programmatically even if original is backed up) and set the final value.
         On a windows machine, system and user variables are kept separately. env:Path returns the combination of both, starting from system then user.
         To see impact of change, you will need to restart the process from which the shell started. This is probably windows explorer.
@@ -201,21 +204,23 @@ class PathVar:
         if system == "Windows":
             result = fr'[System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'
             return result  # if run is False else tm.run(result, shell="powershell")
+        else: raise NotImplementedError
 
 
 # ============================== Shells =========================================
 
 
-def get_shell_profiles(shell: str):
+def get_shell_profiles(shell: SHELLS):
     # following this: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_profiles?view=powershell-7.2
     # https://devblogs.microsoft.com/scripting/understanding-the-six-powershell-profiles/
     # Dynmaically obtained:
-    return tb.Struct(
-        CurrentUserCurrentHost=tm.run("$PROFILE.CurrentUserCurrentHost", shell=shell).op2path(),
-        CurrentUserAllHosts=tm.run("$PROFILE.CurrentUserAllHosts", shell=shell).op2path(),
-        AllUsersCurrentHost=tm.run("$PROFILE.AllUsersCurrentHost", shell=shell).op2path(),
-        AllUsersAllHosts=tm.run("$PROFILE.AllUsersAllHosts", shell=shell).op2path(),
-    )
+    @dataclass
+    class ShellProfile:
+        CurrentUserCurrentHost = tm.run("$PROFILE.CurrentUserCurrentHost", shell=shell).op2path()
+        CurrentUserAllHosts = tm.run("$PROFILE.CurrentUserAllHosts", shell=shell).op2path()
+        AllUsersCurrentHost = tm.run("$PROFILE.AllUsersCurrentHost", shell=shell).op2path()
+        AllUsersAllHosts = tm.run("$PROFILE.AllUsersAllHosts", shell=shell).op2path()
+    return ShellProfile()
 
 
 def construct_path(path_list: list[str]): return tb.L(set(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
