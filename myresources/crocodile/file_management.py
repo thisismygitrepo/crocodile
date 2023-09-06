@@ -11,6 +11,7 @@ from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal
 OPLike: TypeAlias = Union[str, 'P', Path, None]
 PLike: TypeAlias = Union[str, 'P', Path]
 FILE_MODE: TypeAlias = Literal['r', 'w', 'x', 'a']
+SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
 
 
 # %% =============================== Security ================================================
@@ -470,7 +471,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         tmp1 = (__import__('platform').system().lower() if os_specific else 'generic_os')
         if isinstance(root, str): return P(root) / tmp1 / self.rel2home()
         return tmp1 / self.rel2home()
-    def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False, key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
+    def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False, key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False,
+                 share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
@@ -488,8 +490,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             assert isinstance(tmp, P), f"Could not get link for {self}."
             return tmp
         return self
-    def from_cloud(self, cloud: str, localpath: OPLike = None,
-                   decrypt: bool = False, unzip: bool = False,  # type: ignore
+    def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore
                    key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, overwrite: bool = True, merge: bool = False, os_specific: bool = False, transfers: int = 10, root: str = "myhome"):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
@@ -512,9 +513,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return self
     @property
     def str(self) -> str: return str(self)  # or self._str
-
-
-SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
 
 
 def compress_folder(root_dir: str, op_path: str, base_dir: str, fmt: SHUTIL_FORMATS = 'zip', verbose: bool = False, **kwargs: Any) -> str:  # shutil works with folders nicely (recursion is done interally) # directory to be archived: root_dir\base_dir, unless base_dir is passed as absolute path. # when archive opened; base_dir will be found."""

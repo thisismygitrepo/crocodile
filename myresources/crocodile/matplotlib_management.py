@@ -600,9 +600,9 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
 
 
 class ImShow(FigureManager):
-    artist = ['internal', 'external'][0]
-    parser = ['internal', 'external'][0]
-    stream = ['clear', 'accumulate', 'update'][2]
+    # artist = ['internal', 'external'][0]
+    # parser = ['internal', 'external'][0]
+    # stream = ['clear', 'accumulate', 'update'][2]
     def __init__(self, img_tensor: 'npt.NDArray[np.float64]', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[list[str]]] = None, save_type: Type[Saver] = Null, save_name: Optional[str] = None,
                  save_dir: OPLike = None, save_kwargs: Optional[dict[str, Any]] = None,
                  subplots_adjust: Any = None, gridspec: Any = None, tight: bool = True, info_loc: Optional[tuple[float, float]] = None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax: Optional[Axes] = None,
@@ -668,10 +668,12 @@ class ImShow(FigureManager):
     # def from_img_paths(paths: list[PLike], **kwargs: Any): ImShow(List(paths).apply(plt.imread), sub_labels=List(paths).apply(lambda x: P(x).stem), **kwargs)
     # @staticmethod
     # def from_complex(data: 'npt.NDArray[np.float64]', pause: bool = True, **kwargs: Any): ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs)
-    # @staticmethod
-    # def test(): ImShow(np.random.rand(12, 10, 80, 120, 3))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-    # @staticmethod
-    # def resize(path: PLike, m: int, n: int): plt.imsave(path, install_n_import(library="skimage", name="scikit-image").transform.resize(plt.imread(path), (m, n), anti_aliasing=True))
+    @staticmethod
+    def test() -> None: ImShow(img_tensor=np.random.rand(12, 10, 80, 120, 3))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
+    @staticmethod
+    def resize(path: PLike, m: int, n: int):
+        res = install_n_import(library="skimage", name="scikit-image").transform.resize(plt.imread(str(path)), (m, n), anti_aliasing=True)
+        plt.imsave(str(path), res)
 
 
 if __name__ == '__main__':
