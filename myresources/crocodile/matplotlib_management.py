@@ -137,7 +137,8 @@ class GIFFileBased(GenericSave):
         elif _type == 'MPEGFileBased': writer, extension = animation.FFMpegFileWriter, '.mp4'
         elif _type == 'MPEGPipeBased': writer, extension = animation.FFMpegWriter, '.mp4'
         else: raise ValueError("Unknown writer.")
-        self.writer = writer(fps=fps, metadata=dict(artist='Alex Al-Saffar'), bitrate=bitrate)
+        import getpass
+        self.writer = writer(fps=fps, metadata=dict(artist=getpass.getuser()), bitrate=bitrate)
         self.fname = self.save_dir.joinpath(self.save_name + extension)
         assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
         self.writer.setup(fig=self.watch_figs[0], outfile=str(self.fname), dpi=dpi)
@@ -369,14 +370,14 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         if ax is not None:
             assert self.fig is not None, "Figure is not defined yet."
             cmap = self.cmaps.next() if event.key in 'tT' else self.cmaps.previous()
-            [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axes] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
+            _ = [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axes] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
             self.message = f"Color map changed to {ax.images[0].cmap.name}"
     def show_pix_val(self, event: Any):
         if (ax := event.inaxes) is not None:
             self.pix_vals = not self.pix_vals; self.message = f"Pixel values flag set to {self.pix_vals}"
             if self.pix_vals: self.show_pixels_values(ax)
             else:
-                while len(ax.texts) > 0: [text.remove() for text in ax.texts]
+                while len(ax.texts) > 0: _ = [text.remove() for text in ax.texts]
     def show_cursor(self, event: Any):
         if not (ax := event.inaxes): return None  # don't do this if c was pressed outside an axis.
         if hasattr(ax, 'cursor_'):  # is this the first time?
