@@ -133,11 +133,16 @@ class DataFrameHander:
                 res[att] = getattr(self, att)
         return res
 
-    def profile_dataframe(self, df: pd.DataFrame, path: tb.P, silent: bool = False, explorative: bool = True):
+    @staticmethod
+    def profile_dataframe(df: pd.DataFrame, path: tb.P, silent: bool = False, explorative: bool = True):
         profile_report = tb.install_n_import("pandas_profiling").ProfileReport
+        # from pandas_profiling import ProfileReport
+        # profile_report = pandas_profiling.()
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
         profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(path, silent=silent)
         return path
+    @staticmethod
+    def gui_dataframe(df: 'pd.DataFrame'): tb.install_n_import("pandas_profiling").show(df)
 
     def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""

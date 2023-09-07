@@ -59,7 +59,7 @@ class DBMS:
         self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_view_names(schema=x)))}
         return self
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         del state["con"]
         del state["ses"]
@@ -69,7 +69,10 @@ class DBMS:
         if self.path:
             state['path'] = self.path.collapseuser()
         return state
-    def __setstate__(self, state: dict[str, Any]): self.__dict__.update(state); self.eng = self.make_sql_engine(self.path); self.refresh()
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self.eng = self.make_sql_engine(self.path)
+        self.refresh()
 
     @classmethod
     def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
@@ -82,6 +85,7 @@ class DBMS:
             print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
         if self.con: self.con.close()
         if self.ses: self.ses.close()
+        self.eng.pool.dispose()
         self.eng.dispose()
         time.sleep(sleep)
     def _get_table_identifier(self, table: str, sch: Optional[str]):
