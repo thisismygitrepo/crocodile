@@ -111,7 +111,7 @@ class NumericalClipper:
 
 
 class DataFrameHander:
-    def __init__(self, scaler: StandardScaler, imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
+    def __init__(self, scaler: Union[RobustScaler, StandardScaler], imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
                  encoder_onehot: OneHotEncoder,
                  encoder_ordinal: OrdinalEncoder,
                  clipper_categorical: CategoricalClipper,
