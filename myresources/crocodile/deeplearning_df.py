@@ -142,7 +142,7 @@ class DataFrameHander:
         profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(path, silent=silent)
         return path
     @staticmethod
-    def gui_dataframe(df: 'pd.DataFrame'): tb.install_n_import("pandas_profiling").show(df)
+    def gui_dataframe(df: 'pd.DataFrame'): tb.install_n_import("pandasgui").show(df)
 
     def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
