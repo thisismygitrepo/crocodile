@@ -4,10 +4,10 @@ This module contains classes that can be used to preprocess dataframes for deep 
 """
 
 
-from typing import Optional, Any
+from typing import Optional, Any, Union
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 import crocodile.toolbox as tb
@@ -112,19 +112,23 @@ class NumericalClipper:
 
 class DataFrameHander:
     def __init__(self, scaler: StandardScaler, imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
-                 encoder_onehot: OneHotEncoder, encoder_ordinal: OrdinalEncoder,
-                 clipper_categorical: Optional[CategoricalClipper],
-                 clipper_numerical: Optional[NumericalClipper]
+                 encoder_onehot: OneHotEncoder,
+                 encoder_ordinal: OrdinalEncoder,
+                 clipper_categorical: CategoricalClipper,
+                 clipper_numerical: NumericalClipper
                  ) -> None:
-        self.scaler: StandardScaler = scaler
-        self.imputer: SimpleImputer = imputer
         self.cols_ordinal: list[str] = cols_ordinal
         self.cols_onehot: list[str] = cols_onehot
         self.cols_numerical: list[str] = cols_numerical
+
+        self.scaler: Union[RobustScaler, StandardScaler] = scaler
+        self.imputer: SimpleImputer = imputer
+
         self.encoder_onehot: OneHotEncoder = encoder_onehot
         self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
-        self.clipper_categorical: Optional[CategoricalClipper] = clipper_categorical
-        self.clipper_numerical: Optional[NumericalClipper] = clipper_numerical
+
+        self.clipper_categorical: CategoricalClipper = clipper_categorical
+        self.clipper_numerical: NumericalClipper = clipper_numerical
     def __getstate__(self):
         atts: list[str] = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
         res = {}
