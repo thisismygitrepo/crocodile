@@ -135,7 +135,7 @@ class DataFrameHander:
 
     @staticmethod
     def profile_dataframe(df: pd.DataFrame, path: tb.P, silent: bool = False, explorative: bool = True):
-        profile_report = tb.install_n_import("pandas_profiling").ProfileReport
+        profile_report = tb.install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
         # from pandas_profiling import ProfileReport
         # profile_report = pandas_profiling.()
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
