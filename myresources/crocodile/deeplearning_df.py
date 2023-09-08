@@ -139,14 +139,15 @@ class DataFrameHander:
         return res
 
     @staticmethod
-    def profile_dataframe(df: pd.DataFrame, data: DataReader, silent: bool = False, explorative: bool = True):
-        path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report.html")
+    def profile_dataframe(df: pd.DataFrame, data: DataReader, silent: bool = False, explorative: bool = True, appendix: str = ""):
+        path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report{appendix}.html").create(parents_only=True)
         profile_report = tb.install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
         # from pandas_profiling import ProfileReport
         # profile_report = pandas_profiling.()
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
         profile_report(df, title="Pandas Profiling Report", explorative=explorative).to_file(path, silent=silent)
         return path
+
     @staticmethod
     def gui_dataframe(df: 'pd.DataFrame'): tb.install_n_import("pandasgui").show(df)
 
