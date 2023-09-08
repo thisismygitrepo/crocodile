@@ -114,7 +114,6 @@ class DataReader:
     subpath = tb.P("metadata/data_reader")
     """This class holds the dataset for training and testing.
     """
-    def get_pandas_profile_path(self, suffix: str) -> tb.P: return self.hp.save_dir.joinpath(self.subpath, f"pandas_profile_report_{suffix}.html").create(parents_only=True)
     def __init__(self, hp: SubclassedHParams,  # type: ignore
                  specs: Optional[Specs] = None,
                  split: Optional[dict[str, Any]] = None) -> None:
