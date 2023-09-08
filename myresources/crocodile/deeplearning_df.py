@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 import crocodile.toolbox as tb
+from crocodile.deeplearning import DataReader
 
 
 class CategoricalClipper:
@@ -138,7 +139,8 @@ class DataFrameHander:
         return res
 
     @staticmethod
-    def profile_dataframe(df: pd.DataFrame, path: tb.P, silent: bool = False, explorative: bool = True):
+    def profile_dataframe(df: pd.DataFrame, data: DataReader, silent: bool = False, explorative: bool = True):
+        path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report.html")
         profile_report = tb.install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
         # from pandas_profiling import ProfileReport
         # profile_report = pandas_profiling.()
