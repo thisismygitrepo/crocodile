@@ -27,14 +27,14 @@ _ = SourceFileLoader, WorkloadParams
 params = JobParams.from_empty()
 
 print("\n" * 2)
-manager = ResourceManager.from_pickle(params.resource_manager_path)
+manager: ResourceManager = ResourceManager.from_pickle(params.resource_manager_path)
 manager.secure_resources()
 
 # keep those values after lock is released
 time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
 manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
-func_kwargs = manager.kwargs_path.readit()
+func_kwargs = tb.Read.vanilla_pickle(path=manager.kwargs_path)
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -45,7 +45,8 @@ print("\n" * 2)
 console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
 console.print(f"Executing {tb.P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_r} : {params.func_name}", style="bold blue")
-inspect(func_kwargs, value=False, title=f"kwargs from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
+if isinstance(func_kwargs, dict): tb.S(func_kwargs).print(title="kwargs", as_config=True)
+else: inspect(func_kwargs, value=False, title=f"kwargs from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
 res = ""

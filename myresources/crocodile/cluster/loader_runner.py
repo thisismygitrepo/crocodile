@@ -218,7 +218,7 @@ class ResourceManager:
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
         self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py")
         self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
-        self.kwargs_path = self.root_dir.joinpath(f"data/cluster_kwargs.pkl")
+        self.kwargs_path = self.root_dir.joinpath(f"data/func_kwargs.pkl")
         self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
