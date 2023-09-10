@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 
 _ = IO, TextIO
-SHELLS: TypeAlias = Literal["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]
+SHELLS: TypeAlias = Literal["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]  # pwsh.exe is PowerShell (community) and powershell.exe is Windows Powershell (msft)
 
 
 @dataclass
@@ -319,7 +319,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 return list(tmp)
             print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
         if z: print(f"ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
-        if target is None: target = P(source_obj).expanduser().absolute().collapseuser(); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+        if target is None: target = P(source_obj).expanduser().absolute().collapseuser(strict=True); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
@@ -332,7 +332,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             if r:
-                tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser()", desc="Searching for files in source", return_obj=True, verbose=False)
+                tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser(strict=False)", desc="Searching for files in source", return_obj=True, verbose=False)
                 assert isinstance(tmp11, List), f"Could not resolve source path {source} due to error"
                 for file in tmp11:
                     self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
@@ -343,7 +343,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if not isinstance(tmp2, P): raise RuntimeError(f"Could not zip {source} due to {tmp.err}")
             else: source = tmp2
         if target is None:
-            tmpx = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
+            tmpx = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser(strict=False))", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
             if isinstance(tmpx, P): target = tmpx
             else: raise RuntimeError(f"Could not resolve target path {target} due to error")
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."

@@ -59,7 +59,8 @@ class DataReader(dl.DataReader):
 
     def viz(self, eval_data: EvaluationData, ax: Optional[Axes] = None, title: str = ""):
         # _ = names
-        if ax is None: fig, ax = plt.subplots(figsize=(14, 10))
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(14, 10))
         else: fig = ax.get_figure()
         x = np.arange(len(eval_data.y_true[0]))
         ax.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)

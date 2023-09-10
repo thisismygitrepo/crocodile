@@ -37,7 +37,7 @@ class DBMS:
 
         # self.db = db
         self.sch = sch
-        self.vws = vws
+        self.vws: bool = vws
         self.schema: Optional[L[str]] = None
         # self.tables = None
         # self.views = None
@@ -91,7 +91,7 @@ class DBMS:
     def _get_table_identifier(self, table: str, sch: Optional[str]):
         if sch is None: sch = self.sch
         if sch is not None:
-            return sch + "." + table
+            return f"{sch}.'{table}'"
         else: return table
 
     @staticmethod
@@ -103,7 +103,7 @@ class DBMS:
                 from sqlalchemy.pool import StaticPool  # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
                 return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
             else: return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
-        path = P.tmpfile(folder="tmp_dbs", suffix=".db") if path is None else P(path).expanduser().absolute().create(parents_only=True)
+        path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
         return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
 
@@ -131,17 +131,21 @@ class DBMS:
     #     return result if not df else pd.DataFrame(result)
 
     # ========================== TABLES =====================================
-    def read_table(self, table: str, sch: Optional[str] = None, size: int = 100):
+    def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
+        sch = sch or self.sch or 'main'
+        if table is None:
+            table = self.sch_tab[sch][0]
+            print(f"Reading table `{table}` from schema `{sch}`")
         if self.con:
-            res = self.con.execute(text(f'''SELECT * FROM "{self._get_table_identifier(table, sch)}"'''))
+            res = self.con.execute(text(f'''SELECT * FROM {self._get_table_identifier(table, sch)} '''))
             return pd.DataFrame(res.fetchmany(size))
 
-    def insert_dicts(self, table: str, *mydicts: dict[str, Any]):
+    def insert_dicts(self, table: str, *mydicts: dict[str, Any]) -> None:
         cmd = f"""INSERT INTO {table} VALUES """
         for mydict in mydicts: cmd += f"""({tuple(mydict)}), """
         self.execute_begin_once(cmd)
 
-    def describe_table(self, table: str, sch: Optional[str] = None, dtype: bool = True):
+    def describe_table(self, table: str, sch: Optional[str] = None, dtype: bool = True) -> None:
         print(table.center(100, "="))
         self.refresh()
         assert self.meta is not None
@@ -149,7 +153,7 @@ class DBMS:
         assert self.ses is not None
         count = self.ses.query(tbl).count()
         res = Struct(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
-        res.print(dtype=False, as_config=True)
+        res.print(dtype=False, as_config=True, title="TABLE DETAILS")
         dat = self.read_table(table=table, sch=sch, size=2)
         cols = self.get_columns(table, sch=sch)
         df = pd.DataFrame.from_records(dat, columns=cols)

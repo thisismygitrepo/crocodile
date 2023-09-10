@@ -70,6 +70,9 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 # %% =================================== File ============================================
 def read(path: PLike, **kwargs: Any):
     suffix = Path(path).suffix[1:]
+    if suffix == "sqlite":
+        from crocodile.database import DBMS
+        return DBMS.from_local_db(path=path)
     try: return getattr(Read, suffix)(str(path), **kwargs)
     except AttributeError as err:
         if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
