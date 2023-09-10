@@ -34,7 +34,7 @@ manager.secure_resources()
 time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
 manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
-func_kwargs = tb.Read.vanilla_pickle(path=manager.kwargs_path)
+func_kwargs = tb.Read.vanilla_pickle(path=manager.kwargs_path.expanduser())
 
 # EXTRA-PLACEHOLDER-POST
 
