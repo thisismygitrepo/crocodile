@@ -146,10 +146,10 @@ class DataFrameHander:
     def profile_dataframe(df: pd.DataFrame, save_path: Optional[tb.P] = None, silent: bool = False, explorative: bool = True):
         # path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report{appendix}.html").create(parents_only=True)
         profile_report = tb.install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
-        # from pandas_profiling import ProfileReport
+        # from ydata_profiling import ProfileReport as profile_report
         # profile_report = pandas_profiling.()
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
-        report = profile_report(df, title="Pandas Profiling Report", explorative=explorative)
+        report = profile_report(df, title="Pandas Profiling Report", explorative=explorative, silent=silent)
         if save_path is not None: report.to_file(save_path)
 
     @staticmethod
