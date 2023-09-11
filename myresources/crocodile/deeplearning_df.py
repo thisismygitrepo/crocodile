@@ -28,6 +28,9 @@ class CategoricalClipper:
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__ = state
 
     def fit(self, df: pd.DataFrame) -> 'CategoricalClipper':
+        print("\n")
+        print(f"Fitting Categorical Clipper".center(100, '-'))
+
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
@@ -38,7 +41,7 @@ class CategoricalClipper:
             self.pre_percentage_counts[col].index.name = name
             self.post_percentage_counts[col].name = "Percentage"
             self.post_percentage_counts[col].index.name = name
-            print(f"Categories pre summarizer:\n{self.pre_percentage_counts[col].to_markdown()}\n\nCategories post summarizer:\n{self.post_percentage_counts[col].to_markdown()}")
+            print(f"`{col}` categories pre-clipper:\n{self.pre_percentage_counts[col].to_markdown()}\n\n`{col}` categories post-clipper:\n{self.post_percentage_counts[col].to_markdown()}")
         return self
     def transform(self, df: pd.DataFrame, inplace: bool = True):
         if self.columns is None: raise RuntimeError("Fit the encoder first")
@@ -94,6 +97,7 @@ class NumericalClipper:
         print("\n")
         print(f"Clipping Columns".center(100, '-'))
         print(pd.DataFrame([self.value_min, self.value_max], index=["min", "max"]).T)
+        print("\nQuantiles used for clipping: \n - min: {self.quant_min}\n  - max: {self.quant_max}")
         print(f"-" * 100)
         print("\n")
 
