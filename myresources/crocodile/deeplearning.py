@@ -66,6 +66,7 @@ SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 PRECISON = Literal['float64', 'float32', 'float16']
 
+
 @dataclass
 class HParams:
     # ===================== Data ==============================
