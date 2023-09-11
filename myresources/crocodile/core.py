@@ -13,6 +13,7 @@ class Slicable(Protocol):
 
 
 PLike = Union[str, Path]
+a: int = 1
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace: str = '_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
