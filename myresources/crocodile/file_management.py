@@ -196,7 +196,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         import requests
         response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, timeout=timeout, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
         if memory: return response  # r.contents is bytes encoded as per docs of requests.
-        return (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(str(name or self.name))).create(parents_only=True).write_bytes(response.content)
+        return (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(validate_name(str(name or P(response.history[-1].url).name))).create(parents_only=True).write_bytes(response.content)
     def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
         if inlieu:
             self._str = str(res)  # type: ignore # pylint: disable=W0201

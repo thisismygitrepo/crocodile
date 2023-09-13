@@ -293,6 +293,10 @@ class BaseModel(ABC):
         # self.fig = None
         # self.kwargs = None
         # self.tmp = None
+        __module = self.__class__.__module__
+        if __module.startswith('__main__'):
+            print("WARNING: Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+
     def get_model(self):
         raise NotImplementedError
         # pass
@@ -465,7 +469,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only: bool = True, version: str = '0', **kwargs: Any):
+    def save_class(self, weights_only: bool = True, version: str = '0', strict: bool = True, **kwargs: Any):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -482,10 +486,12 @@ class BaseModel(ABC):
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
+
         import importlib
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
-            raise RuntimeError("Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+            if strict: raise RuntimeError("Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+            else: pass
         try:
             module = importlib.import_module(__module)
         except ModuleNotFoundError as ex:
