@@ -189,6 +189,7 @@ class DataReader:
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
         tb.Struct(self.split).print()
+        print(f"==================================================================")
 
     def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
                        use_slice: bool = False, split: Literal["train", "test"] = "test", size: Optional[int] = None) -> tuple[list[Any], list[Any], list[Any]]:
