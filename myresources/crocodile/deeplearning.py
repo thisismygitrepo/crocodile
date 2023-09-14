@@ -149,8 +149,8 @@ class DataReader:
     def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
     def __repr__(self):
         print(f"DataReader Object with these keys: \n")
-        tb.S(self.specs.__dict__).print(as_config=True, title="Data Specs")
-        tb.S(self.split).print(as_config=True, title="Split Data")
+        tb.S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
+        tb.S(self.split).print(as_config=False, title="Split Data")  # table print
         return f"--" * 50
 
     def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
@@ -222,9 +222,9 @@ class DataReader:
             if isinstance(tmp3, (pd.DataFrame, pd.Series)):
                 item = tmp.iloc[np.array(selection)]
             elif tmp3 is not None:
-                if "raggedtensor" in str(type(tmp3)).lower():
-                    item = [tmp3[ii] for ii in selection]
-                else: item = tmp3[selection]
+                # if "raggedtensor" in str(type(tmp3)).lower():
+                #     item = [tmp3[ii] for ii in selection]
+                item = tmp3[selection]
             elif tmp3 is None: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
             else: raise ValueError(f"Split key `{key}` is of unknown data type `{type(tmp3)}`.")
             if idx == 0: x.append(item)

@@ -319,7 +319,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                     if install_n_import("tabulate"):
                         install_n_import("rich").print(res.to_markdown())
                     else: print(res)
-                return str(res) if return_str else str(self)
+                    return None
+                return str(res)
 
     @staticmethod
     def concat_values(*dicts: dict[Any, Any], orient: str = 'list') -> 'Struct':
