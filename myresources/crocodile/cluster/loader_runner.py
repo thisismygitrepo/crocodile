@@ -216,14 +216,27 @@ class ResourceManager:
         parent: JOB_STATUS
         parent = 'queued'
         self.root_dir = self.base.joinpath(f"{parent}/{self.job_id}")
-        self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
-        # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
-        self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
-        self.cloud_download_py_script_path = self.root_dir.joinpath(f"python/download_data.py")
-        self.shell_script_path = self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
-        self.kwargs_path = self.root_dir.joinpath(f"data/func_kwargs.pkl")
-        self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
-        self.execution_log_dir = self.root_dir.joinpath(f"logs")
+    @property
+    def machine_obj_path(self):
+        return self.root_dir.joinpath(f"machine.Machine.pkl")
+    @property
+    def py_script_path(self):
+        return self.root_dir.joinpath(f"python/cluster_wrap.py")
+    @property
+    def cloud_download_py_script_path(self):
+        return self.root_dir.joinpath(f"python/download_data.py")
+    @property
+    def shell_script_path(self):
+        return self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
+    @property
+    def kwargs_path(self):
+        return self.root_dir.joinpath(f"data/func_kwargs.pkl")
+    @property
+    def resource_manager_path(self):
+        return self.root_dir.joinpath(f"data/resource_manager.pkl")
+    @property
+    def execution_log_dir(self):
+        return self.root_dir.joinpath(f"logs")
 
     def move_job(self, status: JOB_STATUS):
         # target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
