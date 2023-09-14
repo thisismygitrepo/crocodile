@@ -226,8 +226,8 @@ class ResourceManager:
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
     def move_job(self, status: JOB_STATUS):
-        target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
-        self.root_dir.expanduser().move(folder=target)
+        # target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
+        target = self.root_dir.expanduser().move(folder=self.base.joinpath(status))
         self.root_dir = target.collapseuser()
 
     def add_to_queue(self, job_status: JobStatus):
