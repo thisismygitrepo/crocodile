@@ -282,12 +282,12 @@ class BaseModel(ABC):
     """
     # @abstractmethod
     def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader,  # type: ignore
-                 compiler: Optional[Compiler] = None, history: Optional[list[dict[str, Any]]] = None):
+                 history: Optional[list[dict[str, Any]]] = None):
         # : Optional[list]
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
         self.model: Any = self.get_model()  # should be populated upon instantiation.
-        self.compiler = compiler  # Struct with .losses, .metrics and .optimizer.
+        self.compiler: Compiler
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
         # self.plotter = NullAuto
         # self.fig = None
