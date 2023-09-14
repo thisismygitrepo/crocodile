@@ -208,10 +208,10 @@ class DataReader:
         select_size = size or self.hp.batch_size
         start_idx = np.random.choice(ds_size - select_size)
 
-        selection: Union[list[int], range]
+        selection: Union[list[int], slice]
         if indices is not None: selection = indices
         elif aslice is not None: selection = list(range(aslice.start, aslice.stop, aslice.step))
-        elif use_slice: selection = range(start_idx, start_idx + select_size)  # ragged tensors don't support indexing, this can be handy in that case.
+        elif use_slice: selection = slice(start_idx, start_idx + select_size, 1)  # ragged tensors don't support indexing, this can be handy in that case.
         else:
             tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
             selection = tmp2
