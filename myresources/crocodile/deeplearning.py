@@ -405,10 +405,10 @@ class BaseModel(ABC):
         :param x:
         :return: prediction as numpy
         """
-        # return self.model.predict(x)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
+        # return self.model(x, training=False)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
         # https://stackoverflow.com/questions/64199384/tf-keras-model-predict-results-in-memory-leak
         # https://github.com/tensorflow/tensorflow/issues/44711
-        return self.model(x, training=False)
+        return self.model.predict(x)
 
     def predict(self, x: Any, **kwargs: Any):
         """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
@@ -451,8 +451,8 @@ class BaseModel(ABC):
             self.viz(results, **(viz_kwargs or {}))
         return results
 
-    def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> Optional[pd.DataFrame]:
-        if self.compiler is None: return None
+    def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
+        # if self.compiler is None: return None
         metrics = [self.compiler.loss] + self.compiler.metrics
         loss_dict: dict[str, list[Any]] = dict()
         for a_metric in metrics:
@@ -599,7 +599,6 @@ class BaseModel(ABC):
         except TypeError as te:
             raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
-        # sample_dataset = True
         if ip is None:
             if sample_dataset:
                 ip, _, _ = self.data.sample_dataset()

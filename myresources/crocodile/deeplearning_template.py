@@ -68,7 +68,8 @@ class DataReader(dl.DataReader):
         ax.legend()
         ax.set_title(title or 'Predicted vs True')
         FigureManager.grid(ax)
-        plt.show()
+        plt.show(block=False)
+        plt.pause(0.5)  # pause a bit so that the figure is displayed.
         return fig
 
 
@@ -96,9 +97,9 @@ def main():
     d.load_trianing_data()
     m = Model(hp, d)
     _fig, ax = plt.subplots(ncols=2)
-    _res_before = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]))
+    _res_before = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]), viz=True)
     m.fit()
-    _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]))
+    _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]), viz=True)
     m.save_class()
     return m
 
