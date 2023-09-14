@@ -147,7 +147,11 @@ class DataReader:
             if hasattr(self, item): res[item] = getattr(self, item)
         return res
     def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
-    # def __repr__(self): return f"DataReader Object with these keys: \n" + tb.Struct(self.__dict__).print(as_config=False, return_str=True)
+    def __repr__(self):
+        print(f"DataReader Object with these keys: \n")
+        tb.S(self.specs.__dict__).print(as_config=True, title="Data Specs")
+        tb.S(self.split).print(as_config=True, title="Split Data")
+        return f"--" * 50
 
     def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
         # populating data specs ip / op shapes based on arguments sent to this method.
@@ -214,11 +218,15 @@ class DataReader:
         y: list[Any] = []
         others: list[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
-            tmp = self.split[key]
-            if isinstance(tmp, (pd.DataFrame, pd.Series)):
+            tmp3: Any = self.split[key]
+            if isinstance(tmp3, (pd.DataFrame, pd.Series)):
                 item = tmp.iloc[np.array(selection)]
-            elif tmp is not None: item = tmp[selection]
-            else: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
+            elif tmp3 is not None:
+                if "raggedtensor" in str(type(tmp3)).lower():
+                    item = [tmp3[ii] for ii in selection]
+                else: item = tmp3[selection]
+            elif tmp3 is None: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
+            else: raise ValueError(f"Split key `{key}` is of unknown data type `{type(tmp3)}`.")
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
