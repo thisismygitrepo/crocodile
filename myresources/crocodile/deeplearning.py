@@ -208,9 +208,10 @@ class DataReader:
         select_size = size or self.hp.batch_size
         start_idx = np.random.choice(ds_size - select_size)
 
+        selection: Union[list[int], range]
         if indices is not None: selection = indices
         elif aslice is not None: selection = list(range(aslice.start, aslice.stop, aslice.step))
-        elif use_slice: selection = list(range(start_idx, start_idx + select_size))  # ragged tensors don't support indexing, this can be handy in that case.
+        elif use_slice: selection = range(start_idx, start_idx + select_size)  # ragged tensors don't support indexing, this can be handy in that case.
         else:
             tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
             selection = tmp2
@@ -222,8 +223,6 @@ class DataReader:
             if isinstance(tmp3, (pd.DataFrame, pd.Series)):
                 item = tmp.iloc[np.array(selection)]
             elif tmp3 is not None:
-                # if "raggedtensor" in str(type(tmp3)).lower():
-                #     item = [tmp3[ii] for ii in selection]
                 item = tmp3[selection]
             elif tmp3 is None: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
             else: raise ValueError(f"Split key `{key}` is of unknown data type `{type(tmp3)}`.")
