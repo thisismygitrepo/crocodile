@@ -3,7 +3,7 @@
 Job Execution Script
 """
 
-# import os
+import os
 import getpass
 import platform
 import crocodile.toolbox as tb
@@ -30,6 +30,8 @@ print("\n" * 2)
 manager: ResourceManager = ResourceManager.from_pickle(params.resource_manager_path)
 manager.secure_resources()
 manager.move_job(status="running")
+pid: int = os.getpid()
+manager.execution_log_dir.expanduser().joinpath("pid.txt").write_text(str(pid))
 
 
 # keep those values after lock is released
@@ -69,11 +71,11 @@ else:
     res_folder = tb.P.tmp(folder=rf"tmp_dirs/{manager.job_id}").create()
     console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
     print("\n\n")
-    try:
-        tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
-    except TypeError as e:
-        print(e)
-        print(f"Could not pickle res object to path `{res_folder.joinpath('result.pkl').collapseuser().as_posix()}`.")
+    # try:
+        # tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
+    # except TypeError as e:
+        # print(e)
+        # print(f"Could not pickle res object to path `{res_folder.joinpath('result.pkl').collapseuser().as_posix()}`.")
 
 time_at_execution_end_utc = pd.Timestamp.utcnow()
 time_at_execution_end_local = pd.Timestamp.now()
@@ -87,7 +89,7 @@ manager.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(t
 manager.execution_log_dir.expanduser().joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
 manager.execution_log_dir.expanduser().joinpath("error_message.txt").write_text(params.error_message)
 exec_times.save(path=manager.execution_log_dir.expanduser().joinpath("execution_times.Struct.pkl"))
-tb.Experimental.generate_readme(path=manager.root_dir.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
+tb.Experimental.generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
 
 Job executed via tb.cluster.Machine
 remote: {params.ssh_repr}
@@ -106,7 +108,7 @@ kwargs_path @ `{manager.kwargs_path.collapseuser()}`
 ''')
 
 
-manager.root_dir.expanduser().copy(folder=res_folder, overwrite=True)
+# manager.root_dir.expanduser().copy(folder=res_folder, overwrite=True)
 
 # print to execution console:
 exec_times.print(title="Execution Times", as_config=True)
@@ -129,4 +131,6 @@ print(f"job {manager.job_id} is completed.")
 
 manager.unlock_resources()
 if params.error_message == "": manager.move_job(status="completed")
-else: manager.move_job(status="failed")
+else:
+    print(f"Job failed with error message: `{params.error_message}`")
+    manager.move_job(status="failed")

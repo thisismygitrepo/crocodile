@@ -5,7 +5,7 @@ This file contains a template for a remote machine. It is not meant to be run, b
 
 
 def run_on_remote():
-    from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
+    from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
     from crocodile.cluster.utils import expensive_function
     from crocodile.file_management import P
     # from crocodile.cluster.self_ssh import SelfSSH
@@ -23,7 +23,7 @@ def run_on_remote():
         ipython=True, interactive=True, pdb=False, pudb=False, wrap_in_try_except=True,
         # resources
         lock_resources=True, max_simulataneous_jobs=2, parallelize=False, )
-    m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3), workload_params=None),
+    m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3), workload_params=WorkloadParams()),
                       config=config)
     m.run()
     return m

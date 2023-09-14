@@ -29,9 +29,9 @@ Hi `{params.addressee}`, I'm `{params.speaker}`, this is a notification that I h
 `{error_message}`
 #### Execution Times
 {exec_times.print(as_config=True, return_str=True)}
-#### Executed Shell Script: 
+#### Executed Shell Script:
 `{manager.shell_script_path}`
-#### Executed Python Script: 
+#### Executed Python Script:
 `{manager.py_script_path}`
 
 #### Pull results using this script:

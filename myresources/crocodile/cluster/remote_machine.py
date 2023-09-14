@@ -3,7 +3,7 @@
 """
 
 from pickle import PickleError
-from typing import Optional, Any, Union, Callable, Literal
+from typing import Optional, Any, Union, Callable, Literal, TypeAlias
 from dataclasses import dataclass, field
 import time
 import crocodile.toolbox as tb
@@ -22,6 +22,7 @@ import random
 
 
 console = Console()
+TRANSFER_METHOD: TypeAlias = Literal["sftp", "transfer_sh", "cloud"]
 
 
 class CloudManager:
@@ -82,7 +83,7 @@ class RemoteMachineConfig:
     install_repo: bool = False
     update_essential_repos: bool = True
     data: Optional[list[Any]] = None
-    transfer_method: str = "sftp"
+    transfer_method: TRANSFER_METHOD = "sftp"
 
     # remote machine behaviour
     open_console: bool = True
@@ -144,7 +145,7 @@ class RemoteMachine:
             # send email at start execution time
         if isinstance(self.session_manager, Zellij):
             self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=self.execution_command, run=run,
-                                              job_wd=self.resources.root_dir.as_posix())
+                                              job_wd=self.resources.job_root.as_posix())
         print("\n")
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
@@ -156,17 +157,27 @@ class RemoteMachine:
         return self
 
     def submit(self) -> None:
-        console.rule("Submitting job")
+        console.rule(title="Submitting job")
         if type(self.ssh) is SelfSSH: return None
-        from crocodile.cluster.data_transfer import Submission
+        from crocodile.cluster.data_transfer import Submission  # import here to avoid circular import.
         self.submitted = True  # before sending `self` to the remote.
         try: tb.Save.pickle(obj=self, path=self.resources.machine_obj_path.expanduser())
         except PickleError: print(f"Couldn't pickle Mahcine object. 🤷‍♂️")
         if self.config.transfer_method == "transfer_sh": Submission.transfer_sh(rm=self)
-        elif self.config.transfer_method == "gdrive": Submission.gdrive(rm=self)
+        elif self.config.transfer_method == "cloud": Submission.cloud(rm=self, cloud="oduq1")
         elif self.config.transfer_method == "sftp": Submission.sftp(self)
         else: raise ValueError(f"Transfer method {self.config.transfer_method} not recognized. 🤷‍")
         self.execution_command_to_clip_memory()
+
+    # def submit_to_cloud(self, split: int = 5):
+    #     assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
+    #     wl = WorkloadParams().split_to_jobs(jobs=split)
+    #     # self.config.base_dir = 
+    #     self.config.job_id
+    #     self.generate_scripts()
+    #     self.show_scripts()
+    #     self.submit()
+    #     print(f"Saved RemoteMachine object can be found @ {self.resources.machine_obj_path.expanduser()}")
 
     def generate_scripts(self):
         console.rule("Generating scripts")
@@ -190,7 +201,7 @@ class RemoteMachine:
                                        executed_obj=executed_obj,
                                        resource_manager_path=self.resources.resource_manager_path.collapseuser().as_posix(),
                                        to_email=self.config.to_email, email_config_name=self.config.email_config_name)
-            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}")
+            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}").replace('manager = ResourceManager.from_pickle(params.resource_manager_path)', '')
         shell_script = f"""
 
 # EXTRA-PLACEHOLDER-PRE
@@ -224,7 +235,6 @@ deactivate
         self.resources.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         tb.Save.pickle(obj=self.kwargs, path=self.resources.kwargs_path.expanduser(), verbose=False)
         tb.Save.pickle(obj=self.resources.__getstate__(), path=self.resources.resource_manager_path.expanduser(), verbose=False)
-        self.resources.root_dir.expanduser().joinpath("status.txt").write_text("current=queued_or_running")
         print("\n")
         # self.show_scripts()
 

@@ -189,7 +189,7 @@ class ResourceManager:
     running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running_jobs.pkl")
     queue_path   = tb.P(f"~/tmp_results/remote_machines/resource_manager/queued_jobs.pkl")
     history_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/history_jobs.pkl")
-    base_path    = tb.P(f"~/tmp_results/remote_machines/jobs")
+    default_base = tb.P(f"~/tmp_results/remote_machines/jobs")
     shell_script_path_log = rf"~/tmp_results/remote_machines/resource_manager/last_cluster_script.txt"
 
     @staticmethod
@@ -212,36 +212,36 @@ class ResourceManager:
 
         self.submission_time = pd.Timestamp.now()
 
-        self.base = tb.P(base).collapseuser() if bool(base) else ResourceManager.base_path
+        self.base_dir = tb.P(base).collapseuser() if bool(base) else ResourceManager.default_base
         parent: JOB_STATUS
         parent = 'queued'
-        self.root_dir = self.base.joinpath(f"{parent}/{self.job_id}")
+        self.job_root = self.base_dir.joinpath(f"{parent}/{self.job_id}")
     @property
     def machine_obj_path(self):
-        return self.root_dir.joinpath(f"machine.Machine.pkl")
+        return self.job_root.joinpath(f"machine.Machine.pkl")
     @property
     def py_script_path(self):
-        return self.root_dir.joinpath(f"python/cluster_wrap.py")
+        return self.job_root.joinpath(f"python/cluster_wrap.py")
     @property
     def cloud_download_py_script_path(self):
-        return self.root_dir.joinpath(f"python/download_data.py")
+        return self.job_root.joinpath(f"python/download_data.py")
     @property
     def shell_script_path(self):
-        return self.root_dir.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
+        return self.job_root.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
     @property
     def kwargs_path(self):
-        return self.root_dir.joinpath(f"data/func_kwargs.pkl")
+        return self.job_root.joinpath(f"data/func_kwargs.pkl")
     @property
     def resource_manager_path(self):
-        return self.root_dir.joinpath(f"data/resource_manager.pkl")
+        return self.job_root.joinpath(f"data/resource_manager.pkl")
     @property
     def execution_log_dir(self):
-        return self.root_dir.joinpath(f"logs")
+        return self.job_root.joinpath(f"logs")
 
     def move_job(self, status: JOB_STATUS):
         # target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
-        target = self.root_dir.expanduser().move(folder=self.base.joinpath(status))
-        self.root_dir = target.collapseuser()
+        target = self.job_root.expanduser().move(folder=self.base_dir.joinpath(status))
+        self.job_root = target.collapseuser()
 
     def add_to_queue(self, job_status: JobStatus):
         try:
