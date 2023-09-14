@@ -226,7 +226,7 @@ class ResourceManager:
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
 
     def move_job(self, status: JOB_STATUS):
-        target = self.root_dir.expanduser().parent.joinpath(f"{status}/{self.job_id}")
+        target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
         self.root_dir.expanduser().move(folder=target)
         self.root_dir = target.collapseuser()
 

@@ -16,7 +16,7 @@ def run_on_remote():
         ssh_params=dict(host="thinkpad"),  # dict(host="239wsl"),
         description="Description of running an expensive function",  # job_id=, base_dir="",
         # data
-        copy_repo=False, update_repo=False, install_repo=False, update_essential_repos=True, data=data, transfer_method="sftp",
+        copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=data, transfer_method="sftp",
         # remote machine behaviour
         open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='zoho', kill_on_completion=False,
         # execution behaviour
