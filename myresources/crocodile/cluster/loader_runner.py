@@ -9,10 +9,11 @@ import os
 from rich import inspect
 from rich.console import Console
 import time
-from typing import Optional, Callable, Union, Any, Literal
+from typing import Optional, Callable, Union, Any, Literal, TypeAlias
 import pandas as pd
 
 
+JOB_STATUS: TypeAlias = Literal["queued", "running", "completed", "failed"]
 console = Console()
 
 
@@ -164,7 +165,7 @@ try:
 {base}
 except Exception as e:
     print(e)
-    error_message = str(e)
+    params.error_message = str(e)
     res = None
 
 """
@@ -212,7 +213,9 @@ class ResourceManager:
         self.submission_time = pd.Timestamp.now()
 
         self.base = tb.P(base).collapseuser() if bool(base) else ResourceManager.base_path
-        self.root_dir = self.base.joinpath(f"current/{self.job_id}")
+        parent: JOB_STATUS
+        parent = 'queued'
+        self.root_dir = self.base.joinpath(f"{parent}/{self.job_id}")
         self.machine_obj_path = self.root_dir.joinpath(f"machine.Machine.pkl")
         # tb.P(self.func_relative_file).stem}__{self.func.__name__ if self.func is not None else ''}
         self.py_script_path = self.root_dir.joinpath(f"python/cluster_wrap.py")
@@ -221,6 +224,11 @@ class ResourceManager:
         self.kwargs_path = self.root_dir.joinpath(f"data/func_kwargs.pkl")
         self.resource_manager_path = self.root_dir.joinpath(f"data/resource_manager.pkl")
         self.execution_log_dir = self.root_dir.joinpath(f"logs")
+
+    def move_job(self, status: JOB_STATUS):
+        target = self.root_dir.expanduser().parent.joinpath(f"{status}/{self.job_id}")
+        self.root_dir.expanduser().move(folder=target)
+        self.root_dir = target.collapseuser()
 
     def add_to_queue(self, job_status: JobStatus):
         try:

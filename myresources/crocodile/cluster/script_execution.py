@@ -29,6 +29,8 @@ params = JobParams.from_empty()
 print("\n" * 2)
 manager: ResourceManager = ResourceManager.from_pickle(params.resource_manager_path)
 manager.secure_resources()
+manager.move_job(status="running")
+
 
 # keep those values after lock is released
 time_at_execution_start_utc = pd.Timestamp.utcnow()
@@ -60,8 +62,6 @@ print("\n" * 2)
 
 # ######################### END OF EXECUTION #############################
 
-
-manager.unlock_resources()
 
 if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
     res_folder = tb.P(res).expanduser()
@@ -124,5 +124,9 @@ if params.session_name != "":
 
 
 print(f"job {manager.job_id} is completed.")
-manager.root_dir.expanduser().joinpath("status.txt").write_text("completed")
+# manager.root_dir.expanduser().joinpath("status.txt").write_text("completed")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")
+
+manager.unlock_resources()
+if params.error_message == "": manager.move_job(status="completed")
+else: manager.move_job(status="failed")

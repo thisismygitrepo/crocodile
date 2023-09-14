@@ -3,7 +3,7 @@
 """
 
 from pickle import PickleError
-from typing import Optional, Any, Union, Callable, TypeAlias, Literal
+from typing import Optional, Any, Union, Callable, Literal
 from dataclasses import dataclass, field
 import time
 import crocodile.toolbox as tb
@@ -22,9 +22,6 @@ import random
 
 
 console = Console()
-
-
-JOB_STATUS: TypeAlias = Literal["queued", "running", "completed", "failed"]
 
 
 class CloudManager:
@@ -187,13 +184,13 @@ class RemoteMachine:
             else: executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
             assert self.config.email_config_name is not None, "Email config name is not provided. 🤷‍♂️"
             assert self.config.to_email is not None, "Email address is not provided. 🤷‍♂️"
-            job_params = EmailParams(addressee=self.ssh.get_repr("local", add_machine=True),
-                                     speaker=self.ssh.get_repr('remote', add_machine=True),
-                                     ssh_conn_str=self.ssh.get_repr('remote', add_machine=False),
-                                     executed_obj=executed_obj,
-                                     resource_manager_path=self.resources.resource_manager_path.collapseuser().as_posix(),
-                                     to_email=self.config.to_email, email_config_name=self.config.email_config_name)
-            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {job_params}")
+            email_params = EmailParams(addressee=self.ssh.get_repr("local", add_machine=True),
+                                       speaker=self.ssh.get_repr('remote', add_machine=True),
+                                       ssh_conn_str=self.ssh.get_repr('remote', add_machine=False),
+                                       executed_obj=executed_obj,
+                                       resource_manager_path=self.resources.resource_manager_path.collapseuser().as_posix(),
+                                       to_email=self.config.to_email, email_config_name=self.config.email_config_name)
+            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}")
         shell_script = f"""
 
 # EXTRA-PLACEHOLDER-PRE
