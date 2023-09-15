@@ -118,7 +118,7 @@ class RemoteMachine:
         assert self.execution_command is not None, "Execution command is not yet generated. Run generate_scripts() first. 🤷‍♂️"
         console.rule(f"Firing job @ remote machine {self.ssh}")
         if open_console and self.config.open_console:
-            self.ssh.open_console(cmd=self.session_manager.get_create_session_command(), shell="pwsh")
+            self.ssh.open_console(cmd=self.session_manager.get_new_session_command(), shell="pwsh")
             self.session_manager.asssert_session_started()
             # send email at start execution time
         if isinstance(self.session_manager, Zellij):

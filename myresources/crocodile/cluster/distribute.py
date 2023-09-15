@@ -225,7 +225,7 @@ class Cluster:
         self.window_number = window_number if window_number is not None else 0  # tb.randstr(length=3, lower=False, upper=False)
         cmd = f"wt -w {self.window_number} "
         for idx, m in enumerate(self.machines):
-            sub_cmd = m.session_manager.get_new_session_string()
+            sub_cmd = m.session_manager.get_new_session_ssh_command()
             if idx == 0: cmd += f""" new-tab --title '{str(m.ssh.hostname) + str(idx)}' pwsh -Command "{sub_cmd}" `;"""  # avoid new tabs despite being even index
             elif idx % self.machines_per_tab == 0: cmd += f""" new-tab --title {str(m.ssh.hostname) + str(idx)} pwsh -Command "{sub_cmd}" `;"""
             else: cmd += f""" split-pane --horizontal --size {1 / self.machines_per_tab} pwsh -Command "{sub_cmd}" `;"""

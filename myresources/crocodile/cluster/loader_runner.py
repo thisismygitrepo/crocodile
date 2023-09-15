@@ -4,6 +4,7 @@ Runner
 """
 
 import crocodile.toolbox as tb
+from crocodile.meta import MACHINE
 from rich import inspect
 from rich.console import Console
 import pandas as pd
@@ -203,7 +204,7 @@ class ResourceManager:
         return rm
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
-    def __init__(self, job_id: str, remote_machine_type: Literal['Windows', 'Linux'], lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, tb.P, None] = None):
+    def __init__(self, job_id: str, remote_machine_type: MACHINE, lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, tb.P, None] = None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.

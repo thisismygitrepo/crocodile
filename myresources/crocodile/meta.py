@@ -14,7 +14,9 @@ from dataclasses import dataclass
 
 
 _ = IO, TextIO
-SHELLS: TypeAlias = Literal["cmd", "wt", "powershell", "wsl", "ubuntu", "pwsh"]  # pwsh.exe is PowerShell (community) and powershell.exe is Windows Powershell (msft)
+SHELLS: TypeAlias = Literal["default", "cmd", "powershell", "pwsh", "bash"]  # pwsh.exe is PowerShell (community) and powershell.exe is Windows Powershell (msft)
+CONSOLE: TypeAlias = Literal["wt", "cmd"]
+MACHINE: TypeAlias = Literal["Windows", "Linux", "Darwin"]
 
 
 @dataclass
@@ -166,6 +168,12 @@ class Terminal:
         if self.elevated is False or self.is_user_admin(): resp: subprocess.CompletedProcess[str] = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return Response.from_completed_process(resp)
+    def run_script(self, script: str, shell: SHELLS = "default"):
+        tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
+        if shell == "default": start_cmd  = "source"
+        else: start_cmd = shell
+        resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True)
+        return Response.from_completed_process(resp)
     @staticmethod
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if __import__('os').name == 'nt':
@@ -189,7 +197,7 @@ class Terminal:
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
         script = ((Terminal.get_header(wdir=wdir) if header else "") + script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
-        py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts").write_text(f"""print(r'''{script}''')""" + "\n" + script)
+        py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts/terminal").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", py_script.absolute().as_uri())
         shell_script = f"""
 {f'cd {wdir}' if wdir is not None else ''}
@@ -274,15 +282,18 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
         self._local_distro: Optional[str] = None
         self._remote_distro: Optional[str] = None
-        self._remote_machine: Optional[Literal['Windows', 'Linux']] = None
+        self._remote_machine: Optional[MACHINE] = None
         self.terminal_responses: list[Response] = []
         self.platform = platform
         self.remote_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""  # works for both cmd and pwsh
     def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "tmate_sess", "port", "sshkey", "compress", "pwd", "ve"]}
     def __setstate__(self, state: dict[str, Any]): SSH(**state)
-    def get_remote_machine(self) -> Literal['Windows', 'Linux']:
-        self._remote_machine = ("Windows" if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT") else "Linux") if self._remote_machine is None else self._remote_machine; return self._remote_machine  # echo %OS% TODO: uname on linux
+    def get_remote_machine(self) -> MACHINE:
+        if self._remote_machine is None:
+            if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT"): self._remote_machine = "Windows"
+            else: self._remote_machine = "Linux"
+        return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
     def get_remote_distro(self):
         if self._remote_distro is None: self._remote_distro = self.run_py("print(tb.install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
@@ -290,7 +301,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
     def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
-    def get_repr(self, which: str = "remote", add_machine: bool = False): return (f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")) if which == "remote" else f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
+    def get_repr(self, which: str = "remote", add_machine: bool = False) -> str:
+        if which == "remote": return f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")
+        return f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
     def run_locally(self, command: str):
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
@@ -426,7 +439,9 @@ class Scheduler:
         return self
     def default_exception_handler(self, ex: Union[Exception, KeyboardInterrupt], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
-        self.record_session_end(reason=f"during {during}, " + str(ex)); self.logger.exception(ex); raise ex
+        self.record_session_end(reason=f"during {during}, " + str(ex))
+        self.logger.exception(ex)
+        raise ex
 
 
 # def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):

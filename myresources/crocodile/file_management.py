@@ -297,8 +297,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace: str = '_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
-    def write_text(self, data: str, encoding: str = 'utf-8') -> 'P':
-        super(P, self).write_text(data, encoding=encoding); return self
+    def write_text(self, data: str, encoding: str = 'utf-8', newline: Optional[str] = None) -> 'P':
+        super(P, self).write_text(data, encoding=encoding, newline=newline); return self
     def read_text(self, encoding: Optional[str] = 'utf-8') -> str: return super(P, self).read_text(encoding=encoding)
     def write_bytes(self, data: bytes, overwrite: bool = False) -> 'P':
         slf = self.expanduser().absolute(); _ = slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
