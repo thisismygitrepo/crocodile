@@ -397,7 +397,6 @@ class CloudManager:
             return CloudManager.run_cloud_jobs()
         queue_path = queue_path.list[0]
 
-
     @staticmethod
     def reset_cloud(force: bool = False):
         if not force: CloudManager.claim_lock()

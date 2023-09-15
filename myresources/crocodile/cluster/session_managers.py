@@ -37,9 +37,11 @@ class Zellij:
         return sess_name
     # def __getstate__(self): return self.__dict__
     # def __setstate__(self, state): self.__dict__.update(state)
-    def get_ssh_command(self, sess_name: Optional[str] = None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
-    def get_new_session_string(self): return f"{self.ssh.get_ssh_conn_str()} -t {self.get_ssh_command()}"
-    def open_console(self): return tb.Terminal().run_async(self.get_new_session_string(), shell="pwsh")
+    def get_create_session_command(self, sess_name: Optional[str] = None): return f"zellij attach {sess_name or self.get_new_session_name()} -c "  # -c means create if not exists.
+    def get_new_session_string(self): return f"{self.ssh.get_ssh_conn_str()} -t {self.get_create_session_command()}"
+    def open_console(self):
+        if isinstance(self.ssh, SelfSSH): return tb.Terminal().run_async(self.get_create_session_command(), shell="powershell")
+        return tb.Terminal().run_async(self.get_new_session_string(), shell="pwsh")
     def asssert_session_started(self):
         while True:
             resp = self.ssh.run("zellij ls", verbose=False).op.split("\n")
@@ -92,7 +94,7 @@ class WindowsTerminal:
 
     def get_new_session_name(self): return f"mprocs{self.id}"
     def get_new_session_string(self): return f"lol"
-    def get_ssh_command(self): return ""
+    def get_create_session_command(self): return ""
     def open_console(self, cmd: str, shell: str = "powershell"):
         _ = cmd, shell
         return "wt -w 0 -d ."
