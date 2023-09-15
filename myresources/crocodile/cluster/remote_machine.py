@@ -3,13 +3,13 @@
 """
 
 from pickle import PickleError
-from typing import Optional, Any, Union, Callable, Literal, TypeAlias
+from typing import Optional, Any, Union, Callable
 from dataclasses import dataclass, field
 import time
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
-from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager
+from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager, TRANSFER_METHOD, JOB_STATUS, CloudManager
 import crocodile.cluster as cluster
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -17,55 +17,9 @@ from rich import inspect
 # from rich.text import Text
 from rich.console import Console
 import pandas as pd
-import getpass
-import random
 
 
 console = Console()
-TRANSFER_METHOD: TypeAlias = Literal["sftp", "transfer_sh", "cloud"]
-
-
-class CloudManager:
-    base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
-    cloud = "gdw"
-    @staticmethod
-    def claim_lock() -> Literal[True]:
-        path = CloudManager.base_path.expanduser().create()
-        try:
-            lock_path = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
-        except AssertionError as _ae:
-            print(f"Lock doesn't exist on remote, uploading for the first time.")
-            path.joinpath("lock.txt").write_text(getpass.getuser()).to_cloud(cloud=CloudManager.cloud, rel2home=True)
-            return CloudManager.claim_lock()
-
-        lock_data = lock_path.read_text()
-        if lock_data != "" and lock_data != getpass.getuser():
-            print(f"CloudManager: Lock already claimed by `{lock_data}`. 🤷‍♂️")
-            wait = int(random.random() * 30)
-            print(f"sleeping for {wait} seconds and trying again.")
-            time.sleep(wait)
-            return CloudManager.claim_lock()
-
-        print("No calims on lock, claiming it...")
-        path.joinpath("lock.txt").write_text(getpass.getuser()).to_cloud(cloud=CloudManager.cloud, rel2home=True)
-        counter: int = 1
-        while counter < 4:
-            lock_path_tmp = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
-            lock_data_tmp = lock_path_tmp.read_text()
-            if lock_data_tmp != getpass.getuser():
-                print(f"CloudManager: Lock already claimed by `{lock_data_tmp}`. 🤷‍♂️")
-                print("sleeping for 30 seconds and trying again.")
-                time.sleep(30)
-                return CloudManager.claim_lock()
-            counter += 1
-            print(f"Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter}")
-            time.sleep(10)
-        return True
-
-    @staticmethod
-    def release_lock() -> Literal[True]:
-        CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=CloudManager.cloud, rel2home=True)
-        return True
 
 
 @dataclass
@@ -75,7 +29,7 @@ class RemoteMachineConfig:
     base_dir: str = f"~/tmp_results/remote_machines/jobs"
     description: str = ""
     ssh_params: dict[str, Union[str, int]] = field(default_factory=lambda: {})
-    ssh_obj: Optional[tb.SSH] = None
+    ssh_obj: Union[tb.SSH, SelfSSH, None] = None
 
     # data
     copy_repo: bool = False
@@ -102,20 +56,44 @@ class RemoteMachineConfig:
     lock_resources: bool = True
     max_simulataneous_jobs: int = 1
     workload_params: Optional[WorkloadParams] = None
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.interactive and self.lock_resources: print(f"RemoteMachineConfig Warning: If interactive is ON along with lock_resources, the job might never end.")
 
 
 class RemoteMachine:
+    def submit_to_cloud(self, split: int = 5) -> list['RemoteMachine']:
+        """This operation is save to do without lock since the to_cloud method only sends data upwards and dooesn't change anything on the remote.
+        """
+        assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
+        assert isinstance(self.ssh, SelfSSH), "CloudManager only works with `SelfSSH` objects."
+        assert self.config.workload_params is None, "CloudManager only works with `workload_params` set to `None`."
+
+        self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
+        self.resources.base_dir = tb.P(self.config.base_dir).collapseuser()
+        status_init: JOB_STATUS = 'queued'
+        wl = WorkloadParams().split_to_jobs(jobs=split)
+        rms = []
+        from copy import deepcopy
+        for idx, a_workload_params in enumerate(wl):
+            rm = deepcopy(self)
+            rm.config.job_id = f"{rm.config.job_id}-split-{idx + 1}-{split}"
+            rm.config.workload_params = a_workload_params
+            rm.resources.job_root = self.resources.base_dir.joinpath(f"{status_init}/{rm.config.job_id}").collapseuser()
+            rm.generate_scripts()
+            rms.append(rm)
+        self.resources.base_dir.joinpath(status_init).to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        return rms
+
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_repr('remote', add_machine=True)}"
     def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list[tb.P]] = None):
-        self.config = config
+        self.config: RemoteMachineConfig = config
         self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
         if self.config.install_repo is True: assert self.job_params.is_installabe()
 
+        if self.config.workload_params is not None and func_kwargs is not None: assert "workload_params" not in func_kwargs, "workload_params provided twice, once in config and once in func_kwargs. 🤷‍♂️"
         self.kwargs = func_kwargs or {}
         self.data = data if data is not None else []
         # conn
@@ -169,18 +147,8 @@ class RemoteMachine:
         else: raise ValueError(f"Transfer method {self.config.transfer_method} not recognized. 🤷‍")
         self.execution_command_to_clip_memory()
 
-    # def submit_to_cloud(self, split: int = 5):
-    #     assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
-    #     wl = WorkloadParams().split_to_jobs(jobs=split)
-    #     # self.config.base_dir = 
-    #     self.config.job_id
-    #     self.generate_scripts()
-    #     self.show_scripts()
-    #     self.submit()
-    #     print(f"Saved RemoteMachine object can be found @ {self.resources.machine_obj_path.expanduser()}")
-
     def generate_scripts(self):
-        console.rule("Generating scripts")
+        console.rule(f"Generating scripts for {self.__repr__()}")
 
         self.session_name = self.session_manager.get_new_session_name()
         self.job_params.ssh_repr = repr(self.ssh)
@@ -207,9 +175,9 @@ class RemoteMachine:
 # EXTRA-PLACEHOLDER-PRE
 
 echo "~~~~~~~~~~~~~~~~SHELL START~~~~~~~~~~~~~~~"
-{self.ssh.remote_env_cmd}
 {'~/scripts/devops -w update' if self.config.update_essential_repos else ''}
 {f'cd {tb.P(self.job_params.repo_path_rh).collapseuser().as_posix()}'}
+. activate_ve
 {'git pull' if self.config.update_repo else ''}
 {'pip install -e .' if self.config.install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL  END ~~~~~~~~~~~~~~~"
@@ -226,17 +194,14 @@ cd ~
 deactivate
 
 """
-        # self.ssh.run_py("import machineconfig.scripts.python.devops_update_repos as x; obj=x.main(verbose=False)", verbose=False, desc=f"Querying `{self.ssh.get_repr(which='remote')}` for how to update its essential repos.").op
         if self.ssh.get_remote_machine() != "Windows": shell_script += f"""{f'zellij kill-session {self.session_name}' if self.config.kill_on_completion else ''}"""
 
-        # only available in py 3.10:
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
         with open(file=self.resources.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         self.resources.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         tb.Save.pickle(obj=self.kwargs, path=self.resources.kwargs_path.expanduser(), verbose=False)
         tb.Save.pickle(obj=self.resources.__getstate__(), path=self.resources.resource_manager_path.expanduser(), verbose=False)
         print("\n")
-        # self.show_scripts()
 
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.resources.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))

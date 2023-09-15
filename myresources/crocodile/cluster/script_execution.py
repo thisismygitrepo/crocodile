@@ -29,9 +29,9 @@ params = JobParams.from_empty()
 print("\n" * 2)
 manager: ResourceManager = ResourceManager.from_pickle(params.resource_manager_path)
 manager.secure_resources()
-manager.move_job(status="running")
+manager.move_job(status="running")  # doesn't work for interactive jobs.
 pid: int = os.getpid()
-manager.execution_log_dir.expanduser().joinpath("pid.txt").write_text(str(pid))
+manager.execution_log_dir.expanduser().joinpath("pid.txt").create(parents_only=True).write_text(str(pid))
 
 
 # keep those values after lock is released

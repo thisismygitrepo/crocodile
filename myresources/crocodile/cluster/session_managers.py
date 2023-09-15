@@ -4,12 +4,13 @@ Session Manager
 """
 
 import crocodile.toolbox as tb
+from crocodile.cluster.self_ssh import SelfSSH
 import time
-from typing import Optional
+from typing import Optional, Union
 
 
 class Zellij:
-    def __init__(self, ssh: tb.SSH):
+    def __init__(self, ssh: Union[SelfSSH, tb.SSH]):
         """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
         self.ssh = ssh
         self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
@@ -85,7 +86,7 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 
 
 class WindowsTerminal:
-    def __init__(self, ssh: tb.SSH):
+    def __init__(self, ssh: Union[tb.SSH, SelfSSH]):
         self.ssh = ssh
         self.id = "400"  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
 

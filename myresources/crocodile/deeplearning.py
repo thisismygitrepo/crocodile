@@ -41,6 +41,10 @@ class EvaluationData:
     y_true_pp: list[Any]
     names: list[str]
     loss_df: Optional['pd.DataFrame']
+    def __repr__(self) -> str:
+        print("")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
+        _ = tb.S(self.__dict__).print()
+        return "EvaluationData Object"
 
 
 @dataclass
@@ -466,6 +470,7 @@ class BaseModel(ABC):
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
+            elif hasattr(a_metric, "__class__"): name = a_metric.__class__.__name__
             else: name = "unknown_loss_name"
             # try:  # EAFP vs LBYL: both are duck-typing styles as they ask for what object can do (whether by introspection or trial) as opposed to checking its type.
             #     path = a_metric.path  # works for subclasses Metrics

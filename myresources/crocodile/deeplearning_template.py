@@ -88,6 +88,16 @@ class Model(dl.BaseModel):
         m = tf.keras.Sequential([tf.keras.layers.Dense(5), tf.keras.layers.Dense(1)])
         return m
 
+    def test(self):
+        report = self.evaluate(viz=False)
+        import pandas as pd
+        assert isinstance(report.loss_df, pd.DataFrame)
+        # loss_name = self.compiler.loss.__class__.__name__ if not hasattr(self.compiler.loss, '__name__') else self.compiler.loss.__name__
+        # report.loss_df[loss_name] = report.loss_df[loss_name].round()
+        df = pd.DataFrame(np.concatenate([report.y_true[0], report.y_pred[0]], axis=1).round(3), columns=["y_true", "y_pred"])
+        res = pd.concat([df, report.loss_df], axis=1)
+        return res
+
 
 def main():
     # noinspection PyUnresolvedReferences
@@ -100,6 +110,7 @@ def main():
     _res_before = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]), viz=True)
     m.fit()
     _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]), viz=True)
+    print(m.test())
     m.save_class()
     return m
 

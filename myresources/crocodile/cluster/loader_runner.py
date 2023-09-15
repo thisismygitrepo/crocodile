@@ -3,17 +3,21 @@
 Runner
 """
 
-from dataclasses import dataclass
 import crocodile.toolbox as tb
-import os
 from rich import inspect
 from rich.console import Console
-import time
-from typing import Optional, Callable, Union, Any, Literal, TypeAlias
 import pandas as pd
+from typing import Optional, Callable, Union, Any, Literal, TypeAlias
+import time
+from dataclasses import dataclass
+import os
+import getpass
+import random
+import platform
 
 
 JOB_STATUS: TypeAlias = Literal["queued", "running", "completed", "failed"]
+TRANSFER_METHOD: TypeAlias = Literal["sftp", "transfer_sh", "cloud"]
 console = Console()
 
 
@@ -23,7 +27,7 @@ class WorkloadParams:
     idx_end: int = 1000
     idx_max: int = 1000
     jobs: int = 3
-    job_id: int = 0
+    job_id: str = ''
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
     def split_to_jobs(self, jobs: Optional[int] = None) -> tb.List['WorkloadParams']:
@@ -213,9 +217,9 @@ class ResourceManager:
         self.submission_time = pd.Timestamp.now()
 
         self.base_dir = tb.P(base).collapseuser() if bool(base) else ResourceManager.default_base
-        parent: JOB_STATUS
-        parent = 'queued'
-        self.job_root = self.base_dir.joinpath(f"{parent}/{self.job_id}")
+        status: JOB_STATUS
+        status = 'queued'
+        self.job_root = self.base_dir.joinpath(f"{status}/{self.job_id}")
     @property
     def machine_obj_path(self):
         return self.job_root.joinpath(f"machine.Machine.pkl")
@@ -372,6 +376,85 @@ echo "Unlocked resources"
         print(f"Saved history file to {hist_file} with {len(hist)} items.")
         tb.Save.pickle(obj=hist, path=hist_file)
         # this is further handled by the calling script in case this function failed.
+
+
+class CloudManager:
+    base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
+    cloud = "gdw"
+    max_jobs: int = 3
+
+    @staticmethod
+    def run_cloud_jobs():
+        CloudManager.claim_lock()
+        status: JOB_STATUS = 'queued'
+        queue_path = CloudManager.base_path.expanduser().joinpath(f"{status}").search()
+        if len(queue_path) == 0:
+            print(f"No queued jobs found.")
+            CloudManager.release_lock()
+            wait = int(random.random() * 1000)
+            print(f"sleeping for {wait} seconds and trying again.")
+            time.sleep(wait)
+            return CloudManager.run_cloud_jobs()
+        queue_path = queue_path.list[0]
+
+
+    @staticmethod
+    def reset_cloud(force: bool = False):
+        if not force: CloudManager.claim_lock()
+        CloudManager.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=CloudManager.cloud, rel2home=True, sync_up=True)
+        CloudManager.release_lock()
+
+    @staticmethod
+    def claim_lock() -> Literal[True]:
+        this_machine = f"{getpass.getuser()}@{platform.node()}"
+        path = CloudManager.base_path.expanduser().create()
+        try:
+            lock_path = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+        except AssertionError as _ae:
+            print(f"Lock doesn't exist on remote, uploading for the first time.")
+            path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=CloudManager.cloud, rel2home=True)
+            return CloudManager.claim_lock()
+
+        lock_data = lock_path.read_text()
+        if lock_data != "" and lock_data != this_machine:
+            print(f"CloudManager: Lock already claimed by `{lock_data}`. 🤷‍♂️")
+            wait = int(random.random() * 30)
+            print(f"sleeping for {wait} seconds and trying again.")
+            time.sleep(wait)
+            return CloudManager.claim_lock()
+
+        print("No calims on lock, claiming it...")
+        path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        counter: int = 1
+        while counter < 4:
+            lock_path_tmp = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+            lock_data_tmp = lock_path_tmp.read_text()
+            if lock_data_tmp != this_machine:
+                print(f"CloudManager: Lock already claimed by `{lock_data_tmp}`. 🤷‍♂️")
+                print("sleeping for 30 seconds and trying again.")
+                time.sleep(30)
+                return CloudManager.claim_lock()
+            counter += 1
+            print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")
+            time.sleep(10)
+        return True
+
+    @staticmethod
+    def release_lock() -> bool:
+        path = CloudManager.base_path.expanduser().create()
+        try:
+            lock_path = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+        except AssertionError as _ae:
+            print(f"Lock doesn't exist on remote, uploading for the first time.")
+            path.joinpath("lock.txt").write_text("").to_cloud(cloud=CloudManager.cloud, rel2home=True)
+            return True
+        data = lock_path.read_text()
+        this_machine = f"{getpass.getuser()}@{platform.node()}"
+        if data != this_machine:
+            print(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned!")
+            return False
+        path.joinpath("lock.txt").write_text("").to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        return True
 
 
 if __name__ == '__main__':
