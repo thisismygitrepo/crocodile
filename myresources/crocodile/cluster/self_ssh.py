@@ -30,10 +30,11 @@ class SelfSSH:
         if self._remote_machine is None:
             self._remote_machine = "Windows" if (self.run("$env:OS").op.rstrip("\n") == "Windows_NT" or self.run("echo %OS%").op == "Windows_NT") else "Linux"
         return self._remote_machine
-    def get_repr(self, which: str, add_machine: bool = False):
+    def get_remote_repr(self, add_machine: bool = False):
         _ = add_machine
         host = f"{getpass.getuser()}@{platform.node()}"
-        return f"SelfSSH({host})({which})"
+        return f"SelfSSH({host}) REMOTE"
+    def get_local_repr(self, add_machine: bool = False): return self.get_remote_repr(add_machine=add_machine).replace("REMOTE", "LOCAL")
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"):
         _ = cmd, shell, new_window, terminal
         return tb.Terminal().run_async("-i", new_window=True, shell=shell)

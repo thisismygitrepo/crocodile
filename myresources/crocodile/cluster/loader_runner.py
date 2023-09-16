@@ -10,7 +10,7 @@ from rich.console import Console
 import pandas as pd
 from typing import Optional, Callable, Union, Any, Literal, TypeAlias
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import os
 import getpass
 import random
@@ -19,6 +19,7 @@ import platform
 
 JOB_STATUS: TypeAlias = Literal["queued", "running", "completed", "failed"]
 TRANSFER_METHOD: TypeAlias = Literal["sftp", "transfer_sh", "cloud"]
+LAUNCH_METHOD: TypeAlias = Literal["remotely", "locally"]
 console = Console()
 
 
@@ -83,10 +84,10 @@ class JobParams:
             func_module = func.__module__
             assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."
             if func.__name__ != func.__qualname__:
-                print(f"Passed function {func} is a method of a class.")
+                # print(f"Passed function {func} is a method of a class.")
                 func_file, func_class = tb.P(func.__code__.co_filename), func.__qualname__.split(".")[0]
             else:
-                print(f"Passed function {func} is not a method of a class.")
+                # print(f"Passed function {func} is not a method of a class.")
                 func_file, func_class = tb.P(func.__code__.co_filename), None
         elif type(func) is str or type(func) is tb.P:
             func_file = tb.P(func)
@@ -191,11 +192,11 @@ class EmailParams:
 
 
 class ResourceManager:
-    running_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/running_jobs.pkl")
-    queue_path   = tb.P(f"~/tmp_results/remote_machines/resource_manager/queued_jobs.pkl")
-    history_path = tb.P(f"~/tmp_results/remote_machines/resource_manager/history_jobs.pkl")
-    default_base = tb.P(f"~/tmp_results/remote_machines/jobs")
-    shell_script_path_log = rf"~/tmp_results/remote_machines/resource_manager/last_cluster_script.txt"
+    running_path          = tb.P(f"~/tmp_results/remote_machines/resource_manager/running_jobs.pkl")
+    queue_path            = tb.P(f"~/tmp_results/remote_machines/resource_manager/queued_jobs.pkl")
+    history_path          = tb.P(f"~/tmp_results/remote_machines/resource_manager/history_jobs.pkl")
+    shell_script_path_log = tb.P(f"~/tmp_results/remote_machines/resource_manager/last_cluster_script.txt")
+    default_base          = tb.P(f"~/tmp_results/remote_machines/jobs")
 
     @staticmethod
     def from_pickle(path: Union[str, tb.P]):
@@ -221,9 +222,19 @@ class ResourceManager:
         status: JOB_STATUS
         status = 'queued'
         self.job_root = self.base_dir.joinpath(f"{status}/{self.job_id}")
-    @property
-    def machine_obj_path(self):
-        return self.job_root.joinpath(f"machine.Machine.pkl")
+
+    def get_fire_command(self, launch_method: LAUNCH_METHOD):
+        script_path = self.shell_script_path.expanduser()
+        if launch_method == "remotely": pass  # shell_script is already repared for target machine.
+        else:
+            if platform.system() == "Windows" and script_path.name.endswith(".sh"): script_path.copy(path=script_path.with_suffix(".ps1"))
+            if platform.system() == "Linux" and script_path.name.endswith(".ps1"): script_path.copy(path=script_path.with_suffix(".sh"))
+        return f". {script_path}"
+    def fire_command_to_clip_memory(self, launch_method: LAUNCH_METHOD):
+        print("Execution command copied to clipboard 📋")
+        print(self.get_fire_command(launch_method=launch_method)); tb.install_n_import("clipboard").copy(self.get_fire_command(launch_method=launch_method))
+        print("\n")
+
     @property
     def py_script_path(self):
         return self.job_root.joinpath(f"python/cluster_wrap.py")
@@ -240,13 +251,54 @@ class ResourceManager:
     def resource_manager_path(self):
         return self.job_root.joinpath(f"data/resource_manager.pkl")
     @property
+    def remote_machine_path(self):
+        return self.job_root.joinpath(f"data/remote_machine.Machine.pkl")
+    @property
+    def remote_machine_config_path(self):
+        return self.job_root.joinpath(f"data/remote_machine_config.pkl")
+    @property
     def execution_log_dir(self):
         return self.job_root.joinpath(f"logs")
 
-    def move_job(self, status: JOB_STATUS):
-        # target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
-        target = self.job_root.expanduser().move(folder=self.base_dir.joinpath(status))
-        self.job_root = target.collapseuser()
+    # def move_job(self, status: JOB_STATUS):
+    #     # target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
+    #     target = self.job_root.expanduser().move(folder=self.base_dir.joinpath(status))
+    #     self.job_root = target.collapseuser()
+    # def update_job_location(self) -> JOB_STATUS:
+    #     status: JOB_STATUS
+    #     if self.base_dir.joinpath("queued").joinpath(self.job_id).expanduser().exists(): status = 'queued'
+    #     elif self.base_dir.joinpath("running").joinpath(self.job_id).expanduser().exists(): status = 'running'
+    #     elif self.base_dir.joinpath("completed").joinpath(self.job_id).expanduser().exists(): status = 'completed'
+    #     elif self.base_dir.joinpath("failed").joinpath(self.job_id).expanduser().exists(): status = 'failed'
+    #     else: raise FileNotFoundError(f"Job {self.job_id} is not found in any of the status folders.")
+    #     self.job_root = self.base_dir.joinpath(status).joinpath(self.job_id).collapseuser()
+    #     return status
+    def get_job_status(self) -> JOB_STATUS:
+        pid_path = self.execution_log_dir.joinpath("pid.txt")
+        tmp = self.execution_log_dir.joinpath("status.txt").read_text()
+        status: JOB_STATUS = tmp  # type: ignore
+        if status == "running":
+            if not pid_path.exists():
+                print(f"Something wrong happened to this job, moving to failed.")
+                status = 'failed'
+                self.execution_log_dir.joinpath("status.txt").write_text(status)
+                return status
+            pid: int = int(pid_path.read_text().rstrip())
+            import psutil
+            try: proc = psutil.Process(pid=pid)
+            except psutil.NoSuchProcess:
+                print(f"Something wrong happened to this job, moving to failed.")
+                status = 'failed'
+                self.execution_log_dir.joinpath("status.txt").write_text(status)
+                return status
+            command = " ".join(proc.cmdline())
+            if self.job_id not in command:
+                print(f"Something wrong happened to this job, moving to failed.")
+                status = 'failed'
+                self.execution_log_dir.joinpath("status.txt").write_text(status)
+                return status
+            return status
+        return status
 
     def add_to_queue(self, job_status: JobStatus):
         try:
@@ -379,41 +431,96 @@ echo "Unlocked resources"
         # this is further handled by the calling script in case this function failed.
 
 
+@dataclass
+class LogEntry:
+    name: str
+    submission_time: pd.Timestamp
+    start_time: Optional[pd.Timestamp]
+    end_time: Optional[pd.Timestamp]
+    run_machine: str
+    source_machine: str
+    note: str
+    @staticmethod
+    def from_dict(a_dict: dict[str, Any]):
+        return LogEntry(name=a_dict["name"], submission_time=pd.to_datetime(a_dict["submission_time"]), start_time=pd.to_datetime(a_dict["start_time"]), end_time=pd.to_datetime(a_dict["end_time"]), run_machine=a_dict["run_machine"], source_machine=a_dict["source_machine"], note=a_dict["note"])
+
+
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
-    cloud = "gdw"
-    max_jobs: int = 3
+    def __init__(self, max_jobs: int = 3, cloud: str = "gdw") -> None:
 
-    @staticmethod
-    def run_cloud_jobs():
-        CloudManager.claim_lock()
-        status: JOB_STATUS = 'queued'
-        queue_path = CloudManager.base_path.expanduser().joinpath(f"{status}").search()
-        if len(queue_path) == 0:
-            print(f"No queued jobs found.")
-            CloudManager.release_lock()
+        self.max_jobs = max_jobs
+        self.cloud = cloud
+        from crocodile.cluster.remote_machine import RemoteMachine
+        self.running_jobs: list[RemoteMachine] = []
+
+    def read_log(self) -> dict[JOB_STATUS, 'pd.DataFrame']:
+        path = self.base_path.joinpath("logs.pkl")
+        if not path.exists():
+            cols = [a_field.name for a_field in fields(LogEntry)]
+            res: dict[JOB_STATUS, 'pd.DataFrame'] = {}
+            res['queued'] = pd.DataFrame(columns=cols)
+            res['running'] = pd.DataFrame(columns=cols)
+            res['completed'] = pd.DataFrame(columns=cols)
+            res['failed'] = pd.DataFrame(columns=cols)
+            tb.Save.vanilla_pickle(obj=res, path=path.create(parents_only=True))
+        return tb.Read.vanilla_pickle(path=path)
+
+    def run(self):
+        cycle = 0
+        while True:
+            cycle += 1
+            print(f"Cycle #{cycle}")
+            print(f"Running jobs: {len(self.running_jobs)} / {self.max_jobs=}")
+
+            self.update()
             wait = int(random.random() * 1000)
             print(f"sleeping for {wait} seconds and trying again.")
             time.sleep(wait)
-            return CloudManager.run_cloud_jobs()
-        queue_path = queue_path.list[0]
+            for a_rm in self.running_jobs:
+                if a_rm.resources.get_job_status() is None:
+                    self.running_jobs.remove(a_rm)
+                    self.update()
 
-    @staticmethod
-    def reset_cloud(force: bool = False):
-        if not force: CloudManager.claim_lock()
-        CloudManager.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=CloudManager.cloud, rel2home=True, sync_up=True)
-        CloudManager.release_lock()
+    def update(self):
+        from crocodile.cluster.remote_machine import RemoteMachine
+        self.claim_lock()
+        log = self.read_log()
 
-    @staticmethod
-    def claim_lock() -> Literal[True]:
+        if len(log["queued"]) == 0:
+            print(f"No queued jobs found.")
+            self.release_lock()
+            return None
+
+        if len(self.running_jobs) < self.max_jobs:
+            queue_entry = LogEntry.from_dict(log["queued"].iloc[0].to_dict())
+            log["queued"] = log["queued"].iloc[1:] if len(log["queued"]) > 1 else pd.DataFrame(columns=log["queued"].columns)
+            tmp = log["running"]
+            log["running"] = tmp.append(queue_entry.__dict__, ignore_index=True)
+
+            a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
+            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm.fire(run=True)
+            self.running_jobs.append(rm)
+            self.update()
+        return None
+
+    def reset_cloud(self, force: bool = False):
+        if not force: self.claim_lock()
+        CloudManager.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, verbose=True, transfers=100)
+        self.release_lock()
+    def reset_lock(self): CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+
+    def claim_lock(self, first_call: bool = True) -> Literal[True]:
+        if first_call: console.rule(title=f"Claiming Lock", style="bold red", characters="-")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         path = CloudManager.base_path.expanduser().create()
         try:
-            lock_path = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+            lock_path = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         except AssertionError as _ae:
             print(f"Lock doesn't exist on remote, uploading for the first time.")
-            path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=CloudManager.cloud, rel2home=True)
-            return CloudManager.claim_lock()
+            path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+            return self.claim_lock(first_call=False)
 
         lock_data = lock_path.read_text()
         if lock_data != "" and lock_data != this_machine:
@@ -421,39 +528,44 @@ class CloudManager:
             wait = int(random.random() * 30)
             print(f"sleeping for {wait} seconds and trying again.")
             time.sleep(wait)
-            return CloudManager.claim_lock()
+            return self.claim_lock(first_call=False)
 
         print("No calims on lock, claiming it...")
-        path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         counter: int = 1
         while counter < 4:
-            lock_path_tmp = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+            lock_path_tmp = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
             lock_data_tmp = lock_path_tmp.read_text()
             if lock_data_tmp != this_machine:
                 print(f"CloudManager: Lock already claimed by `{lock_data_tmp}`. 🤷‍♂️")
                 print("sleeping for 30 seconds and trying again.")
                 time.sleep(30)
-                return CloudManager.claim_lock()
+                return self.claim_lock(first_call=False)
             counter += 1
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")
             time.sleep(10)
+        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+        console.rule(title=f"Lock Claimed", style="bold red", characters="-")
         return True
 
-    @staticmethod
-    def release_lock() -> bool:
+    def release_lock(self) -> bool:
+        console.rule(title=f"Releasing Lock", style="bold red", characters="-")
         path = CloudManager.base_path.expanduser().create()
         try:
-            lock_path = path.joinpath("lock.txt").from_cloud(cloud=CloudManager.cloud, rel2home=True)
+            lock_path = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         except AssertionError as _ae:
             print(f"Lock doesn't exist on remote, uploading for the first time.")
-            path.joinpath("lock.txt").write_text("").to_cloud(cloud=CloudManager.cloud, rel2home=True)
+            path.joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
             return True
         data = lock_path.read_text()
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         if data != this_machine:
             print(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned!")
             return False
-        path.joinpath("lock.txt").write_text("").to_cloud(cloud=CloudManager.cloud, rel2home=True)
+        path.joinpath("lock.txt").write_text("")
+        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+        # .to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+        # console.rule(title=f"Lock Released", style="bold red", characters="-")
         return True
 
 

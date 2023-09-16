@@ -172,7 +172,7 @@ class Terminal:
         tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
         if shell == "default": start_cmd  = "source"
         else: start_cmd = shell
-        resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True)
+        resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=True)
         return Response.from_completed_process(resp)
     @staticmethod
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
@@ -301,15 +301,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
     def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
-    def get_repr(self, which: str = "remote", add_machine: bool = False) -> str:
-        if which == "remote": return f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")
-        return f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
-    def __repr__(self): return f"local {self.get_repr('local', add_machine=True)} >>> SSH TO >>> remote {self.get_repr('remote', add_machine=True)}"
+    def get_remote_repr(self, add_machine: bool = False) -> str: return f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")
+    def get_local_repr(self, add_machine: bool = False) -> str: return f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
+    def __repr__(self): return f"local {self.get_local_repr(add_machine=True)} >>> SSH TO >>> remote {self.get_remote_repr(add_machine=True)}"
     def run_locally(self, command: str):
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
         res = Response(cmd=command); res.output.returncode = os.system(command)
         return res
-    def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_repr('remote').replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
+    def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_remote_repr().replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
     def run(self, cmd: str, verbose: bool = True, desc: str = "", strict_err: bool = False, strict_returncode: bool = False, env_prefix: bool = False) -> Response:  # most central method.
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd
@@ -318,7 +317,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         _ = res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False) -> Union[Any, Response]:
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
-        if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_repr('remote')}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
+        if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_remote_repr()}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
         assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"
         source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]
         return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
@@ -333,7 +332,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
         if z: print(f"ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source_obj).expanduser().absolute().collapseuser(strict=True); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
-        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_repr('remote')}", verbose=False).op or ''
+        remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129

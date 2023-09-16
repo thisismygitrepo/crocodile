@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import psutil
 import numpy as np
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams, LAUNCH_METHOD
 from rich.console import Console
 # from platform import system
 # import time
@@ -153,12 +153,12 @@ class Cluster:
         print("\n" * 2)
         console.rule(title=f"kwargs of functions to be run on machines")
         for an_ssh, a_kwarg in zip(self.sshz, self.workload_params):
-            tb.S(a_kwarg.__dict__).print(as_config=True, title=an_ssh.get_repr(which="remote"))
-    def print_commands(self):
+            tb.S(a_kwarg.__dict__).print(as_config=True, title=an_ssh.get_remote_repr())
+    def print_commands(self, launch_method: LAUNCH_METHOD):
         print("\n" * 2)
         console.rule(title="Commands to run on each machine:")
         for machine in self.machines:
-            print(f"{repr(machine)} ==> {machine.execution_command}")
+            print(f"{repr(machine)} ==> {machine.resources.get_fire_command(launch_method=launch_method)}")
 
     def generate_standard_kwargs(self) -> None:
         if self.workload_params:
@@ -173,7 +173,7 @@ class Cluster:
             try: cpus.append(int(res.split(' ')[0]))
             except ValueError as ve:
                 print(f"Couldn't get cpu count from {an_ssh}")
-                raise ValueError(f"Couldn't get cpu count from {an_ssh.get_repr(which='remote')}") from ve
+                raise ValueError(f"Couldn't get cpu count from {an_ssh.get_remote_repr()}") from ve
             rams.append(ceil(int(res.split(' ')[1]) / 2 ** 30))
         total_cpu = np.array(cpus).sum()
         total_ram = np.array(rams).sum()
@@ -187,7 +187,7 @@ class Cluster:
     def viz_load_ratios(self) -> None:
         if not self.workload_params: raise RuntimeError("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
         plt = tb.install_n_import("plotext")
-        names = tb.L(self.sshz).apply(lambda x: x.get_repr(which='remote', add_machine=True)).list
+        names = tb.L(self.sshz).apply(lambda x: x.get_remote_repr(add_machine=True)).list
 
         plt.simple_multiple_bar(names, [[machine_specs.cpu for machine_specs in self.machines_specs], [machine_specs.ram for machine_specs in self.machines_specs]], title=f"Resources per machine", labels=["#cpu threads", "memory size"])
         plt.show()
@@ -218,7 +218,7 @@ class Cluster:
         except Exception as re:
             print(re)
             print("Couldn't pickle cluster object")
-        self.print_commands()
+        # self.print_commands()
 
     def open_mux(self, machines_per_tab: int = 1, window_number: Optional[int] = None):
         self.machines_per_tab = machines_per_tab

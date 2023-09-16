@@ -7,7 +7,8 @@ import os
 import getpass
 import platform
 import crocodile.toolbox as tb
-from crocodile.cluster.loader_runner import JobParams, ResourceManager, WorkloadParams
+from crocodile.cluster.loader_runner import JobParams, ResourceManager, WorkloadParams, JOB_STATUS
+from crocodile.cluster.remote_machine import RemoteMachineConfig
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
@@ -17,6 +18,15 @@ import pandas as pd
 
 # import time
 
+# import psutil
+# res = []
+# for proc in psutil.process_iter():
+#     try:
+#         files = proc.open_files()
+#     except psutil.AccessDenied:
+#         continue
+#     for file in files:
+#         res.append(file.path)
 
 console = Console()
 
@@ -29,9 +39,10 @@ params = JobParams.from_empty()
 print("\n" * 2)
 manager: ResourceManager = ResourceManager.from_pickle(params.resource_manager_path)
 manager.secure_resources()
-manager.move_job(status="running")  # doesn't work for interactive jobs.
 pid: int = os.getpid()
 manager.execution_log_dir.expanduser().joinpath("pid.txt").create(parents_only=True).write_text(str(pid))
+job_status: JOB_STATUS = "running"
+manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
 
 
 # keep those values after lock is released
@@ -120,17 +131,29 @@ ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
 
 
 if params.session_name != "":
-    tb.Terminal().run(f"""zellij --session {params.session_name} action new-tab --name results  """)
-    # --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl --cwd {res_folder.as_posix()}
-    tb.Terminal().run(f"""zellij --session {params.session_name} action write-chars "cd {res_folder.as_posix()};lf" """)
+    if platform.system() == "Linux":
+        tb.Terminal().run(f"""zellij --session {params.session_name} action new-tab --name results  """)
+        # --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl --cwd {res_folder.as_posix()}
+        tb.Terminal().run(f"""zellij --session {params.session_name} action write-chars "cd {res_folder.as_posix()};lf" """)
+    elif platform.system() == "Windows":
+        tb.Terminal().run(f"""wt --window {params.session_name} new-tab --title results -startingDirectory {res_folder.as_posix()} lf """)
 
 
 print(f"job {manager.job_id} is completed.")
-# manager.root_dir.expanduser().joinpath("status.txt").write_text("completed")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")
 
-manager.unlock_resources()
-if params.error_message == "": manager.move_job(status="completed")
+if params.error_message == "":
+    job_status = "failed"
+    manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
 else:
-    print(f"Job failed with error message: `{params.error_message}`")
-    manager.move_job(status="failed")
+    job_status = "completed"
+    manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
+
+manager.unlock_resources()
+rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machine_config_path.expanduser())
+
+
+if rm_conf.kill_on_completion and params.session_name != "":
+    from machineconfig.utils.procs import ProcessManager
+    pm = ProcessManager()
+    pm.kill(commands=[params.session_name])

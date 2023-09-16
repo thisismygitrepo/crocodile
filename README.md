@@ -115,7 +115,7 @@ import crocodile.toolbox as tb
 EX1: Get a list of `.exe` available in terminal.
 
 ```python
-     P.get_env().Path.search('*.exe').reduce(lambda x, y: x+y).print()
+     P.get_env().PATH.search('*.exe').reduce(lambda x, y: x+y).print()
 ```
 
 EX2: Suppose you want to know how many lines of code in your repository. The procedure is to glob all `.py` files recursively, read string code, split each one of them by lines, count the lines, add up everything from all strings of code.

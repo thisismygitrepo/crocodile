@@ -24,7 +24,7 @@ class Zellij:
         # if self.new_sess_name is not None: return self.new_sess_name
         # zellij kill-session {name}
         sess_name: str
-        resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_repr(which='remote')}` for new session name", verbose=False)
+        resp = self.ssh.run("zellij ls", desc=f"Querying `{self.ssh.get_remote_repr()}` for new session name", verbose=False)
         if resp.err == "No active zellij sessions found.":
             sess_name = "ms0"
         else:
@@ -87,11 +87,22 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
 
 """
-        # if isinstance(self.ssh, SelfSSH): return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`", verbose=False)
-        return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`", verbose=False)
+        # if isinstance(self.ssh, SelfSSH): return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_remote_repr()}`", verbose=False)
+        return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_remote_repr()}`", verbose=False)
+    def kill_session(self):
+        cmd = f'zellij kill-session {self.new_sess_name}'
+        return self.ssh.run(cmd, desc=f"Killing zellij session `{self.new_sess_name}` on `{self.ssh.get_remote_repr()}`", verbose=False)
 
 
 class WindowsTerminal:
+    def kill_session(self):
+        from machineconfig.utils.procs import ProcessManager
+        pm = ProcessManager()
+        assert self.id is not None, "Session ID is None. This is not expected."
+        pm.kill(commands=[self.id])
+
+    @staticmethod
+    def open_reference(): tb.P(r"https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments?tabs=windows")()
     def __init__(self, ssh: Union[tb.SSH, SelfSSH]) -> None:
         self.ssh = ssh
         self.id: Optional[str] = None
@@ -115,29 +126,31 @@ class WindowsTerminal:
     def asssert_session_started(self):
         time.sleep(6)
         return True
-    def setup_layout(self, sess_name: str, cmd: str = "", run: bool = True, job_wd: str = "$HOME/tmp_results/remote_machines"):
+    def setup_layout(self, sess_name: str, cmd: str = "", run: bool = True, job_wd: str = "$HOME/tmp_results/remote_machines", compact: bool = True):
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe = f"""
-wt --window {sess_name} new-tab --title 🏃‍♂️ pwsh -noExit -Command {cmd}; sleep 2
+wt --window {sess_name} new-tab --title '🏃‍♂️' pwsh -noExit -Command {cmd}
 """
         else: raise NotImplementedError("I don't know how to write-chars in Windows Terminal")  # exe = f""" wt --window {sess_name} action write-chars "{cmd}" """
         sleep = 5
-        cmd = f"""
-wt --window {sess_name} new-tab --title 💻 htop; sleep {sleep}
-wt --window {sess_name} new-tab --title 📁 --startingDirectory {job_wd} lf; sleep {sleep}
-wt --window {sess_name} new-tab --title 🪪 powershell -noExit "$HOME/scripts/neofetch.ps1"; sleep {sleep}
-wt --window {sess_name} new-tab --title 🧑‍💻 --startingDirectory {job_wd} --profile pwsh; sleep {sleep}
-
-{exe}
-
+        if compact: cmd = f"""
+wt --window {sess_name} new-tab --title '💻' htop `; split-pane --horizontal --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --profile pwsh
 """
+        else: cmd = f"""'
+wt --window {sess_name} new-tab --title '💻' htop; sleep {sleep}
+wt --window {sess_name} new-tab --title '📁' --startingDirectory {job_wd} lf; sleep {sleep}
+wt --window {sess_name} new-tab --title '🪪' powershell -noExit "$HOME/scripts/neofetch.ps1"; sleep {sleep}
+wt --window {sess_name} new-tab --title '🧑‍💻' --startingDirectory {job_wd} --profile pwsh; sleep {sleep}
+"""
+        cmd = cmd + f"\nsleep {sleep};" + exe
+        print(cmd)
         if isinstance(self.ssh, SelfSSH):
-            print(f"Setting up Windows Terminal layout on `{self.ssh.get_repr(which='remote')}`")
+            print(f"Setting up Windows Terminal layout on `{self.ssh.get_remote_repr()}`")
             return tb.Terminal().run_script(cmd, shell="pwsh")
-        return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_repr(which='remote')}`", verbose=False)
+        return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_remote_repr()}`", verbose=False)
 
 
 class Mprocs:
