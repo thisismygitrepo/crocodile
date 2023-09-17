@@ -275,7 +275,7 @@ class ResourceManager:
     #     return status
     def get_job_status(self) -> JOB_STATUS:
         pid_path = self.execution_log_dir.joinpath("pid.txt")
-        tmp = self.execution_log_dir.joinpath("status.txt").read_text()
+        tmp = self.execution_log_dir.expanduser().joinpath("status.txt").read_text()
         status: JOB_STATUS = tmp  # type: ignore
         if status == "running":
             if not pid_path.exists():
@@ -448,9 +448,19 @@ class LogEntry:
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
+    @staticmethod
+    def run_clean_trial():
+        self = CloudManager()
+        self.base_path.expanduser().delete(sure=True).create().to_cloud(cloud=self.cloud, rel2home=True)
+        from crocodile.cluster.template import run_on_cloud
+        run_on_cloud()
+        self.run()
+
     def __init__(self, max_jobs: int = 3, cloud: str = "gdw") -> None:
 
         self.max_jobs = max_jobs
+        self.num_claim_checks = 1
+        self.inter_check_interval = 1
         self.cloud = cloud
         self.lock_claimed = False
         from crocodile.cluster.remote_machine import RemoteMachine
@@ -480,8 +490,7 @@ class CloudManager:
         cycle = 0
         while True:
             cycle += 1
-            print(f"Cycle #{cycle}")
-            print(f"Running jobs: {len(self.running_jobs)} / {self.max_jobs=}")
+            print(f"\n\nCloudManager: Cycle #{cycle}. \nRunning jobs: {len(self.running_jobs)} / {self.max_jobs=}")
             self.start_jobs_if_possible()
             self.check_jobs_statuses()
             self.release_lock()
@@ -496,13 +505,13 @@ class CloudManager:
             status = a_rm.resources.get_job_status()
             if status == "running": pass
             elif status == "completed" or status == "failed":
-                job_name = a_rm.resources.job_id
+                job_name = a_rm.config.job_id
                 log = self.read_log()
                 df_to_add = log[status]
                 df_to_take = log["running"]
                 entry = LogEntry.from_dict(df_to_take[df_to_take["name"] == job_name].iloc[0].to_dict())
                 entry.end_time = pd.Timestamp.now()
-                df_to_add = pd.concat([df_to_add, pd.DataFrame(entry.__dict__)], ignore_index=True)
+                df_to_add = pd.concat([df_to_add, pd.DataFrame([entry.__dict__])], ignore_index=True)
                 df_to_take = df_to_take[df_to_take["name"] != job_name]
                 log[status] = df_to_add
                 log["running"] = df_to_take
@@ -529,6 +538,7 @@ class CloudManager:
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
             rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             rm.fire(run=True)
+            print(f"Sleeping for 60 seconds to allow time for the job to start before proceeding to firing the next ones.")
             time.sleep(60)  # allow time for new jobs to start before checking job status which relies on log files, yet to be written bt the new process.
             self.running_jobs.append(rm)
             self.write_log(log=log)
@@ -562,13 +572,13 @@ class CloudManager:
         print("No calims on lock, claiming it...")
         path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         counter: int = 1
-        while counter < 4:
+        while counter < self.num_claim_checks:
             lock_path_tmp = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
             lock_data_tmp = lock_path_tmp.read_text()
             if lock_data_tmp != this_machine:
                 print(f"CloudManager: Lock already claimed by `{lock_data_tmp}`. 🤷‍♂️")
-                print("sleeping for 30 seconds and trying again.")
-                time.sleep(30)
+                print(f"sleeping for {self.inter_check_interval} seconds and trying again.")
+                time.sleep(self.inter_check_interval)
                 return self.claim_lock(first_call=False)
             counter += 1
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")

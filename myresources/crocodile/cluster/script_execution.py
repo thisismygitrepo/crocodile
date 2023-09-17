@@ -100,6 +100,14 @@ manager.execution_log_dir.expanduser().joinpath("end_time.txt").write_text(str(t
 manager.execution_log_dir.expanduser().joinpath("results_folder_path.txt").write_text(res_folder.collapseuser().as_posix())
 manager.execution_log_dir.expanduser().joinpath("error_message.txt").write_text(params.error_message)
 exec_times.save(path=manager.execution_log_dir.expanduser().joinpath("execution_times.Struct.pkl"))
+if params.error_message == "":
+    job_status = "completed"
+    manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
+else:
+    job_status = "failed"
+    manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
+
+
 tb.Experimental.generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
 
 Job executed via tb.cluster.Machine
@@ -142,12 +150,6 @@ if params.session_name != "":
 print(f"job {manager.job_id} is completed.")
 # if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")
 
-if params.error_message == "":
-    job_status = "failed"
-    manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
-else:
-    job_status = "completed"
-    manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
 
 manager.unlock_resources()
 rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machine_config_path.expanduser())

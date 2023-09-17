@@ -83,6 +83,7 @@ class RemoteMachine:
             rm.config.job_id = f"{rm.config.job_id}-split-{idx + 1}-{split}"
             rm.config.workload_params = a_workload_params
             rm.resources.job_root = self.resources.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
+            rm.resources.job_id = rm.config.job_id
             rm.submitted = True  # must be done before generate_script which performs the pickling.
             rm.generate_scripts()
             rms.append(rm)
