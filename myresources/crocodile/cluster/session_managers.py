@@ -127,17 +127,18 @@ class WindowsTerminal:
         time.sleep(6)
         return True
     def setup_layout(self, sess_name: str, cmd: str = "", run: bool = True, job_wd: str = "$HOME/tmp_results/remote_machines", compact: bool = True):
+        print(f"Firing WindowsTerminal Session `{sess_name}`.")
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe = f"""
-wt --window {sess_name} new-tab --title '🏃‍♂️' pwsh -noExit -Command {cmd}
+wt --window {sess_name} new-tab --title '🏃‍♂️{sess_name}' pwsh -noExit -Command {cmd}
 """
         else: raise NotImplementedError("I don't know how to write-chars in Windows Terminal")  # exe = f""" wt --window {sess_name} action write-chars "{cmd}" """
         sleep = 5
         if compact: cmd = f"""
-wt --window {sess_name} new-tab --title '💻' htop `; split-pane --horizontal --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --profile pwsh
+wt --window {sess_name} new-tab --title '💻{sess_name}' htop `; split-pane --horizontal --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --profile pwsh
 """
         else: cmd = f"""'
 wt --window {sess_name} new-tab --title '💻' htop; sleep {sleep}

@@ -5,10 +5,12 @@
 from typing import Optional, Any, Union, Callable
 from dataclasses import dataclass, field
 import time
+import platform
+import getpass
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
-from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager
+from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager, LogEntry
 import crocodile.cluster as cluster
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -64,27 +66,33 @@ class RemoteMachineConfig:
 
 class RemoteMachine:
     def submit_to_cloud(self, cm: CloudManager, split: int = 5) -> list['RemoteMachine']:
+        """The only authority responsible for adding entries to queue df."""
         assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
         assert self.config.launch_method == "remotely", "CloudManager only works with `launch_method` set to `remotely`."
         assert isinstance(self.ssh, SelfSSH), "CloudManager only works with `SelfSSH` objects."
         assert self.config.workload_params is None, "CloudManager only works with `workload_params` set to `None`."
+        cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
+        from copy import deepcopy
         self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
         self.resources.base_dir = tb.P(self.config.base_dir).collapseuser()
-        status_init: JOB_STATUS = 'queued'
         wl = WorkloadParams().split_to_jobs(jobs=split)
         rms: list[RemoteMachine] = []
-        from copy import deepcopy
+        new_log_entries: list[LogEntry] = []
         for idx, a_workload_params in enumerate(wl):
             rm = deepcopy(self)
             rm.config.job_id = f"{rm.config.job_id}-split-{idx + 1}-{split}"
             rm.config.workload_params = a_workload_params
-            rm.resources.job_root = self.resources.base_dir.joinpath(f"{status_init}/{rm.config.job_id}").collapseuser()
+            rm.resources.job_root = self.resources.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
             rm.submitted = True  # must be done before generate_script which performs the pickling.
             rm.generate_scripts()
             rms.append(rm)
-        cm.claim_lock()
-        self.resources.base_dir.joinpath(status_init).to_cloud(cloud=cm.cloud, rel2home=True)  # upload all in one go (faster)
-        cm.release_lock()
+            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now(), start_time=None, end_time=None, run_machine=None, source_machine=f"{getpass.getuser()}@{platform.node()}", note=""))
+        log = cm.read_log()  # this claims lock internally.
+        new_queued_df: 'pd.DataFrame' = pd.DataFrame([item.__dict__ for item in new_log_entries])
+        total_queued_df = pd.concat([log["queued"], new_queued_df], ignore_index=True, sort=False)
+        log["queued"] = total_queued_df
+        cm.write_log(log=log)
+        cm.release_lock()  # all base_dir is synced anyway: self.resources.base_dir.joinpath(status_init).to_cloud(cloud=cm.cloud, rel2home=True)
         return rms
 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
@@ -114,13 +122,12 @@ class RemoteMachine:
 
     def fire(self, run: bool = False, open_console: bool = True, launch_method: LAUNCH_METHOD = "remotely") -> None:
         assert self.submitted, "Job even not submitted yet. 🤔"
-        console.rule(f"Firing job @ remote machine {self.ssh}")
+        console.rule(f"Firing job `{self.config.job_id}` @ remote machine {self.ssh}")
         if open_console and self.config.open_console:
             self.ssh.open_console(cmd=self.session_manager.get_new_session_command(), shell="pwsh")
             self.session_manager.asssert_session_started()
         cmd = self.resources.get_fire_command(launch_method=launch_method)
-        job_root_copy = self.resources.job_root.copy(folder=tb.P.tmpdir())
-        self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=cmd, run=run, job_wd=job_root_copy.expanduser().absolute().as_posix())
+        self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix())
         print("\n")
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
@@ -142,7 +149,7 @@ class RemoteMachine:
         self.submitted = True  # before sending `self` to the remote.
 
     def generate_scripts(self):
-        console.rule(f"Generating scripts for {self.__repr__()}")
+        console.rule(f"Generating scripts for job `{self.resources.job_id}` @ Machine `{self.__repr__()}`")
         self.job_params.ssh_repr = repr(self.ssh)
         self.job_params.ssh_repr_remote = self.ssh.get_remote_repr()
         self.job_params.description = self.config.description
@@ -193,10 +200,10 @@ deactivate
         self.resources.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
         tb.Save.vanilla_pickle(obj=self.kwargs, path=self.resources.kwargs_path.expanduser(), verbose=False)
         tb.Save.vanilla_pickle(obj=self.resources.__getstate__(), path=self.resources.resource_manager_path.expanduser(), verbose=False)
-        # tb.Save.vanilla_pickle(obj=self.config.__getstate__(), path=self.resources.remote_machine_config_path.expanduser(), verbose=False)
+        tb.Save.vanilla_pickle(obj=self.config, path=self.resources.remote_machine_config_path.expanduser(), verbose=False)
         tb.Save.vanilla_pickle(obj=self, path=self.resources.remote_machine_path.expanduser(), verbose=False)
         job_status: JOB_STATUS = "queued"
-        self.resources.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
+        self.resources.execution_log_dir.expanduser().create().joinpath("status.txt").write_text(job_status)
         print("\n")
 
     def show_scripts(self) -> None:

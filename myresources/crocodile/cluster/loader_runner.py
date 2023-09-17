@@ -8,7 +8,7 @@ from crocodile.meta import MACHINE
 from rich import inspect
 from rich.console import Console
 import pandas as pd
-from typing import Optional, Callable, Union, Any, Literal, TypeAlias
+from typing import Optional, Callable, Union, Any, Literal, TypeAlias, NoReturn
 import time
 from dataclasses import dataclass, fields
 import os
@@ -386,6 +386,7 @@ echo "Unlocked resources"
         console.print(f"Resources are locked by this job `{self.job_id}`. Process pid = {os.getpid()}.", highlight=True)
 
     def write_lock_file(self, job_status: JobStatus):
+        job_status.start_time = pd.Timestamp.now()
         queue_path = self.queue_path.expanduser()
         try: queue_file: list[JobStatus] = queue_path.readit()
         except FileNotFoundError as fne: raise FileNotFoundError(f"Queue file {queue_path} does not exist. This method should not be called in the first place.") from fne
@@ -437,7 +438,7 @@ class LogEntry:
     submission_time: pd.Timestamp
     start_time: Optional[pd.Timestamp]
     end_time: Optional[pd.Timestamp]
-    run_machine: str
+    run_machine: Optional[str]
     source_machine: str
     note: str
     @staticmethod
@@ -451,20 +452,29 @@ class CloudManager:
 
         self.max_jobs = max_jobs
         self.cloud = cloud
+        self.lock_claimed = False
         from crocodile.cluster.remote_machine import RemoteMachine
         self.running_jobs: list[RemoteMachine] = []
 
     def read_log(self) -> dict[JOB_STATUS, 'pd.DataFrame']:
-        path = self.base_path.joinpath("logs.pkl")
+        # assert self.claim_lock, f"method should never be called without claiming the lock first. This is a cloud-wide file."
+        if not self.lock_claimed: self.claim_lock()
+        path = self.base_path.joinpath("logs.pkl").expanduser()
         if not path.exists():
             cols = [a_field.name for a_field in fields(LogEntry)]
-            res: dict[JOB_STATUS, 'pd.DataFrame'] = {}
-            res['queued'] = pd.DataFrame(columns=cols)
-            res['running'] = pd.DataFrame(columns=cols)
-            res['completed'] = pd.DataFrame(columns=cols)
-            res['failed'] = pd.DataFrame(columns=cols)
-            tb.Save.vanilla_pickle(obj=res, path=path.create(parents_only=True))
+            log: dict[JOB_STATUS, 'pd.DataFrame'] = {}
+            log['queued'] = pd.DataFrame(columns=cols)
+            log['running'] = pd.DataFrame(columns=cols)
+            log['completed'] = pd.DataFrame(columns=cols)
+            log['failed'] = pd.DataFrame(columns=cols)
+            tb.Save.vanilla_pickle(obj=log, path=path.create(parents_only=True))
+            return log
         return tb.Read.vanilla_pickle(path=path)
+    def write_log(self, log: dict[JOB_STATUS, 'pd.DataFrame']):
+        # assert self.claim_lock, f"method should never be called without claiming the lock first. This is a cloud-wide file."
+        if not self.lock_claimed: self.claim_lock()
+        tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser())
+        return NoReturn
 
     def run(self):
         cycle = 0
@@ -472,37 +482,56 @@ class CloudManager:
             cycle += 1
             print(f"Cycle #{cycle}")
             print(f"Running jobs: {len(self.running_jobs)} / {self.max_jobs=}")
-
-            self.update()
+            self.start_jobs_if_possible()
+            self.check_jobs_statuses()
+            self.release_lock()
             wait = int(random.random() * 1000)
             print(f"sleeping for {wait} seconds and trying again.")
             time.sleep(wait)
-            for a_rm in self.running_jobs:
-                if a_rm.resources.get_job_status() is None:
-                    self.running_jobs.remove(a_rm)
-                    self.update()
 
-    def update(self):
+    def check_jobs_statuses(self):
+        """This is the only authority responsible for moving jobs from running df to failed df or completed df."""
+        jobs_ids_to_be_removed_from_running: list[str] = []
+        for a_rm in self.running_jobs:
+            status = a_rm.resources.get_job_status()
+            if status == "running": pass
+            elif status == "completed" or status == "failed":
+                job_name = a_rm.resources.job_id
+                log = self.read_log()
+                df_to_add = log[status]
+                df_to_take = log["running"]
+                entry = LogEntry.from_dict(df_to_take[df_to_take["name"] == job_name].iloc[0].to_dict())
+                entry.end_time = pd.Timestamp.now()
+                df_to_add = pd.concat([df_to_add, pd.DataFrame(entry.__dict__)], ignore_index=True)
+                df_to_take = df_to_take[df_to_take["name"] != job_name]
+                log[status] = df_to_add
+                log["running"] = df_to_take
+                self.write_log(log=log)
+                # self.running_jobs.remove(a_rm)
+                jobs_ids_to_be_removed_from_running.append(a_rm.config.job_id)
+            elif status == "queued": raise RuntimeError(f"I thought I'm working strictly with running jobs, and I encountered unexpected a job with `queued` status.")
+            else: raise ValueError(f"I receieved a status that I don't know how to handle `{status}`")
+        self.running_jobs = [a_rm for a_rm in self.running_jobs if a_rm.config.job_id not in jobs_ids_to_be_removed_from_running]
+
+    def start_jobs_if_possible(self):
+        """This is the only authority responsible for moving jobs from queue df to running df."""
         from crocodile.cluster.remote_machine import RemoteMachine
-        self.claim_lock()
-        log = self.read_log()
-
-        if len(log["queued"]) == 0:
-            print(f"No queued jobs found.")
-            self.release_lock()
-            return None
-
-        if len(self.running_jobs) < self.max_jobs:
+        while len(self.running_jobs) < self.max_jobs:  # capacity to run more jobs exists.
+            log = self.read_log()  # ask for the log file.
+            if len(log["queued"]) == 0:
+                print(f"No queued jobs found.")
+                return None
             queue_entry = LogEntry.from_dict(log["queued"].iloc[0].to_dict())
-            log["queued"] = log["queued"].iloc[1:] if len(log["queued"]) > 1 else pd.DataFrame(columns=log["queued"].columns)
-            tmp = log["running"]
-            log["running"] = tmp.append(queue_entry.__dict__, ignore_index=True)
-
+            queue_entry.run_machine = f"{getpass.getuser()}@{platform.node()}"
+            queue_entry.start_time = pd.Timestamp.now()
+            log["queued"] = log["queued"].iloc[1:] if len(log["queued"]) > 0 else pd.DataFrame(columns=log["queued"].columns)
+            log["running"] = pd.concat([log["running"], pd.DataFrame([queue_entry.__dict__])], ignore_index=True)
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
             rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             rm.fire(run=True)
+            time.sleep(60)  # allow time for new jobs to start before checking job status which relies on log files, yet to be written bt the new process.
             self.running_jobs.append(rm)
-            self.update()
+            self.write_log(log=log)
         return None
 
     def reset_cloud(self, force: bool = False):
@@ -511,7 +540,7 @@ class CloudManager:
         self.release_lock()
     def reset_lock(self): CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
 
-    def claim_lock(self, first_call: bool = True) -> Literal[True]:
+    def claim_lock(self, first_call: bool = True):
         if first_call: console.rule(title=f"Claiming Lock", style="bold red", characters="-")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         path = CloudManager.base_path.expanduser().create()
@@ -544,11 +573,12 @@ class CloudManager:
             counter += 1
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")
             time.sleep(10)
-        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_down=True)
         console.rule(title=f"Lock Claimed", style="bold red", characters="-")
-        return True
+        self.lock_claimed = True
 
-    def release_lock(self) -> bool:
+    def release_lock(self):
+        if not self.lock_claimed: return
         console.rule(title=f"Releasing Lock", style="bold red", characters="-")
         path = CloudManager.base_path.expanduser().create()
         try:
@@ -556,17 +586,19 @@ class CloudManager:
         except AssertionError as _ae:
             print(f"Lock doesn't exist on remote, uploading for the first time.")
             path.joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
-            return True
+            self.lock_claimed = False
+            return NoReturn
         data = lock_path.read_text()
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         if data != this_machine:
-            print(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned!")
-            return False
+            raise ValueError(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned! This shouldn't happen.")
+            # self.lock_claimed = False
         path.joinpath("lock.txt").write_text("")
-        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
+        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_up=True)
         # .to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         # console.rule(title=f"Lock Released", style="bold red", characters="-")
-        return True
+        self.lock_claimed = False
+        return NoReturn
 
 
 if __name__ == '__main__':
