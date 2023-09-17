@@ -274,14 +274,14 @@ class ResourceManager:
     #     self.job_root = self.base_dir.joinpath(status).joinpath(self.job_id).collapseuser()
     #     return status
     def get_job_status(self) -> JOB_STATUS:
-        pid_path = self.execution_log_dir.joinpath("pid.txt")
+        pid_path = self.execution_log_dir.expanduser().joinpath("pid.txt")
         tmp = self.execution_log_dir.expanduser().joinpath("status.txt").read_text()
         status: JOB_STATUS = tmp  # type: ignore
         if status == "running":
             if not pid_path.exists():
                 print(f"Something wrong happened to this job, moving to failed.")
                 status = 'failed'
-                self.execution_log_dir.joinpath("status.txt").write_text(status)
+                self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
             pid: int = int(pid_path.read_text().rstrip())
             import psutil
@@ -289,13 +289,13 @@ class ResourceManager:
             except psutil.NoSuchProcess:
                 print(f"Something wrong happened to this job, moving to failed.")
                 status = 'failed'
-                self.execution_log_dir.joinpath("status.txt").write_text(status)
+                self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
             command = " ".join(proc.cmdline())
             if self.job_id not in command:
                 print(f"Something wrong happened to this job, moving to failed.")
                 status = 'failed'
-                self.execution_log_dir.joinpath("status.txt").write_text(status)
+                self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
             return status
         return status
@@ -451,7 +451,7 @@ class CloudManager:
     @staticmethod
     def run_clean_trial():
         self = CloudManager()
-        self.base_path.expanduser().delete(sure=True).create().to_cloud(cloud=self.cloud, rel2home=True)
+        self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True)
         from crocodile.cluster.template import run_on_cloud
         run_on_cloud()
         self.run()
@@ -477,25 +477,27 @@ class CloudManager:
             log['running'] = pd.DataFrame(columns=cols)
             log['completed'] = pd.DataFrame(columns=cols)
             log['failed'] = pd.DataFrame(columns=cols)
-            tb.Save.vanilla_pickle(obj=log, path=path.create(parents_only=True))
+            tb.Save.vanilla_pickle(obj=log, path=path.create(parents_only=True), verbose=False)
             return log
         return tb.Read.vanilla_pickle(path=path)
     def write_log(self, log: dict[JOB_STATUS, 'pd.DataFrame']):
         # assert self.claim_lock, f"method should never be called without claiming the lock first. This is a cloud-wide file."
         if not self.lock_claimed: self.claim_lock()
-        tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser())
+        tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
         return NoReturn
 
     def run(self):
         cycle = 0
         while True:
             cycle += 1
-            print(f"\n\nCloudManager: Cycle #{cycle}. \nRunning jobs: {len(self.running_jobs)} / {self.max_jobs=}")
+            print("\n")
+            console.rule(title=f"CloudManager: Cycle #{cycle}", style="bold red", characters="-")
+            print(f"Running jobs: {len(self.running_jobs)} / {self.max_jobs=}")
             self.start_jobs_if_possible()
             self.check_jobs_statuses()
             self.release_lock()
             wait = int(random.random() * 1000)
-            print(f"sleeping for {wait} seconds and trying again.")
+            print(f"CloudManager: Finished cycle {cycle}. Sleeping for {wait} seconds.")
             time.sleep(wait)
 
     def check_jobs_statuses(self):
@@ -551,7 +553,7 @@ class CloudManager:
     def reset_lock(self): CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
 
     def claim_lock(self, first_call: bool = True):
-        if first_call: console.rule(title=f"Claiming Lock", style="bold red", characters="-")
+        if first_call: print(f"Claiming lock...")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         path = CloudManager.base_path.expanduser().create()
         try:
@@ -584,12 +586,12 @@ class CloudManager:
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")
             time.sleep(10)
         CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_down=True)
-        console.rule(title=f"Lock Claimed", style="bold red", characters="-")
+        print(f"Lock Claimed")
         self.lock_claimed = True
 
     def release_lock(self):
         if not self.lock_claimed: return
-        console.rule(title=f"Releasing Lock", style="bold red", characters="-")
+        print(f"Releasing Lock")
         path = CloudManager.base_path.expanduser().create()
         try:
             lock_path = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
