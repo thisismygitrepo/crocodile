@@ -18,6 +18,13 @@ class SelfSSH:
         self._remote_machine: Optional[MACHINE] = None
         self.remote_env_cmd = ". activate_ve"
         self.sftp: Any
+    def __getstate__(self) -> object: return {}
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """This behaviour makes SelfSSH dynamic, even if it was pickled from windows machine, when unpickled on Linux, it will behave as a Linux machine instance."""
+        _ = state
+        new_instance = SelfSSH()
+        self.__dict__.update(new_instance.__dict__)
+        return None
     def run(self, cmd: str, desc: str = "", verbose: bool = False):
         _ = desc, verbose
         return tb.Terminal().run(cmd, shell="powershell")
