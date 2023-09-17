@@ -111,7 +111,6 @@ class RemoteMachine:
         self.data = data if data is not None else []
         # conn
         self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)  # type: ignore
-        self.session_manager: Union[Zellij, WindowsTerminal]
         # scripts
         self.resources = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
@@ -121,14 +120,17 @@ class RemoteMachine:
         self.results_downloaded: bool = False
         self.results_path: Optional[tb.P] = None
 
+    def get_session_manager(self): return Zellij() if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal()
     def fire(self, run: bool = False, open_console: bool = True, launch_method: LAUNCH_METHOD = "remotely") -> None:
         assert self.submitted, "Job even not submitted yet. 🤔"
         console.rule(f"Firing job `{self.config.job_id}` @ remote machine {self.ssh}")
+        session_manager = self.get_session_manager()
+        ssh = self.ssh
         if open_console and self.config.open_console:
-            self.ssh.open_console(cmd=self.session_manager.get_new_session_command(), shell="pwsh")
-            self.session_manager.asssert_session_started()
+            self.ssh.open_console(cmd=session_manager.get_new_session_command(sess_name=self.job_params.session_name), shell="pwsh")
+            session_manager.asssert_session_started(ssh=ssh, sess_name=self.job_params.session_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
-        self.session_manager.setup_layout(sess_name=self.session_manager.new_sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix())
+        session_manager.setup_layout(ssh=ssh, sess_name=self.job_params.session_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix())
         print("\n")
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
@@ -156,8 +158,7 @@ class RemoteMachine:
         self.job_params.description = self.config.description
         self.job_params.resource_manager_path = self.resources.resource_manager_path.collapseuser().as_posix()
 
-        self.session_manager = Zellij(self.ssh) if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal(self.ssh)  # avoid creation in init as it is prepature and causes repettion problem with submit_to_cloud method.
-        self.job_params.session_name = self.session_manager.get_new_session_name()
+        self.job_params.session_name = "TS-" + tb.randstr(noun=True)
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
         py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
