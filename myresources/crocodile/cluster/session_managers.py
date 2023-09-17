@@ -95,12 +95,11 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 
 
 class WindowsTerminal:
-    def kill_session(self):
+    @staticmethod
+    def kill_session(sess_name: str):
         from machineconfig.utils.procs import ProcessManager
         pm = ProcessManager()
-        assert self.id is not None, "Session ID is None. This is not expected."
-        pm.kill(commands=[self.id])
-
+        pm.kill(commands=[sess_name])
     @staticmethod
     def open_reference(): tb.P(r"https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments?tabs=windows")()
     def __init__(self, ssh: Union[tb.SSH, SelfSSH]) -> None:
@@ -138,7 +137,7 @@ wt --window {sess_name} new-tab --title '🏃‍♂️{tb.P(job_wd).name}' pwsh 
         sleep = 5
         if compact: cmd = f"""
 wt --window {sess_name} new-tab --title '💻{sess_name}' htop `; split-pane --horizontal --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --title '💻{sess_name}' --profile pwsh
-"""
+"""  # when pane-splitting, the tab title goes to the last pane declared.
         else: cmd = f"""'
 wt --window {sess_name} new-tab --title '💻' htop; sleep {sleep}
 wt --window {sess_name} new-tab --title '📁' --startingDirectory {job_wd} lf; sleep {sleep}
@@ -150,7 +149,7 @@ wt --window {sess_name} new-tab --title '🧑‍💻' --startingDirectory {job_w
         if isinstance(self.ssh, SelfSSH):
             print(f"Firing WindowsTerminal Session `{sess_name}` on `{self.ssh.get_remote_repr()}` to run `{tb.P(job_wd).name}`")
             return tb.Terminal().run_script(cmd, shell="pwsh")
-        return self.ssh.run(cmd, desc=f"Setting up zellij layout on `{self.ssh.get_remote_repr()}`", verbose=False)
+        return self.ssh.run(cmd, desc=f"Setting up WindowsTerminal layout on `{self.ssh.get_remote_repr()}`", verbose=False)
 
 
 class Mprocs:
