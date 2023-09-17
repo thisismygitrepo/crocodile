@@ -94,8 +94,10 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 
 """
         if isinstance(ssh, SelfSSH):
+            print(1)
             print(f"Setting up zellij layout `{sess_name}` on `{ssh.get_remote_repr()}` to run `{tb.P(job_wd).name}`")
             return tb.Terminal().run_script(cmd)
+        print(2)
         return ssh.run(cmd, desc=f"Setting up zellij layout on `{ssh.get_remote_repr()}`", verbose=False)
     @staticmethod
     def kill_session(ssh: Union[tb.SSH, SelfSSH], sess_name: str):

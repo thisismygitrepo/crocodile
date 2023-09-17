@@ -571,7 +571,10 @@ class CloudManager:
             time.sleep(wait)
             return self.claim_lock(first_call=False)
 
-        print("No calims on lock, claiming it...")
+        if lock_data == this_machine: print(f"Lock already claimed by this machine. 😎")
+        elif lock_data == "": print("No claims on lock, claiming it ... 🙂")
+        else: raise ValueError(f"Unexpected value of lock_data at this point of code.")
+
         path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         counter: int = 1
         while counter < self.num_claim_checks:
