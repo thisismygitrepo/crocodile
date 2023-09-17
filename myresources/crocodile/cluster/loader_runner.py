@@ -279,7 +279,7 @@ class ResourceManager:
         status: JOB_STATUS = tmp  # type: ignore
         if status == "running":
             if not pid_path.exists():
-                print(f"Something wrong happened to this job, moving to failed.")
+                print(f"Something wrong happened to job `{self.job_id}`, moving to failed.")
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
@@ -287,13 +287,13 @@ class ResourceManager:
             import psutil
             try: proc = psutil.Process(pid=pid)
             except psutil.NoSuchProcess:
-                print(f"Something wrong happened to this job, moving to failed.")
+                print(f"Something wrong happened to job `{self.job_id}`, moving to failed.")
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
             command = " ".join(proc.cmdline())
             if self.job_id not in command:
-                print(f"Something wrong happened to this job, moving to failed.")
+                print(f"Something wrong happened to job `{self.job_id}`, moving to failed.")
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
