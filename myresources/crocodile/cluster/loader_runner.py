@@ -19,7 +19,7 @@ import platform
 
 JOB_STATUS: TypeAlias = Literal["queued", "running", "completed", "failed"]
 TRANSFER_METHOD: TypeAlias = Literal["sftp", "transfer_sh", "cloud"]
-LAUNCH_METHOD: TypeAlias = Literal["remotely", "locally"]
+LAUNCH_METHOD: TypeAlias = Literal["remotely", "cloud_manager"]
 console = Console()
 
 
@@ -225,10 +225,10 @@ class ResourceManager:
 
     def get_fire_command(self, launch_method: LAUNCH_METHOD):
         script_path = self.shell_script_path.expanduser()
-        if launch_method == "remotely": pass  # shell_script is already repared for target machine.
-        else:
-            if platform.system() == "Windows" and script_path.name.endswith(".sh"): script_path.copy(path=script_path.with_suffix(".ps1"))
-            if platform.system() == "Linux" and script_path.name.endswith(".ps1"): script_path.copy(path=script_path.with_suffix(".sh"))
+        # if launch_method == "remotely": pass  # shell_script is already repared for target machine.
+        # else:
+        if platform.system() == "Windows" and script_path.name.endswith(".sh"): script_path.copy(path=script_path.with_suffix(".ps1"))
+        if platform.system() == "Linux" and script_path.name.endswith(".ps1"): script_path.copy(path=script_path.with_suffix(".sh"))
         return f". {script_path}"
     def fire_command_to_clip_memory(self, launch_method: LAUNCH_METHOD):
         print("Execution command copied to clipboard 📋")

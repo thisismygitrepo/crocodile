@@ -156,6 +156,11 @@ rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machin
 
 
 if rm_conf.kill_on_completion and params.session_name != "":
-    from machineconfig.utils.procs import ProcessManager
-    pm = ProcessManager()
-    pm.kill(commands=[params.session_name])
+    if rm_conf.launch_method == "cloud_manager":
+        from crocodile.cluster.session_managers import Zellij
+        current_zellij_session = Zellij.get_current_zellij_session()
+        Zellij.close_tab(session_name=current_zellij_session, tab_name=params.session_name)
+    else:
+        from machineconfig.utils.procs import ProcessManager
+        pm = ProcessManager()
+        pm.kill(commands=[params.session_name])

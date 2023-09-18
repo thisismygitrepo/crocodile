@@ -68,7 +68,7 @@ class RemoteMachine:
     def submit_to_cloud(self, cm: CloudManager, split: int = 5) -> list['RemoteMachine']:
         """The only authority responsible for adding entries to queue df."""
         assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
-        assert self.config.launch_method == "remotely", "CloudManager only works with `launch_method` set to `remotely`."
+        assert self.config.launch_method == "cloud_manager", "CloudManager only works with `launch_method` set to `cloud_manager`."
         assert isinstance(self.ssh, SelfSSH), "CloudManager only works with `SelfSSH` objects."
         assert self.config.workload_params is None, "CloudManager only works with `workload_params` set to `None`."
         cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
@@ -135,7 +135,7 @@ class RemoteMachine:
                 session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
                 session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
-        session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=sess_name)
+        session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.session_name)
         print("\n")
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
