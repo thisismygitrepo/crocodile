@@ -85,7 +85,6 @@ zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'
 
     @staticmethod
     def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines", tab_name: str = ""):
-        tab_name = ""
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
@@ -177,7 +176,7 @@ class WindowsTerminal:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
-            exe = f"""
+            exe: str = f"""
 wt --window {sess_name} new-tab --title '🏃‍♂️{tb.P(job_wd).name}' pwsh -noExit -Command {cmd}
 """
         else: raise NotImplementedError("I don't know how to write-chars in Windows Terminal")  # exe = f""" wt --window {sess_name} action write-chars "{cmd}" """

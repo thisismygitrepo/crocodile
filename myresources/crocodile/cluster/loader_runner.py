@@ -224,11 +224,18 @@ class ResourceManager:
         self.job_root = self.base_dir.joinpath(f"{status}/{self.job_id}")
 
     def get_fire_command(self, launch_method: LAUNCH_METHOD):
+        _ = launch_method
         script_path = self.shell_script_path.expanduser()
         # if launch_method == "remotely": pass  # shell_script is already repared for target machine.
         # else:
-        if platform.system() == "Windows" and script_path.name.endswith(".sh"): script_path.copy(path=script_path.with_suffix(".ps1"))
-        if platform.system() == "Linux" and script_path.name.endswith(".ps1"): script_path.copy(path=script_path.with_suffix(".sh"))
+        if platform.system() == "Windows" and script_path.name.endswith(".sh"):
+            tmp = script_path.with_suffix(".ps1")
+            tmp.write_text(script_path.read_text(), encoding="utf-8", newline=None)
+            script_path = tmp
+        if platform.system() == "Linux" and script_path.name.endswith(".ps1"):
+            tmp = script_path.with_suffix(".sh")
+            tmp.write_text(script_path.read_text(), encoding="utf-8", newline='\n')
+            script_path = tmp
         return f". {script_path}"
     def fire_command_to_clip_memory(self, launch_method: LAUNCH_METHOD):
         print("Execution command copied to clipboard 📋")
