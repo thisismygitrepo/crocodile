@@ -5,6 +5,7 @@ Session Manager
 
 import crocodile.toolbox as tb
 from crocodile.cluster.self_ssh import SelfSSH
+from crocodile.meta import Response
 import time
 import subprocess
 from typing import Union
@@ -84,13 +85,13 @@ zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'
         return tb.Terminal().run_script(cmd)
 
     @staticmethod
-    def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines", tab_name: str = ""):
+    def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines", tab_name: str = "", compact: bool = False):
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe = f"""
-zellij --session {sess_name} action new-tab --name 'J-{tab_name}'; sleep 0.2
+zellij --session {sess_name} action new-tab --name '{tab_name}'; sleep 0.2
 zellij --session {sess_name} run -d down -- /bin/bash {cmd}; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
@@ -98,7 +99,7 @@ zellij --session {sess_name} action close-pane; sleep 0.2
         else: exe = f"""
 zellij --session {sess_name} action write-chars "{cmd}"
 """
-        cmd = f"""
+        if not compact: cmd = f"""
 zellij --session {sess_name} action new-tab --name '🖥️{tab_name}'; sleep 0.2
 zellij --session {sess_name} action rename-tab '🖥️{tab_name}'  # rename the focused first tab; sleep 0.2
 zellij --session {sess_name} action new-tab --name '🔍{tab_name}'; sleep 0.2
@@ -120,10 +121,12 @@ zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
 
 """
+        else: cmd = exe
         if isinstance(ssh, SelfSSH):
             # print(1)
             print(f"Setting up zellij layout `{sess_name}` on `{ssh.get_remote_repr()}` to run `{tb.P(job_wd).name}`")
-            return tb.Terminal().run_script(cmd)
+            # return tb.Terminal().run_script(cmd)  # Zellij not happy with launching scripts of zellij commands.
+            return Response.from_completed_process(subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True))
         # print(2)
         return ssh.run(cmd, desc=f"Setting up zellij layout on `{ssh.get_remote_repr()}`", verbose=False)
     @staticmethod

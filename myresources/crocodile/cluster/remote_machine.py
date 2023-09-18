@@ -135,7 +135,7 @@ class RemoteMachine:
                 session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
                 session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
-        session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.session_name).print()
+        session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.session_name, compact=True).print()
         print("\n")
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
