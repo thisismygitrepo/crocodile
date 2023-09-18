@@ -54,6 +54,7 @@ def run_on_cloud():
         # remote machine behaviour
         open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='zoho',
         kill_on_completion=False,
+        launch_method="cloud_manager",
         # execution behaviour
         ipython=False, interactive=False, pdb=False, pudb=False, wrap_in_try_except=True,
         workload_params=None,  # to be added later per sub-job.

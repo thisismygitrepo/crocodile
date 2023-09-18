@@ -458,7 +458,7 @@ class CloudManager:
     @staticmethod
     def run_clean_trial():
         self = CloudManager()
-        self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True)
+        self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
         from crocodile.cluster.template import run_on_cloud
         run_on_cloud()
         self.run()
