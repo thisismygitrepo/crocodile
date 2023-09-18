@@ -126,11 +126,14 @@ class RemoteMachine:
         console.rule(f"Firing job `{self.config.job_id}` @ remote machine {self.ssh}")
         session_manager = self.get_session_manager()
         ssh = self.ssh
+        sess_name = self.job_params.session_name
         if open_console and self.config.open_console:
-            session_manager.open_console(sess_name=self.job_params.session_name, ssh=self.ssh)
-            session_manager.asssert_session_started(ssh=ssh, sess_name=self.job_params.session_name)
+            if isinstance(session_manager, Zellij):
+                sess_name = session_manager.get_current_zellij_session()  # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
+            else: session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
+            session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
-        session_manager.setup_layout(ssh=ssh, sess_name=self.job_params.session_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix())
+        session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=sess_name)
         print("\n")
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):

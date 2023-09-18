@@ -11,6 +11,11 @@ from typing import Union
 
 
 class Zellij:
+    @staticmethod
+    def get_current_zellij_session() -> str:
+        """Fails if there is no zellij session running, fails if there is no (current) suffix against the session name."""
+        return tb.L(tb.Terminal().run("zellij ls").op.split("\n")).filter(lambda x: "(current)" in x).list[0].replace(" (current)", "")
+
     # def __init__(self, ssh: Union[SelfSSH, tb.SSH]):
     #     """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
     #     ssh = ssh
@@ -48,7 +53,8 @@ class Zellij:
     def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         if isinstance(ssh, SelfSSH):
             # return tb.Terminal().run_async(Zellij.get_new_session_command(sess_name=sess_name), shell="powershell")
-            print("*" * 100)
+            # currently, there is a limitation in zellij on creating a detached sessions, there is no way to fix this now.
+            # this will get stuck in the new session and won't run parallel.
             return subprocess.Popen(["zellij", "--session", sess_name], shell=True, stdin=None, stdout=None, stderr=None)
         return tb.Terminal().run_async(Zellij.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name))
     @staticmethod
@@ -65,13 +71,14 @@ class Zellij:
             time.sleep(2)
             print(f"--> Waiting for zellij session {sess_name} to start before sending fire commands ...")
     @staticmethod
-    def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines"):
-        self_id = ""
+    def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines", tab_name: str = ""):
+        tab_name = ""
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe = f"""
+zellij --session {sess_name} action new-tab --name 'J-{tab_name}'; sleep 0.2
 zellij --session {sess_name} run -d down -- /bin/bash {cmd}; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
@@ -80,21 +87,22 @@ zellij --session {sess_name} action close-pane; sleep 0.2
 zellij --session {sess_name} action write-chars "{cmd}"
 """
         cmd = f"""
-zellij --session {sess_name} action rename-tab '🖥️{self_id}'  # rename the focused first tab; sleep 0.2
-zellij --session {sess_name} action new-tab --name '🔍{self_id}'; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🖥️{tab_name}'; sleep 0.2
+zellij --session {sess_name} action rename-tab '🖥️{tab_name}'  # rename the focused first tab; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🔍{tab_name}'; sleep 0.2
 zellij --session {sess_name} action write-chars htop; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name '📁{self_id}'; sleep 0.2
+zellij --session {sess_name} action new-tab --name '📁{tab_name}'; sleep 0.2
 zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name '🪪{self_id}'; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🪪{tab_name}'; sleep 0.2
 zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name '🧑‍💻{self_id}'; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'; sleep 0.2
 zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep 0.2
 zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
@@ -150,7 +158,8 @@ class WindowsTerminal:
         time.sleep(6)
         return True
     @staticmethod
-    def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = True, job_wd: str = "$HOME/tmp_results/remote_machines", compact: bool = True):
+    def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, tab_name: str = "", cmd: str = "", run: bool = True, job_wd: str = "$HOME/tmp_results/remote_machines", compact: bool = True):
+        _ = tab_name
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
