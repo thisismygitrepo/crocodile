@@ -13,9 +13,10 @@ from typing import Union
 class Zellij:
     @staticmethod
     def get_current_zellij_session() -> str:
-        """Fails if there is no zellij session running, fails if there is no (current) suffix against the session name."""
-        return tb.L(tb.Terminal().run("zellij ls").op.split("\n")).filter(lambda x: "(current)" in x).list[0].replace(" (current)", "")
-
+        try: return tb.L(tb.Terminal().run("zellij ls").op.split("\n")).filter(lambda x: "(current)" in x).list[0].replace(" (current)", "")
+        except IndexError as ie:
+            print(f"""Fails if there is no zellij session running, fails if there is no (current) suffix against the session name.""")
+            raise ie
     # def __init__(self, ssh: Union[SelfSSH, tb.SSH]):
     #     """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
     #     ssh = ssh

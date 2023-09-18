@@ -130,8 +130,10 @@ class RemoteMachine:
         if open_console and self.config.open_console:
             if isinstance(session_manager, Zellij):
                 sess_name = session_manager.get_current_zellij_session()  # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
-            else: session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
-            session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
+                # no need to assert session started, as it is already started. Plus, The lack of suffix `sess_name (current)` creates problems.
+            else:
+                session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
+                session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
         session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=sess_name)
         print("\n")
