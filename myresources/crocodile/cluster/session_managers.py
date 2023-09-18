@@ -6,6 +6,7 @@ Session Manager
 import crocodile.toolbox as tb
 from crocodile.cluster.self_ssh import SelfSSH
 import time
+import subprocess
 from typing import Union
 
 
@@ -45,7 +46,9 @@ class Zellij:
         return f"{ssh.get_ssh_conn_str()} -t {Zellij.get_new_session_command(sess_name=sess_name)}"
     @staticmethod
     def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
-        if isinstance(ssh, SelfSSH): return tb.Terminal().run_async(Zellij.get_new_session_command(sess_name=sess_name), shell="powershell")
+        if isinstance(ssh, SelfSSH):
+            # return tb.Terminal().run_async(Zellij.get_new_session_command(sess_name=sess_name), shell="powershell")
+            return subprocess.Popen(["zellij", "--session", sess_name], shell=True, stdin=None, stdout=None, stderr=None)
         return tb.Terminal().run_async(Zellij.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name))
     @staticmethod
     def asssert_session_started(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
@@ -133,7 +136,9 @@ class WindowsTerminal:
         return f"{ssh.get_ssh_conn_str()} -t {WindowsTerminal.get_new_session_command(sess_name=sess_name)}"
     @staticmethod
     def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
-        if isinstance(ssh, SelfSSH): return tb.Terminal().run_async(WindowsTerminal.get_new_session_command(sess_name=sess_name), shell="powershell")
+        if isinstance(ssh, SelfSSH):
+            # return tb.Terminal().run_async(WindowsTerminal.get_new_session_command(sess_name=sess_name), shell="powershell")
+            return subprocess.Popen(["wt", "--window", sess_name], shell=True, stdin=None, stdout=None, stderr=None)
         return tb.Terminal().run_async(WindowsTerminal.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name), shell="pwsh")
     @staticmethod
     def asssert_session_started(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
@@ -173,15 +178,9 @@ class Mprocs:
     def get_template():
         import machineconfig
         return tb.P(machineconfig.__file__).parent.joinpath(r"settings/mprocs/windows/mprocs.yaml").readit()
-
-    def __init__(self, ssh: tb.SSH):
-        ssh = ssh
-        self.id = "4"  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
-        self.new_sess_name = None
-
     # def get_new_session_name(self): return f"mprocs{self.id}"
-    def get_new_session_string(self): return f"lol"
-    def get_ssh_command(self): return ""
+    @staticmethod
+    def get_ssh_command(): return ""
     def open_console(self, cmd: str, shell: str = "powershell"):
         _ = cmd, shell
         return "wt -w 0 -d ."
