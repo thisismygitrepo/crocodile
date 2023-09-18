@@ -46,7 +46,7 @@ class Zellij:
     @staticmethod
     def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         if isinstance(ssh, SelfSSH): return tb.Terminal().run_async(Zellij.get_new_session_command(sess_name=sess_name), shell="powershell")
-        return tb.Terminal().run_async(Zellij.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name), shell="pwsh")
+        return tb.Terminal().run_async(Zellij.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name))
     @staticmethod
     def asssert_session_started(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         while True:
@@ -73,31 +73,31 @@ zellij --session {sess_name} action close-pane; sleep 0.2
 zellij --session {sess_name} action write-chars "{cmd}"
 """
         cmd = f"""
-zellij --session {sess_name} action rename-tab 🖥️{self_id}  # rename the focused first tab; sleep 0.2
-zellij --session {sess_name} action new-tab --name 🔍{self_id}; sleep 0.2
+zellij --session {sess_name} action rename-tab '🖥️{self_id}'  # rename the focused first tab; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🔍{self_id}'; sleep 0.2
 zellij --session {sess_name} action write-chars htop; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name 📁{self_id}; sleep 0.2
+zellij --session {sess_name} action new-tab --name '📁{self_id}'; sleep 0.2
 zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name 🪪{self_id}; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🪪{self_id}'; sleep 0.2
 zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep 0.2
 zellij --session {sess_name} action move-focus up; sleep 0.2
 zellij --session {sess_name} action close-pane; sleep 0.2
 
-zellij --session {sess_name} action new-tab --name 🧑‍💻{self_id}; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🧑‍💻{self_id}'; sleep 0.2
 zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep 0.2
 zellij --session {sess_name} action go-to-tab 1; sleep 0.2
 {exe}
 
 """
         if isinstance(ssh, SelfSSH):
-            print(1)
+            # print(1)
             print(f"Setting up zellij layout `{sess_name}` on `{ssh.get_remote_repr()}` to run `{tb.P(job_wd).name}`")
             return tb.Terminal().run_script(cmd)
-        print(2)
+        # print(2)
         return ssh.run(cmd, desc=f"Setting up zellij layout on `{ssh.get_remote_repr()}`", verbose=False)
     @staticmethod
     def kill_session(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
@@ -132,8 +132,7 @@ class WindowsTerminal:
         if isinstance(ssh, SelfSSH): return WindowsTerminal.get_new_session_command(sess_name=sess_name)
         return f"{ssh.get_ssh_conn_str()} -t {WindowsTerminal.get_new_session_command(sess_name=sess_name)}"
     @staticmethod
-    def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str, shell: str = "powershell"):
-        _ = cmd, shell
+    def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         if isinstance(ssh, SelfSSH): return tb.Terminal().run_async(WindowsTerminal.get_new_session_command(sess_name=sess_name), shell="powershell")
         return tb.Terminal().run_async(WindowsTerminal.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name), shell="pwsh")
     @staticmethod

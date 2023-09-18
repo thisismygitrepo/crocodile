@@ -7,6 +7,7 @@ This module contains classes that can be used to preprocess dataframes for deep 
 from typing import Optional, Any, Union
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
@@ -15,8 +16,11 @@ import crocodile.toolbox as tb
 
 
 class CategoricalClipper:
-    """Use pre onehot or ordinal encoding to create a new category "Other" for values that are less than a certain threshold"""
-    def __init__(self, thresh: float = 1.0, others_name: str = 'Other'):
+    """Use pre onehot or ordinal encoding to create a new category "Other" for values that are less than a certain threshold
+Note: this class does not perform imputing. I.e. Null values are ignored at fit, and passed as is at transform. Same behaviour happens with new values at transform time.
+This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, which `can` perform missing values handling if instructed to do so.
+"""
+    def __init__(self, thresh: float = 1.0, others_name: str = 'ClipperOther'):
         self.thresh = thresh
         self.others_name = others_name
         self.columns: Optional[list[str]] = None
@@ -34,6 +38,11 @@ class CategoricalClipper:
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
+            series_na = series.isna()
+            if series_na.sum() != 0:
+                print(f"Column `{col}` has {series.isna().sum()} NaN, NA, None values. These will be dropped before clipping.")
+                print("Percentage of Nulls before dropping = ", series_na.mean() * 100)
+                series = series[~series_na]
             self.pre_percentage_counts[col] = series.value_counts(normalize=True) * 100
             self.post_percentage_counts[col], self.mapper[col] = self.create_others_category(self.pre_percentage_counts[col], thresh=self.thresh, others_name=self.others_name)
             name = self.pre_percentage_counts[col].name
@@ -74,6 +83,10 @@ class CategoricalClipper:
 
 
 class NumericalClipper:
+    """
+    Note: simliarly to CategoricalClipper, this class does not perform imputing. I.e. Null values are ignored at fit, and passed as is at transform.
+    This behaviour is inherited from numpy's ignoring behaviour of NaN when max, min, quantile, etc. are calculated.
+    """
     def __init__(self, quant_min: float, quant_max: float):
         self.columns: Optional[list[str]] = None
         self.quant_min: float = quant_min
@@ -122,18 +135,19 @@ class DataFrameHander:
                  clipper_categorical: CategoricalClipper,
                  clipper_numerical: NumericalClipper
                  ) -> None:
-        self.cols_ordinal: list[str] = cols_ordinal
-        self.cols_onehot: list[str] = cols_onehot
-        self.cols_numerical: list[str] = cols_numerical
-
-        self.scaler: Union[RobustScaler, StandardScaler] = scaler
-        self.imputer: SimpleImputer = imputer
-
-        self.encoder_onehot: OneHotEncoder = encoder_onehot
-        self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
 
         self.clipper_categorical: CategoricalClipper = clipper_categorical
+
+        self.encoder_onehot: OneHotEncoder = encoder_onehot
+        self.cols_onehot: list[str] = cols_onehot
+        self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
+        self.cols_ordinal: list[str] = cols_ordinal
+
+        self.cols_numerical: list[str] = cols_numerical
         self.clipper_numerical: NumericalClipper = clipper_numerical
+        self.imputer: SimpleImputer = imputer
+        self.scaler: Union[RobustScaler, StandardScaler] = scaler
+
     def __getstate__(self):
         atts: list[str] = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
         res = {}
@@ -166,12 +180,28 @@ class DataFrameHander:
 
     def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
         df.fillna(np.nan, inplace=True)  # SKlearn Imputer only works with Numpy's np.nan, as opposed to Pandas' pd.NA
-        columns = df.columns
-        res = self.imputer.transform(df)
+        # all_columns = df.columns
+        res = self.imputer.transform(df[self.imputer.get_feature_names_out()])
         assert isinstance(res, np.ndarray), f"Imputer returned {type(res)}, but expected np.ndarray"
-        res = self.scaler.transform(pd.DataFrame(res, columns=columns))
+        df[self.imputer.get_feature_names_out()] = res
+        res = self.scaler.transform(df[self.scaler.get_feature_names_out()])
         assert isinstance(res, np.ndarray), f"Scaler returned {type(res)}, but expected np.ndarray"
-        return pd.DataFrame(res, columns=columns)
+        df[self.scaler.get_feature_names_out()] = res
+        # return pd.DataFrame(res, columns=columns)
+        return df
+
+
+def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
+    assert len(ip.shape) == 2, f"Expected 2D array, but got {len(ip.shape)}D array"
+    total_nan_count: int = 0
+    for col_idx in range(ip.shape[1]):
+        nan_count = np.isnan(ip[:, col_idx]).sum()
+        nan_indices = np.argwhere(np.isnan(ip[:, col_idx]))
+        total_nan_count += nan_count
+        if nan_count > 0:
+            print(f"Column {col_idx}-{ip.shape[1]} has {nan_count} NaNs")
+            print(f"Locations of NaNs: {nan_indices[:5]}")
+    return total_nan_count
 
 
 if __name__ == "__main__":

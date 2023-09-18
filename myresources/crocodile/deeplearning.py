@@ -154,7 +154,9 @@ class DataReader:
     def __repr__(self):
         print(f"DataReader Object with these keys: \n")
         tb.S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
-        tb.S(self.split).print(as_config=False, title="Split Data")  # table print
+        if bool(self.split):
+            print("Split-Data Table:")
+            tb.S(self.split).print(as_config=False, title="Split Data")  # table print
         return f"--" * 50
 
     def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
