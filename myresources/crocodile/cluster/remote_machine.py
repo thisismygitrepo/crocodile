@@ -217,7 +217,7 @@ deactivate
         Console().print(Panel(Syntax(self.resources.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
         inspect(tb.Struct(shell_script=repr(tb.P(self.resources.shell_script_path).expanduser()), python_script=repr(tb.P(self.resources.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.resources.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
 
-    def wait_for_results(self, sleep_minutes: int = 10):
+    def wait_for_results(self, sleep_minutes: int = 10) -> None:
         assert self.submitted, "Job even not submitted yet. 🤔"
         assert not self.results_downloaded, "Job already completed. 🤔"
         while True:
