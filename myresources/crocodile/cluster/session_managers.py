@@ -53,6 +53,9 @@ class Zellij:
     @staticmethod
     def asssert_session_started(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         while True:
+            # if isinstance(ssh, SelfSSH):
+                # resp = tb.Terminal().run("zellij ls").op.split("\n")
+            # else:
             resp = ssh.run("zellij ls", verbose=False).op.split("\n")
             if sess_name in resp:
                 print(f"--> Session {resp} has started at the remote.")

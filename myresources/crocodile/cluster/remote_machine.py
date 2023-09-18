@@ -127,7 +127,7 @@ class RemoteMachine:
         session_manager = self.get_session_manager()
         ssh = self.ssh
         if open_console and self.config.open_console:
-            # ssh.open_console(sess_name=self.job_params.session_name, ssh=self.ssh)
+            session_manager.open_console(sess_name=self.job_params.session_name, ssh=self.ssh)
             session_manager.asssert_session_started(ssh=ssh, sess_name=self.job_params.session_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
         session_manager.setup_layout(ssh=ssh, sess_name=self.job_params.session_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix())
