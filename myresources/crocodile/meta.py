@@ -169,8 +169,9 @@ class Terminal:
         else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return Response.from_completed_process(resp)
     def run_script(self, script: str, shell: SHELLS = "default"):
+        if self.machine == "Linux": script = "#!/bin/bash" + "\n" + script  # `source` is only available in bash.
         tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
-        if shell == "default": start_cmd  = "source"
+        if shell == "default": start_cmd  = "."  # "source"
         else: start_cmd = shell
         resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         return Response.from_completed_process(resp)
