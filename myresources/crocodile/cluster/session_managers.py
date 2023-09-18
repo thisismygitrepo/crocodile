@@ -48,13 +48,14 @@ class Zellij:
     def open_console(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         if isinstance(ssh, SelfSSH):
             # return tb.Terminal().run_async(Zellij.get_new_session_command(sess_name=sess_name), shell="powershell")
+            print("*" * 100)
             return subprocess.Popen(["zellij", "--session", sess_name], shell=True, stdin=None, stdout=None, stderr=None)
         return tb.Terminal().run_async(Zellij.get_new_session_ssh_command(ssh=ssh, sess_name=sess_name))
     @staticmethod
     def asssert_session_started(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         while True:
             # if isinstance(ssh, SelfSSH):
-                # resp = tb.Terminal().run("zellij ls").op.split("\n")
+            # resp = tb.Terminal().run("zellij ls").op.split("\n")
             # else:
             resp = ssh.run("zellij ls", verbose=False).op.split("\n")
             if sess_name in resp:
