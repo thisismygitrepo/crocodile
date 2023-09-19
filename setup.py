@@ -59,11 +59,11 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.6",  # 3.9
+    python_requires=">=3.10",  # 3.9
     license='Apache 2.0',
     author='Alex Al-Saffar',
     author_email='programmer@usa.com',
-    description='Making Python even more convenient by extending list and dict and pathlib and more.',
+    description='Deep Learning Framework & Workload Management For On-premise Personal Machines.',
     long_description=long_desc,
     long_description_content_type="text/markdown",
     package_data={'crocodile': ['art/*']},
