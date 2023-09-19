@@ -61,7 +61,7 @@ def run_on_cloud():
         # resources
         lock_resources=True, max_simulataneous_jobs=2, parallelize=False, )
     m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3)), config=config)
-    res = m.submit_to_cloud(split=5, cm=CloudManager())
+    res = m.submit_to_cloud(split=10, cm=CloudManager())
     return res
 
 

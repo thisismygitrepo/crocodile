@@ -25,16 +25,20 @@ console = Console()
 
 @dataclass
 class WorkloadParams:
+    idx_min: int = 0
+    idx_max: int = 1000
     idx_start: int = 0
     idx_end: int = 1000
-    idx_max: int = 1000
+    idx: int = 0
     jobs: int = 3
     job_id: str = ''
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
     def split_to_jobs(self, jobs: Optional[int] = None) -> tb.List['WorkloadParams']:
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
-        return tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=self.idx_max, jobs=jobs or self.jobs))
+        res = tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=self.idx_max, jobs=self.jobs))
+        for idx, item in enumerate(res): item.idx = idx
+        return res
     def get_section_from_series(self, series: list[pd.Timestamp]):
         from math import floor
         min_idx_start = int(floor((len(series) - 1) * self.idx_start / self.idx_max))
@@ -304,6 +308,7 @@ class ResourceManager:
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
+            print(f"Job `{self.job_id}` is running with pid {pid}.")
             return status
         return status
 
@@ -455,16 +460,7 @@ class LogEntry:
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
-    @staticmethod
-    def run_clean_trial():
-        self = CloudManager()
-        self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
-        from crocodile.cluster.template import run_on_cloud
-        run_on_cloud()
-        self.run()
-
     def __init__(self, max_jobs: int = 3, cloud: str = "gdw") -> None:
-
         self.max_jobs = max_jobs
         self.num_claim_checks = 1
         self.inter_check_interval = 1
@@ -553,12 +549,36 @@ class CloudManager:
             self.write_log(log=log)
         return None
 
-    def reset_cloud(self, force: bool = False):
-        if not force: self.claim_lock()
+    def reset_cloud(self, unsafe: bool = False):
+        if not unsafe: self.claim_lock()  # it is unsafe to ignore the lock since other workers thinnk they own the lock and will push their data and overwrite the reset.
         CloudManager.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, verbose=True, transfers=100)
         self.release_lock()
     def reset_lock(self): CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
-
+    @staticmethod
+    def run_clean_trial():
+        self = CloudManager()
+        self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
+        from crocodile.cluster.template import run_on_cloud
+        run_on_cloud()
+        self.run()
+    @staticmethod
+    def check_cloud_status():
+        """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
+        cm = CloudManager()
+        path = cm.base_path.joinpath("logs.pkl").expanduser()
+        remote = path.get_remote_path(root="myhome")
+        log: dict[str, 'pd.DataFrame'] = remote.from_cloud("gdw", localpath=tb.P.tmpfile(suffix=".pkl")).readit()
+        console.print(f"Queued DataFrame", highlight=True)
+        print(log["queued"][-10:])
+        print("\n\n")
+        console.print(f"Running DataFrame", highlight=True)
+        print(log["running"][-10:])
+        print("\n\n")
+        console.print(f"Completed DataFrame", highlight=True)
+        print(log["completed"][-10:])
+        print("\n\n")
+        console.print(f"Failed DataFrame", highlight=True)
+        print(log["failed"][-10:])
     def claim_lock(self, first_call: bool = True):
         if first_call: print(f"Claiming lock...")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
