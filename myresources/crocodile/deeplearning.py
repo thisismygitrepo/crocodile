@@ -181,6 +181,7 @@ class DataReader:
                 if data_name in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
                 elif data_name in self.specs.op_names: self.specs.op_shapes.append(a_shape)
                 elif data_name in self.specs.other_names: self.specs.other_shapes.append(a_shape)
+                else: raise ValueError(f"data_name `{data_name}` is not in the specs. I don't know what to do with it.\n{self.specs=}")
             if len(delcared_ip_shapes) != 0 and len(delcared_op_shapes) != 0:
                 if delcared_ip_shapes != self.specs.ip_shapes or delcared_op_shapes != self.specs.op_shapes or delcared_other_shapes != self.specs.other_shapes:
                     print(f"Declared ip shapes: {delcared_ip_shapes}")
