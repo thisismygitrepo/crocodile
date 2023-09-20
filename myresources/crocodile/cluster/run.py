@@ -1,16 +1,16 @@
 
 """Run
 """
-
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, CloudManager, WorkloadParams
+from crocodile.cluster.self_ssh import SelfSSH
 from typing import Any
+
+_ = WorkloadParams
 
 
 def run_on_cloud(func: Any, split: int):
-    from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, CloudManager
-    from crocodile.cluster.self_ssh import SelfSSH
     if hasattr(func, '__doc__'): description = func.__doc__
     else: description = "Description of running an expensive function"
-
     config = RemoteMachineConfig(
         # connection
         ssh_obj=SelfSSH(),  # overrides ssh_params
