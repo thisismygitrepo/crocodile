@@ -83,6 +83,7 @@ class JobParams:
         return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
     @staticmethod
     def from_func(func: Union[Callable[[Any], Any], tb.P, str]) -> 'JobParams':
+        # if callable(self.func): executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
         if callable(func) and not isinstance(func, tb.P):
             func_name = func.__name__
             func_module = func.__module__
@@ -377,7 +378,7 @@ echo "Unlocked resources"
                 attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
                              'ppid', 'num_threads', 'pid', 'cpu_percent', 'create_time', 'nice',
                              'name', 'cpu_affinity', 'cmdline', 'username', 'cwd']
-                if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
+                # if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
                 # environ, memory_maps, 'io_counters'
                 attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
                 inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)

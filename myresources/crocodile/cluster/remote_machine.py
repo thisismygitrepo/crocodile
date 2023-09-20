@@ -101,7 +101,6 @@ class RemoteMachine:
     def __repr__(self): return f"Compute Machine {self.ssh.get_remote_repr(add_machine=True)}"
     def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list[tb.P]] = None):
         self.config: RemoteMachineConfig = config
-        self.func = func
         self.job_params: JobParams = JobParams.from_func(func=func)
         # self.job_params.kill_at_end
         if self.config.install_repo is True: assert self.job_params.is_installabe()
@@ -166,8 +165,7 @@ class RemoteMachine:
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
         py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
-            if callable(self.func): executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
-            else: executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
+            executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
             assert self.config.email_config_name is not None, "Email config name is not provided. 🤷‍♂️"
             assert self.config.to_email is not None, "Email address is not provided. 🤷‍♂️"
             email_params = EmailParams(addressee=self.ssh.get_local_repr(add_machine=True),
