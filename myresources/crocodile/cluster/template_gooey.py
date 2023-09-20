@@ -8,7 +8,7 @@ import crocodile.toolbox as tb
 # from crocodile.cluster.distribute import Cluster, WorkloadParams
 from crocodile.cluster.remote_machine import RemoteMachineConfig
 # from crocodile.cluster.utils import expensive_function
-# from machineconfig.utils.utils import get_ssh_hosts, choose_ssh_host
+from machineconfig.utils.utils import DEFAULTS_PATH
 # from typing import Any, Optional
 
 Gooey = tb.install_n_import("gooey").Gooey
@@ -58,15 +58,19 @@ def main() -> RemoteMachineConfig:
     # parser.add_argument('-o', '--open_console', help='Open console', action='store_true', default=True)
 
     # # remote machine behaviour
-    # notify_upon_completion=True
     parser.add_argument('cloud_name', help='Cloud Rclone Config Name', default="oduq1", choices=cloud_names)
     parser.add_argument('-v', '--notify_upon_completion', help='Notify upon completion', action='store_true', default=True)
 
-    # to_email='random@email.com'
-    parser.add_argument('-z', '--to_email', help='To email',)
-    # email_config_name='enaut'
-    parser.add_argument('-f', '--email_config_name', help='Email config name', default='enaut')
-    # kill_on_completion=False
+    try:
+        section = tb.Read.ini(DEFAULTS_PATH)['general']
+        to_email = section['to_email']
+        email_config_name = section['email_config_name']
+    except (FileNotFoundError, KeyError, IndexError):
+        to_email = 'random@email.com'
+        email_config_name = 'enaut'
+
+    parser.add_argument('-z', '--to_email', help='To email', default=to_email)
+    parser.add_argument('-f', '--email_config_name', help='Email config name', default=email_config_name)
     parser.add_argument('-k', '--kill_on_completion', help='Kill terminal tab/pane for this job on completion', action='store_true', default=False)
     parser.add_argument('split', help='How many jobs to split into', type=int, default=3)
 

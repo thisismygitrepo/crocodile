@@ -461,11 +461,14 @@ class LogEntry:
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
-    def __init__(self, max_jobs: int = 3, cloud: str = "gdw") -> None:
+    def __init__(self, max_jobs: int, cloud: Optional[str] = None) -> None:
         self.max_jobs = max_jobs
         self.num_claim_checks = 1
         self.inter_check_interval = 1
-        self.cloud = cloud
+        if cloud is None:
+            from machineconfig.utils.utils import DEFAULTS_PATH
+            self.cloud = tb.Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
+        else: self.cloud = cloud
         self.lock_claimed = False
         from crocodile.cluster.remote_machine import RemoteMachine
         self.running_jobs: list[RemoteMachine] = []
@@ -557,7 +560,7 @@ class CloudManager:
     def reset_lock(self): CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
     @staticmethod
     def run_clean_trial():
-        self = CloudManager()
+        self = CloudManager(max_jobs=1)
         self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
         from crocodile.cluster.template import run_on_cloud
         run_on_cloud()
@@ -565,7 +568,7 @@ class CloudManager:
     @staticmethod
     def check_cloud_status():
         """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
-        cm = CloudManager()
+        cm = CloudManager(max_jobs=1)
         path = cm.base_path.joinpath("logs.pkl").expanduser()
         remote = path.get_remote_path(root="myhome")
         log: dict[str, 'pd.DataFrame'] = remote.from_cloud("gdw", localpath=tb.P.tmpfile(suffix=".pkl")).readit()

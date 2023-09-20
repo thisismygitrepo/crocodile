@@ -18,7 +18,7 @@ def run_on_remote():
         # data
         copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=data, transfer_method="sftp",
         # remote machine behaviour
-        open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='zoho', kill_on_completion=False,
+        open_console=True, notify_upon_completion=True, to_email=None, email_config_name=None, kill_on_completion=False,
         # execution behaviour
         ipython=True, interactive=True, pdb=False, pudb=False, wrap_in_try_except=True,
         workload_params=None,  # this means no workload params object will be created in execution script, nor fed explicitil with workload_params=workload_params.
@@ -51,7 +51,7 @@ def run_on_cloud():
         # data
         copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=[], transfer_method="cloud", cloud_name="oduq1",
         # remote machine behaviour
-        open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='zoho',
+        open_console=True, notify_upon_completion=True, to_email=None, email_config_name=None,
         kill_on_completion=False,
         launch_method="cloud_manager",
         # execution behaviour
