@@ -42,15 +42,14 @@ def try_run_on_remote():
 def run_on_cloud():
     from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, CloudManager
     from crocodile.cluster.utils import expensive_function
-    from crocodile.file_management import P
+    # from crocodile.file_management import P
     from crocodile.cluster.self_ssh import SelfSSH
-    data: list[P] = []
     config = RemoteMachineConfig(
         # connection
         ssh_obj=SelfSSH(),  # overrides ssh_params
         description="Description of running an expensive function",  # job_id=, base_dir="",
         # data
-        copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=data, transfer_method="cloud", cloud_name="oduq1",
+        copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=[], transfer_method="cloud", cloud_name="oduq1",
         # remote machine behaviour
         open_console=True, notify_upon_completion=True, to_email='random@email.com', email_config_name='zoho',
         kill_on_completion=False,
