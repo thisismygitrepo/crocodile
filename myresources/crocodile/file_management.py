@@ -79,15 +79,15 @@ def read(path: PLike, **kwargs: Any):
         if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
         try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
         except ImportError as err2: print(f"Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
-def json(path: PLike, r: bool = False, **kwargs: Any) -> Struct:
+def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
     _ = r
-    return mydict  # Struct.recursive_struct(mydict) if r else Struct(mydict)
-def yaml(path: PLike, r: bool = False):
+    return mydict
+def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict etc
     with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
     _ = r
-    return mydict  # Struct(mydict) if not r else Struct.recursive_struct(mydict)
+    return mydict
 def ini(path: PLike): import configparser; res = configparser.ConfigParser(); res.read(str(path)); return res
 def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
 def npy(path: PLike, **kwargs: Any): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
