@@ -77,6 +77,16 @@ class JobParams:
     func_class: Optional[str] = None  # the callable might be a function on its own, not a method of a class.
     func_name: Optional[str] = None  # the job might be running a script as is, no particular method.
 
+    def auto_commit(self):
+        from git.repo import Repo
+        repo = Repo(tb.P(self.repo_path_rh).expanduser(), search_parent_directories=True)
+        # do a commit if the repo is dirty
+        if repo.is_dirty():
+            repo.git.add(update=True)
+            repo.index.commit(f"CloudManager auto commit by {getpass.getuser()}@{platform.node()}")
+            print(f"Repo {repo.working_dir} was dirty, auto-committed.")
+        else: print(f"Repo {repo.working_dir} was clean, no auto-commit.")
+
     def is_installabe(self) -> bool: return True if "setup.py" in tb.P(self.repo_path_rh).expanduser().absolute().listdir().apply(str) else False
     @staticmethod
     def from_empty() -> 'JobParams':
@@ -461,7 +471,8 @@ class LogEntry:
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
-    def __init__(self, max_jobs: int, cloud: Optional[str] = None) -> None:
+    def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
+        if reset_local: tb.P(self.base_path).expanduser().delete(sure=True)
         self.max_jobs = max_jobs
         self.num_claim_checks = 1
         self.inter_check_interval = 1
@@ -554,7 +565,7 @@ class CloudManager:
         return None
 
     def reset_cloud(self, unsafe: bool = False):
-        if not unsafe: self.claim_lock()  # it is unsafe to ignore the lock since other workers thinnk they own the lock and will push their data and overwrite the reset.
+        if not unsafe: self.claim_lock()  # it is unsafe to ignore the lock since other workers thinnk they own the lock and will push their data and overwrite the reset. Do so only when knowing that other
         CloudManager.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, verbose=True, transfers=100)
         self.release_lock()
     def reset_lock(self): CloudManager.base_path.expanduser().create().joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
@@ -640,9 +651,7 @@ class CloudManager:
             raise ValueError(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned! This shouldn't happen.")
             # self.lock_claimed = False
         path.joinpath("lock.txt").write_text("")
-        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_up=True)
-        # .to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
-        # console.rule(title=f"Lock Released", style="bold red", characters="-")
+        CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_up=True)  # .to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         self.lock_claimed = False
         return NoReturn
 

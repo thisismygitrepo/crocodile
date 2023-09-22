@@ -1,6 +1,7 @@
 
 """Run
 """
+
 from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, CloudManager, WorkloadParams
 from crocodile.cluster.self_ssh import SelfSSH
 from typing import Any
@@ -8,7 +9,7 @@ from typing import Any
 _ = WorkloadParams
 
 
-def run_on_cloud(func: Any, split: int):
+def run_on_cloud(func: Any, split: int, reset_cloud: bool = False, reset_local: bool = False):
     if hasattr(func, '__doc__'): description = func.__doc__
     else: description = "Description of running an expensive function"
     config = RemoteMachineConfig(
@@ -27,7 +28,7 @@ def run_on_cloud(func: Any, split: int):
         # resources
         lock_resources=False, max_simulataneous_jobs=2, parallelize=False, )
     m = RemoteMachine(func=func, func_kwargs=None, config=config)
-    res = m.submit_to_cloud(split=split, cm=CloudManager(max_jobs=0))
+    res = m.submit_to_cloud(split=split, cm=CloudManager(max_jobs=0, reset_local=reset_local), reset_cloud=reset_cloud)
     return res
 
 

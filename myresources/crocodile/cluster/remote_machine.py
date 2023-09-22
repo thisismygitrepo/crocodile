@@ -77,12 +77,14 @@ class RemoteMachineConfig:
 
 
 class RemoteMachine:
-    def submit_to_cloud(self, cm: CloudManager, split: int = 5) -> list['RemoteMachine']:
+    def submit_to_cloud(self, cm: CloudManager, split: int = 5, reset_cloud: bool = False) -> list['RemoteMachine']:
         """The only authority responsible for adding entries to queue df."""
         assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
         assert self.config.launch_method == "cloud_manager", "CloudManager only works with `launch_method` set to `cloud_manager`."
         assert isinstance(self.ssh, SelfSSH), "CloudManager only works with `SelfSSH` objects."
         assert self.config.workload_params is None, "CloudManager only works with `workload_params` set to `None`."
+        self.job_params.auto_commit()
+        if reset_cloud: cm.reset_cloud()
         cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
         from copy import deepcopy
         self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
