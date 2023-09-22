@@ -522,7 +522,7 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
                     self.ax = [tmp]
         else:
             self.ax = [ax]
-            self.fig: Figure = ax.figure  # use the passed axis
+            self.fig: Figure = ax.figure or None  # type: ignore
         self.visibility_ax = [0.01, 0.05, 0.2, 0.15]
         self.txt: list[str] = []
         self.label: str = label
