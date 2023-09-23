@@ -185,7 +185,7 @@ wt --window {sess_name} new-tab --title '🏃‍♂️{tb.P(job_wd).name}' pwsh 
         else: raise NotImplementedError("I don't know how to write-chars in Windows Terminal")  # exe = f""" wt --window {sess_name} action write-chars "{cmd}" """
         sleep = 5
         if compact: cmd = f"""
-wt --window {sess_name} new-tab --title '💻{sess_name}' htop `; split-pane --horizontal --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --title '💻{sess_name}' --profile pwsh
+wt --window {sess_name} new-tab --title '💻{sess_name}' htop `; split-pane --horizontal  --title '📁{sess_name}' --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical  --title '🪪{sess_name}' powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --title '🧑‍💻{sess_name}' --profile pwsh
 """  # when pane-splitting, the tab title goes to the last pane declared.
         else: cmd = f"""'
 wt --window {sess_name} new-tab --title '💻' htop; sleep {sleep}

@@ -541,7 +541,7 @@ class CloudManager:
                 print(f"Job `{entry.name}` is not running, removing it from log of running jobs.")
         log["running"] = log["running"][~log["running"]["name"].isin(jobs_ids_to_be_removed_from_running_log)]
         self.write_log(log=log)
-        
+
         cycle: int = 0
         while True:
             cycle += 1
@@ -592,11 +592,12 @@ class CloudManager:
             queue_entry = LogEntry.from_dict(log["queued"].iloc[0].to_dict())
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
             rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
-            pid, process_cmd = rm.fire(run=True)
+            pid, _process_cmd = rm.fire(run=True)
             queue_entry.pid = pid
-            queue_entry.cmd = process_cmd
+            # queue_entry.cmd = process_cmd
             queue_entry.run_machine = f"{getpass.getuser()}@{platform.node()}"
             queue_entry.start_time = pd.Timestamp.now()
+            queue_entry.session_name = rm.job_params.session_name
             log["queued"] = log["queued"].iloc[1:] if len(log["queued"]) > 0 else pd.DataFrame(columns=log["queued"].columns)
             log["running"] = pd.concat([log["running"], pd.DataFrame([queue_entry.__dict__])], ignore_index=True)
             self.running_jobs.append(rm)
