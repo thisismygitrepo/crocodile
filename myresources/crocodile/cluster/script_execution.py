@@ -16,18 +16,6 @@ from rich import inspect
 from rich.text import Text
 import pandas as pd
 
-# import time
-
-# import psutil
-# res = []
-# for proc in psutil.process_iter():
-#     try:
-#         files = proc.open_files()
-#     except psutil.AccessDenied:
-#         continue
-#     for file in files:
-#         res.append(file.path)
-
 console = Console()
 
 # EXTRA-PLACEHOLDER-PRE

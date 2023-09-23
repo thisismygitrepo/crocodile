@@ -449,7 +449,9 @@ class LogEntry:
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
     def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
-        if reset_local: tb.P(self.base_path).expanduser().delete(sure=True)
+        if reset_local:
+            print("☠️ Resetting local cloud cache ☠️")
+            tb.P(self.base_path).expanduser().delete(sure=True)
         self.status_root: tb.P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
         self.max_jobs: int = max_jobs
         self.num_claim_checks: int = 1
@@ -523,12 +525,12 @@ class CloudManager:
             print("\n\n")
             time.sleep(wait)
 
-    def run(self):
-        # cleaning dirt from potential previous crash or interrupt.
+    def clean_interrupted_and_failed_jobs_mess(self, return_to_queue: bool = True):
+        assert len(self.running_jobs) == 0, f"method should never be called while there are running jobs. This can only be called at the beginning of the run."
         from crocodile.cluster.remote_machine import RemoteMachine
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         log = self.read_log()
-        jobs_ids_to_be_removed_from_running_log: list[str] = []
+        dirt: list[str] = []
         for _idx, row in log["running"].iterrows():
             entry = LogEntry.from_dict(row.to_dict())
             if entry.run_machine != this_machine: continue
@@ -539,11 +541,28 @@ class CloudManager:
                 print(f"Job `{entry.name}` is still running, added to running jobs.")
                 self.running_jobs.append(rm)
             else:
-                jobs_ids_to_be_removed_from_running_log.append(entry.name)
+                entry.pid = None
+                entry.cmd = None
+                entry.start_time = None
+                entry.end_time = None
+                entry.run_machine = None
+                entry.session_name = None
+                rm.resources.execution_log_dir.expanduser().joinpath("status.txt").delete(sure=True)
+                rm.resources.execution_log_dir.expanduser().joinpath("pid.txt").delete(sure=True)
+                entry.note = f"Job was interrupted by a crash of the machine `{this_machine}`."
+                dirt.append(entry.name)
                 print(f"Job `{entry.name}` is not running, removing it from log of running jobs.")
-        log["running"] = log["running"][~log["running"]["name"].isin(jobs_ids_to_be_removed_from_running_log)]
+                if return_to_queue:
+                    log["queued"] = pd.concat([log["queued"], pd.DataFrame([entry.__dict__])], ignore_index=True)
+                    print(f"Job `{entry.name}` is not running, returning it to the queue.")
+                else:
+                    log["failed"] = pd.concat([log["failed"], pd.DataFrame([entry.__dict__])], ignore_index=True)
+                    print(f"Job `{entry.name}` is not running, moving it to failed jobs.")
+        log["running"] = log["running"][~log["running"]["name"].isin(dirt)]
         self.write_log(log=log)
 
+    def run(self):
+        self.clean_interrupted_and_failed_jobs_mess()
         cycle: int = 0
         while True:
             cycle += 1
@@ -607,6 +626,7 @@ class CloudManager:
         return None
 
     def reset_cloud(self, unsafe: bool = False):
+        print("☠️ Resetting cloud server ☠️")
         if not unsafe: self.claim_lock()  # it is unsafe to ignore the lock since other workers thinnk they own the lock and will push their data and overwrite the reset. Do so only when knowing that other
         CloudManager.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, verbose=True, transfers=100)
         self.release_lock()

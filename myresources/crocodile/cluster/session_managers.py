@@ -18,33 +18,6 @@ class Zellij:
         except IndexError as ie:
             print(f"""Fails if there is no zellij session running, fails if there is no (current) suffix against the session name.""")
             raise ie
-    # def __init__(self, ssh: Union[SelfSSH, tb.SSH]):
-    #     """At the moment, there is no way to list tabs in a session. Therefore, we opt for multiple sessions, instead of same session and multiple tabs."""
-    #     ssh = ssh
-    #     self.id = ""  # f"_{tb.randstr(2)}"  # for now, tabs are unique. Sesssions are going to change.
-    #     self._new_sess_name: Optional[str] = None
-    # @property
-    # def new_sess_name(self) -> str:
-    #     if isinstance(self._new_sess_name, str): tmp = self._new_sess_name
-    #     else: tmp = self.get_new_session_name()
-    #     return tmp
-    # def get_new_session_name(self):
-    #     # if self.new_sess_name is not None: return self.new_sess_name
-    #     # zellij kill-session {name}
-    #     sess_name: str
-    #     resp = ssh.run("zellij ls", desc=f"Querying `{ssh.get_remote_repr()}` for new session name", verbose=False)
-    #     if resp.err == "No active zellij sessions found.":
-    #         sess_name = "ms0"
-    #     else:
-    #         sess = resp.op.split("\n")
-    #         sess = [int(s.replace("ms", "")) for s in sess if s.startswith("ms")]
-    #         sess.sort()
-    #         if len(sess) == 0: sess_name = "ms0"
-    #         else: sess_name = f"ms{1+sess[-1]}"
-    #     self._new_sess_name = sess_name
-    #     return sess_name
-    # def __getstate__(self): return self.__dict__
-    # def __setstate__(self, state): self.__dict__.update(state)
     @staticmethod
     def get_new_session_command(sess_name: str) -> str: return f"zellij attach {sess_name} -c "  # -c means create if not exists.
     @staticmethod
@@ -86,38 +59,39 @@ zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'
 
     @staticmethod
     def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines", tab_name: str = "", compact: bool = False):
+        sleep = 0.9
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe = f"""
-zellij --session {sess_name} action new-tab --name '{tab_name}'; sleep 0.2
-zellij --session {sess_name} run -d down -- /bin/bash {cmd}; sleep 0.2
-zellij --session {sess_name} action move-focus up; sleep 0.2
-zellij --session {sess_name} action close-pane; sleep 0.2
+zellij --session {sess_name} action new-tab --name '{tab_name}'; sleep {sleep}
+zellij --session {sess_name} run -d down -- /bin/bash {cmd}; sleep {sleep}
+zellij --session {sess_name} action move-focus up; sleep {sleep}
+zellij --session {sess_name} action close-pane; sleep {sleep}
 """
         else: exe = f"""
 zellij --session {sess_name} action write-chars "{cmd}"
 """
         if not compact: cmd = f"""
-zellij --session {sess_name} action new-tab --name '🖥️{tab_name}'; sleep 0.2
-zellij --session {sess_name} action rename-tab '🖥️{tab_name}'  # rename the focused first tab; sleep 0.2
-zellij --session {sess_name} action new-tab --name '🔍{tab_name}'; sleep 0.2
-zellij --session {sess_name} action write-chars htop; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🖥️{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action rename-tab '🖥️{tab_name}'; sleep {sleep}  # rename the focused first tab
+zellij --session {sess_name} action new-tab --name '🔍{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action write-chars htop; sleep {sleep}
 
-zellij --session {sess_name} action new-tab --name '📁{tab_name}'; sleep 0.2
-zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf; sleep 0.2
-zellij --session {sess_name} action move-focus up; sleep 0.2
-zellij --session {sess_name} action close-pane; sleep 0.2
+zellij --session {sess_name} action new-tab --name '📁{tab_name}'; sleep {sleep}
+zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf; sleep {sleep}
+zellij --session {sess_name} action move-focus up; sleep {sleep}
+zellij --session {sess_name} action close-pane; sleep {sleep}
 
-zellij --session {sess_name} action new-tab --name '🪪{tab_name}'; sleep 0.2
-zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep 0.2
-zellij --session {sess_name} action move-focus up; sleep 0.2
-zellij --session {sess_name} action close-pane; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🪪{tab_name}'; sleep {sleep}
+zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep {sleep}
+zellij --session {sess_name} action move-focus up; sleep {sleep}
+zellij --session {sess_name} action close-pane; sleep {sleep}
 
-zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'; sleep 0.2
-zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep 0.2
-zellij --session {sess_name} action go-to-tab 1; sleep 0.2
+zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep {sleep}
+zellij --session {sess_name} action go-to-tab 1; sleep {sleep}
 {exe}
 
 """
@@ -143,18 +117,6 @@ class WindowsTerminal:
         pm.kill(commands=[sess_name])
     @staticmethod
     def open_reference(): tb.P(r"https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments?tabs=windows")()
-    # def __init__(self, ssh: Union[tb.SSH, SelfSSH]) -> None:
-    #     ssh = ssh
-    #     self.id: Optional[str] = None
-    # def __getstate__(self): return self.__dict__
-    # def __setstate__(self, state): self.__dict__.update(state)
-    # @property
-    # def new_sess_name(self) -> str:
-    #     if self.id is None: self.id = tb.randstr(noun=True)
-    #     return self.id
-    # def get_new_session_name(self):
-    #     """Ideally, this method should look into the already opened sessions and try to make a new one based on latest activated index, but Windows Terminal Doesn't allow that yet."""
-    #     return self.new_sess_name
     @staticmethod
     def get_new_session_command(sess_name: str): return f"wt -w {sess_name} -d ."
     @staticmethod
@@ -219,5 +181,3 @@ class Mprocs:
     def asssert_session_started(self):
         time.sleep(3)
         return True
-    # def __getstate__(self): return self.__dict__
-    # def __setstate__(self, state): self.__dict__.update(state)
