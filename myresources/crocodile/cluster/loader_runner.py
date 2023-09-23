@@ -473,9 +473,10 @@ class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
     def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
         if reset_local: tb.P(self.base_path).expanduser().delete(sure=True)
-        self.max_jobs = max_jobs
-        self.num_claim_checks = 1
-        self.inter_check_interval = 1
+        self.status_root: tb.P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
+        self.max_jobs: int = max_jobs
+        self.num_claim_checks: int = 1
+        self.inter_check_interval: int = 1
         if cloud is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
             self.cloud = tb.Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
@@ -503,7 +504,46 @@ class CloudManager:
         if not self.lock_claimed: self.claim_lock()
         tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
         return NoReturn
+    def run_monitor(self):
+        """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
+        from crocodile.cluster.remote_machine import RemoteMachine
+        cycle: int = 0
+        # self.base_path.expanduser().delete(sure=True)
+        remote = CloudManager.base_path  # .expanduser().get_remote_path(root="myhome")
+        localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager/{tb.randstr()}").create()
+        alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath, verbose=False)
+        from rich import print as pprint
+        while True:
+            alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath.delete(sure=True), verbose=False)
+            lock_path = alternative_base.expanduser().joinpath("lock.txt")
+            if lock_path.exists(): lock_owner: str = lock_path.read_text()
+            else: lock_owner = "None"
+            print(f"🔒 Lock is held by: {lock_owner}")
+            print("🧾 Log File:")
+            log_path = alternative_base.joinpath("logs.pkl")
+            if log_path.exists(): log: dict[str, 'pd.DataFrame'] = tb.Read.vanilla_pickle(path=log_path)
+            else:
+                print(f"Log file doesn't exist! 🫤")
+                log = {}
+            for item_name, item_df in log.items():
+                console.rule(f"{item_name} DataFrame (Latest 10)")
+                pprint(item_df[-10:].to_markdown())
+                pprint("\n\n")
 
+            print("👷 Workers:")
+            workers_root = alternative_base.joinpath(f"workers").search("*")
+            res: dict[str, list[RemoteMachine]] = {}
+            for a_worker in workers_root:
+                running_jobs = a_worker.joinpath("running_jobs.pkl")
+                res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
+            print(res)
+
+            cycle += 1
+            wait = 5 * 60
+            print(f"CloudManager Monitor: Finished Cycle {cycle}. Sleeping for {wait} seconds")
+            console.rule()
+            print("\n\n")
+            time.sleep(wait)
     def run(self):
         cycle = 0
         while True:
@@ -512,13 +552,13 @@ class CloudManager:
             console.rule(title=f"CloudManager: Cycle #{cycle}", style="bold red", characters="-")
             print(f"Running jobs: {len(self.running_jobs)} / {self.max_jobs=}")
             self.start_jobs_if_possible()
-            self.check_jobs_statuses()
+            self.get_running_jobs_statuses()
             self.release_lock()
             wait = int(random.random() * 1000)
             print(f"CloudManager: Finished cycle {cycle}. Sleeping for {wait} seconds.")
             time.sleep(wait)
 
-    def check_jobs_statuses(self):
+    def get_running_jobs_statuses(self):
         """This is the only authority responsible for moving jobs from running df to failed df or completed df."""
         jobs_ids_to_be_removed_from_running: list[str] = []
         for a_rm in self.running_jobs:
@@ -541,6 +581,8 @@ class CloudManager:
             elif status == "queued": raise RuntimeError(f"I thought I'm working strictly with running jobs, and I encountered unexpected a job with `queued` status.")
             else: raise ValueError(f"I receieved a status that I don't know how to handle `{status}`")
         self.running_jobs = [a_rm for a_rm in self.running_jobs if a_rm.config.job_id not in jobs_ids_to_be_removed_from_running]
+        tb.Save.vanilla_pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
+        self.status_root.to_cloud(cloud=self.cloud, rel2home=True, verbose=False)  # no need for lock as this writes to a folder specific to this machine.
 
     def start_jobs_if_possible(self):
         """This is the only authority responsible for moving jobs from queue df to running df."""
@@ -576,24 +618,6 @@ class CloudManager:
         from crocodile.cluster.template import run_on_cloud
         run_on_cloud()
         self.run()
-    @staticmethod
-    def check_cloud_status():
-        """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
-        cm = CloudManager(max_jobs=1)
-        path = cm.base_path.joinpath("logs.pkl").expanduser()
-        remote = path.get_remote_path(root="myhome")
-        log: dict[str, 'pd.DataFrame'] = remote.from_cloud("gdw", localpath=tb.P.tmpfile(suffix=".pkl")).readit()
-        console.print(f"Queued DataFrame", highlight=True)
-        print(log["queued"][-10:])
-        print("\n\n")
-        console.print(f"Running DataFrame", highlight=True)
-        print(log["running"][-10:])
-        print("\n\n")
-        console.print(f"Completed DataFrame", highlight=True)
-        print(log["completed"][-10:])
-        print("\n\n")
-        console.print(f"Failed DataFrame", highlight=True)
-        print(log["failed"][-10:])
     def claim_lock(self, first_call: bool = True):
         if first_call: print(f"Claiming lock...")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
