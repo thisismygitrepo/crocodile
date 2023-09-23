@@ -101,7 +101,8 @@ class RemoteMachine:
             rm.submitted = True  # must be done before generate_script which performs the pickling.
             rm.generate_scripts()
             rms.append(rm)
-            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now(), start_time=None, end_time=None, run_machine=None, source_machine=f"{getpass.getuser()}@{platform.node()}", note=""))
+            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now(), start_time=None, end_time=None, run_machine=None,
+                                            source_machine=f"{getpass.getuser()}@{platform.node()}", note="", pid=None, cmd="", session_name=""))
         log = cm.read_log()  # this claims lock internally.
         new_queued_df: 'pd.DataFrame' = pd.DataFrame([item.__dict__ for item in new_log_entries])
         total_queued_df = pd.concat([log["queued"], new_queued_df], ignore_index=True, sort=False)
@@ -134,7 +135,7 @@ class RemoteMachine:
         self.results_path: Optional[tb.P] = None
 
     def get_session_manager(self): return Zellij() if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal()
-    def fire(self, run: bool = False, open_console: bool = True, launch_method: LAUNCH_METHOD = "remotely") -> None:
+    def fire(self, run: bool = False, open_console: bool = True, launch_method: LAUNCH_METHOD = "remotely") -> tuple[int, str]:
         assert self.submitted, "Job even not submitted yet. 🤔"
         console.rule(f"Firing job `{self.config.job_id}` @ remote machine {self.ssh}")
         session_manager = self.get_session_manager()
@@ -149,7 +150,20 @@ class RemoteMachine:
                 session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
         cmd = self.resources.get_fire_command(launch_method=launch_method)
         session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.session_name, compact=True).print()
+        if isinstance(ssh, SelfSSH):
+            while True:
+                try:
+                    pid = int(self.resources.execution_log_dir.expanduser().joinpath("pid.txt").read_text())
+                    import psutil
+                    process_command = " ".join(psutil.Process(pid).cmdline())
+                    break
+                except Exception: time.sleep(3)
+        else:
+            pid = 0
+            process_command = "haha"
         print("\n")
+        time.sleep(5)  # allow time for job to write essential log files to define itself (see execution header and repo updates lines prior to py file).
+        return pid, process_command
 
     def run(self, run: bool = True, open_console: bool = True, show_scripts: bool = True):
         self.generate_scripts()

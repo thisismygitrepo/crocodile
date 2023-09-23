@@ -212,7 +212,6 @@ class ResourceManager:
     history_path          = tb.P(f"~/tmp_results/remote_machines/resource_manager/history_jobs.pkl")
     shell_script_path_log = tb.P(f"~/tmp_results/remote_machines/resource_manager/last_cluster_script.txt")
     default_base          = tb.P(f"~/tmp_results/remote_machines/jobs")
-
     @staticmethod
     def from_pickle(path: Union[str, tb.P]):
         rm = ResourceManager(job_id='1', remote_machine_type='Windows', lock_resources=True, max_simulataneous_jobs=1, base=None)
@@ -237,7 +236,6 @@ class ResourceManager:
         status: JOB_STATUS
         status = 'queued'
         self.job_root = self.base_dir.joinpath(f"{status}/{self.job_id}")
-
     def get_fire_command(self, launch_method: LAUNCH_METHOD):
         _ = launch_method
         script_path = self.shell_script_path.expanduser()
@@ -256,45 +254,22 @@ class ResourceManager:
         print("Execution command copied to clipboard 📋")
         print(self.get_fire_command(launch_method=launch_method)); tb.install_n_import("clipboard").copy(self.get_fire_command(launch_method=launch_method))
         print("\n")
-
     @property
-    def py_script_path(self):
-        return self.job_root.joinpath(f"python/cluster_wrap.py")
+    def py_script_path(self): return self.job_root.joinpath(f"python/cluster_wrap.py")
     @property
-    def cloud_download_py_script_path(self):
-        return self.job_root.joinpath(f"python/download_data.py")
+    def cloud_download_py_script_path(self): return self.job_root.joinpath(f"python/download_data.py")
     @property
-    def shell_script_path(self):
-        return self.job_root.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
+    def shell_script_path(self): return self.job_root.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
     @property
-    def kwargs_path(self):
-        return self.job_root.joinpath(f"data/func_kwargs.pkl")
+    def kwargs_path(self): return self.job_root.joinpath(f"data/func_kwargs.pkl")
     @property
-    def resource_manager_path(self):
-        return self.job_root.joinpath(f"data/resource_manager.pkl")
+    def resource_manager_path(self): return self.job_root.joinpath(f"data/resource_manager.pkl")
     @property
-    def remote_machine_path(self):
-        return self.job_root.joinpath(f"data/remote_machine.Machine.pkl")
+    def remote_machine_path(self): return self.job_root.joinpath(f"data/remote_machine.Machine.pkl")
     @property
-    def remote_machine_config_path(self):
-        return self.job_root.joinpath(f"data/remote_machine_config.pkl")
+    def remote_machine_config_path(self): return self.job_root.joinpath(f"data/remote_machine_config.pkl")
     @property
-    def execution_log_dir(self):
-        return self.job_root.joinpath(f"logs")
-
-    # def move_job(self, status: JOB_STATUS):
-    #     # target = self.root_dir.expanduser().parent.with_name(f"{status}/{self.job_id}")
-    #     target = self.job_root.expanduser().move(folder=self.base_dir.joinpath(status))
-    #     self.job_root = target.collapseuser()
-    # def update_job_location(self) -> JOB_STATUS:
-    #     status: JOB_STATUS
-    #     if self.base_dir.joinpath("queued").joinpath(self.job_id).expanduser().exists(): status = 'queued'
-    #     elif self.base_dir.joinpath("running").joinpath(self.job_id).expanduser().exists(): status = 'running'
-    #     elif self.base_dir.joinpath("completed").joinpath(self.job_id).expanduser().exists(): status = 'completed'
-    #     elif self.base_dir.joinpath("failed").joinpath(self.job_id).expanduser().exists(): status = 'failed'
-    #     else: raise FileNotFoundError(f"Job {self.job_id} is not found in any of the status folders.")
-    #     self.job_root = self.base_dir.joinpath(status).joinpath(self.job_id).collapseuser()
-    #     return status
+    def execution_log_dir(self): return self.job_root.joinpath(f"logs")
     def get_job_status(self) -> JOB_STATUS:
         pid_path = self.execution_log_dir.expanduser().joinpath("pid.txt")
         tmp = self.execution_log_dir.expanduser().joinpath("status.txt").read_text()
@@ -445,10 +420,8 @@ echo "Unlocked resources"
         end_time = pd.Timestamp.now()
         item = {"job_id": self.job_id, "start_time": start_time, "end_time": end_time, "submission_time": self.submission_time}
         hist_file = self.history_path.expanduser()
-        if hist_file.exists():
-            hist = hist_file.readit()
-        else:
-            hist = []
+        if hist_file.exists(): hist = hist_file.readit()
+        else: hist = []
         hist.append(item)
         print(f"Saved history file to {hist_file} with {len(hist)} items.")
         tb.Save.pickle(obj=hist, path=hist_file)
@@ -462,11 +435,15 @@ class LogEntry:
     start_time: Optional[pd.Timestamp]
     end_time: Optional[pd.Timestamp]
     run_machine: Optional[str]
+    session_name: Optional[str]
+    pid: Optional[int]
+    cmd: Optional[str]
     source_machine: str
     note: str
     @staticmethod
     def from_dict(a_dict: dict[str, Any]):
-        return LogEntry(name=a_dict["name"], submission_time=pd.to_datetime(a_dict["submission_time"]), start_time=pd.to_datetime(a_dict["start_time"]), end_time=pd.to_datetime(a_dict["end_time"]), run_machine=a_dict["run_machine"], source_machine=a_dict["source_machine"], note=a_dict["note"])
+        return LogEntry(name=a_dict["name"], submission_time=pd.to_datetime(a_dict["submission_time"]), start_time=pd.to_datetime(a_dict["start_time"]), end_time=pd.to_datetime(a_dict["end_time"]),
+                        run_machine=a_dict["run_machine"], source_machine=a_dict["source_machine"], note=a_dict["note"], pid=a_dict["pid"], cmd=a_dict["cmd"], session_name=a_dict["session_name"])
 
 
 class CloudManager:
@@ -537,15 +514,35 @@ class CloudManager:
                 running_jobs = a_worker.joinpath("running_jobs.pkl")
                 res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
             print(res)
-
             cycle += 1
             wait = 5 * 60
             print(f"CloudManager Monitor: Finished Cycle {cycle}. Sleeping for {wait} seconds")
             console.rule()
             print("\n\n")
             time.sleep(wait)
+
     def run(self):
-        cycle = 0
+        # cleaning dirt from potential previous crash or interrupt.
+        from crocodile.cluster.remote_machine import RemoteMachine
+        this_machine = f"{getpass.getuser()}@{platform.node()}"
+        log = self.read_log()
+        jobs_ids_to_be_removed_from_running_log: list[str] = []
+        for _idx, row in log["running"].iterrows():
+            entry = LogEntry.from_dict(row.to_dict())
+            if entry.run_machine != this_machine: continue
+            a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
+            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            status = rm.resources.get_job_status()
+            if status == "running":
+                print(f"Job `{entry.name}` is still running, added to running jobs.")
+                self.running_jobs.append(rm)
+            else:
+                jobs_ids_to_be_removed_from_running_log.append(entry.name)
+                print(f"Job `{entry.name}` is not running, removing it from log of running jobs.")
+        log["running"] = log["running"][~log["running"]["name"].isin(jobs_ids_to_be_removed_from_running_log)]
+        self.write_log(log=log)
+        
+        cycle: int = 0
         while True:
             cycle += 1
             print("\n")
@@ -593,15 +590,15 @@ class CloudManager:
                 print(f"No queued jobs found.")
                 return None
             queue_entry = LogEntry.from_dict(log["queued"].iloc[0].to_dict())
+            a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
+            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            pid, process_cmd = rm.fire(run=True)
+            queue_entry.pid = pid
+            queue_entry.cmd = process_cmd
             queue_entry.run_machine = f"{getpass.getuser()}@{platform.node()}"
             queue_entry.start_time = pd.Timestamp.now()
             log["queued"] = log["queued"].iloc[1:] if len(log["queued"]) > 0 else pd.DataFrame(columns=log["queued"].columns)
             log["running"] = pd.concat([log["running"], pd.DataFrame([queue_entry.__dict__])], ignore_index=True)
-            a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
-            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
-            rm.fire(run=True)
-            print(f"Sleeping for 60 seconds to allow time for the job to start before proceeding to firing the next ones.")
-            time.sleep(60)  # allow time for new jobs to start before checking job status which relies on log files, yet to be written bt the new process.
             self.running_jobs.append(rm)
             self.write_log(log=log)
         return None
