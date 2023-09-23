@@ -431,9 +431,9 @@ echo "Unlocked resources"
 @dataclass
 class LogEntry:
     name: str
-    submission_time: pd.Timestamp
-    start_time: Optional[pd.Timestamp]
-    end_time: Optional[pd.Timestamp]
+    submission_time: str
+    start_time: Optional[str]
+    end_time: Optional[str]
     run_machine: Optional[str]
     session_name: Optional[str]
     pid: Optional[int]
@@ -504,7 +504,9 @@ class CloudManager:
                 log = {}
             for item_name, item_df in log.items():
                 console.rule(f"{item_name} DataFrame (Latest 10)")
-                pprint(item_df[-10:].to_markdown())
+                cols = item_df.columns
+                cols = [a_col for a_col in cols if a_col != "cmd"]
+                pprint(item_df[cols][-10:].to_markdown())
                 pprint("\n\n")
 
             print("👷 Workers:")
@@ -567,7 +569,7 @@ class CloudManager:
                 df_to_add = log[status]
                 df_to_take = log["running"]
                 entry = LogEntry.from_dict(df_to_take[df_to_take["name"] == job_name].iloc[0].to_dict())
-                entry.end_time = pd.Timestamp.now()
+                entry.end_time = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
                 df_to_add = pd.concat([df_to_add, pd.DataFrame([entry.__dict__])], ignore_index=True)
                 df_to_take = df_to_take[df_to_take["name"] != job_name]
                 log[status] = df_to_add
@@ -596,7 +598,7 @@ class CloudManager:
             queue_entry.pid = pid
             # queue_entry.cmd = process_cmd
             queue_entry.run_machine = f"{getpass.getuser()}@{platform.node()}"
-            queue_entry.start_time = pd.Timestamp.now()
+            queue_entry.start_time = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
             queue_entry.session_name = rm.job_params.session_name
             log["queued"] = log["queued"].iloc[1:] if len(log["queued"]) > 0 else pd.DataFrame(columns=log["queued"].columns)
             log["running"] = pd.concat([log["running"], pd.DataFrame([queue_entry.__dict__])], ignore_index=True)

@@ -101,7 +101,7 @@ class RemoteMachine:
             rm.submitted = True  # must be done before generate_script which performs the pickling.
             rm.generate_scripts()
             rms.append(rm)
-            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now(), start_time=None, end_time=None, run_machine=None,
+            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"), start_time=None, end_time=None, run_machine=None,
                                             source_machine=f"{getpass.getuser()}@{platform.node()}", note="", pid=None, cmd="", session_name=""))
         log = cm.read_log()  # this claims lock internally.
         new_queued_df: 'pd.DataFrame' = pd.DataFrame([item.__dict__ for item in new_log_entries])
