@@ -94,7 +94,7 @@ class RemoteMachine:
         new_log_entries: list[LogEntry] = []
         for idx, a_workload_params in enumerate(wl):
             rm = deepcopy(self)
-            rm.config.job_id = f"{rm.config.job_id}-split-{idx + 1}-{split}"
+            rm.config.job_id = f"{rm.config.job_id}-{idx + 1}-{split}"
             rm.config.workload_params = a_workload_params
             rm.resources.job_root = self.resources.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
             rm.resources.job_id = rm.config.job_id
@@ -152,12 +152,14 @@ class RemoteMachine:
         session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.session_name, compact=True).print()
         if isinstance(ssh, SelfSSH):
             while True:
+                print(f"Waiting for Python process to start and declare its pid ... ")
+                time.sleep(3)
                 try:
                     pid = int(self.resources.execution_log_dir.expanduser().joinpath("pid.txt").read_text())
                     import psutil
                     process_command = " ".join(psutil.Process(pid).cmdline())
                     break
-                except Exception: time.sleep(3)
+                except Exception: pass
         else:
             pid = 0
             process_command = "haha"

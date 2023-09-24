@@ -63,6 +63,7 @@ class JobStatus:
 
 @dataclass
 class JobParams:
+    """What Python script needs to run the job. This will be dynamically typed into the script."""
     description: str
     ssh_repr: str
     ssh_repr_remote: str
@@ -294,7 +295,8 @@ class ResourceManager:
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
-            print(f"Job `{self.job_id}` is running with pid {pid}.")
+            # sess_name = 1
+            print(f"Job `{self.job_id}` is running with {pid=} & session name = ?.")
             return status
         return status
 
@@ -500,24 +502,32 @@ class CloudManager:
             print(f"🔒 Lock is held by: {lock_owner}")
             print("🧾 Log File:")
             log_path = alternative_base.joinpath("logs.pkl")
-            if log_path.exists(): log: dict[str, 'pd.DataFrame'] = tb.Read.vanilla_pickle(path=log_path)
+            if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = tb.Read.vanilla_pickle(path=log_path)
             else:
                 print(f"Log file doesn't exist! 🫤")
                 log = {}
             for item_name, item_df in log.items():
-                console.rule(f"{item_name} DataFrame (Latest 10)")
+                console.rule(f"{item_name} DataFrame (Latest 10 / {len(item_df)})")
+                if item_name != "queued":
+                    item_df["duration"] = pd.to_datetime(item_df["end_time"]) - (pd.to_datetime(item_df["start_time"]) if item_name != "running" else pd.Timestamp.now())
                 cols = item_df.columns
-                cols = [a_col for a_col in cols if a_col != "cmd"]
+                cols = [a_col for a_col in cols if a_col not in {"cmd", "note"}]
+                if item_name == "queued": cols = [a_col for a_col in cols if a_col not in {"pid", "start_time", "end_time", "run_machine"}]
+                if item_name == "running": cols = [a_col for a_col in cols if a_col not in {"submission_time", "source_machine", "end_time"}]
+                if item_name == "completed": cols = [a_col for a_col in cols if a_col not in {"submission_time", "source_machine", "start_time", "pid"}]
+                if item_name == "failed": cols = [a_col for a_col in cols if a_col not in {"submission_time", "source_machine", "start_time"}]
                 pprint(item_df[cols][-10:].to_markdown())
                 pprint("\n\n")
 
             print("👷 Workers:")
             workers_root = alternative_base.joinpath(f"workers").search("*")
             res: dict[str, list[RemoteMachine]] = {}
+            times: dict[str, pd.Timedelta] = {}
             for a_worker in workers_root:
                 running_jobs = a_worker.joinpath("running_jobs.pkl")
+                times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
                 res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
-            print(res)
+            pprint(pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())}).to_markdown())
             cycle += 1
             wait = 5 * 60
             print(f"CloudManager Monitor: Finished Cycle {cycle}. Sleeping for {wait} seconds")
@@ -525,7 +535,7 @@ class CloudManager:
             print("\n\n")
             time.sleep(wait)
 
-    def clean_interrupted_and_failed_jobs_mess(self, return_to_queue: bool = True):
+    def clean_interrupted_jobs_mess(self, return_to_queue: bool = True):
         assert len(self.running_jobs) == 0, f"method should never be called while there are running jobs. This can only be called at the beginning of the run."
         from crocodile.cluster.remote_machine import RemoteMachine
         this_machine = f"{getpass.getuser()}@{platform.node()}"
@@ -549,7 +559,7 @@ class CloudManager:
                 entry.session_name = None
                 rm.resources.execution_log_dir.expanduser().joinpath("status.txt").delete(sure=True)
                 rm.resources.execution_log_dir.expanduser().joinpath("pid.txt").delete(sure=True)
-                entry.note = f"Job was interrupted by a crash of the machine `{this_machine}`."
+                entry.note += f"| Job was interrupted by a crash of the machine `{this_machine}`."
                 dirt.append(entry.name)
                 print(f"Job `{entry.name}` is not running, removing it from log of running jobs.")
                 if return_to_queue:
@@ -560,15 +570,66 @@ class CloudManager:
                     print(f"Job `{entry.name}` is not running, moving it to failed jobs.")
         log["running"] = log["running"][~log["running"]["name"].isin(dirt)]
         self.write_log(log=log)
+    def clean_failed_jobs_mess(self):
+        from crocodile.cluster.remote_machine import RemoteMachine
+        log = self.read_log()
+        for _idx, row in log["failed"].iterrows():
+            entry = LogEntry.from_dict(row.to_dict())
+            a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
+            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            entry.note += f"| Job failed @ {entry.run_machine}"
+            entry.pid = None
+            entry.cmd = None
+            entry.start_time = None
+            entry.end_time = None
+            entry.run_machine = None
+            entry.session_name = None
+            rm.resources.execution_log_dir.expanduser().joinpath("status.txt").delete(sure=True)
+            rm.resources.execution_log_dir.expanduser().joinpath("pid.txt").delete(sure=True)
+            print(f"Job `{entry.name}` is not running, removing it from log of running jobs.")
+            log["queued"] = pd.concat([log["queued"], pd.DataFrame([entry.__dict__])], ignore_index=True)
+            print(f"Job `{entry.name}` is not running, returning it to the queue.")
+        log["failed"] = pd.DataFrame(columns=log["failed"].columns)
+        self.write_log(log=log)
+        self.release_lock()
+
+    def rerun_jobs(self):
+        log = self.read_log()
+        from crocodile.cluster.remote_machine import RemoteMachine
+        from machineconfig.utils.utils import display_options
+        jobs_all: list[str] = self.base_path.expanduser().joinpath("jobs").search("*").apply(lambda x: x.name).list
+        jobs_selected = display_options(options=jobs_all, msg="Select Jobs to Redo", multi=True, fzf=True)
+        for a_job in jobs_selected:
+            # find in which dataframe does this job lives:
+            for log_type, log_df in log.items():
+                if a_job in log_df["name"].values: break
+            else: raise ValueError(f"Job `{a_job}` is not found in any of the log dataframes.")
+            entry = LogEntry.from_dict(log_df[log_df["name"] == a_job].iloc[0].to_dict())
+            a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
+            entry.note += f"| Job failed @ {entry.run_machine}"
+            entry.pid = None
+            entry.cmd = None
+            entry.start_time = None
+            entry.end_time = None
+            entry.run_machine = None
+            entry.session_name = None
+            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm.resources.execution_log_dir.expanduser().joinpath("status.txt").delete(sure=True)
+            rm.resources.execution_log_dir.expanduser().joinpath("pid.txt").delete(sure=True)
+            log["queued"] = pd.concat([log["queued"], pd.DataFrame([entry.__dict__])], ignore_index=True)
+            log[log_type] = log[log_type][log[log_type]["name"] != a_job]
+            print(f"Job `{entry.name}` was removed from {log_type} and added to the queue in order to be re-run.")
+        self.write_log(log=log)
+        self.release_lock()
 
     def run(self):
-        self.clean_interrupted_and_failed_jobs_mess()
+        self.clean_interrupted_jobs_mess()
         cycle: int = 0
         while True:
             cycle += 1
             print("\n")
             console.rule(title=f"CloudManager: Cycle #{cycle}", style="bold red", characters="-")
-            print(f"Running jobs: {len(self.running_jobs)} / {self.max_jobs=}")
+            print(f"# Running jobs = {len(self.running_jobs)} / {self.max_jobs=}")
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
