@@ -450,14 +450,15 @@ class LogEntry:
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
+    sever_interval_sec: int = 60 * 5
+    num_claim_checks: int = 3
+    inter_check_interval_sec: int = 15
     def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
         if reset_local:
             print("☠️ Resetting local cloud cache ☠️")
             tb.P(self.base_path).expanduser().delete(sure=True)
         self.status_root: tb.P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
         self.max_jobs: int = max_jobs
-        self.num_claim_checks: int = 1
-        self.inter_check_interval: int = 1
         if cloud is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
             self.cloud = tb.Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
@@ -507,9 +508,10 @@ class CloudManager:
                 print(f"Log file doesn't exist! 🫤")
                 log = {}
             for item_name, item_df in log.items():
-                console.rule(f"{item_name} DataFrame (Latest 10 / {len(item_df)})")
+                console.rule(f"{item_name} DataFrame (Latest {'10' if len(item_df) > 10 else len(item_df)} / {len(item_df)})")
                 if item_name != "queued":
-                    item_df["duration"] = pd.to_datetime(item_df["end_time"]) - (pd.to_datetime(item_df["start_time"]) if item_name != "running" else pd.Timestamp.now())
+                    t2 = pd.to_datetime(item_df["end_time"]) if item_name != "running" else pd.Series([pd.Timestamp.now()] * len(item_df))
+                    item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
                 cols = item_df.columns
                 cols = [a_col for a_col in cols if a_col not in {"cmd", "note"}]
                 if item_name == "queued": cols = [a_col for a_col in cols if a_col not in {"pid", "start_time", "end_time", "run_machine"}]
@@ -633,7 +635,7 @@ class CloudManager:
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
-            wait = int(random.random() * 1000)
+            wait = int(self.sever_interval_sec + random.random() * 30)
             print(f"CloudManager: Finished cycle {cycle}. Sleeping for {wait} seconds.")
             time.sleep(wait)
 
@@ -700,6 +702,10 @@ class CloudManager:
         run_on_cloud()
         self.run()
     def claim_lock(self, first_call: bool = True):
+        """
+        Note: If the parameters of the class are messed with, there is no gaurantee of zero collision by this method.
+        It takes at least inter_check_interval_sec * num_claims_check to claim the lock.
+        """
         if first_call: print(f"Claiming lock...")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         path = CloudManager.base_path.expanduser().create()
@@ -729,8 +735,8 @@ class CloudManager:
             lock_data_tmp = lock_path_tmp.read_text()
             if lock_data_tmp != this_machine:
                 print(f"CloudManager: Lock already claimed by `{lock_data_tmp}`. 🤷‍♂️")
-                print(f"sleeping for {self.inter_check_interval} seconds and trying again.")
-                time.sleep(self.inter_check_interval)
+                print(f"sleeping for {self.inter_check_interval_sec} seconds and trying again.")
+                time.sleep(self.inter_check_interval_sec)
                 return self.claim_lock(first_call=False)
             counter += 1
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")
