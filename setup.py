@@ -87,6 +87,7 @@ setup(
         "cryptography",  # for encoding
         "paramiko",  # for SSH
         "requests",  # interacting with web
+        "colorlog",  # for colored logging
         # "cycler",
 
         # Developer Tools

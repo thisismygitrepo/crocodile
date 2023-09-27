@@ -226,7 +226,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
                 tmp: list[Any] = list(self.list[i].__dict__.values())
                 data: list[Any] = [obj] if names is None else [names[i]]
                 df.iloc[i] = pd.Series(data + tmp)
-            else: df.iloc[i] = pd.Series(self.list[i].__dict__.values())
+            else: df.iloc[i] = pd.Series(self.list[i].__dict__.values())  # type: ignore
         return df
 
 

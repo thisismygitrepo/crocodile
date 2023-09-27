@@ -397,9 +397,12 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         assert self.fig is not None, "Figure is not defined yet."
         self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
     @staticmethod
-    def maximize_fig() -> None: plt.get_current_fig_manager().full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
+    def maximize_fig() -> None:
+        fig = plt.get_current_fig_manager()
+        if isinstance(fig, Figure): fig.full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
     def clear_axes(self) -> None:
-        if self.ax is not None: [ax.cla() for ax in self.ax]
+        if self.ax is not None:
+            for ax in self.ax: ax.cla()
     def transperent_fig(self) -> None:
         assert self.fig is not None, "Figure is not defined yet."
         self.fig.canvas.manager.window.attributes("-transparentcolor", "white")  # type: ignore
@@ -414,12 +417,13 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def set_ax_size(ax: Axes, w: float, h: float, units: Literal["inches", "pixels"] = 'inches'):
         l, r, t, b = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom  # type: ignore
         _ = units
-        ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
+        if isinstance(ax.figure, Figure): ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
     @staticmethod
     def get_ax_size(ax: Axes, units: Literal["inches", "pixels"] = "inches"):
-        w, h = ax.figure.get_size_inches()
+        assert ax.figure is not None, "Figure is not defined yet."
+        w, h = ax.figure.get_size_inches()  # type: ignore
         if units == "pixels":
-            w, h = ax.figure.get_size_inches() * ax.figure.dpi
+            w, h = ax.figure.get_size_inches() * ax.figure.dpi  # type: ignore
         width, height = ax.figure.subplotpars.right - ax.figure.subplotpars.left, ax.figure.subplotpars.top - ax.figure.subplotpars.bottom  # type: ignore
         return w * width, h * height
     @staticmethod
@@ -453,7 +457,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         if figpolicy is FigurePolicy.same: return plt.figure(num=figname, **kwargs)
         elif figpolicy is FigurePolicy.add_new: return plt.figure(num=(timestamp(name=figname) if suffix is None else figname + suffix) if exist else figname, **kwargs)
         elif figpolicy is FigurePolicy.close_create_new:
-            _ = plt.close(figname) if exist else None
+            if exist: plt.close(figname)
             return plt.figure(num=figname, **kwargs)
     @staticmethod
     def try_figure_size() -> None:
@@ -509,7 +513,7 @@ class Artist(FigureManager):  # This object knows how to draw a figure from curv
         super().__init__(figpolicy=figpolicy)
         self.style = style
         self.title = title
-        self.line = None
+        self.line: Optional[list[Any]] = None
         self.cursor = None
         self.check_b = None
         if ax is None:  # create a figure
@@ -613,6 +617,7 @@ class ImShow(FigureManager):
         :param sup_titles: Titles for frames (N)
         :param sub_labels: M x N. If shape sent is M
         """
+        super().__init__(figpolicy=FigurePolicy.add_new)
         n, m = len(img_tensor), len(img_tensor[0])
         self.m, self.n = m, n
         super(ImShow, self).__init__(info_loc=info_loc)
@@ -632,16 +637,18 @@ class ImShow(FigureManager):
             else: self.ax = self.fig.subplots(nrows=nrows, ncols=ncols)
         else:
             self.ax = [ax]
-            self.fig = ax[0].figure if type(ax) is list else ax.figure
+            if type(ax) is list: self.fig = ax[0].figure
+            else: self.fig = ax.figure
         # if nrows == 1 and ncols == 1: pass
         # else: self.ax = self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
 
         self.connect()
         # self.fig.canvas.mpl_connect("pick_event", self.annotate)
-        self.fig.tight_layout() if tight else None; self.fig.subplots_adjust(**subplots_adjust) if subplots_adjust is not None else None
+        if tight and isinstance(self.fig, Figure): self.fig.tight_layout()
+        if subplots_adjust is not None and self.fig is not None: self.fig.subplots_adjust(**subplots_adjust)
         # self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
-        assert self.ax is not None, "Axes is not defined yet."
-        for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)
+        if isinstance(self.ax, list):
+            for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)
         self.idx_cycle = Cycle([item for item in range(len(self.img_tensor))])  # self.animate()
     def animate(self):
         for i in range(self.idx_cycle.get_index(), self.n):

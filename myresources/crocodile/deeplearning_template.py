@@ -60,14 +60,16 @@ class DataReader(dl.DataReader):
     def viz(self, eval_data: EvaluationData, ax: Optional[Axes] = None, title: str = ""):
         # _ = names
         if ax is None:
-            fig, ax = plt.subplots(figsize=(14, 10))
-        else: fig = ax.get_figure()
+            fig, axis = plt.subplots(figsize=(14, 10))
+        else:
+            fig = ax.get_figure()
+            axis = ax
         x = np.arange(len(eval_data.y_true[0]))
-        ax.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
-        ax.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
-        ax.legend()
-        ax.set_title(title or 'Predicted vs True')
-        FigureManager.grid(ax)
+        axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
+        axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
+        axis.legend()
+        axis.set_title(title or 'Predicted vs True')
+        FigureManager.grid(axis)
         plt.show(block=False)
         plt.pause(0.5)  # pause a bit so that the figure is displayed.
         return fig

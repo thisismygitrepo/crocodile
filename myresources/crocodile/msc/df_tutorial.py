@@ -19,7 +19,7 @@ C- Scale (only for ordinally encoded data)
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder  # type: ignore
 
 data = {
     'category': ['A', 'B', 'A', 'C', pd.NA, 'B', 'C', 'A'],

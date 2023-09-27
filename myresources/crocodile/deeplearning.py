@@ -192,7 +192,7 @@ class DataReader:
                     print(f"Populated other shapes: {self.specs.other_shapes}")
                     raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
 
-        from sklearn.model_selection import train_test_split
+        from sklearn.model_selection import train_test_split  # type: ignore
         args = [data_dict[item] for item in strings]
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **split_kwargs if split_kwargs is not None else {})
         self.split = {}  # dict(train_loader=None, test_loader=None)
@@ -723,8 +723,8 @@ class Losses:
 
             def call(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]'):
                 _ = self
-                tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))
-                factor = tf.Tensor(20) / tmp
+                tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))  # type: ignore
+                factor = tf.Tensor(20) / tmp  # type: ignore
                 return factor * tf.math.log(tf.reduce_mean((y_true - y_pred)**2))
         return LogSquareLoss
 

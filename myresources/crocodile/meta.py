@@ -49,7 +49,6 @@ class Log(logging.Logger):  #
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path  # proper update to this value by self.add_filehandler()
         if dialect == "colorlog":
-            install_n_import("colorlog")
             import colorlog
             module: Any = colorlog
             processed_fmt: Any = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/

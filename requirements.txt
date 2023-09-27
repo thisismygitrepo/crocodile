@@ -8,6 +8,16 @@ cycler
 rich
 psutil
 
+# dev
+mypy
+dash
+plotly
+dash_bootstrap_components
+dash_daq
+tensorflow
+sqlalchemy
+scikit-learn
+
 # gdrive
 # google-api-python-client  # The Google APIs Client Library for Python:  https://developers.google.com/drive/api/quickstart/python
 # google-auth

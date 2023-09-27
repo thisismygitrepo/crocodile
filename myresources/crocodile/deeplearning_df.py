@@ -8,9 +8,9 @@ from typing import Optional, Any, Union
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
-from sklearn.preprocessing import StandardScaler, RobustScaler
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from sklearn.preprocessing import StandardScaler, RobustScaler  # type: ignore
+from sklearn.impute import SimpleImputer  # type: ignore
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder  # type: ignore
 import crocodile.toolbox as tb
 # from crocodile.deeplearning import DataReader
 
