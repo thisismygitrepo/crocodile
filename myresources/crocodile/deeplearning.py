@@ -530,13 +530,13 @@ class BaseModel(ABC):
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[SubclassedHParams] = None, data_class: Optional[SubclassedDataReader] = None,
+    def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[Type[SubclassedHParams]] = None, data_class: Optional[Type[SubclassedDataReader]] = None,
                            device_name: Optional[Device] = None, verbose: bool = True):
         path = tb.P(path)
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
-            hp_obj = tb.Read.vanilla_pickle(path=path / HParams.subpath + "hparams.HyperParam.pkl")
+            hp_obj = tb.Read.vanilla_pickle(path=path / HParams.subpath + "hparams.HParams.pkl")
         if device_name: hp_obj.device_name = device_name
         if hp_obj.root != path.parent:
             hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
@@ -587,8 +587,8 @@ class BaseModel(ABC):
                 print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
                 module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute().as_posix())
         model_class: SubclassedBaseModel = getattr(module, specs['model_class'])
-        data_class: DataReader = getattr(module, specs['data_class'])
-        hp_class: HParams = getattr(module, specs['hp_class'])
+        data_class: Type[DataReader] = getattr(module, specs['data_class'])
+        hp_class: Type[HParams] = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
     def plot_model(self, dpi: int = 150, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
