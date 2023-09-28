@@ -132,13 +132,21 @@ class PNG(GenericSave):
 class GIFFileBased(GenericSave):
     def __init__(self, fps: int = 4, dpi: int = 100, bitrate: int = 1800, _type: SAVE_TYPE = 'GIFFileBased', **kwargs: Any):
         super().__init__(**kwargs); assert_requirements()
-        if _type == 'GIFPipeBased': writer, extension = animation.ImageMagickFileWriter, '.gif'  # internally calls: matplotlib._get_executable_info("magick")
-        elif _type == "GIFFileBased": writer, extension = animation.ImageMagickWriter, '.gif'
-        elif _type == 'MPEGFileBased': writer, extension = animation.FFMpegFileWriter, '.mp4'
-        elif _type == 'MPEGPipeBased': writer, extension = animation.FFMpegWriter, '.mp4'
+        if _type == 'GIFPipeBased':
+            extension = '.gif'
+            writer: Any = animation.ImageMagickFileWriter  # internally calls: matplotlib._get_executable_info("magick")
+        elif _type == "GIFFileBased":
+            extension = '.gif'
+            writer = animation.ImageMagickWriter
+        elif _type == 'MPEGFileBased':
+            extension = '.mp4'
+            writer = animation.FFMpegFileWriter
+        elif _type == 'MPEGPipeBased':
+            extension = '.mp4'
+            writer = animation.FFMpegWriter
         else: raise ValueError("Unknown writer.")
         import getpass
-        self.writer = writer(fps=fps, metadata=dict(artist=getpass.getuser()), bitrate=bitrate)
+        self.writer = writer(fps=fps, metadata={'artist': getpass.getuser()}, bitrate=bitrate)
         self.fname = self.save_dir.joinpath(self.save_name + extension)
         assert self.watch_figs, "No figure was sent during instantiation of saver, therefore the writer cannot be setup. Did you mean to use an autosaver?"
         self.writer.setup(fig=self.watch_figs[0], outfile=str(self.fname), dpi=dpi)
@@ -274,7 +282,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.cmaps: Cycle[str] = Cycle(PLT_CMAPS)
         self.colors: Cycle[str] = Cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
         self.mcolors: list[str] = list(CSS4_COLORS.keys())
-        self.facecolor: Cycle[str] = Cycle(list(CSS4_COLORS.values()))
+        tmp: list[str] = [str(item) for item in CSS4_COLORS.values()]
+        self.facecolor: Cycle[str] = Cycle(iterable=tmp)
         self.cmaps.set_value('viridis')
         self.idx_cycle = Cycle([])
         self.pause: bool = False  # animation
@@ -355,7 +364,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
             if self.auto_brightness:
                 if self.ax is not None:
                     im = self.ax[0].images[0]
-                    im.norm.autoscale(im.get_array())  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
+                    im.norm.autoscale(im.get_array())  # type: ignore  # changes to all ims take place in animate as in ImShow and Nifti methods animate.
         vmin, vmax = ax.images[0].get_clim()
         if event.key in '-_': message = 'increase vmin'; vmin += 1
         elif event.key in '[{': message = 'decrease vmin'; vmin -= 1
@@ -364,7 +373,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.message = message + '  ' + str(round(vmin, 1)) + '  ' + str(round(vmax, 1))
         if event.key in '_+}{' and self.fig is not None:
             for ax in self.fig.axes:
-                if ax.images: ax.images[0].set_clim((vmin, vmax))
+                if ax.images: ax.images[0].set_clim((vmin, vmax))  # type: ignore
         else:
             if ax.images: ax.images[0].set_clim((vmin, vmax))
     def change_cmap(self, event: Any):
@@ -372,8 +381,13 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         if ax is not None:
             assert self.fig is not None, "Figure is not defined yet."
             cmap = self.cmaps.next() if event.key in 'tT' else self.cmaps.previous()
-            _ = [[im.set_cmap(cmap) for im in ax.images] for ax in self.fig.axes] if event.key in 'TY'else [im.set_cmap(cmap) for im in ax.images]
-            self.message = f"Color map changed to {ax.images[0].cmap.name}"
+            if event.key in 'TY':
+                for ax in self.fig.axes:
+                    for im in ax.images: im.set_cmap(cmap)  # type: ignore
+            else:
+                for im in ax.images:
+                    im.set_cmap(cmap)
+            self.message = f"Color map changed to {ax.images[0].cmap.name}"  # type: ignore
     def show_pix_val(self, event: Any):
         if (ax := event.inaxes) is not None:
             self.pix_vals = not self.pix_vals; self.message = f"Pixel values flag set to {self.pix_vals}"
@@ -437,7 +451,9 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def show_pixels_values(ax: Axes):
         xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
         if ymin > ymax: ymin, ymax = ymax, ymin  # default imshow settings
-        _ = [ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8) for (j, i), label in np.ndenumerate(ax.images[0].get_array()) if (xmin < i < xmax) and (ymin < j < ymax)]
+        for (j, i), label in np.ndenumerate(ax.images[0].get_array()):  # type: ignore
+            if (xmin < i < xmax) and (ymin < j < ymax):
+                ax.text(i, j, np.round(label).__int__(), ha='center', va='center', size=8)
     # ============================ matplotlib setup ==============================
     @staticmethod
     def get_nrows_ncols(num_plots: int, nrows: Optional[int] = None, ncols: Optional[int] = None) -> tuple[int, int]:
@@ -620,6 +636,7 @@ class ImShow(FigureManager):
         :param sup_titles: Titles for frames (N)
         :param sub_labels: M x N. If shape sent is M
         """
+        _ = save_dir, save_kwargs
         super().__init__(figpolicy=FigurePolicy.add_new)
         n, m = len(img_tensor), len(img_tensor[0])
         self.m, self.n = m, n
@@ -635,27 +652,30 @@ class ImShow(FigureManager):
         if ax is None:
             self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white'); self.maximize_fig() if figsize is None else None
             if gridspec is not None:
+                assert self.fig is not None
                 gs = self.fig.add_gridspec(gridspec[0])
-                self.ax = [self.fig.add_subplot(gs[ags[0], ags[1]]) for ags in gridspec[1:]]
+                tmp: list[Axes] = []
+                for ags in gridspec[1:]:
+                    assert self.fig is not None
+                    qq = self.fig.add_subplot(gs[ags[0], ags[1]])
+                    tmp.append(qq)
+                self.ax = tmp
             else:
                 tmp: list[Axes] = list(self.fig.subplots(nrows=nrows, ncols=ncols))  # type: ignore
                 self.ax = tmp
         else:
             self.ax = [ax]
-            if type(ax) is list: self.fig = ax[0].figure
-            else:
-                fig = ax.figure
-                if isinstance(fig, Figure): self.fig = fig
-                raise ValueError("Figure is not defined yet.")
+            fig = ax.figure
+            if isinstance(fig, Figure): self.fig = fig
+            raise ValueError("Figure is not defined yet.")
         # if nrows == 1 and ncols == 1: pass
         # else: self.ax = self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
-
         self.connect()
         # self.fig.canvas.mpl_connect("pick_event", self.annotate)
-        if tight and self.fig is not None: self.fig.tight_layout()
-        if subplots_adjust is not None and self.fig is not None: self.fig.subplots_adjust(**subplots_adjust)
+        if tight and self.fig is not None: self.fig.tight_layout()  # type: ignore
+        if subplots_adjust is not None and self.fig is not None: self.fig.subplots_adjust(**subplots_adjust)  # type: ignore
         # self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
-        if isinstance(self.ax, list):
+        if isinstance(self.ax, list):  # type: ignore
             for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)
         self.idx_cycle = Cycle([item for item in range(len(self.img_tensor))])  # self.animate()
     def animate(self):
