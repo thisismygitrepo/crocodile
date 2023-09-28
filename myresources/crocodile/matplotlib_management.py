@@ -76,7 +76,7 @@ class GenericSave:
         if fignames is not None:
             fig_objs = self.fig_names_to_fig_objects(fignames)
             self.watch_figs += fig_objs  # path sent explicitly, # None exist ==> add all else # they exist already.
-        if names is None: names = [timestamp(name=a_figure.get_label()) for a_figure in self.watch_figs]  # individual save path, useful for PNG.
+        if names is None: names = [timestamp(name=str(a_figure.get_label())) for a_figure in self.watch_figs]  # individual save path, useful for PNG.
         for afig, aname in zip(self.watch_figs, names): self._save(afig, aname, **kwargs)
     def _save(self, *args: Any, **kwargs: Any): pass  # called by generic method `add`, to be implemented when subclassing.
 
@@ -508,7 +508,7 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
         self.fig.canvas.draw()  # type: ignore
 
 
-class Artist(FigureManager):  # This object knows how to draw a figure from curve-type data.
+class LineArtist(FigureManager):  # This object knows how to draw a figure from curve-type data.
     def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn', figpolicy: FigurePolicy = FigurePolicy.add_new, figsize: tuple[int, int] = (14, 8)):
         super().__init__(figpolicy=figpolicy)
         self.style = style
@@ -634,18 +634,23 @@ class ImShow(FigureManager):
             if gridspec is not None:
                 gs = self.fig.add_gridspec(gridspec[0])
                 self.ax = [self.fig.add_subplot(gs[ags[0], ags[1]]) for ags in gridspec[1:]]
-            else: self.ax = self.fig.subplots(nrows=nrows, ncols=ncols)
+            else:
+                tmp: list[Axes] = list(self.fig.subplots(nrows=nrows, ncols=ncols))  # type: ignore
+                self.ax = tmp
         else:
             self.ax = [ax]
             if type(ax) is list: self.fig = ax[0].figure
-            else: self.fig = ax.figure
+            else:
+                fig = ax.figure
+                if isinstance(fig, Figure): self.fig = fig
+                raise ValueError("Figure is not defined yet.")
         # if nrows == 1 and ncols == 1: pass
         # else: self.ax = self.ax.ravel()  # make a list out of it or # make a 1D  list out of a 2D array.
 
         self.connect()
         # self.fig.canvas.mpl_connect("pick_event", self.annotate)
-        if tight and isinstance(self.fig, Figure): self.fig.tight_layout()
-        if subplots_adjust is not None and self.fig is not None: self.fig.subplots_adjust(**subplots_adjust)
+        if tight: self.fig.tight_layout()
+        if subplots_adjust is not None: self.fig.subplots_adjust(**subplots_adjust)
         # self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
         if isinstance(self.ax, list):
             for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)

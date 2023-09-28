@@ -328,8 +328,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         assert orient in ["dict", "list", "series", "split", "tight", "index"]
         return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe()).list).to_dict(orient=orient))  # type: ignore
     def plot_plt(self, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
-        from crocodile.matplotlib_management import Artist
-        artist = Artist(figname='Structure Plot', **kwargs)
+        from crocodile.matplotlib_management import LineArtist
+        artist = LineArtist(figname='Structure Plot', **kwargs)
         artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel)
         return artist
     def plot_plotly(self):

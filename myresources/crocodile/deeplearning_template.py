@@ -36,7 +36,7 @@ class HParams(dl.HParams):
 
 
 class DataReader(dl.DataReader):
-    def __init__(self, hp: HParams, load_trianing_data: bool = False):
+    def __init__(self, hp: HParams, load_trianing_data: bool = False) -> None:
         specs = dl.Specs(ip_names=['x'],
                          op_names=["y"],
                          other_names=["names"],
