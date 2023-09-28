@@ -363,8 +363,10 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         elif event.key in ']}': message = 'decrease vmax'; vmax -= 1
         self.message = message + '  ' + str(round(vmin, 1)) + '  ' + str(round(vmax, 1))
         if event.key in '_+}{' and self.fig is not None:
-            [ax.images[0].set_clim((vmin, vmax)) for ax in self.fig.axes if ax.images]
-        else: ax.images[0].set_clim((vmin, vmax)) if ax.images else None
+            for ax in self.fig.axes:
+                if ax.images: ax.images[0].set_clim((vmin, vmax))
+        else:
+            if ax.images: ax.images[0].set_clim((vmin, vmax))
     def change_cmap(self, event: Any):
         ax = event.inaxes
         if ax is not None:
@@ -388,7 +390,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def show_ticks(self, event: Any):
         self.boundaries_flag = not self.boundaries_flag
         if event.key == 'a' and (axis := event.inaxes): self.toggle_ticks(axis); self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
-        elif self.ax is not None: [self.toggle_ticks(ax) for ax in self.ax]
+        elif self.ax is not None:
+            for ax in self.ax: self.toggle_ticks(ax)
     # ====================== class methods ===============================
     def get_fig(self, figname: str = '', suffix: Optional[str] = None, **kwargs: Any): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
     def update_info_text(self, message: str):
@@ -522,7 +525,7 @@ class LineArtist(FigureManager):  # This object knows how to draw a figure from 
                 tmp = self.fig.subplots()
                 assert tmp is not None, "Subplots failed to create axes."
                 if isinstance(tmp, list): self.ax = tmp
-                else:
+                elif isinstance(tmp, Axes):
                     self.ax = [tmp]
         else:
             self.ax = [ax]
@@ -554,8 +557,8 @@ class LineArtist(FigureManager):  # This object knows how to draw a figure from 
         else: raise ValueError("Not implemented yet.")
         twin_ax = ax.twinx()
         line1 = ax.plot(x or range(len(c1)), c1, color="blue", label=l1)[0]
-        line2 = twin_ax.plot(c2, color="red", label=l2)[0]
-        twin_ax.legend([line1, line2], [l1, l2])
+        line2 = twin_ax.plot(c2, color="red", label=l2)[0]  # type: ignore
+        twin_ax.legend([line1, line2], [l1, l2])  # type: ignore
         ax.set_ylabel(l1); twin_ax.set_ylabel(l2)
         plt.show()
     def suptitle(self, title: str):
@@ -649,8 +652,8 @@ class ImShow(FigureManager):
 
         self.connect()
         # self.fig.canvas.mpl_connect("pick_event", self.annotate)
-        if tight: self.fig.tight_layout()
-        if subplots_adjust is not None: self.fig.subplots_adjust(**subplots_adjust)
+        if tight and self.fig is not None: self.fig.tight_layout()
+        if subplots_adjust is not None and self.fig is not None: self.fig.subplots_adjust(**subplots_adjust)
         # self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
         if isinstance(self.ax, list):
             for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)
