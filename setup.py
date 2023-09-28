@@ -72,9 +72,9 @@ setup(
         # CORE:
         "numpy",
         "pandas",
+        "tabulate",  # pandas optional for pretty printing of tables
         "matplotlib",
         "psutil",
-        # "tabulate",  # pretty printing of tables
         # "scipy",  # heavy-weight.
 
         # Accessories
