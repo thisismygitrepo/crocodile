@@ -8,7 +8,7 @@ import platform
 import getpass
 import os
 import sys
-from typing import Union, Literal
+from typing import Union, Literal, Optional
 from dataclasses import dataclass
 
 
@@ -81,7 +81,7 @@ DotFiles = P.home().joinpath("dotfiles")
 # ============================== Networking ==============================
 
 
-def get_network_addresses():
+def get_network_addresses() -> 'dict[str, Optional[str]]':
     # netifaces = tb.install_n_import(package="netifaces2", library="netifaces2")
     # netifaces = tb.install_n_import(library="netifaces", package="netifaces2")
     # subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
@@ -96,6 +96,7 @@ def get_network_addresses():
     except Exception:
         print(f"Warning: Could not get local_ip_v4. This is probably because you are running a WSL instance")  # TODO find a way to get the local_ip_v4 in WSL
         local_ip_v4 = socket.gethostbyname(socket.gethostname())
+    # _addresses: TypeAlias = Literal['subnet_mask', 'mac_address', 'local_ip_v4', 'default_gateway', 'public_ip_v4']
     res = dict(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=P('https://api.ipify.org').download_to_memory().text)
     return res
 

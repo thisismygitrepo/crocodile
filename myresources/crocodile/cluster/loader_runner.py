@@ -455,7 +455,7 @@ class CloudManager:
     inter_check_interval_sec: int = 15
     def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
         if reset_local:
-            print("☠️ Resetting local cloud cache ☠️")
+            print("☠️ Resetting local cloud cache ☠️. Locally created / completed jobs not yet synced will not make it to the cloud.")
             tb.P(self.base_path).expanduser().delete(sure=True)
         self.status_root: tb.P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
         self.max_jobs: int = max_jobs
@@ -627,7 +627,7 @@ class CloudManager:
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
-        sched = tb.Scheduler(routine=routine, wait=self.sever_interval_sec)
+        sched = tb.Scheduler(routine=routine, wait=f"{self.sever_interval_sec}s")
         return sched.run()
 
     def get_running_jobs_statuses(self):
@@ -707,16 +707,20 @@ class CloudManager:
             path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
             return self.claim_lock(first_call=False)
 
-        lock_data = lock_path.read_text()
-        if lock_data != "" and lock_data != this_machine:
-            print(f"CloudManager: Lock already claimed by `{lock_data}`. 🤷‍♂️")
+        locking_machine = lock_path.read_text()
+        if locking_machine != "" and locking_machine != this_machine:
+            if (pd.Timestamp.now() - lock_path.time("m")).total_seconds() > 3600:
+                print(f"⚠️ Lock was claimed by `{locking_machine}` for more than an hour. Something wrong happened there. Resetting the lock!")
+                self.reset_lock()
+                return self.claim_lock(first_call=False)
+            print(f"CloudManager: Lock already claimed by `{locking_machine}`. 🤷‍♂️")
             wait = int(random.random() * 30)
             print(f"sleeping for {wait} seconds and trying again.")
             time.sleep(wait)
             return self.claim_lock(first_call=False)
 
-        if lock_data == this_machine: print(f"Lock already claimed by this machine. 😎")
-        elif lock_data == "": print("No claims on lock, claiming it ... 🙂")
+        if locking_machine == this_machine: print(f"Lock already claimed by this machine. 😎")
+        elif locking_machine == "": print("No claims on lock, claiming it ... 🙂")
         else: raise ValueError(f"Unexpected value of lock_data at this point of code.")
 
         path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
@@ -750,7 +754,7 @@ class CloudManager:
         data = lock_path.read_text()
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         if data != this_machine:
-            raise ValueError(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned! This shouldn't happen.")
+            raise ValueError(f"CloudManager: Lock already claimed by `{data}`. 🤷‍♂️ Can't release a lock not owned! This shouldn't happen. Consider increasing trails before confirming the claim.")
             # self.lock_claimed = False
         path.joinpath("lock.txt").write_text("")
         CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_up=True)  # .to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
