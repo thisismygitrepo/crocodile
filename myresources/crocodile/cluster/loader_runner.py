@@ -486,16 +486,29 @@ class CloudManager:
         if not self.lock_claimed: self.claim_lock()
         tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
         return NoReturn
+    def fetch_cloud_live(self):
+        remote = CloudManager.base_path
+        localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager_live").create()
+        alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath.delete(sure=True), verbose=False)
+        return alternative_base
+    @staticmethod
+    def prepare_workers_report(cloud_root: tb.P):
+        from crocodile.cluster.remote_machine import RemoteMachine
+        workers_root = cloud_root.joinpath(f"workers").search("*")
+        res: dict[str, list[RemoteMachine]] = {}
+        times: dict[str, pd.Timedelta] = {}
+        for a_worker in workers_root:
+            running_jobs = a_worker.joinpath("running_jobs.pkl")
+            times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
+            res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
+        workers_report = pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())})
+        return workers_report
     def run_monitor(self):
         """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
-        from crocodile.cluster.remote_machine import RemoteMachine
-        remote = CloudManager.base_path
-        localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager/{tb.randstr()}").create()
-        # alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath, verbose=False)
         from rich import print as pprint
         def routine(sched: Any):
             _ = sched
-            alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath.delete(sure=True), verbose=False)
+            alternative_base = self.fetch_cloud_live()
             lock_path = alternative_base.expanduser().joinpath("lock.txt")
             if lock_path.exists(): lock_owner: str = lock_path.read_text()
             else: lock_owner = "None"
@@ -521,14 +534,8 @@ class CloudManager:
                 pprint(item_df[cols][-10:].to_markdown())
                 pprint("\n\n")
             print("👷 Workers:")
-            workers_root = alternative_base.joinpath(f"workers").search("*")
-            res: dict[str, list[RemoteMachine]] = {}
-            times: dict[str, pd.Timedelta] = {}
-            for a_worker in workers_root:
-                running_jobs = a_worker.joinpath("running_jobs.pkl")
-                times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
-                res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
-            pprint(pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())}).to_markdown())
+            workers_report = self.prepare_workers_report(cloud_root=alternative_base)
+            pprint(workers_report.to_markdown())
         sched = tb.Scheduler(routine=routine, wait=f"5m")
         sched.run()
 
@@ -537,6 +544,7 @@ class CloudManager:
         from crocodile.cluster.remote_machine import RemoteMachine
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         log = self.read_log()
+        # workers_report = self.prepare_workers_report(cloud_root=CloudManager.base_path.expanduser())
         dirt: list[str] = []
         for _idx, row in log["running"].iterrows():
             entry = LogEntry.from_dict(row.to_dict())
@@ -568,6 +576,7 @@ class CloudManager:
         log["running"] = log["running"][~log["running"]["name"].isin(dirt)]
         self.write_log(log=log)
     def clean_failed_jobs_mess(self):
+        print(f"⚠️ Cleaning failed jobs mess ⚠️")
         from crocodile.cluster.remote_machine import RemoteMachine
         log = self.read_log()
         for _idx, row in log["failed"].iterrows():
@@ -589,7 +598,6 @@ class CloudManager:
         log["failed"] = pd.DataFrame(columns=log["failed"].columns)
         self.write_log(log=log)
         self.release_lock()
-
     def rerun_jobs(self):
         log = self.read_log()
         from crocodile.cluster.remote_machine import RemoteMachine
@@ -734,7 +742,7 @@ class CloudManager:
                 time.sleep(self.inter_check_interval_sec)
                 return self.claim_lock(first_call=False)
             counter += 1
-            print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter} ❓")
+            print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter}-{self.num_claim_checks} ❓")
             time.sleep(10)
         CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_down=True)
         print(f"Lock Claimed")
