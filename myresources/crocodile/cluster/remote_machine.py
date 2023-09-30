@@ -205,6 +205,11 @@ class RemoteMachine:
                                        resource_manager_path=self.resources.resource_manager_path.collapseuser().as_posix(),
                                        to_email=self.config.to_email, email_config_name=self.config.email_config_name)
             py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}").replace('manager = ResourceManager.from_pickle(params.resource_manager_path)', '')
+        ve_path = tb.P(self.job_params.repo_path_rh).expanduser().joinpath(".ve_path")
+        if ve_path.exists(): ve_name = tb.P(ve_path.read_text()).expanduser().name
+        else:
+            import sys
+            ve_name = tb.P(sys.executable).parent.parent.name
         shell_script = f"""
 
 # EXTRA-PLACEHOLDER-PRE
@@ -212,7 +217,7 @@ class RemoteMachine:
 echo "~~~~~~~~~~~~~~~~SHELL START~~~~~~~~~~~~~~~"
 {'~/scripts/devops -w update' if self.config.update_essential_repos else ''}
 {f'cd {tb.P(self.job_params.repo_path_rh).collapseuser().as_posix()}'}
-. activate_ve
+. activate_ve {ve_name}
 {'git pull' if self.config.update_repo else ''}
 {'pip install -e .' if self.config.install_repo else ''}
 echo "~~~~~~~~~~~~~~~~SHELL  END ~~~~~~~~~~~~~~~"

@@ -85,8 +85,8 @@ class JobParams:
         if repo.is_dirty():
             repo.git.add(update=True)
             repo.index.commit(f"CloudManager auto commit by {getpass.getuser()}@{platform.node()}")
-            print(f"Repo {repo.working_dir} was dirty, auto-committed.")
-        else: print(f"Repo {repo.working_dir} was clean, no auto-commit.")
+            print(f"⚠️ Repo {repo.working_dir} was dirty, auto-committed.")
+        else: print(f"✅ Repo {repo.working_dir} was clean, no auto-commit.")
 
     def is_installabe(self) -> bool: return True if "setup.py" in tb.P(self.repo_path_rh).expanduser().absolute().listdir().apply(str) else False
     @staticmethod
@@ -450,7 +450,7 @@ class LogEntry:
 
 class CloudManager:
     base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
-    sever_interval_sec: int = 60 * 5
+    server_interval_sec: int = 60 * 5
     num_claim_checks: int = 3
     inter_check_interval_sec: int = 15
     def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
@@ -627,7 +627,7 @@ class CloudManager:
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
-        sched = tb.Scheduler(routine=routine, wait=f"{self.sever_interval_sec}s")
+        sched = tb.Scheduler(routine=routine, wait=f"{self.server_interval_sec}s")
         return sched.run()
 
     def get_running_jobs_statuses(self):
