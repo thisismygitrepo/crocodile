@@ -63,12 +63,13 @@ class JobStatus:
 
 @dataclass
 class JobParams:
-    """What Python script needs to run the job. This will be dynamically typed into the script."""
+    """What Python script needs to run the job. This will be dynamically injected into the script. Notice that all attrs are either strings or integers."""
     description: str
     ssh_repr: str
     ssh_repr_remote: str
     error_message: str
     session_name: str
+    tab_name: str
     resource_manager_path: str
 
     repo_path_rh: str
@@ -91,7 +92,7 @@ class JobParams:
     def is_installabe(self) -> bool: return True if "setup.py" in tb.P(self.repo_path_rh).expanduser().absolute().listdir().apply(str) else False
     @staticmethod
     def from_empty() -> 'JobParams':
-        return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
+        return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", tab_name="", resource_manager_path="")
     @staticmethod
     def from_func(func: Union[Callable[[Any], Any], tb.P, str]) -> 'JobParams':
         # if callable(self.func): executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
@@ -121,7 +122,8 @@ class JobParams:
         return JobParams(repo_path_rh=repo_path.collapseuser().as_posix(), file_path_rh=repo_path.collapseuser().joinpath(func_relative_file).collapseuser().as_posix(),
                          file_path_r=tb.P(func_relative_file).as_posix(),
                          func_module=func_module, func_class=func_class, func_name=func_name,
-                         description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", resource_manager_path="")
+                         description="", ssh_repr="", ssh_repr_remote="", error_message="",
+                         session_name="", tab_name="", resource_manager_path="")
 
     def get_execution_line(self, workload_params: Optional[WorkloadParams], parallelize: bool, wrap_in_try_except: bool) -> str:
         # tb.P(self.repo_path_rh).name}.{self.file_path_r.replace(".py", '').replace('/', '.')#
@@ -295,7 +297,6 @@ class ResourceManager:
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
-            # sess_name = 1
             print(f"Job `{self.job_id}` is running with {pid=} & session name = ?.")
             return status
         return status
@@ -467,6 +468,7 @@ class CloudManager:
         from crocodile.cluster.remote_machine import RemoteMachine
         self.running_jobs: list[RemoteMachine] = []
 
+    # =================== READ WRITE OF LOGS ===================
     def read_log(self) -> dict[JOB_STATUS, 'pd.DataFrame']:
         # assert self.claim_lock, f"method should never be called without claiming the lock first. This is a cloud-wide file."
         if not self.lock_claimed: self.claim_lock()
@@ -486,13 +488,15 @@ class CloudManager:
         if not self.lock_claimed: self.claim_lock()
         tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
         return NoReturn
+
+    # =================== CLOUD MONITORING ===================
     def fetch_cloud_live(self):
         remote = CloudManager.base_path
         localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager_live").create()
         alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath.delete(sure=True), verbose=False)
         return alternative_base
     @staticmethod
-    def prepare_workers_report(cloud_root: tb.P):
+    def prepare_servers_report(cloud_root: tb.P):
         from crocodile.cluster.remote_machine import RemoteMachine
         workers_root = cloud_root.joinpath(f"workers").search("*")
         res: dict[str, list[RemoteMachine]] = {}
@@ -501,8 +505,8 @@ class CloudManager:
             running_jobs = a_worker.joinpath("running_jobs.pkl")
             times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
             res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
-        workers_report = pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())})
-        return workers_report
+        servers_report = pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())})
+        return servers_report
     def run_monitor(self):
         """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
         from rich import print as pprint
@@ -534,17 +538,20 @@ class CloudManager:
                 pprint(item_df[cols][-10:].to_markdown())
                 pprint("\n\n")
             print("👷 Workers:")
-            workers_report = self.prepare_workers_report(cloud_root=alternative_base)
-            pprint(workers_report.to_markdown())
+            servers_report = self.prepare_servers_report(cloud_root=alternative_base)
+            pprint(servers_report.to_markdown())
         sched = tb.Scheduler(routine=routine, wait=f"5m")
         sched.run()
 
+    # ================== CLEARNING METHODS ===================
     def clean_interrupted_jobs_mess(self, return_to_queue: bool = True):
+        """Clean jobs that failed but in logs show running by looking at the pid.
+        If you want to do the same for remote machines, you will need to do it manually using `rerun_jobs`"""
         assert len(self.running_jobs) == 0, f"method should never be called while there are running jobs. This can only be called at the beginning of the run."
         from crocodile.cluster.remote_machine import RemoteMachine
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         log = self.read_log()
-        # workers_report = self.prepare_workers_report(cloud_root=CloudManager.base_path.expanduser())
+        # servers_report = self.prepare_servers_report(cloud_root=CloudManager.base_path.expanduser())
         dirt: list[str] = []
         for _idx, row in log["running"].iterrows():
             entry = LogEntry.from_dict(row.to_dict())
@@ -576,7 +583,8 @@ class CloudManager:
         log["running"] = log["running"][~log["running"]["name"].isin(dirt)]
         self.write_log(log=log)
     def clean_failed_jobs_mess(self):
-        print(f"⚠️ Cleaning failed jobs mess ⚠️")
+        """If you want to do it for remote machine, use `rerun_jobs` (manual selection)"""
+        print(f"⚠️ Cleaning failed jobs mess for this machine ⚠️")
         from crocodile.cluster.remote_machine import RemoteMachine
         log = self.read_log()
         for _idx, row in log["failed"].iterrows():
@@ -599,6 +607,8 @@ class CloudManager:
         self.write_log(log=log)
         self.release_lock()
     def rerun_jobs(self):
+        """This method involves manual selection but has all-files scope (failed and running) and can be used for both local and remote machines.
+        The reason it is not automated for remotes is because even though the server might have failed, the processes therein might be running, so there is no automated way to tell."""
         log = self.read_log()
         from crocodile.cluster.remote_machine import RemoteMachine
         from machineconfig.utils.utils import display_options
@@ -627,7 +637,7 @@ class CloudManager:
         self.write_log(log=log)
         self.release_lock()
 
-    def run(self):
+    def serve(self):
         self.clean_interrupted_jobs_mess()
         def routine(sched: Any):
             _ = sched
@@ -663,7 +673,6 @@ class CloudManager:
         self.running_jobs = [a_rm for a_rm in self.running_jobs if a_rm.config.job_id not in jobs_ids_to_be_removed_from_running]
         tb.Save.vanilla_pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
         self.status_root.to_cloud(cloud=self.cloud, rel2home=True, verbose=False)  # no need for lock as this writes to a folder specific to this machine.
-
     def start_jobs_if_possible(self):
         """This is the only authority responsible for moving jobs from queue df to running df."""
         from crocodile.cluster.remote_machine import RemoteMachine
@@ -699,7 +708,7 @@ class CloudManager:
         self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
         from crocodile.cluster.template import run_on_cloud
         run_on_cloud()
-        self.run()
+        self.serve()
     def claim_lock(self, first_call: bool = True):
         """
         Note: If the parameters of the class are messed with, there is no gaurantee of zero collision by this method.

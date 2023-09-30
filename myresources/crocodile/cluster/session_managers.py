@@ -60,12 +60,14 @@ zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'
     @staticmethod
     def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, cmd: str = "", run: bool = False, job_wd: str = "$HOME/tmp_results/remote_machines", tab_name: str = "", compact: bool = False):
         sleep = 0.9
+        _ = tab_name
+        job_id = tb.P(job_wd).name
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe = f"""
-zellij --session {sess_name} action new-tab --name '{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action new-tab --name '🏃‍♂️{job_id}'; sleep {sleep}
 zellij --session {sess_name} run -d down -- /bin/bash {cmd}; sleep {sleep}
 zellij --session {sess_name} action move-focus up; sleep {sleep}
 zellij --session {sess_name} action close-pane; sleep {sleep}
@@ -74,22 +76,22 @@ zellij --session {sess_name} action close-pane; sleep {sleep}
 zellij --session {sess_name} action write-chars "{cmd}"
 """
         if not compact: cmd = f"""
-zellij --session {sess_name} action new-tab --name '🖥️{tab_name}'; sleep {sleep}
-zellij --session {sess_name} action rename-tab '🖥️{tab_name}'; sleep {sleep}  # rename the focused first tab
-zellij --session {sess_name} action new-tab --name '🔍{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action new-tab --name '🖥️{job_id}'; sleep {sleep}
+zellij --session {sess_name} action rename-tab '🖥️{job_id}'; sleep {sleep}  # rename the focused first tab
+zellij --session {sess_name} action new-tab --name '🔍{job_id}'; sleep {sleep}
 zellij --session {sess_name} action write-chars htop; sleep {sleep}
 
-zellij --session {sess_name} action new-tab --name '📁{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action new-tab --name '📁{job_id}'; sleep {sleep}
 zellij --session {sess_name} run --direction down --cwd {job_wd} -- lf; sleep {sleep}
 zellij --session {sess_name} action move-focus up; sleep {sleep}
 zellij --session {sess_name} action close-pane; sleep {sleep}
 
-zellij --session {sess_name} action new-tab --name '🪪{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action new-tab --name '🪪{job_id}'; sleep {sleep}
 zellij --session {sess_name} run --direction down -- neofetch;cpufetch; sleep {sleep}
 zellij --session {sess_name} action move-focus up; sleep {sleep}
 zellij --session {sess_name} action close-pane; sleep {sleep}
 
-zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'; sleep {sleep}
+zellij --session {sess_name} action new-tab --name '🧑‍💻{job_id}'; sleep {sleep}
 zellij --session {sess_name} action write-chars "cd {job_wd}"; sleep {sleep}
 zellij --session {sess_name} action go-to-tab 1; sleep {sleep}
 {exe}
@@ -98,7 +100,7 @@ zellij --session {sess_name} action go-to-tab 1; sleep {sleep}
         else: cmd = exe
         if isinstance(ssh, SelfSSH):
             # print(1)
-            print(f"Setting up zellij layout `{sess_name}` on `{ssh.get_remote_repr()}` to run `{tb.P(job_wd).name}`")
+            print(f"Setting up zellij layout `{sess_name}` on `{ssh.get_remote_repr()}` to run `{job_id}`")
             # return tb.Terminal().run_script(cmd)  # Zellij not happy with launching scripts of zellij commands.
             return Response.from_completed_process(subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True))
         # print(2)
@@ -136,29 +138,30 @@ class WindowsTerminal:
         return True
     @staticmethod
     def setup_layout(ssh: Union[tb.SSH, SelfSSH], sess_name: str, tab_name: str = "", cmd: str = "", run: bool = True, job_wd: str = "$HOME/tmp_results/remote_machines", compact: bool = True):
+        job_id = tb.P(job_wd).name
         _ = tab_name
         if run:
             if cmd.startswith(". "): cmd = cmd[2:]
             elif cmd.startswith("source "): cmd = cmd[7:]
             else: pass
             exe: str = f"""
-wt --window {sess_name} new-tab --title '🏃‍♂️{tb.P(job_wd).name}' pwsh -noExit -Command {cmd}
+wt --window {sess_name} new-tab --title '🏃‍♂️{job_id}' pwsh -noExit -Command {cmd}
 """
         else: raise NotImplementedError("I don't know how to write-chars in Windows Terminal")  # exe = f""" wt --window {sess_name} action write-chars "{cmd}" """
         sleep = 0.9
         if compact: cmd = f"""
-wt --window {sess_name} new-tab --title '💻{sess_name}' htop `; split-pane --horizontal  --title '📁{sess_name}' --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical  --title '🪪{sess_name}' powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --title '🧑‍💻{sess_name}' --profile pwsh
+wt --window {sess_name} new-tab --title '💻{job_id}' htop `; split-pane --horizontal  --title '📁{job_id}' --startingDirectory {job_wd} --profile pwsh lf `;  split-pane --vertical  --title '🪪{job_id}' powershell -noExit "$HOME/scripts/neofetch.ps1" `; move-focus up `;  split-pane --vertical --startingDirectory {job_wd} --title '🧑‍💻{job_id}' --profile pwsh
 """  # when pane-splitting, the tab title goes to the last pane declared.
         else: cmd = f"""'
-wt --window {sess_name} new-tab --title '💻' htop; sleep {sleep}
-wt --window {sess_name} new-tab --title '📁' --startingDirectory {job_wd} lf; sleep {sleep}
-wt --window {sess_name} new-tab --title '🪪' powershell -noExit "$HOME/scripts/neofetch.ps1"; sleep {sleep}
-wt --window {sess_name} new-tab --title '🧑‍💻' --startingDirectory {job_wd} --profile pwsh; sleep {sleep}
+wt --window {sess_name} new-tab --title '💻{job_id}' htop; sleep {sleep}
+wt --window {sess_name} new-tab --title '📁{job_id}' --startingDirectory {job_wd} lf; sleep {sleep}
+wt --window {sess_name} new-tab --title '🪪{job_id}' powershell -noExit "$HOME/scripts/neofetch.ps1"; sleep {sleep}
+wt --window {sess_name} new-tab --title '🧑‍💻{job_id}' --startingDirectory {job_wd} --profile pwsh; sleep {sleep}
 """
         cmd = cmd + f"\nsleep {sleep};" + exe
         # print(cmd)
         if isinstance(ssh, SelfSSH):
-            print(f"Firing WindowsTerminal Session `{sess_name}` on `{ssh.get_remote_repr()}` to run `{tb.P(job_wd).name}`")
+            print(f"Firing WindowsTerminal Session `{sess_name}` on `{ssh.get_remote_repr()}` to run `{job_id}`")
             return tb.Terminal().run_script(cmd, shell="pwsh")
         return ssh.run(cmd, desc=f"Setting up WindowsTerminal layout on `{ssh.get_remote_repr()}`", verbose=False)
 
