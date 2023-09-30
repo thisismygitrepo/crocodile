@@ -489,13 +489,12 @@ class CloudManager:
     def run_monitor(self):
         """Without syncing, bring the latest from the cloud to random local path (not the default path, as that would require the lock)"""
         from crocodile.cluster.remote_machine import RemoteMachine
-        cycle: int = 0
-        # self.base_path.expanduser().delete(sure=True)
-        remote = CloudManager.base_path  # .expanduser().get_remote_path(root="myhome")
+        remote = CloudManager.base_path
         localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager/{tb.randstr()}").create()
-        alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath, verbose=False)
+        # alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath, verbose=False)
         from rich import print as pprint
-        while True:
+        def routine(sched: Any):
+            _ = sched
             alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath.delete(sure=True), verbose=False)
             lock_path = alternative_base.expanduser().joinpath("lock.txt")
             if lock_path.exists(): lock_owner: str = lock_path.read_text()
@@ -509,6 +508,7 @@ class CloudManager:
                 log = {}
             for item_name, item_df in log.items():
                 console.rule(f"{item_name} DataFrame (Latest {'10' if len(item_df) > 10 else len(item_df)} / {len(item_df)})")
+                print()  # empty line after the rule helps keeping the rendering clean in the terminal while zooming in and out.
                 if item_name != "queued":
                     t2 = pd.to_datetime(item_df["end_time"]) if item_name != "running" else pd.Series([pd.Timestamp.now()] * len(item_df))
                     item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
@@ -520,7 +520,6 @@ class CloudManager:
                 if item_name == "failed": cols = [a_col for a_col in cols if a_col not in {"submission_time", "source_machine", "start_time"}]
                 pprint(item_df[cols][-10:].to_markdown())
                 pprint("\n\n")
-
             print("👷 Workers:")
             workers_root = alternative_base.joinpath(f"workers").search("*")
             res: dict[str, list[RemoteMachine]] = {}
@@ -530,12 +529,8 @@ class CloudManager:
                 times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
                 res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
             pprint(pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())}).to_markdown())
-            cycle += 1
-            wait = 5 * 60
-            print(f"CloudManager Monitor: Finished Cycle {cycle}. Sleeping for {wait} seconds")
-            console.rule()
-            print("\n\n")
-            time.sleep(wait)
+        sched = tb.Scheduler(routine=routine, wait=f"5m")
+        sched.run()
 
     def clean_interrupted_jobs_mess(self, return_to_queue: bool = True):
         assert len(self.running_jobs) == 0, f"method should never be called while there are running jobs. This can only be called at the beginning of the run."
@@ -626,18 +621,14 @@ class CloudManager:
 
     def run(self):
         self.clean_interrupted_jobs_mess()
-        cycle: int = 0
-        while True:
-            cycle += 1
-            print("\n")
-            console.rule(title=f"CloudManager: Cycle #{cycle}", style="bold red", characters="-")
+        def routine(sched: Any):
+            _ = sched
             print(f"# Running jobs = {len(self.running_jobs)} / {self.max_jobs=}")
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
-            wait = int(self.sever_interval_sec + random.random() * 30)
-            print(f"CloudManager: Finished cycle {cycle}. Sleeping for {wait} seconds.")
-            time.sleep(wait)
+        sched = tb.Scheduler(routine=routine, wait=self.sever_interval_sec)
+        return sched.run()
 
     def get_running_jobs_statuses(self):
         """This is the only authority responsible for moving jobs from running df to failed df or completed df."""

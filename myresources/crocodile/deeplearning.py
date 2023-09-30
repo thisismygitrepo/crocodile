@@ -846,11 +846,6 @@ def batcherv2(func_type: str = 'function', order: int = 1):
         return Batch
 
 
-def get_template():
-    tb.install_n_import("clipboard").copy(tb.P(__file__).parent.joinpath("msc/dl_template.py").read_text(encoding="utf-8"))
-    print("Copied to clipboard")
-
-
 def load_class(file_path: str):
     import importlib.util
     module_spec = importlib.util.spec_from_file_location(name="__temp_module__", location=file_path)
