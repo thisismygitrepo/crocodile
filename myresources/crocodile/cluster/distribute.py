@@ -158,7 +158,7 @@ class Cluster:
         print("\n" * 2)
         console.rule(title="Commands to run on each machine:")
         for machine in self.machines:
-            print(f"{repr(machine)} ==> {machine.resources.get_fire_command(launch_method=launch_method)}")
+            print(f"{repr(machine)} ==> {machine.file_manager.get_fire_command(launch_method=launch_method)}")
 
     def generate_standard_kwargs(self) -> None:
         if self.workload_params:

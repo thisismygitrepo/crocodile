@@ -5,7 +5,7 @@ Notify User Upon Completion
 
 from crocodile.comms.notification import Email
 import crocodile.toolbox as tb
-from crocodile.cluster.remote_machine import ResourceManager
+from crocodile.cluster.remote_machine import FileManager
 from crocodile.cluster.loader_runner import EmailParams
 
 error_message = ''
@@ -13,7 +13,7 @@ exec_times = tb.S()
 res_folder = tb.P()
 
 params = EmailParams.from_empty()
-manager = ResourceManager.from_pickle(params.resource_manager_path)
+manager = FileManager.from_pickle(params.file_manager_path)
 
 print(f'SENDING notification email using `{params.email_config_name}` email configuration ...')
 

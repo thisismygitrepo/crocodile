@@ -7,7 +7,7 @@ import os
 import getpass
 import platform
 import crocodile.toolbox as tb
-from crocodile.cluster.loader_runner import JobParams, ResourceManager, WorkloadParams, JOB_STATUS
+from crocodile.cluster.loader_runner import JobParams, FileManager, WorkloadParams, JOB_STATUS
 from crocodile.cluster.remote_machine import RemoteMachineConfig
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
@@ -25,7 +25,7 @@ _ = SourceFileLoader, WorkloadParams
 params = JobParams.from_empty()
 
 print("\n" * 2)
-manager: ResourceManager = ResourceManager.from_pickle(params.resource_manager_path)
+manager: FileManager = FileManager.from_pickle(params.file_manager_path)
 manager.secure_resources()
 pid: int = os.getpid()
 manager.execution_log_dir.expanduser().joinpath("pid.txt").create(parents_only=True).write_text(str(pid))

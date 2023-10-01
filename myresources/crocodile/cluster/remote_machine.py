@@ -10,7 +10,7 @@ import getpass
 import crocodile.toolbox as tb
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
-from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, ResourceManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager, LogEntry
+from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, FileManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager, LogEntry
 import crocodile.cluster as cluster
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -42,6 +42,7 @@ class RemoteMachineConfig:
     cloud_name: Optional[str] = None
 
     # remote machine behaviour
+    allowed_remotes: Optional[list[str]] = None
     open_console: bool = True
     notify_upon_completion: bool = False
     to_email: Optional[str] = None
@@ -88,7 +89,7 @@ class RemoteMachine:
         cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
         from copy import deepcopy
         self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
-        self.resources.base_dir = tb.P(self.config.base_dir).collapseuser()
+        self.file_manager.base_dir = tb.P(self.config.base_dir).collapseuser()
         wl = WorkloadParams().split_to_jobs(jobs=split)
         rms: list[RemoteMachine] = []
         new_log_entries: list[LogEntry] = []
@@ -96,8 +97,8 @@ class RemoteMachine:
             rm = deepcopy(self)
             rm.config.job_id = f"{rm.config.job_id}-{idx + 1}-{split}"
             rm.config.workload_params = a_workload_params
-            rm.resources.job_root = self.resources.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
-            rm.resources.job_id = rm.config.job_id
+            rm.file_manager.job_root = self.file_manager.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
+            rm.file_manager.job_id = rm.config.job_id
             rm.submitted = True  # must be done before generate_script which performs the pickling.
             rm.generate_scripts()
             rms.append(rm)
@@ -126,7 +127,7 @@ class RemoteMachine:
         # conn
         self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)  # type: ignore
         # scripts
-        self.resources = ResourceManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
+        self.file_manager = FileManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
         # self.execution_command: Optional[str] = None
         self.submitted: bool = False
@@ -145,17 +146,19 @@ class RemoteMachine:
             if isinstance(session_manager, Zellij):
                 sess_name = session_manager.get_current_zellij_session()  # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
                 # no need to assert session started, as it is already started. Plus, The lack of suffix `sess_name (current)` creates problems.
+                self.job_params.session_name = sess_name
+                tb.Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
             else:
                 session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
                 session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
-        cmd = self.resources.get_fire_command(launch_method=launch_method)
-        session_manager.setup_layout(ssh=ssh, sess_name=sess_name, cmd=cmd, run=run, job_wd=self.resources.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.tab_name, compact=True).print()
+        cmd = self.file_manager.get_fire_command(launch_method=launch_method)
+        session_manager.setup_layout(ssh=ssh, sess_name=self.job_params.session_name, cmd=cmd, run=run, job_wd=self.file_manager.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.tab_name, compact=True).print()
         if isinstance(ssh, SelfSSH):
             while True:
                 print(f"Waiting for Python process to start and declare its pid ... ")
                 time.sleep(3)
                 try:
-                    pid = int(self.resources.execution_log_dir.expanduser().joinpath("pid.txt").read_text())
+                    pid = int(self.file_manager.execution_log_dir.expanduser().joinpath("pid.txt").read_text())
                     import psutil
                     process_command = " ".join(psutil.Process(pid).cmdline())
                     break
@@ -186,13 +189,13 @@ class RemoteMachine:
         self.submitted = True  # before sending `self` to the remote.
 
     def generate_scripts(self):
-        console.rule(f"Generating scripts for job `{self.resources.job_id}` @ Machine `{self.__repr__()}`")
+        console.rule(f"Generating scripts for job `{self.file_manager.job_id}` @ Machine `{self.__repr__()}`")
         self.job_params.ssh_repr = repr(self.ssh)
         self.job_params.ssh_repr_remote = self.ssh.get_remote_repr()
         self.job_params.description = self.config.description
-        self.job_params.resource_manager_path = self.resources.resource_manager_path.collapseuser().as_posix()
+        self.job_params.file_manager_path = self.file_manager.file_manager_path.collapseuser().as_posix()
         self.job_params.session_name = "TS-" + tb.randstr(noun=True)  # TS: TerminalSession-CloudManager, to distinguish from other sessions created manually.
-        self.job_params.tab_name = f'🏃‍♂️{self.resources.job_id}'  # tb.randstr(noun=True)
+        self.job_params.tab_name = f'🏃‍♂️{self.file_manager.job_id}'  # tb.randstr(noun=True)
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
         py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
@@ -203,9 +206,9 @@ class RemoteMachine:
                                        speaker=self.ssh.get_remote_repr(add_machine=True),
                                        ssh_conn_str=self.ssh.get_remote_repr(add_machine=False),
                                        executed_obj=executed_obj,
-                                       resource_manager_path=self.resources.resource_manager_path.collapseuser().as_posix(),
+                                       file_manager_path=self.file_manager.file_manager_path.collapseuser().as_posix(),
                                        to_email=self.config.to_email, email_config_name=self.config.email_config_name)
-            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}").replace('manager = ResourceManager.from_pickle(params.resource_manager_path)', '')
+            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}").replace('manager = FileManager.from_pickle(params.file_manager_path)', '')
         ve_path = tb.P(self.job_params.repo_path_rh).expanduser().joinpath(".ve_path")
         if ve_path.exists(): ve_name = tb.P(ve_path.read_text()).expanduser().name
         else:
@@ -225,31 +228,31 @@ echo "~~~~~~~~~~~~~~~~SHELL  END ~~~~~~~~~~~~~~~"
 
 echo ""
 echo "Starting job {self.config.job_id} 🚀"
-echo "Executing Python wrapper script: {self.resources.py_script_path.as_posix()}"
+echo "Executing Python wrapper script: {self.file_manager.py_script_path.as_posix()}"
 
 # EXTRA-PLACEHOLDER-POST
 
 cd ~
-{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'-i' if self.config.interactive else ''} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} ./{self.resources.py_script_path.rel2home().as_posix()}
+{'python' if (not self.config.ipython and not self.config.pdb) else 'ipython'} {'-i' if self.config.interactive else ''} {'--pdb' if self.config.pdb else ''} {' -m pudb ' if self.config.pudb else ''} ./{self.file_manager.py_script_path.rel2home().as_posix()}
 
 deactivate
 
 """  # EVERYTHING in the script above is shell-agnostic. Ensure this is the case when adding new lines.
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
-        with open(file=self.resources.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
-        self.resources.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
-        tb.Save.vanilla_pickle(obj=self.kwargs, path=self.resources.kwargs_path.expanduser(), verbose=False)
-        tb.Save.vanilla_pickle(obj=self.resources.__getstate__(), path=self.resources.resource_manager_path.expanduser(), verbose=False)
-        tb.Save.vanilla_pickle(obj=self.config, path=self.resources.remote_machine_config_path.expanduser(), verbose=False)
-        tb.Save.vanilla_pickle(obj=self, path=self.resources.remote_machine_path.expanduser(), verbose=False)
+        with open(file=self.file_manager.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
+        self.file_manager.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
+        tb.Save.vanilla_pickle(obj=self.kwargs, path=self.file_manager.kwargs_path.expanduser(), verbose=False)
+        tb.Save.vanilla_pickle(obj=self.file_manager.__getstate__(), path=self.file_manager.file_manager_path.expanduser(), verbose=False)
+        tb.Save.vanilla_pickle(obj=self.config, path=self.file_manager.remote_machine_config_path.expanduser(), verbose=False)
+        tb.Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
         job_status: JOB_STATUS = "queued"
-        self.resources.execution_log_dir.expanduser().create().joinpath("status.txt").write_text(job_status)
+        self.file_manager.execution_log_dir.expanduser().create().joinpath("status.txt").write_text(job_status)
         print("\n")
 
     def show_scripts(self) -> None:
-        Console().print(Panel(Syntax(self.resources.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
-        Console().print(Panel(Syntax(self.resources.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
-        inspect(tb.Struct(shell_script=repr(tb.P(self.resources.shell_script_path).expanduser()), python_script=repr(tb.P(self.resources.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.resources.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
+        Console().print(Panel(Syntax(self.file_manager.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
+        Console().print(Panel(Syntax(self.file_manager.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
+        inspect(tb.Struct(shell_script=repr(tb.P(self.file_manager.shell_script_path).expanduser()), python_script=repr(tb.P(self.file_manager.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.file_manager.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
 
     def wait_for_results(self, sleep_minutes: int = 10) -> None:
         assert self.submitted, "Job even not submitted yet. 🤔"
@@ -269,8 +272,8 @@ deactivate
             print("Job already completed. 🤔")
             return None
 
-        base = self.resources.execution_log_dir.expanduser().create()
-        try: self.ssh.copy_to_here(self.resources.execution_log_dir.as_posix(), z=True)
+        base = self.file_manager.execution_log_dir.expanduser().create()
+        try: self.ssh.copy_to_here(self.file_manager.execution_log_dir.as_posix(), z=True)
         except Exception: pass  # type: ignore  # the directory doesn't exist yet at the remote.
         end_time_file = base.joinpath("end_time.txt")
 
