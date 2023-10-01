@@ -146,11 +146,13 @@ rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machin
 
 
 if rm_conf.kill_on_completion:
-    if rm_conf.launch_method == "cloud_manager":
+    # assert rm_conf.launch_method == "cloud_manager"
+    if platform.system() == "Linux":
         from crocodile.cluster.session_managers import Zellij  # type: ignore
         Zellij.close_tab(sess_name=params.session_name, tab_name=params.tab_name)
-    else:
+    elif platform.system() == "Windows":
         print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
         from machineconfig.utils.procs import ProcessManager
         pm = ProcessManager()
         pm.kill(commands=[params.session_name])
+    else: raise NotImplementedError(f"kill_on_completion is not implemented for platform `{platform.system()}`")
