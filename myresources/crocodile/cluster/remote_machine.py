@@ -191,8 +191,8 @@ class RemoteMachine:
         self.job_params.ssh_repr_remote = self.ssh.get_remote_repr()
         self.job_params.description = self.config.description
         self.job_params.resource_manager_path = self.resources.resource_manager_path.collapseuser().as_posix()
-        self.job_params.session_name = "TS-CM"   # + tb.randstr(noun=True)  # TS: TerminalSession-CloudManager, to distinguish from other sessions created manually.
-        self.job_params.tab_name = tb.randstr(noun=True)
+        self.job_params.session_name = "TS-" + tb.randstr(noun=True)  # TS: TerminalSession-CloudManager, to distinguish from other sessions created manually.
+        self.job_params.tab_name = f'🏃‍♂️{self.resources.job_id}'  # tb.randstr(noun=True)
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
         py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
