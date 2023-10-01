@@ -279,7 +279,7 @@ class FileManager:
         status: JOB_STATUS = tmp  # type: ignore
         if status == "running":
             if not pid_path.exists():
-                print(f"Something wrong happened to job `{self.job_id}`, moving to failed.")
+                print(f"Something wrong happened to job `{self.job_id}`. Its status log file says `{status}`, but pid_path doesn't exists. Moving to failed.")
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
@@ -287,13 +287,13 @@ class FileManager:
             import psutil
             try: proc = psutil.Process(pid=pid)
             except psutil.NoSuchProcess:
-                print(f"Something wrong happened to job `{self.job_id}`, moving to failed.")
+                print(f"Something wrong happened to job `{self.job_id}`.. Its status log file says `{status}`, but its declared `{pid=}` is dead. Moving to failed.")
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
             command = " ".join(proc.cmdline())
             if self.job_id not in command:
-                print(f"Something wrong happened to job `{self.job_id}`, moving to failed.")
+                print(f"Something wrong happened to job `{self.job_id}`. Its status log file says `{status}` but the `{pid=}` declared seem to belong to a different process as indicated by the firing command `{command=}`. Moving to failed.")
                 status = 'failed'
                 self.execution_log_dir.expanduser().joinpath("status.txt").write_text(status)
                 return status
@@ -641,7 +641,6 @@ class CloudManager:
         self.clean_interrupted_jobs_mess()
         def routine(sched: Any):
             _ = sched
-            print(f"# Running jobs = {len(self.running_jobs)} / {self.max_jobs=}")
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
@@ -676,7 +675,7 @@ class CloudManager:
     def start_jobs_if_possible(self):
         """This is the only authority responsible for moving jobs from queue df to running df."""
         if len(self.running_jobs) == self.max_jobs:
-            print(f"no more capacity to run more jobs ({len(self.running_jobs)} / {self.max_jobs=})")
+            print(f"⚠️ No more capacity to run more jobs ({len(self.running_jobs)} / {self.max_jobs=})")
             return
         from crocodile.cluster.remote_machine import RemoteMachine
         log = self.read_log()  # ask for the log file.

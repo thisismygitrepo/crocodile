@@ -94,6 +94,7 @@ if params.error_message == "":
 else:
     job_status = "failed"
     manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
+print(f"job {manager.job_id} is completed.")
 
 
 tb.Experimental.generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
@@ -133,9 +134,6 @@ if params.session_name != "":
         tb.Terminal().run(f"""zellij --session {params.session_name} action write-chars "cd {res_folder.as_posix()};lf" """)
     elif platform.system() == "Windows":
         tb.Terminal().run(f"""wt --window {params.session_name} new-tab --title results -startingDirectory {res_folder.as_posix()} lf """)
-
-
-print(f"job {manager.job_id} is completed.")
 
 
 # NOTIFICATION-CODE-PLACEHOLDER
