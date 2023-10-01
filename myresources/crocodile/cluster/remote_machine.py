@@ -208,7 +208,8 @@ class RemoteMachine:
                                        executed_obj=executed_obj,
                                        file_manager_path=self.file_manager.file_manager_path.collapseuser().as_posix(),
                                        to_email=self.config.to_email, email_config_name=self.config.email_config_name)
-            py_script += tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}").replace('manager = FileManager.from_pickle(params.file_manager_path)', '')
+            email_script = tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("params = EmailParams.from_empty()", f"params = {email_params}").replace('manager = FileManager.from_pickle(params.file_manager_path)', '')
+            py_script = py_script.replace("# NOTIFICATION-CODE-PLACEHOLDER", email_script)
         ve_path = tb.P(self.job_params.repo_path_rh).expanduser().joinpath(".ve_path")
         if ve_path.exists(): ve_name = tb.P(ve_path.read_text()).expanduser().name
         else:

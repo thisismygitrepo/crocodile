@@ -725,7 +725,7 @@ class CloudManager:
         Note: If the parameters of the class are messed with, there is no gaurantee of zero collision by this method.
         It takes at least inter_check_interval_sec * num_claims_check to claim the lock.
         """
-        if first_call: print(f"Claiming lock...")
+        if first_call: print(f"Claiming lock 🔒 ...")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         path = CloudManager.base_path.expanduser().create()
         try:
@@ -743,7 +743,7 @@ class CloudManager:
                 return self.claim_lock(first_call=False)
             print(f"CloudManager: Lock already claimed by `{locking_machine}`. 🤷‍♂️")
             wait = int(random.random() * 30)
-            print(f"sleeping for {wait} seconds and trying again.")
+            print(f"💤 sleeping for {wait} seconds and trying again.")
             time.sleep(wait)
             return self.claim_lock(first_call=False)
 
@@ -765,11 +765,13 @@ class CloudManager:
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter}-{self.num_claim_checks} ❓")
             time.sleep(10)
         CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_down=True)
-        print(f"Lock Claimed")
+        print(f"✅ Lock Claimed 🔒")
         self.lock_claimed = True
 
     def release_lock(self):
-        if not self.lock_claimed: return
+        if not self.lock_claimed:
+            print(f"⚠️ Lock is not claimed, nothing to release.")
+            return
         print(f"Releasing Lock")
         path = CloudManager.base_path.expanduser().create()
         try:

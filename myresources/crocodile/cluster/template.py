@@ -42,7 +42,6 @@ def try_run_on_remote():
 def run_on_cloud():
     from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, CloudManager
     from crocodile.cluster.utils import expensive_function
-    # from crocodile.file_management import P
     from crocodile.cluster.self_ssh import SelfSSH
     config = RemoteMachineConfig(
         # connection

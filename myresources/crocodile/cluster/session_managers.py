@@ -49,12 +49,13 @@ class Zellij:
     @staticmethod
     def close_tab(sess_name: str, tab_name: str):
         cmd = f"""
-zellij --session {sess_name} action close-tab --tab-name 'J-{tab_name}'
+zellij --session {sess_name} action close-tab --tab-name '{tab_name}'
 zellij --session {sess_name} action new-tab --name '🖥️{tab_name}'
 zellij --session {sess_name} action new-tab --name '🔍{tab_name}'
 zellij --session {sess_name} action new-tab --name '🪪{tab_name}'
 zellij --session {sess_name} action new-tab --name '🧑‍💻{tab_name}'
 """
+        print(f"Closing tab `{tab_name}` in zellij session `{sess_name}` with command \n{cmd}")
         return tb.Terminal().run_script(cmd)
 
     @staticmethod

@@ -136,18 +136,21 @@ if params.session_name != "":
 
 
 print(f"job {manager.job_id} is completed.")
-# if lock_resources and interactive: print(f"This jos is interactive. Don't forget to close it as it is also locking resources.")
+
+
+# NOTIFICATION-CODE-PLACEHOLDER
 
 
 manager.unlock_resources()
 rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machine_config_path.expanduser())
 
 
-if rm_conf.kill_on_completion and params.session_name != "":
+if rm_conf.kill_on_completion:
     if rm_conf.launch_method == "cloud_manager":
         from crocodile.cluster.session_managers import Zellij  # type: ignore
         Zellij.close_tab(sess_name=params.session_name, tab_name=params.tab_name)
     else:
+        print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
         from machineconfig.utils.procs import ProcessManager
         pm = ProcessManager()
         pm.kill(commands=[params.session_name])
