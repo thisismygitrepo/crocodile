@@ -304,14 +304,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         slf = self.expanduser().absolute(); _ = slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self
-    def touch(self, mode: int = 0o666, parents: bool = True, exist_ok: bool = True) -> 'P':  # pyling: disable=W0237
+    def touch(self, mode: int = 0o666, parents: bool = True, exist_ok: bool = True) -> 'P':  # pylint: disable=W0237
         _ = self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, src_folder: OPLike = None, src_file: OPLike = None, verbose: bool = False, overwrite: bool = False):
         assert self.expanduser().exists(), "self must exist if this method is used."
         if src_file is not None: assert src_folder is None, "You can only pass source or source_dir, not both."; result = P(src_file).expanduser().absolute()
         else: result = P(src_folder or P.cwd()).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
-    def symlink_to(self, target: PLike, verbose: bool = True, overwrite: bool = False, orig: bool = False):  # pyling: disable=W0237
+    def symlink_to(self, target: PLike, verbose: bool = True, overwrite: bool = False, orig: bool = False):  # pylint: disable=W0237
         self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         if __import__("platform").system() == "Windows" and not (tm := __import__("crocodile").meta.Terminal).is_user_admin():  # you cannot create symlink without priviliages.
@@ -490,7 +490,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             if verbose: print("🔗 SHARING FILE")
             res = Terminal().run(f"""rclone link '{cloud}:{rp.as_posix()}'""", shell="powershell").capture()
             tmp = res.op2path(strict_err=True, strict_returncode=True)
-            assert isinstance(tmp, P), f"Could not get link for {self}."
+            if tmp is None:
+                res.print()
+                raise RuntimeError(f"Could not get link for {self}.")
             return tmp
         return self
     def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore
