@@ -217,7 +217,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if verbose and msg != "":
             try: print(msg)  # emojie print error.
             except UnicodeEncodeError: print(f"tb.P._return warning: UnicodeEncodeError, could not print message.")
-        if verbose and __delayed_msg__ != "": print(__delayed_msg__)
+        if verbose and __delayed_msg__ != "":
+            try: print(__delayed_msg__)
+            except UnicodeEncodeError: print(f"tb.P._return warning: UnicodeEncodeError, could not print message.")
         return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
