@@ -214,7 +214,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             elif operation == "delete":
                 self.delete(sure=True, verbose=False)
                 __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
-        if verbose and msg != "": print(msg)
+        if verbose and msg != "":
+            try: print(msg)  # emojie print error.
+            except UnicodeEncodeError: print(f"tb.P._return warning: UnicodeEncodeError, could not print message.")
         if verbose and __delayed_msg__ != "": print(__delayed_msg__)
         return self if orig else res
     # ================================ Path Object management ===========================================
