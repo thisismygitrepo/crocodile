@@ -169,10 +169,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
-    def readit(self, reader: Optional[Callable[[PLike], Any]] = None, strict: bool = True, notfound: Optional[Any] = None, verbose: bool = False, **kwargs: Any) -> 'Any':
+    def readit(self, reader: Optional[Callable[[PLike], Any]] = None, strict: bool = True, default: Optional[Any] = None, verbose: bool = False, **kwargs: Any) -> 'Any':
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
-            else: _ = (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return notfound
+            else: _ = (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return default
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
@@ -209,9 +209,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
                     else: _ = print(f"SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
-                self.rename(res); msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
-            elif operation == "delete": self.delete(sure=True, verbose=False); __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
-        _ = print(msg) if verbose and msg != "" else None; _ = print(__delayed_msg__) if verbose and __delayed_msg__ != "" else None; return self if orig else res
+                self.rename(res)
+                msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
+            elif operation == "delete":
+                self.delete(sure=True, verbose=False)
+                __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
+        if verbose and msg != "": print(msg)
+        if verbose and __delayed_msg__ != "": print(__delayed_msg__)
+        return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
         `inplace`: the operation on the path object will affect the underlying file on disk if this flag is raised, otherwise the method will only alter the string.
