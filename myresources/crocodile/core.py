@@ -23,7 +23,7 @@ def str2timedelta(shift: str) -> datetime.timedelta:  # Converts a human readabl
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 def install_n_import(library: str, package: Optional[str] = None, fromlist: Optional[list[str]] = None):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(library, fromlist=fromlist if fromlist is not None else ())
-    except ImportError: __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", package or library]); return __import__(library, fromlist=fromlist if fromlist is not None else ())
+    except (ImportError, ModuleNotFoundError): __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", package or library]); return __import__(library, fromlist=fromlist if fromlist is not None else ())
 def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bool = True, punctuation: bool = False, safe: bool = False, noun: bool = False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     if noun: return install_n_import("randomname").get_name()
