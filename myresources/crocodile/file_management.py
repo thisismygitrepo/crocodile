@@ -70,6 +70,7 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 # %% =================================== File ============================================
 def read(path: PLike, **kwargs: Any):
     suffix = Path(path).suffix[1:]
+    if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
     if suffix == "sqlite":
         from crocodile.database import DBMS
         return DBMS.from_local_db(path=path)
@@ -485,7 +486,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         tmp1 = (__import__('platform').system().lower() if os_specific else 'generic_os')
         if isinstance(root, str): return P(root) / tmp1 / self.rel2home()
         return tmp1 / self.rel2home()
-    def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False, key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False,
+    def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False,  # pylint: disable=W0621, W0622
+                 key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False,
                  share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
@@ -506,7 +508,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 raise RuntimeError(f"Could not get link for {self}.")
             return tmp
         return self
-    def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore
+    def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
                    key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, overwrite: bool = True, merge: bool = False, os_specific: bool = False, transfers: int = 10, root: str = "myhome", verbose: bool = True):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())

@@ -323,9 +323,9 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     def process_key(self, event: Any):
         self.event = event  # useful for debugging.
         # event.
-        for key in self.help_menu.keys():
+        for key, value in self.help_menu.items():
             if event.key in key:
-                self.help_menu[key]['func'](event)  # type: ignore
+                value['func'](event)  # type: ignore
                 self.update_info_text(self.message)
                 break
         if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
@@ -481,7 +481,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     @staticmethod
     def try_figure_size() -> None:
         fig, ax = plt.subplots()
-        y = np.sin(x := np.arange(0, 100, 0.01)) * 100
+        x = np.arange(0, 100, 0.01)
+        y = np.sin(x) * 100
         ax.plot(x, y); ax.axis("square"); ax.set_xlim(0, 100); ax.set_ylim(-100, 100)
         FigureManager.set_ax_to_real_life_size(ax); fig.savefig(str(P.tmp() / "trial.png"), dpi=250)
     @staticmethod
@@ -520,10 +521,11 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
     def add(self, objs: Any) -> None:
         self.idx_cycle.expand(val=len(self.idx_cycle.list))
         self.objs_repo.append(objs)
-        [obj.set_visible(False) for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else [])]
+        for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else []): obj.set_visible(False)
         print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
     def animate(self):
-        _ = [ax.set_visible(False) for ax in self.objs_repo[self.idx_cycle.prev_index]]; [ax.set_visible(True) for ax in self.objs_repo[self.idx_cycle.get_index()]]
+        for ax in self.objs_repo[self.idx_cycle.prev_index]: ax.set_visible(False)
+        for ax in self.objs_repo[self.idx_cycle.get_index()]: ax.set_visible(True)
         self.fig.canvas.draw()  # type: ignore
 
 
@@ -554,10 +556,10 @@ class LineArtist(FigureManager):  # This object knows how to draw a figure from 
         for ax in self.ax:
             self.line = ax.plot(*args, **kwargs)
             ax.legend(legends or [])
-            ax.set_title(title) if title is not None else None
+            if title is not None: ax.set_title(title)
             ax.grid(visible=True)
     def plot_dict(self, adict: dict[str, Any], title: str = '', xlabel: str = '', ylabel: str = ''):
-        [self.plot(val, label=key) for key, val in adict.items()]
+        for key, val in adict.items(): self.plot(val, label=key)
         assert self.ax is not None, "Axes is not defined yet."
         for ax in self.ax:
             ax.legend()
@@ -636,7 +638,7 @@ class ImShow(FigureManager):
         :param sup_titles: Titles for frames (N)
         :param sub_labels: M x N. If shape sent is M
         """
-        _ = save_dir, save_kwargs
+        _ = save_dir, save_kwargs, save_type, save_name
         super().__init__(figpolicy=FigurePolicy.add_new)
         n, m = len(img_tensor), len(img_tensor[0])
         self.m, self.n = m, n
@@ -650,7 +652,8 @@ class ImShow(FigureManager):
         self.ims: list[AxesImage] = []  # container for images.
         self.cmaps = Cycle(PLT_CMAPS); self.cmaps.set_value('viridis')
         if ax is None:
-            self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white'); self.maximize_fig() if figsize is None else None
+            self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white')
+            if figsize is None: self.maximize_fig()
             if gridspec is not None:
                 assert self.fig is not None
                 gs = self.fig.add_gridspec(gridspec[0])
