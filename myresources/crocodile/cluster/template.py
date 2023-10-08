@@ -51,7 +51,7 @@ def run_on_cloud():
         copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=[], transfer_method="cloud", cloud_name="oduq1",
         # remote machine behaviour
         open_console=True, notify_upon_completion=True, to_email=None, email_config_name=None,
-        kill_on_completion=False,
+        kill_on_completion=True,
         launch_method="cloud_manager",
         # execution behaviour
         ipython=False, interactive=False, pdb=False, pudb=False, wrap_in_try_except=True,
@@ -59,10 +59,8 @@ def run_on_cloud():
         # resources
         lock_resources=True, max_simulataneous_jobs=2, parallelize=False, )
     m = RemoteMachine(func=expensive_function, func_kwargs=dict(sim_dict=dict(a=2, b=3)), config=config)
-    res = m.submit_to_cloud(split=10, cm=CloudManager(max_jobs=1))
+    res = m.submit_to_cloud(split=2, cm=CloudManager(max_jobs=1))
     return res
-
-
 
 
 if __name__ == '__main__':
