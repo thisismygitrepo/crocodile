@@ -150,7 +150,7 @@ if rm_conf.kill_on_completion:
         current_session = Zellij.get_current_zellij_session()
         # Zellij.close_tab(sess_name=params.session_name, tab_name=params.tab_name)
         print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
-        tb.Terminal().run(f"zellij --session {current_session} action close-tab").print()  # i.e. current tab
+        tb.Terminal().run(f"zellij --session {current_session} go-to-tab-name '{params.tab_name}'; sleep 2; zellij --session {current_session} action close-tab").print()  # i.e. current tab
     elif platform.system() == "Windows":
         print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
         from machineconfig.utils.procs import ProcessManager
