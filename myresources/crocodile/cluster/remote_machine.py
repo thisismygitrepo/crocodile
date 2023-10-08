@@ -144,7 +144,7 @@ class RemoteMachine:
         sess_name = self.job_params.session_name
         if open_console and self.config.open_console:
             if isinstance(session_manager, Zellij):
-                sess_name = session_manager.get_current_zellij_session() 
+                sess_name = session_manager.get_current_zellij_session()
                 # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
                 # no need to assert session started, as it is already started. Plus, The lack of suffix `sess_name (current)` creates problems.
                 self.job_params.session_name = sess_name
