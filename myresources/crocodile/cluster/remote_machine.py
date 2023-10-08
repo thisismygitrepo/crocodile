@@ -144,23 +144,28 @@ class RemoteMachine:
         sess_name = self.job_params.session_name
         if open_console and self.config.open_console:
             if isinstance(session_manager, Zellij):
-                sess_name = session_manager.get_current_zellij_session()  # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
+                sess_name = session_manager.get_current_zellij_session() 
+                # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
                 # no need to assert session started, as it is already started. Plus, The lack of suffix `sess_name (current)` creates problems.
                 self.job_params.session_name = sess_name
                 tb.Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
             else:
+                # As for Windows Terminal, there is another problem preventing us from using the same window; there is no kill-pane or kill-tab or even kill-window, the only way is to kill process (kills window).
+                # Thus, we can't terminate a job unless it has a window of its own. So we follow that apporach here.
                 session_manager.open_console(sess_name=sess_name, ssh=self.ssh)
                 session_manager.asssert_session_started(ssh=ssh, sess_name=sess_name)
         cmd = self.file_manager.get_fire_command(launch_method=launch_method)
         session_manager.setup_layout(ssh=ssh, sess_name=self.job_params.session_name, cmd=cmd, run=run, job_wd=self.file_manager.job_root.expanduser().absolute().as_posix(), tab_name=self.job_params.tab_name, compact=True).print()
         if isinstance(ssh, SelfSSH):
+            pid_path = self.file_manager.execution_log_dir.expanduser().joinpath("pid.txt")
             while True:
-                print(f"Waiting for Python process to start and declare its pid ... ")
+                print(f"🫷 Waiting for Python process to start and declare its pid @ `{pid_path}` as dictated in python script ... ")
                 time.sleep(3)
                 try:
-                    pid = int(self.file_manager.execution_log_dir.expanduser().joinpath("pid.txt").read_text())
+                    pid = int(pid_path.read_text())
                     import psutil
                     process_command = " ".join(psutil.Process(pid).cmdline())
+                    print(f"🎉 Python process started running @ {pid=} & {process_command=}")
                     break
                 except Exception: pass
         else:
