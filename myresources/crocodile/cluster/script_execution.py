@@ -146,10 +146,11 @@ rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machin
 if rm_conf.kill_on_completion:
     # assert rm_conf.launch_method == "cloud_manager"
     if platform.system() == "Linux":
-        # from crocodile.cluster.session_managers import Zellij  # type: ignore  # pylint: disable=C0412
-        # current_session = Zellij.get_current_zellij_session()
+        from crocodile.cluster.session_managers import Zellij  # type: ignore  # pylint: disable=C0412
+        current_session = Zellij.get_current_zellij_session()
         # Zellij.close_tab(sess_name=params.session_name, tab_name=params.tab_name)
-        tb.Terminal().run_script("zellij action close-tab")  # i.e. current tab
+        print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
+        tb.Terminal().run(f"zellij --session {current_session} action close-tab").print()  # i.e. current tab
     elif platform.system() == "Windows":
         print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
         from machineconfig.utils.procs import ProcessManager
