@@ -156,3 +156,8 @@ if rm_conf.kill_on_completion:
         pm = ProcessManager()
         pm.kill(commands=[params.session_name])
     else: raise NotImplementedError(f"kill_on_completion is not implemented for platform `{platform.system()}`")
+else:
+    print(f"Keeping the tab `{params.tab_name}` on `{params.ssh_repr}`")
+
+
+console.rule(title="END OF PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
