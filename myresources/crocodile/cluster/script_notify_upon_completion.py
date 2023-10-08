@@ -12,17 +12,17 @@ error_message = ''
 exec_times = tb.S()
 res_folder = tb.P()
 
-params = EmailParams.from_empty()
-manager = FileManager.from_pickle(params.file_manager_path)
+email_params = EmailParams.from_empty()
+manager = FileManager.from_pickle(email_params.file_manager_path)
 
-print(f'SENDING notification email using `{params.email_config_name}` email configuration ...')
+print(f'SENDING notification email using `{email_params.email_config_name}` email configuration ...')
 
 sep = "\n" * 2  # SyntaxError: f-string expression part cannot include a backslash, keep it here outside fstring.
 msg = f'''
 
-Hi `{params.addressee}`, I'm `{params.speaker}`, this is a notification that I have completed running the script you sent to me.
+Hi `{email_params.addressee}`, I'm `{email_params.speaker}`, this is a notification that I have completed running the script you sent to me.
 
-``` {params.executed_obj} ```
+``` {email_params.executed_obj} ```
 
 
 #### Error Message:
@@ -35,12 +35,12 @@ Hi `{params.addressee}`, I'm `{params.speaker}`, this is a notification that I h
 `{manager.py_script_path}`
 
 #### Pull results using this script:
-`ftprx {params.ssh_conn_str} {res_folder.collapseuser().as_posix()} -r`
+`ftprx {email_params.ssh_conn_str} {res_folder.collapseuser().as_posix()} -r`
 Or, using croshell,
 
 ```python
 
-ssh = SSH(r'{params.ssh_conn_str}')
+ssh = SSH(r'{email_params.ssh_conn_str}')
 ssh.copy_to_here(r'{res_folder.collapseuser().as_posix()}', r=False, zip_first=False)
 
 ```
@@ -55,7 +55,7 @@ ssh.copy_to_here(r'{res_folder.collapseuser().as_posix()}', r=False, zip_first=F
 '''
 
 try:
-    Email.send_and_close(config_name=params.email_config_name, to=params.to_email,
+    Email.send_and_close(config_name=email_params.email_config_name, to=email_params.to_email,
                          subject=f"Execution Completion Notification, job_id = {manager.job_id}", msg=msg)
-    print(f'FINISHED sending notification email to `{params.to_email}`')
+    print(f'FINISHED sending notification email to `{email_params.to_email}`')
 except Exception as e: print(f"Error sending email: {e}")
