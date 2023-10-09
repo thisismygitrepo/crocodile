@@ -521,17 +521,17 @@ class CloudManager:
             log_path = alternative_base.joinpath("logs.pkl")
             if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = tb.Read.vanilla_pickle(path=log_path)
             else:
-                print(f"Log file doesn't exist! 🫤")
+                print(f"Log file doesn't exist! 🫤 must be that cloud is getting purged or something 🤔 ")
                 log = {}
             for item_name, item_df in log.items():
                 console.rule(f"{item_name} DataFrame (Latest {'10' if len(item_df) > 10 else len(item_df)} / {len(item_df)})")
                 print()  # empty line after the rule helps keeping the rendering clean in the terminal while zooming in and out.
                 if item_name != "queued":
                     t2 = pd.to_datetime(item_df["end_time"]) if item_name != "running" else pd.Series([pd.Timestamp.now()] * len(item_df))
-                    try: item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
-                    except TypeError as te:
-                        print(f"{item_name=} has a problem with \n{item_df=}\n{t2=}\n{item_df['start_time']=}")
-                        raise te
+                    
+                    if len(t2) == 0 and len(item_df) == 0: pass  # the subtraction below gives an error if both are empty. TypeError: cannot subtract DatetimeArray from ndarray
+                    else: item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
+
                 cols = item_df.columns
                 cols = [a_col for a_col in cols if a_col not in {"cmd", "note"}]
                 if item_name == "queued": cols = [a_col for a_col in cols if a_col not in {"pid", "start_time", "end_time", "run_machine"}]
