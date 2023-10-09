@@ -23,18 +23,22 @@ import numpy as np
 import pandas as pd
 import platform
 
-# __ = PLike, vali
-console = Console()
-pretty.install()
 
-_ = f"Python {platform.python_version()} in VE `{os.getenv('VIRTUAL_ENV')}` On {platform.system()}."
-_ = Text(_); _.stylize("bold blue")
-console.rule(_, style="bold red", align="center")
-# link to tutorial or github
-_ = Text(f"Crocodile Shell")
-_.stylize("#93e6c7 on #093006")
-print(_, __import__(name='crocodile').__version__)
-print("Made with 🐍 | Built with ❤️")
+def print_header():
+    console = Console()
+    pretty.install()
+
+    _header = f"Python {platform.python_version()} in VE `{os.getenv('VIRTUAL_ENV')}` On {platform.system()}."
+    _header = Text(_header)
+    _header.stylize("bold blue")
+    console.rule(_header, style="bold red", align="center")
+
+    # link to tutorial or github
+    _ = Text(f"Crocodile Shell")
+    _.stylize("#93e6c7 on #039006")
+    print(_, __import__(name='crocodile').__version__)
+    print("Made with 🐍 | Built with ❤️")
+
 
 tb.D.set_numpy_display()
 tb.D.set_pandas_display()
@@ -45,7 +49,7 @@ S = core.Struct
 _ = D, L, E, S, inspect, progress, pprint, traceback, pd, np
 
 
-def print_logo():
+def print_logo(logo: str):
     if platform.system() == "Windows":
         _1x = P.home().joinpath(r"AppData/Roaming/npm/figlet").exists()
         _2x = P.home().joinpath(r"AppData/Roaming/npm/lolcatjs").exists()
@@ -57,7 +61,7 @@ def print_logo():
                 font = random.choice(FIGJS_FONTS)
                 # print(f"{font}\n")
                 box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
-                _cmd = f'figlet -f "{font}" "crocodile" | boxes -d "{box_style}" | lolcatjs'
+                _cmd = f'figlet -f "{font}" "{logo}" | boxes -d "{box_style}" | lolcatjs'
                 print(_cmd)
                 os.system(_cmd)  # | lolcat
             else:
@@ -65,7 +69,7 @@ def print_logo():
                 # from rgbprint import gradient_scroll, Color
                 # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
                 _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
-                _new_art.write_text(ArtLib.cowsay("crocodile"))  # utf-8 encoding?
+                _new_art.write_text(ArtLib.cowsay(logo))  # utf-8 encoding?
                 os.system(f'type {_new_art} | lolcatjs')  # | lolcat
         else:
             print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
@@ -92,7 +96,7 @@ def print_logo():
             if _dynamic_art:
                 from crocodile.msc.ascii_art import get_art
                 _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
-                get_art("crocodile", artlib=None, file=str(_new_art), verbose=False)
+                get_art(logo, artlib=None, file=str(_new_art), verbose=False)
                 os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
             else:
                 _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
@@ -121,5 +125,6 @@ def build_parser():
 
 
 if __name__ == "__main__":
-    print_logo()
+    print_header()
+    print_logo(logo="crocodile")
     build_parser()
