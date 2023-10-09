@@ -528,7 +528,6 @@ class CloudManager:
                 print()  # empty line after the rule helps keeping the rendering clean in the terminal while zooming in and out.
                 if item_name != "queued":
                     t2 = pd.to_datetime(item_df["end_time"]) if item_name != "running" else pd.Series([pd.Timestamp.now()] * len(item_df))
-                    
                     if len(t2) == 0 and len(item_df) == 0: pass  # the subtraction below gives an error if both are empty. TypeError: cannot subtract DatetimeArray from ndarray
                     else: item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
 
