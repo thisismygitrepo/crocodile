@@ -528,7 +528,10 @@ class CloudManager:
                 print()  # empty line after the rule helps keeping the rendering clean in the terminal while zooming in and out.
                 if item_name != "queued":
                     t2 = pd.to_datetime(item_df["end_time"]) if item_name != "running" else pd.Series([pd.Timestamp.now()] * len(item_df))
-                    item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
+                    try: item_df["duration"] = t2 - pd.to_datetime(item_df["start_time"])
+                    except TypeError as te:
+                        print(f"{item_name=} has a problem with \n{item_df=}\n{t2=}\n{item_df['start_time']=}")
+                        raise te
                 cols = item_df.columns
                 cols = [a_col for a_col in cols if a_col not in {"cmd", "note"}]
                 if item_name == "queued": cols = [a_col for a_col in cols if a_col not in {"pid", "start_time", "end_time", "run_machine"}]
