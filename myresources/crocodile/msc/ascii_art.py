@@ -2,13 +2,15 @@
 """Ascii art
 """
 
-# import os
+import os
 import random
 # import crocodile.toolbox as tb
 import textwrap
 import subprocess
-from crocodile.core import install_n_import
+from crocodile.core import install_n_import, randstr
 # from pathlib import Path
+from crocodile.file_management import P
+import platform
 from typing import Optional
 
 # https://github.com/VaasuDevanS/cowsay-python
@@ -88,6 +90,32 @@ def get_art(comment: Optional[str] = None, artlib: Optional[str] = None, style: 
         print(f'{cmd=}')
         print(f'Results:\n', res)
     return res
+
+
+def font_box_color(logo: str):
+    # from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles # pylint: disable=C0412
+    font = random.choice(FIGJS_FONTS)
+    # print(f"{font}\n")
+    box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
+    _cmd = f'figlet -f "{font}" "{logo}" | boxes -d "{box_style}" | lolcatjs'
+    print(_cmd)
+    os.system(_cmd)  # | lolcat
+
+
+def charachter_color(logo: str):
+    assert platform.system() == 'Windows', 'This function is only for Windows.'    
+    # from rgbprint import gradient_scroll, Color
+    # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
+    _new_art = P.temp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
+    _new_art.write_text(ArtLib.cowsay(logo))  # utf-8 encoding?
+    os.system(f'type {_new_art} | lolcatjs')  # | lolcat
+
+
+def character_or_box_color(logo: str):
+    assert platform.system() == 'Linux', 'This function is only for Linux.'
+    _new_art = P.temp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
+    get_art(logo, artlib=None, file=str(_new_art), verbose=False)
+    os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
 
 
 if __name__ == '__main__':

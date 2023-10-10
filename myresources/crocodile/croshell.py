@@ -50,42 +50,29 @@ _ = D, L, E, S, inspect, progress, pprint, traceback, pd, np
 
 
 def print_logo(logo: str):
+    from crocodile.msc.ascii_art import font_box_color, charachter_color, character_or_box_color
     if platform.system() == "Windows":
         _1x = P.home().joinpath(r"AppData/Roaming/npm/figlet").exists()
         _2x = P.home().joinpath(r"AppData/Roaming/npm/lolcatjs").exists()
         _3x = P.home().joinpath(r"AppData/Local/Microsoft/WindowsApps/boxes.exe").exists()
-
         if _1x and _2x and _3x:
-            if random.choice([True, True, False]):
-                from crocodile.msc.ascii_art import FIGJS_FONTS  # , BoxStyles # pylint: disable=C0412
-                font = random.choice(FIGJS_FONTS)
-                # print(f"{font}\n")
-                box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
-                _cmd = f'figlet -f "{font}" "{logo}" | boxes -d "{box_style}" | lolcatjs'
-                print(_cmd)
-                os.system(_cmd)  # | lolcat
-            else:
-                from crocodile.msc.ascii_art import ArtLib
-                # from rgbprint import gradient_scroll, Color
-                # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
-                _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
-                _new_art.write_text(ArtLib.cowsay(logo))  # utf-8 encoding?
-                os.system(f'type {_new_art} | lolcatjs')  # | lolcat
+            if random.choice([True, True, False]): font_box_color(logo)
+            else: charachter_color(logo)
         else:
             print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
     else:
-        # _x1 = P.home().joinpath(".nix-profile/bin/cowsay").exists()  # P(r"/usr/games/cowsay").exists()
-        # _x2 = P.home().joinpath(".nix-profile/bin/lolcat").exists()  # P(r"/usr/games/lolcat").exists()
-        # _x3 = P.home().joinpath(".nix-profile/bin/boxes").exists()  # P(r"/usr/bin/boxes").exists()
-        # _x4 = P.home().joinpath(".nix-profile/bin/figlet").exists()  # P(r"/usr/bin/figlet").exists()
         def is_executable_in_path(executable_name: str) -> bool:
             path_dirs = os.environ['PATH'].split(os.pathsep)
             for path_dir in path_dirs:
                 path_to_executable = os.path.join(path_dir, executable_name)
                 if os.path.isfile(path_to_executable) and os.access(path_to_executable, os.X_OK): return True
             return False
+        # _x1 = P.home().joinpath(".nix-profile/bin/cowsay").exists()  # P(r"/usr/games/cowsay").exists()
+        # _x2 = P.home().joinpath(".nix-profile/bin/lolcat").exists()  # P(r"/usr/games/lolcat").exists()
+        # _x3 = P.home().joinpath(".nix-profile/bin/boxes").exists()  # P(r"/usr/bin/boxes").exists()
+        # _x4 = P.home().joinpath(".nix-profile/bin/figlet").exists()  # P(r"/usr/bin/figlet").exists()
         _x1 = is_executable_in_path("cowsay")
         _x2 = is_executable_in_path("lolcat")
         _x3 = is_executable_in_path("boxes")
@@ -94,13 +81,9 @@ def print_logo(logo: str):
         if _x1 and _x2 and _x3 and _x4:
             _dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
             if _dynamic_art:
-                from crocodile.msc.ascii_art import get_art
-                _new_art = tb.P.temp().joinpath("tmp_arts").create().joinpath(f"{tb.randstr()}.txt")
-                get_art(logo, artlib=None, file=str(_new_art), verbose=False)
-                os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
+                character_or_box_color(logo)
             else:
-                _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
-                print(_default_art.read_text())
+                print(P(__file__).parent.joinpath("art").search().sample(size=1).list[0].read_text())
         else:
             print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
