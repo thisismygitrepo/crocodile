@@ -80,10 +80,8 @@ def print_logo(logo: str):
 
         if _x1 and _x2 and _x3 and _x4:
             _dynamic_art = random.choice([True, True, True, True, False])  # classic art (True) or boxes (False)
-            if _dynamic_art:
-                character_or_box_color(logo)
-            else:
-                print(P(__file__).parent.joinpath("art").search().sample(size=1).list[0].read_text())
+            if _dynamic_art: character_or_box_color(logo)
+            else: print(P(__file__).parent.joinpath("art").search().sample(size=1).list[0].read_text())
         else:
             print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]

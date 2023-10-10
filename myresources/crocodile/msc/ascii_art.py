@@ -11,7 +11,7 @@ from crocodile.core import install_n_import, randstr
 # from pathlib import Path
 from crocodile.file_management import P
 import platform
-from typing import Optional
+from typing import Optional, Literal
 
 # https://github.com/VaasuDevanS/cowsay-python
 # https://github.com/pwaller/pyfiglet
@@ -22,6 +22,9 @@ from typing import Optional
 """
 
 """
+
+
+BOX_OR_CHAR = Literal['boxes', 'cowsay']
 
 
 class ArtLib:
@@ -65,7 +68,7 @@ FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic',
                'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity', "Doom"]  # too large  Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
 
 
-def get_art(comment: Optional[str] = None, artlib: Optional[str] = None, style: Optional[str] = None, super_style: str = 'scene', prefix: str = ' ', file: Optional[str] = None, verbose: bool = True):
+def get_art(comment: Optional[str] = None, artlib: Optional[BOX_OR_CHAR] = None, style: Optional[str] = None, super_style: str = 'scene', prefix: str = ' ', file: Optional[str] = None, verbose: bool = True):
     """ takes in a comment and does the following wrangling:
     * text => figlet font => boxes => lolcat
     * text => cowsay => lolcat
@@ -98,12 +101,12 @@ def font_box_color(logo: str):
     # print(f"{font}\n")
     box_style = random.choice(['whirly', 'xes', 'columns', 'parchment', 'scroll', 'scroll-akn', 'diamonds', 'headline', 'nuke', 'spring', 'stark1'])
     _cmd = f'figlet -f "{font}" "{logo}" | boxes -d "{box_style}" | lolcatjs'
-    print(_cmd)
+    # print(_cmd)
     os.system(_cmd)  # | lolcat
 
 
 def charachter_color(logo: str):
-    assert platform.system() == 'Windows', 'This function is only for Windows.'    
+    assert platform.system() == 'Windows', 'This function is only for Windows.'
     # from rgbprint import gradient_scroll, Color
     # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
     _new_art = P.temp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")

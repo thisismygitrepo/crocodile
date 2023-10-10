@@ -47,7 +47,7 @@ def build_parser():
     parser.add_argument("--read", "-r", dest="read", help="read a binary file.", default="")
     parser.add_argument("--file", "-f", dest="file", help="python file path to interpret", default="")
     parser.add_argument("--cmd", "-c", dest="cmd", help="python command to interpret", default="")
-    parser.add_argument("--terminal", "-t", dest="terminal",  help=f"specify which terminal to be used. Default console host.", default="")  # can choose `wt`
+    parser.add_argument("--terminal", "-t", dest="terminal", help=f"specify which terminal to be used. Default console host.", default="")  # can choose `wt`
     parser.add_argument("--shell", "-S", dest="shell", help=f"specify which shell to be used. Defaults to CMD.", default="")
 
     args = parser.parse_args()
@@ -61,7 +61,7 @@ def build_parser():
     if args.cmd != "":
         import textwrap
         code = f"from crocodile.toolbox import *\n{textwrap.dedent(args.cmd)}"
-        exec(code)
+        exec(code)  # pylint: disable=W0122
         return None  # DONE
     elif args.fzf:
         from machineconfig.utils.utils import display_options, P
@@ -87,7 +87,7 @@ __file__ = P(r'{file}')
 {file.read_text(encoding="utf-8")}
 """
 
-        elif args.read != "": 
+        elif args.read != "":
             code_text = f"""
 # >>>>>>> Reading File <<<<<<<<<
 p = P(r\'{str(args.read).lstrip()}\').absolute()
@@ -112,8 +112,8 @@ except Exception as e:
         # Clear-Host;
         # # --autocall 1 in order to enable shell-like behaviour: e.g.: P x is interpreted as P(x)
 
-    if platform.system() == "Windows": return subprocess.run([f"powershell", "-Command", res], shell=True, capture_output=False, text=True)
-    else: return subprocess.run([res], shell=True, capture_output=False, text=True)
+    if platform.system() == "Windows": return subprocess.run([f"powershell", "-Command", res], shell=True, capture_output=False, text=True, check=True)
+    else: return subprocess.run([res], shell=True, capture_output=False, text=True, check=True)
 
 
 if __name__ == "__main__":
