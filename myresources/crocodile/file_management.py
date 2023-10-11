@@ -372,9 +372,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
     def create(self, parents: bool = True, exist_ok: bool = True, parents_only: bool = False) -> 'P':
         target_path = self.parent if parents_only else self
-        try: target_path.mkdir(parents=parents, exist_ok=exist_ok)
-        except (FileExistsError, FileNotFoundError) as err:  # python 3.11 bug that raises FileNotFoundError / FileExistsError even if exist_ok is True.
-            if not exist_ok: raise err
+        target_path.mkdir(parents=parents, exist_ok=exist_ok)
         return self
     def chdir(self) -> 'P': __import__("os").chdir(str(self.expanduser())); return self
     def listdir(self) -> List['P']: return List(__import__("os").listdir(self.expanduser().resolve())).apply(lambda x: P(x))  # pylint: disable=W0108

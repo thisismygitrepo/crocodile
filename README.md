@@ -1,4 +1,12 @@
 
+<p align="center">
+
+<a href="https://github.com/thisismygitrepo/crocodile/commits">
+<img src="https://img.shields.io/github/commit-activity/m/thisismygitrepo/crocodile" />
+</a>
+
+</p>
+
 # Welcome to crocodile
 
 Pythonically facilitate laborious `file management`, `distributed computing`, `scripting` and  `deep learning` workflows.

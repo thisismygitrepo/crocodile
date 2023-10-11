@@ -52,13 +52,13 @@ class App:
     @staticmethod
     def run(app: Any, debug: bool = False, port: Optional[int] = None, start_browser: bool = True, lan_share: bool = True):
         host = "localhost"  # 0.0.0.0"  #  "127.0.0.1"
-        port = tb.randstr(lower=False, upper=False, length=4) if port is None else port  # Random ports prevent multile programs from crashing into each other.
+        port__ = tb.randstr(lower=False, upper=False, length=4) if port is None else port  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
         if start_browser:
-            try: tb.P(rf'http://{host}:{port}/')()
+            try: tb.P(rf'http://{host}:{port__}/')()
             except Exception as ex:
                 print(ex)
-        app.run_server(debug=debug, port=port, host="0.0.0.0" if lan_share else "localhost")  # , processes=2, threaded=False)
+        app.run_server(debug=debug, port=port__, host="0.0.0.0" if lan_share else "localhost")  # , processes=2, threaded=False)
 
     @staticmethod
     def get_app(name: str = ""):
