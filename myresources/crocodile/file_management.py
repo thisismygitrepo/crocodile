@@ -370,7 +370,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     #     if compressed is False and self.is_file(): return self
     #     if len(results := self.search(*args, r=r, compressed=compressed, **func_kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
     browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
-    def create(self, parents: bool = True, exist_ok: bool = True, parents_only: bool = False) -> 'P': _ = self.parent.mkdir(parents=parents, exist_ok=exist_ok) if parents_only else self.mkdir(parents=parents, exist_ok=exist_ok); return self
+    def create(self, parents: bool = True, exist_ok: bool = True, parents_only: bool = False) -> 'P':
+        target_path = self.parent if parents_only else self
+        try: target_path.mkdir(parents=parents, exist_ok=exist_ok)
+        except (FileExistsError, FileNotFoundError) as err:  # python 3.11 bug that raises FileNotFoundError / FileExistsError even if exist_ok is True.
+            if not exist_ok: raise err
+        return self
     def chdir(self) -> 'P': __import__("os").chdir(str(self.expanduser())); return self
     def listdir(self) -> List['P']: return List(__import__("os").listdir(self.expanduser().resolve())).apply(lambda x: P(x))  # pylint: disable=W0108
     @staticmethod
