@@ -16,7 +16,7 @@ from dash import Input, Output, State, callback_context as ctx
 from dash import dcc
 from dash import html
 import dash_daq as daq
-from typing import Any
+from typing import Any, Optional
 
 from types import SimpleNamespace
 import sys
@@ -50,9 +50,9 @@ CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
 
 class App:
     @staticmethod
-    def run(app: Any, debug: bool = False, random_port: bool = True, start_browser: bool = True, lan_share: bool = True):
+    def run(app: Any, debug: bool = False, port: Optional[int] = None, start_browser: bool = True, lan_share: bool = True):
         host = "localhost"  # 0.0.0.0"  #  "127.0.0.1"
-        port = tb.randstr(lower=False, upper=False, length=4) if random_port else "8050"  # Random ports prevent multile programs from crashing into each other.
+        port = tb.randstr(lower=False, upper=False, length=4) if port is None else port  # Random ports prevent multile programs from crashing into each other.
         # pynoinspection HTTP
         if start_browser:
             try: tb.P(rf'http://{host}:{port}/')()
