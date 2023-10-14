@@ -26,33 +26,8 @@ Choices made by default:
 import argparse
 import subprocess
 import platform
-from pathlib import Path
-
-
-def get_ipython_profile(init_path: Path):
-    a_path = init_path
-    ipy_profile: str = "profile_default"
-    idx = len(a_path.parts)
-    while idx >= 0:
-        if a_path.joinpath(".ipy_profile").exists():
-            ipy_profile = a_path.joinpath(".ipy_profile").read_text().rstrip()
-            print(f"✅ Using IPython profile: {ipy_profile}")
-            break
-        idx -= 1
-        a_path = a_path.parent
-    return ipy_profile
-
-
-def get_ve_profile(init_path: Path):
-    ve = ""
-    tmp = init_path
-    for _ in init_path.parents:
-        tmp = tmp.parent
-        if tmp.joinpath(".ve_path").exists():
-            ve = Path(tmp.joinpath(".ve_path").read_text()).name
-            print(f"✅ Using Virtual Environment: {ve}")
-            break
-    return ve
+from crocodile.file_management import P
+from machineconfig.utils.ve import get_ipython_profile
 
 
 def build_parser():
@@ -90,14 +65,14 @@ def build_parser():
         exec(code)  # pylint: disable=W0122
         return None  # DONE
     elif args.fzf:
-        from machineconfig.utils.utils import display_options, P
+        from machineconfig.utils.utils import display_options
         file = display_options(msg="Choose a python file to run", options=list(P.cwd().search("*.py", r=True)), fzf=True, multi=False, )
         assert isinstance(file, P)
-        res = f"""ipython --profile {get_ipython_profile(Path(file))} --no-banner -i -m crocodile.croshell -- --file "{file}" """
+        res = f"""ipython --profile {get_ipython_profile(P(file))} --no-banner -i -m crocodile.croshell -- --file "{file}" """
     elif args.file != "" or args.read != "":
         code_text = ""
         if args.file != "":
-            file = Path(args.file).expanduser().absolute()
+            file = P(args.file).expanduser().absolute()
             if args.module:
                 code_text = fr"""
 # >>>>>>> Importing File <<<<<<<<<
@@ -114,7 +89,7 @@ __file__ = P(r'{file}')
 """
 
         elif args.read != "":
-            file = Path(args.read).expanduser().absolute()
+            file = P(args.read).expanduser().absolute()
             code_text = f"""
 # >>>>>>> Reading File <<<<<<<<<
 p = P(r\'{str(args.read).lstrip()}\').absolute()
@@ -129,14 +104,14 @@ except Exception as e:
         else: raise ValueError("This path of execution should not be reached.")
 
         # next, write code_text to file at ~/tmp_results/shells/python_readfile_script.py using open:
-        base = Path.home().joinpath("tmp_results/shells")
+        base = P.home().joinpath("tmp_results/shells")
         base.mkdir(parents=True, exist_ok=True)
         code_file = base.joinpath("python_readfile_script.py")
         code_file.write_text(code_text, encoding="utf-8")
         res = f"""ipython --profile {get_ipython_profile(file)} --no-banner -i -m crocodile.croshell -- --file "{code_file}" """
 
     else:  # just run croshell.py interactively
-        res = f"{interpreter} {interactivity} --profile {get_ipython_profile(Path.cwd())} --no-banner -m crocodile.croshell"  # --term-title croshell
+        res = f"{interpreter} {interactivity} --profile {get_ipython_profile(P.cwd())} --no-banner -m crocodile.croshell"  # --term-title croshell
         # Clear-Host;
         # # --autocall 1 in order to enable shell-like behaviour: e.g.: P x is interpretred as P(x)
 
