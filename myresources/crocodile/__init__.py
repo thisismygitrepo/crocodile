@@ -2,12 +2,12 @@
 """Info
 """
 
-__version__ = "13.3"
+__version__ = "13.4"
 __author__ = "Alex Al-Saffar"
-__date__ = "2023-09-29"
+__date__ = "2023-10-15"
 docs = r"https://crocodile.readthedocs.io/en/latest/"
 git = r"https://github.com/thisismygitrepo/crocodile"
 pypi = r"https://pypi.org/project/crocodile"
 release_notes = """
-Minor enchacements on the cluster module.
+Minor enchacements on the print statements
 """
