@@ -170,7 +170,9 @@ class Terminal:
     def run_script(self, script: str, shell: SHELLS = "default"):
         if self.machine == "Linux": script = "#!/bin/bash" + "\n" + script  # `source` is only available in bash.
         tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
-        if shell == "default": start_cmd  = "."  # "source"
+        if shell == "default":
+            if self.machine == "Windows": start_cmd = "powershell"  # default shell on Windows is cmd which is not very useful. (./source is not available)
+            else: start_cmd  = "."
         else: start_cmd = shell
         from machineconfig.utils.utils import print_programming_script
         print_programming_script(script, lexer="shell", desc="Script to be executed:")
