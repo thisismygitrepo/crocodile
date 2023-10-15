@@ -30,7 +30,7 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
     import base64
     salt, iteration = None, None
     if pwd is not None:  # generate it from password
-        assert (key is None) and (type(pwd) is str), f"You can either pass key or pwd, or none of them, but not both."
+        assert (key is None) and (type(pwd) is str), f"❌ You can either pass key or pwd, or none of them, but not both."
         import secrets
         iteration = iteration or secrets.randbelow(1_000_000)
         salt = secrets.token_bytes(16) if salted else None
@@ -41,19 +41,19 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
             key = Fernet.generate_key()
             P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes').write_bytes(key, overwrite=False)
         else:
-            try: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes(); print(f"Using key from: {P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes')}")
+            try: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes(); print(f"⚠️ Using key from: {P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes')}")
             except FileNotFoundError as err:
                 print("\n" * 3, "~" * 50, f"""Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~" * 50, "\n" * 3)
                 raise FileNotFoundError(err) from err
     elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
-    else: raise TypeError(f"Key must be either a path, bytes object or None.")
+    else: raise TypeError(f"❌ Key must be either a path, bytes object or None.")
     code = __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).encrypt(msg)
     if pwd is not None and salt is not None and iteration is not None: return base64.urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), base64.urlsafe_b64decode(code)))
     return code
 def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True) -> bytes:
     if pwd is not None:
-        assert key is None, f"You can either pass key or pwd, or none of them, but not both."
+        assert key is None, f"❌ You can either pass key or pwd, or none of them, but not both."
         if salted:
             decoded = __import__("base64").urlsafe_b64decode(token); salt, iterations, token = decoded[:16], decoded[16:20], __import__("base64").urlsafe_b64encode(decoded[20:])
             key = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
@@ -61,7 +61,7 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
     if type(key) is bytes: pass  # passsed explicitly
     elif key is None: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
     elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # passed a path to a file containing kwy
-    else: raise TypeError(f"Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
+    else: raise TypeError(f"❌ Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
     return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
 def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = False):
     return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="pwsh")
