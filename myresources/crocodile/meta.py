@@ -172,7 +172,12 @@ class Terminal:
         tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
         if shell == "default": start_cmd  = "."  # "source"
         else: start_cmd = shell
-        resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
+        from machineconfig.utils.utils import print_programming_script
+        print_programming_script(script, lexer="shell", desc="Script to be executed:")
+        import rich.progress as pb
+        with pb.Progress(transient=True) as progress:
+            _task = progress.add_task("Running Script", total=None)
+            resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         return Response.from_completed_process(resp)
     @staticmethod
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
