@@ -186,7 +186,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
     def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
-    # def cache_from(self, source_func: Callable[[], 'T'], expire: str = "1w", save: Callable[['T', PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], Any] = Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
@@ -367,10 +366,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return List(processed)
 
     def tree(self, *args: Any, **kwargs: Any): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
-    # def find(self, *args, r=True, compressed=True, **func_kwargs) -> 'P':  # short for the method ``search`` then pick first item from results. useful for superflous directories or zip archives containing a single file."""
-    #     if compressed is False and self.is_file(): return self
-    #     if len(results := self.search(*args, r=r, compressed=compressed, **func_kwargs)) > 0: return results[0].unzip() if ".zip" in str(results[0]) else results[0]
-    browse = property(lambda self: self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(x), x)).clean_view)
+    @property
+    def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(str(x)), x)).clean_view
     def create(self, parents: bool = True, exist_ok: bool = True, parents_only: bool = False) -> 'P':
         target_path = self.parent if parents_only else self
         target_path.mkdir(parents=parents, exist_ok=exist_ok)
@@ -533,7 +530,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
         return self
-    @property
+    @property  # kept at the bottom because it confuses the linters
     def str(self) -> str: return str(self)  # or self._str
 
 

@@ -75,9 +75,6 @@ setup(
         "tabulate",  # pandas optional for pretty printing of tables
         "matplotlib",
         "psutil",
-        # "scipy",  # heavy-weight.
-
-        "sqlalchemy",
 
         # Accessories
         "psutil",
@@ -101,7 +98,11 @@ setup(
         # "scikit-image",  # image processing. Heavy-weight.
         # torch
         # tensorflow
-    ]
+    ],
+
+    extras_require={
+            'full': ['sqlalchemy', 'tensorflow', 'dash', 'dash_daq', 'dash_bootstrap_components']
+                    },
 
 )
 
