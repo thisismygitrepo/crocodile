@@ -101,7 +101,7 @@ setup(
     ],
 
     extras_require={
-            'full': ['sqlalchemy', 'tensorflow', 'dash', 'dash_daq', 'dash_bootstrap_components']
+            'full': ['sqlalchemy', 'tensorflow', 'scikit-learn', 'dash', 'dash_daq', 'dash_bootstrap_components']
                     },
 
 )
