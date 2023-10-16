@@ -77,6 +77,8 @@ setup(
         "psutil",
         # "scipy",  # heavy-weight.
 
+        "sqlalchemy",
+
         # Accessories
         "psutil",
         "joblib",  # multitasking

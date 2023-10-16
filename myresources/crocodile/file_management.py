@@ -186,7 +186,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
     def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
-    def cache_from(self, source_func: Callable[[], 'T'], expire: str = "1w", save: Callable[['T', PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], Any] = Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
+    # def cache_from(self, source_func: Callable[[], 'T'], expire: str = "1w", save: Callable[['T', PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], Any] = Read.read, **kwargs: Any): return Cache(source_func=source_func, path=self, expire=expire, save=save, reader=reader, **kwargs)
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
