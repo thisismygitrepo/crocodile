@@ -175,12 +175,12 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         if default is None: return List(reduce(func, self.list))  # type: ignore
         return List(reduce(func, self.list, default))  # type: ignore
     def append(self, item: T) -> 'List[T]': self.list.append(item); return self
+    def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
     def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion
     def __radd__(self, other: 'List[T]') -> 'List[T]': return List(list(other) + self.list)
     def __iadd__(self, other: 'List[T]') -> 'List[T]': self.list = self.list + list(other); return self  # inplace add.
     def sort(self, key: Callable[[T], float], reverse: bool = False) -> 'List[T]': self.list.sort(key=key, reverse=reverse); return self
     def sorted(self, *args: list[Any], **kwargs: Any) -> 'List[T]': return List(sorted(self.list, *args, **kwargs))
-    def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
     # def modify(self, expr: str, other: Optional['List[T]'] = None) -> 'List[T]': _ = [exec(expr) for idx, x in enumerate(self.list)] if other is None else [exec(expr) for idx, (x, y) in enumerate(zip(self.list, other))]; return self
     def remove(self, value: Optional[T] = None, values: Optional[list[T]] = None, strict: bool = True) -> 'List[T]':
         for a_val in ((values or []) + ([value] if value else [])):
