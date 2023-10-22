@@ -69,14 +69,14 @@ def get_options(ctx: Any, description: str, update_repo: bool, update_essential_
     return ctx.params, config
 
 
-def main():
-    res = get_options()  # type: ignore
-    print(res)
-    return res
+# def main():
+#     res = get_options()  # type: ignore
+#     print(res)
+#     return res
 
 
 if __name__ == '__main__':
-    res = get_options(standalone_mode=False)
+    res = get_options(standalone_mode=False)  # type: ignore
     print(res.params)
     # import sys
     # print(sys.orig_argv)

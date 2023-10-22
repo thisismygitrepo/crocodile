@@ -4,7 +4,7 @@ File
 """
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal, NoReturn
 
 
@@ -96,7 +96,7 @@ def npy(path: PLike, **kwargs: Any): data = (np := __import__("numpy")).load(str
 def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
 def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
 def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
-def pickle(path: PLike, **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+def dill(path: PLike, **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 def vanilla_pickle(path: PLike, **kwargs: Any): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
 def txt(path: PLike, encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
 class Read:
@@ -108,7 +108,8 @@ class Read:
     csv = staticmethod(csv)
     pkl = staticmethod(vanilla_pickle)
     vanilla_pickle = staticmethod(vanilla_pickle)
-    pickle = staticmethod(pickle)
+    pickle = staticmethod(vanilla_pickle)
+    dill = staticmethod(dill)
     py = staticmethod(py)
     toml = staticmethod(toml)
     txt = staticmethod(txt)
@@ -589,15 +590,15 @@ T = TypeVar('T')
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
-    def __init__(self, source_func: Callable[[], 'T'], expire: str = "1m", logger: Optional[Callable[[str], NoReturn]] = None, path: OPLike = None, save: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
+    def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[Callable[[str, ...], Union[None, NoReturn]]] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
         self.cache: Optional[T] = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path: P | None = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.time_produced = datetime.now()  # if path is None else
-        self.save = save
+        self.save = saver
         self.reader = reader
         self.logger = logger
-        self.expire = str2timedelta(expire)
+        self.expire = str2timedelta(expire) if isinstance(expire, str) else expire
         self.name = name if isinstance(name, str) else str(self.source_func)
     @property
     def age(self): return datetime.now() - self.time_produced if self.path is None else datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
