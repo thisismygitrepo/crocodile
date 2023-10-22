@@ -209,7 +209,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
-                    else: _ = print(f⚠️ "SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
+                    else: _ = print(f"⚠️ SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res)
                 msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
             elif operation == "delete":
