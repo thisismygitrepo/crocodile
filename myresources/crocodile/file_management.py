@@ -17,6 +17,7 @@ SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
 # %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
+def hash(password: str): import bcrypt; return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
     import base64
     if salt is None:
@@ -27,7 +28,7 @@ def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return base64.urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
 def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True, iteration: Optional[int] = None, gen_key: bool = False) -> bytes:
-    import base64
+    import base64; from cryptography.fernet import Fernet
     salt, iteration = None, None
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"❌ You can either pass key or pwd, or none of them, but not both."
@@ -37,7 +38,6 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
         key = pwd2key(pwd, salt, iteration)
     elif key is None:
         if gen_key:
-            from cryptography.fernet import Fernet
             key = Fernet.generate_key()
             P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes').write_bytes(key, overwrite=False)
         else:
@@ -48,7 +48,7 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
     elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: pass  # key passed explicitly
     else: raise TypeError(f"❌ Key must be either a path, bytes object or None.")
-    code = __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).encrypt(msg)
+    code = Fernet(key).encrypt(msg)
     if pwd is not None and salt is not None and iteration is not None: return base64.urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), base64.urlsafe_b64decode(code)))
     return code
 def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True) -> bytes:
@@ -62,9 +62,11 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
     elif key is None: key = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
     elif isinstance(key, (str, P, Path)): key = P(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"❌ Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
-    return __import__("cryptography.fernet").__dict__["fernet"].Fernet(key).decrypt(token)
+    from cryptography.fernet import Fernet
+    return Fernet(key).decrypt(token)
 def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = False):
-    return __import__("crocodile").meta.Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="powershell")
+    from crocodile.meta import Terminal
+    return Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="powershell")
 
 
 # %% =================================== File ============================================
@@ -89,7 +91,7 @@ def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict e
     with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
     _ = r
     return mydict
-def ini(path: PLike): import configparser; res = configparser.ConfigParser(); res.read(str(path)); return res
+def ini(path: PLike): assert Path(path).exists(); import configparser; res = configparser.ConfigParser(); res.read(filenames=[str(path)]); return res
 def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
 def npy(path: PLike, **kwargs: Any): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
 # def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
