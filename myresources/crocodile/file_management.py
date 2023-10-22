@@ -5,7 +5,7 @@ File
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime, timedelta
-from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal, NoReturn
+from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal, NoReturn, Protocol
 
 
 OPLike: TypeAlias = Union[str, 'P', Path, None]
@@ -79,7 +79,7 @@ def read(path: PLike, **kwargs: Any):
         if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
         if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
         try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
-        except ImportError as err2: print(f"Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
+        except ImportError as err2: print(f"💥 Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
 def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
     try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
     except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
@@ -142,20 +142,20 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     This can be seen in `zip` and `encrypt` but not in `copy`, `move`, `retitle` because the fate of original file is dictated already.
     Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
     def delete(self, sure: bool = False, verbose: bool = True) -> 'P':  # slf = self.expanduser().resolve() don't resolve symlinks.
-        if not sure: _ = print(f"Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
-        if not self.exists(): self.unlink(missing_ok=True); _ = print(f"Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
+        if not sure: _ = print(f"❌ Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
+        if not self.exists(): self.unlink(missing_ok=True); _ = print(f"❌ Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
         _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); _ = print(f"🗑️ ❌ DELETED {repr(self)}.") if verbose else None; return self
     def send2trash(self, verbose: bool = True) -> 'P':
         if self.exists():
             install_n_import("send2trash").send2trash(self.resolve().str)
-            _ = print(f"TRASHED {repr(self)}") if verbose else None; return self  # do not expand user symlinks.
-        elif verbose: print(f"Could NOT trash {self}"); return self
+            _ = print(f"🗑️ TRASHED {repr(self)}") if verbose else None; return self  # do not expand user symlinks.
+        elif verbose: print(f"💥 Could NOT trash {self}"); return self
         return self
     def move(self, folder: OPLike = None, name: OPLike = None, path: OPLike = None, rel2it: bool = False, overwrite: bool = False, verbose: bool = True, parents: bool = True, content: bool = False) -> 'P':
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.absolute().name, rel2it=rel2it)
         _ = path.parent.create(parents=True, exist_ok=True) if parents else None; slf = self.expanduser().resolve()
         if content:
-            assert self.is_dir(), NotADirectoryError(f"When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
+            assert self.is_dir(), NotADirectoryError(f"💥 When `content` flag is set to True, path must be a directory. It is not: `{repr(self)}`")
             self.search("*").apply(lambda x: x.move(folder=path.parent, content=False, overwrite=overwrite)); return path  # contents live within this directory.
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
         else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
@@ -168,13 +168,13 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
         if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); _ = print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); _ = print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
-        else: print(f"Could NOT COPY. Not a file nor a path: {repr(slf)}.")
+        else: print(f"💥 Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
     def readit(self, reader: Optional[Callable[[PLike], Any]] = None, strict: bool = True, default: Optional[Any] = None, verbose: bool = False, **kwargs: Any) -> 'Any':
         if not (slf := self.expanduser().resolve()).exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
-            else: _ = (print(f"tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return default
+            else: _ = (print(f"💥 tb.P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return default
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
@@ -209,7 +209,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
-                    else: _ = print(f"SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
+                    else: _ = print(f⚠️ "SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
                 self.rename(res)
                 msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
             elif operation == "delete":
@@ -507,7 +507,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             tmp = res.op2path(strict_err=True, strict_returncode=True)
             if tmp is None:
                 res.print()
-                raise RuntimeError(f"Could not get link for {self}.")
+                raise RuntimeError(f"💥 Could not get link for {self}.")
             return tmp
         return self
     def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
@@ -526,7 +526,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         tmp1, tmp2 = self.expanduser().absolute().create(parents_only=True).as_posix(), self.get_remote_path(root=root, os_specific=os_specific).as_posix()
         source, target = (tmp1, f"{cloud}:{tmp2 if rel2home else tmp1}") if sync_up else (f"{cloud}:{tmp2 if rel2home else tmp1}", tmp1)  # in bisync direction is irrelavent.
         if not sync_down and not sync_up: _ = print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`") if verbose else None; rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
-        else: print(f"SYNCING {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
+        else: print(f"SYNCING 🔄️ {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
         rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += (" --delete-during" if delete else ""); from crocodile.meta import Terminal, subprocess; _ = print(rclone_cmd) if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
@@ -589,8 +589,12 @@ class Compression:
 T = TypeVar('T')
 
 
+class PrintFunc(Protocol):
+    def __call__(self, string: str, *args: Any) -> Union[NoReturn, None]: ...
+
+
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
-    def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[Callable[[str, ...], Union[None, NoReturn]]] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
+    def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
         self.cache: Optional[T] = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path: P | None = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
