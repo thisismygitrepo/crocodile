@@ -93,7 +93,11 @@ def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict e
     return mydict
 def ini(path: PLike): assert Path(path).exists(); import configparser; res = configparser.ConfigParser(); res.read(filenames=[str(path)]); return res
 def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
-def npy(path: PLike, **kwargs: Any): data = (np := __import__("numpy")).load(str(path), allow_pickle=True, **kwargs); data = data.item() if data.dtype == np.object else data; return Struct(data) if type(data) is dict else data
+def npy(path: PLike, **kwargs: Any): 
+    import numpy as np
+    data = np.load(str(path), allow_pickle=True, **kwargs)
+    # data = data.item() if data.dtype == np.object else data
+    return data
 # def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
 def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
@@ -592,7 +596,7 @@ T = TypeVar('T')
 
 
 class PrintFunc(Protocol):
-    def __call__(self, string: str, *args: Any) -> Union[NoReturn, None]: ...
+    def __call__(self, *args: str) -> Union[NoReturn, None]: ...
 
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
