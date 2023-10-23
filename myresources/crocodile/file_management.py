@@ -17,7 +17,7 @@ SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
 # %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
-def hash(password: str): import bcrypt; return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+def hashpwd(password: str): import bcrypt; return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
     import base64
     if salt is None:
