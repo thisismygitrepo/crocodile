@@ -444,7 +444,7 @@ class BaseModel(ABC):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
         elif names_test is None and x_test is not None:
-            names_test = [str(item) for item in np.arange(len(x_test))]
+            names_test = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
         # ==========================================================================
         y_pred_raw = self.infer(x_test)

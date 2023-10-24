@@ -51,7 +51,7 @@ class DataReader(dl.DataReader):
     def load_trianing_data(self, profile_df: bool = False):
         self.dataset = dict(x=np.random.randn(1000, 10).astype(self.hp.precision),
                             y=np.random.randn(1000, 1).astype(self.hp.precision),
-                            names=np.arange(1000))
+                            names=np.arange(start=0, stop=1000))
         # if profile_df: self.profile_dataframe(df=self.dataset.x)
         # self.get_pandas_profile_path()
         _ = profile_df

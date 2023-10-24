@@ -646,7 +646,7 @@ class ImShow(FigureManager):
         nrows, ncols = self.get_nrows_ncols(m, nrows, ncols)
         self.img_tensor = img_tensor
         self.sub_labels = sub_labels if sub_labels is not None else [[f"{i}-{j}" for j in range(m)] for i in range(n)]
-        self.sup_titles = sup_titles if sup_titles is not None else [str(item) for item in np.arange(n)]
+        self.sup_titles = sup_titles if sup_titles is not None else [str(item) for item in np.arange(start=0, stop=n)]
         self.pause, self.kwargs, self.delay, self.auto_brightness = pause, kwargs, delay, auto_brightness
         self.fname = self.event = None
         self.ims: list[AxesImage] = []  # container for images.
