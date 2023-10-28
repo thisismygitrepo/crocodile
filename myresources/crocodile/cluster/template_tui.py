@@ -5,9 +5,24 @@
 # import crocodile.toolbox as tb
 # from crocodile.cluster.distribute import Cluster, WorkloadParams
 from crocodile.cluster.remote_machine import RemoteMachineConfig
+from crocodile.file_management import Read
+from machineconfig.utils.utils import DEFAULTS_PATH
 import click
 from trogon import tui
 from typing import Any
+
+
+try:
+    section = Read.ini(DEFAULTS_PATH)['general']
+    to_email = section['to_email']
+    email_config_name = section['email_config_name']
+except (FileNotFoundError, KeyError, IndexError):
+    to_email = 'random@email.com'
+    email_config_name = 'enaut'
+try:
+    default_cloud: str = Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
+except (FileNotFoundError, KeyError, IndexError):
+    default_cloud = 'gdrive'
 
 
 @tui()
@@ -16,10 +31,10 @@ from typing import Any
 @click.option('--description', prompt="Description of the job: ", default=f"Description of running func on remotes", help="Write something that describes what this job is about.")
 @click.option('--update_repo', prompt="Update repo: ", default=False, help="Update the repo on the remote machine.")
 @click.option('--update_essential_repos', prompt="Update essential repos: ", default=True, help="Update essential repos on the remote machine.")
-@click.option('--cloud_name', prompt="Cloud name: ", default="gdrive", help="The name of the cloud to use.")
+@click.option('--cloud_name', prompt="Cloud name: ", default=default_cloud, help="The name of the cloud to use.")
 @click.option('--notify_upon_completion', prompt="Notify upon completion: ", default=False, help="Send an email upon completion.")
-@click.option('--to_email', prompt="To email: ", default="blah")
-@click.option('--email_config_name', prompt="Email config name: ", default="blah")
+@click.option('--to_email', prompt="To email: ", default=to_email, help="The email to send to.")
+@click.option('--email_config_name', prompt="Email config name: ", default=email_config_name, help="The name of the email config to use.")
 @click.option('--kill_on_completion', prompt="Kill on completion: ", default=False)
 @click.option('--ipython', prompt="Use ipython: ", default=False)
 @click.option('--interactive', prompt="Interactive: ", default=False)
