@@ -493,10 +493,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         qr.add_data(str(self) if "http" in str(self) else (self.read_text() if text else self.read_bytes()))
         import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0)
         print(f.read()); _ = qr.make_image().save(path) if path is not None else None
-    def get_remote_path(self, root: Optional[str], os_specific: bool = False) -> 'P':
+    def get_remote_path(self, root: Optional[str], os_specific: bool = False, strict: bool = True) -> 'P':
         tmp1 = (__import__('platform').system().lower() if os_specific else 'generic_os')
-        if isinstance(root, str): return P(root) / tmp1 / self.rel2home()
-        return tmp1 / self.rel2home()
+        try: rel2home = self.rel2home()
+        except ValueError as ve:
+            if strict: raise ve
+            rel2home = self
+        if isinstance(root, str): return P(root) / tmp1 / rel2home
+        return tmp1 / rel2home
     def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False,  # pylint: disable=W0621, W0622
                  key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False,
                  share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
