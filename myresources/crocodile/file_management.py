@@ -606,7 +606,7 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
     def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
         self.cache: Optional[T] = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
-        self.path: P | None = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
+        self.path: Optional[P] = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.time_produced = datetime.now()  # if path is None else
         self.save = saver
         self.reader = reader
@@ -614,24 +614,32 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
         self.expire = str2timedelta(expire) if isinstance(expire, str) else expire
         self.name = name if isinstance(name, str) else str(self.source_func)
     @property
-    def age(self): return datetime.now() - self.time_produced if self.path is None else datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
+    def age(self):  # can fail if called before cache is populated and path doesn't exists
+        if self.path is None: return datetime.now() - self.time_produced
+        # if not self.path.exists(): return
+        return datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     def __getstate__(self) -> dict[str, Any]: state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh: bool = False) -> 'T':  # type: ignore
-        age = self.age
-        if self.path is None:  # Memory Cache
-            if self.cache is None or fresh is True or age > self.expire:
-                self.cache, self.time_produced = self.source_func(), datetime.now()
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Updating / Saving data from {self.source_func}")
+        if fresh or self.cache is None:  # populate cache for the first time
+            if not fresh and self.path is not None and self.path.exists():
+                age = datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Reading cached values from `{self.path}`. Lag = {age} ...")
+                self.cache = self.reader(self.path)
+            else:
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from {self.source_func}. Previous cache never existed or a there was an explicit fresh order.")
+                self.cache = self.source_func()
+                if self.path is None: self.time_produced = datetime.now()
+                else: self.save(self.cache, self.path)
+        else:  # cache exists
+            age = self.age
+            if self.age > self.expire:
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Updating cache from {self.source_func}. Age = {age} ...")
+                self.cache = self.source_func()
+                if self.path is None: self.time_produced = datetime.now()
+                else: self.save(self.cache, self.path)
             else:
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
-        elif fresh or not self.path.exists() or age > self.expire:  # disk fridge
-            if self.logger: self.logger(f"⚠️ {self.name} cache: Updating & Saving {self.path} ...")
-            self.cache = self.source_func()
-            self.save(self.cache, self.path)  # fresh order, never existed or exists but expired.
-        elif age < self.expire and self.cache is None:
-            if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
-            self.cache = self.reader(self.path)  # this implementation favours reading over pulling fresh at instantiation.  # exists and not expired. else # use the one in memory self.cache
         return self.cache  # type: ignore
 
 
