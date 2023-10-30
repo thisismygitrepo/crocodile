@@ -100,7 +100,7 @@ def npy(path: PLike, **kwargs: Any):
     return data
 # def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
-def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return Struct(__import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name))
+def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return __import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name)
 def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
 def dill(path: PLike, **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
 def vanilla_pickle(path: PLike, **kwargs: Any): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
@@ -535,7 +535,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return self
     def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
                    key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True,
-                   transfers: int = 10, root: str = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
+                   transfers: int = 10, root: Optional[str] = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
         remotepath = remotepath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
@@ -546,7 +546,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
         return localpath
-    def sync_to_cloud(self, cloud: str, sync_up: bool = False, sync_down: bool = False, os_specific: bool = False, rel2home: bool = True, transfers: int = 10, delete: bool = False, root: str = "myhome", verbose: bool = True):
+    def sync_to_cloud(self, cloud: str, sync_up: bool = False, sync_down: bool = False, os_specific: bool = False, rel2home: bool = True, transfers: int = 10, delete: bool = False, root: Optional[str] = "myhome", verbose: bool = True):
         tmp1, tmp2 = self.expanduser().absolute().create(parents_only=True).as_posix(), self.get_remote_path(root=root, os_specific=os_specific).as_posix()
         source, target = (tmp1, f"{cloud}:{tmp2 if rel2home else tmp1}") if sync_up else (f"{cloud}:{tmp2 if rel2home else tmp1}", tmp1)  # in bisync direction is irrelavent.
         if not sync_down and not sync_up: _ = print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`") if verbose else None; rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """

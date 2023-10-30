@@ -305,9 +305,14 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
             else: print(f"Empty Struct."); return None
         else:
             if as_yaml or as_config:
-                tmp: str = __import__("yaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
+                tmp: str = install_n_import("yaml", package="pyyaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
                 if return_str: return tmp
-                else: print(tmp); return None
+                else:
+                    from rich.syntax import Syntax
+                    from rich.console import Console
+                    console = Console()
+                    console.print(Syntax(tmp, "yaml"))
+                    return None
             else:
                 tmp2 = self._pandas_repr(justify=justify, return_str=False, limit=limit)
                 if isinstance(tmp2, pd.DataFrame):

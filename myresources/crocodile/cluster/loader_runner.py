@@ -99,6 +99,8 @@ class JobParams:
         if callable(func) and not isinstance(func, tb.P):
             func_name = func.__name__
             func_module = func.__module__
+            if func_module == "<run_path>":  # function imported through readpy module.
+                func_module = tb.P(func.__globals__['__file__']).name
             assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."
             if func.__name__ != func.__qualname__:
                 # print(f"Passed function {func} is a method of a class.")
@@ -161,7 +163,7 @@ func = {self.func_class}.{self.func_name}
         else: base = f"""
 res = None  # in case the file did not define it.
 # --------------------------------- SCRIPT AS IS
-{tb.P.home().joinpath(self.file_path_rh).read_text()}
+{tb.P(self.file_path_rh).expanduser().read_text()}
 # --------------------------------- END OF SCRIPT AS IS
 """
 
@@ -718,7 +720,7 @@ class CloudManager:
     def run_clean_trial():
         self = CloudManager(max_jobs=1)
         self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
-        from crocodile.cluster.template import run_on_cloud
+        from crocodile.cluster.templates.template import run_on_cloud
         run_on_cloud()
         self.serve()
     def claim_lock(self, first_call: bool = True):
@@ -748,7 +750,7 @@ class CloudManager:
             time.sleep(wait)
             return self.claim_lock(first_call=False)
 
-        if locking_machine == this_machine: print(f"Lock already claimed by this machine. 😎")
+        if locking_machine == this_machine: print(f"Lock already claimed by this machine. 🤭")
         elif locking_machine == "": print("No claims on lock, claiming it ... 🙂")
         else: raise ValueError(f"Unexpected value of lock_data at this point of code.")
 

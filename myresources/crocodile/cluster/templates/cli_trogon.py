@@ -19,4 +19,3 @@
 # if __name__ == '__main__':
 #     res = get_choices(standalone_mode=False)  # type: ignore
 #     print(res)
- 

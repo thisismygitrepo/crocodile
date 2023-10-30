@@ -12,7 +12,7 @@ from typing import Any
 class ExpensiveComputation:
     @staticmethod
     def func_single_job(workload_params: WorkloadParams, *args: Any, **kwargs: Any) -> tb.P:
-        from crocodile.cluster.utils import expensive_function
+        from crocodile.cluster.templates.utils import expensive_function
         res = expensive_function(workload_params=workload_params, *args, **kwargs)
         return res
 

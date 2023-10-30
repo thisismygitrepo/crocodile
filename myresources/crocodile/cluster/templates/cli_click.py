@@ -4,37 +4,34 @@
 
 # import crocodile.toolbox as tb
 # from crocodile.cluster.distribute import Cluster, WorkloadParams
-from crocodile.cluster.remote_machine import RemoteMachineConfig
+from crocodile.cluster.remote_machine import RemoteMachineConfig, RemoteMachine, CloudManager
 from crocodile.file_management import Read
-from machineconfig.utils.utils import DEFAULTS_PATH
+from crocodile.cluster.templates.run_cloud import to_email_default, email_config_name_default, default_cloud
 import click
-from trogon import tui
-from typing import Any
+# from trogon import tui
+from typing import Any, Optional
 
 
-try:
-    section = Read.ini(DEFAULTS_PATH)['general']
-    to_email = section['to_email']
-    email_config_name = section['email_config_name']
-except (FileNotFoundError, KeyError, IndexError):
-    to_email = 'random@email.com'
-    email_config_name = 'enaut'
-try:
-    default_cloud: str = Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
-except (FileNotFoundError, KeyError, IndexError):
-    default_cloud = 'gdrive'
-
-
-@tui()
-# @click.group()
 @click.command()
+@click.option('--file', prompt="Py File: ", help="The file to run.", default="")
+@click.option('--function', prompt="Function: ", help="The function to run.", default=None)
+@click.pass_context
+def main2(ctx: Any, file: str, function: Optional[str] = None):
+    ctx.obj = {'file': file, 'function': function}
+
+
+# @tui()
+# @click.group("gg")
+@click.command()
+@click.option('--file', prompt="Py File: ", help="The file to run.", default="")
+@click.option('--function', prompt="Function: ", help="The function to run.", default=None)
 @click.option('--description', prompt="Description of the job: ", default=f"Description of running func on remotes", help="Write something that describes what this job is about.")
 @click.option('--update_repo', prompt="Update repo: ", default=False, help="Update the repo on the remote machine.")
 @click.option('--update_essential_repos', prompt="Update essential repos: ", default=True, help="Update essential repos on the remote machine.")
 @click.option('--cloud_name', prompt="Cloud name: ", default=default_cloud, help="The name of the cloud to use.")
 @click.option('--notify_upon_completion', prompt="Notify upon completion: ", default=False, help="Send an email upon completion.")
-@click.option('--to_email', prompt="To email: ", default=to_email, help="The email to send to.")
-@click.option('--email_config_name', prompt="Email config name: ", default=email_config_name, help="The name of the email config to use.")
+@click.option('--to_email', prompt="To email: ", default=to_email_default, help="The email to send to.")
+@click.option('--email_config_name', prompt="Email config name: ", default=email_config_name_default, help="The name of the email config to use.")
 @click.option('--kill_on_completion', prompt="Kill on completion: ", default=False)
 @click.option('--ipython', prompt="Use ipython: ", default=False)
 @click.option('--interactive', prompt="Interactive: ", default=False)
@@ -43,10 +40,20 @@ except (FileNotFoundError, KeyError, IndexError):
 @click.option('--wrap_in_try_except', prompt="Wrap in try except: ", default=False)
 @click.option('--lock_resources', prompt="Lock resources: ", default=False)
 @click.option('--max_simulataneous_jobs', prompt="Max simultaneous jobs: ", default=2)
-@click.pass_context
-def get_options(ctx: Any, description: str, update_repo: bool, update_essential_repos: bool, cloud_name: str,
-                notify_upon_completion: bool, to_email: str, email_config_name: str, kill_on_completion: bool, ipython: bool, interactive: bool,
-                pdb: bool, pudb: bool, wrap_in_try_except: bool, lock_resources: bool, max_simulataneous_jobs: bool) -> Any:
+@click.option('--split', prompt="Split: ", default=1)
+@click.option('--reset_cloud', prompt="Reset cloud: ", default=False)
+@click.option('--reset_local', prompt="Reset local: ", default=False)
+# @click.pass_context
+def main(
+         file: str, function: Optional[str],
+         description: str, update_repo: bool, update_essential_repos: bool, cloud_name: str,
+         notify_upon_completion: bool, to_email: str, email_config_name: str, kill_on_completion: bool, ipython: bool, interactive: bool,
+         pdb: bool, pudb: bool, wrap_in_try_except: bool, lock_resources: bool, max_simulataneous_jobs: bool,
+         split: int, reset_cloud: bool, reset_local: bool,
+          ) -> Any:
+
+    # function = ctx.obj['function']
+    # description = ctx.obj['file']
     from crocodile.cluster.self_ssh import SelfSSH
     config = RemoteMachineConfig(
         # connection
@@ -81,17 +88,17 @@ def get_options(ctx: Any, description: str, update_repo: bool, update_essential_
         max_simulataneous_jobs=max_simulataneous_jobs,
         parallelize=False,  # parallelize,
     )
-    return ctx.params, config
 
-
-# def main():
-#     res = get_options()  # type: ignore
-#     print(res)
-#     return res
+    if function is not None:
+        module: dict[str, Any] = Read.py(file)
+        func = module[function]
+    else: func = file
+    m = RemoteMachine(func=func, func_kwargs=None, config=config)
+    res = m.submit_to_cloud(split=split, cm=CloudManager(max_jobs=0, reset_local=reset_local), reset_cloud=reset_cloud)
+    return res
 
 
 if __name__ == '__main__':
-    res = get_options(standalone_mode=False)  # type: ignore
-    print(res.params)
-    # import sys
-    # print(sys.orig_argv)
+    # conf = get_options(standalone_mode=False)  # type: ignore  # pylint: disable=no-value-for-parameter
+    # main2()  # type: ignore
+    main()  # type: ignore

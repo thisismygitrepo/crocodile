@@ -78,47 +78,12 @@ class RemoteMachineConfig:
 
 
 class RemoteMachine:
-    def submit_to_cloud(self, cm: CloudManager, split: int = 5, reset_cloud: bool = False) -> list['RemoteMachine']:
-        """The only authority responsible for adding entries to queue df."""
-        assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
-        assert self.config.launch_method == "cloud_manager", "CloudManager only works with `launch_method` set to `cloud_manager`."
-        assert isinstance(self.ssh, SelfSSH), "CloudManager only works with `SelfSSH` objects."
-        assert self.config.workload_params is None, "CloudManager only works with `workload_params` set to `None`."
-        self.job_params.auto_commit()
-        if reset_cloud: cm.reset_cloud()
-        cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
-        from copy import deepcopy
-        self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
-        self.file_manager.base_dir = tb.P(self.config.base_dir).collapseuser()
-        wl = WorkloadParams().split_to_jobs(jobs=split)
-        rms: list[RemoteMachine] = []
-        new_log_entries: list[LogEntry] = []
-        for idx, a_workload_params in enumerate(wl):
-            rm = deepcopy(self)
-            rm.config.job_id = f"{rm.config.job_id}-{idx + 1}-{split}"
-            rm.config.workload_params = a_workload_params
-            rm.file_manager.job_root = self.file_manager.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
-            rm.file_manager.job_id = rm.config.job_id
-            rm.submitted = True  # must be done before generate_script which performs the pickling.
-            rm.generate_scripts()
-            rms.append(rm)
-            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"), start_time=None, end_time=None, run_machine=None,
-                                            source_machine=f"{getpass.getuser()}@{platform.node()}", note="", pid=None, cmd="", session_name=""))
-        log = cm.read_log()  # this claims lock internally.
-        new_queued_df: 'pd.DataFrame' = pd.DataFrame([item.__dict__ for item in new_log_entries])
-        total_queued_df = pd.concat([log["queued"], new_queued_df], ignore_index=True, sort=False)
-        log["queued"] = total_queued_df
-        cm.write_log(log=log)
-        cm.release_lock()  # all base_dir is synced anyway: self.resources.base_dir.joinpath(status_init).to_cloud(cloud=cm.cloud, rel2home=True)
-        return rms
-
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_remote_repr(add_machine=True)}"
     def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list[tb.P]] = None):
         self.config: RemoteMachineConfig = config
         self.job_params: JobParams = JobParams.from_func(func=func)
-        # self.job_params.kill_at_end
         if self.config.install_repo is True: assert self.job_params.is_installabe()
 
         if self.config.workload_params is not None and func_kwargs is not None: assert "workload_params" not in func_kwargs, "workload_params provided twice, once in config and once in func_kwargs. 🤷‍♂️"
@@ -204,7 +169,7 @@ class RemoteMachine:
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
         py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
-            executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_rh).collapseuser().as_posix()}*"""  # for email.
+            executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_r).collapseuser().as_posix()}*"""  # for email.
             assert self.config.email_config_name is not None, "Email config name is not provided. 🤷‍♂️"
             assert self.config.to_email is not None, "Email address is not provided. 🤷‍♂️"
             email_params = EmailParams(addressee=self.ssh.get_local_repr(add_machine=True),
@@ -323,6 +288,41 @@ deactivate
         else:
             print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
             return self
+
+    def submit_to_cloud(self, cm: CloudManager, split: int = 5, reset_cloud: bool = False) -> list['RemoteMachine']:
+        """The only authority responsible for adding entries to queue df."""
+        assert self.config.transfer_method == "cloud", "CloudManager only works with `transfer_method` set to `cloud`."
+        assert self.config.launch_method == "cloud_manager", "CloudManager only works with `launch_method` set to `cloud_manager`."
+        assert isinstance(self.ssh, SelfSSH), "CloudManager only works with `SelfSSH` objects."
+        assert self.config.workload_params is None, "CloudManager only works with `workload_params` set to `None`."
+        self.job_params.auto_commit()
+        if reset_cloud: cm.reset_cloud()
+        cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
+        from copy import deepcopy
+        self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
+        self.file_manager.base_dir = tb.P(self.config.base_dir).collapseuser()
+        wl = WorkloadParams().split_to_jobs(jobs=split)
+        rms: list[RemoteMachine] = []
+        new_log_entries: list[LogEntry] = []
+        for idx, a_workload_params in enumerate(wl):
+            rm = deepcopy(self)
+            rm.config.job_id = f"{rm.config.job_id}-{idx + 1}-{split}"
+            if len(wl) == 1: rm.config.workload_params = None
+            else: rm.config.workload_params = a_workload_params
+            rm.file_manager.job_root = self.file_manager.base_dir.joinpath(f"{rm.config.job_id}").collapseuser()
+            rm.file_manager.job_id = rm.config.job_id
+            rm.submitted = True  # must be done before generate_script which performs the pickling.
+            rm.generate_scripts()
+            rms.append(rm)
+            new_log_entries.append(LogEntry(name=rm.config.job_id, submission_time=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"), start_time=None, end_time=None, run_machine=None,
+                                            source_machine=f"{getpass.getuser()}@{platform.node()}", note="", pid=None, cmd="", session_name=""))
+        log = cm.read_log()  # this claims lock internally.
+        new_queued_df: 'pd.DataFrame' = pd.DataFrame([item.__dict__ for item in new_log_entries])
+        total_queued_df = pd.concat([log["queued"], new_queued_df], ignore_index=True, sort=False)
+        log["queued"] = total_queued_df
+        cm.write_log(log=log)
+        cm.release_lock()  # all base_dir is synced anyway: self.resources.base_dir.joinpath(status_init).to_cloud(cloud=cm.cloud, rel2home=True)
+        return rms
 
 
 if __name__ == '__main__':
