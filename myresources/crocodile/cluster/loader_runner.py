@@ -720,7 +720,7 @@ class CloudManager:
     def run_clean_trial():
         self = CloudManager(max_jobs=1)
         self.base_path.expanduser().delete(sure=True).create().sync_to_cloud(cloud=self.cloud, rel2home=True, sync_up=True, transfers=20)
-        from crocodile.cluster.templates.template import run_on_cloud
+        from crocodile.cluster.templates.run_remote import run_on_cloud
         run_on_cloud()
         self.serve()
     def claim_lock(self, first_call: bool = True):
