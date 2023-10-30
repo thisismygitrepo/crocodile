@@ -255,8 +255,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def __deepcopy__(self, *args: Any, **kwargs: Any) -> 'P': _ = args, kwargs; return P(str(self))
     def __getstate__(self) -> str: return str(self)
     def __setstate__(self, state: str): self._str = str(state)  # pylint: disable=W0201
-    def __add__(self, other: PLike) -> 'P': return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
-    def __radd__(self, other: PLike) -> 'P': return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
+    def __add__(self, other: PLike) -> 'P':
+        return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
+    def __radd__(self, other: PLike) -> 'P':
+        return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
     def __sub__(self, other: PLike) -> 'P': res = P(str(self).replace(str(other), "")); return (res[1:] if str(res[0]) in {"\\", "/"} else res) if len(res) else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
     def rel2cwd(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
     def rel2home(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
@@ -494,14 +496,20 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0)
         print(f.read()); _ = qr.make_image().save(path) if path is not None else None
     def get_remote_path(self, root: Optional[str], os_specific: bool = False, rel2home: bool = True, strict: bool = True) -> 'P':
-        tmp1 = (__import__('platform').system().lower() if os_specific else 'generic_os')
+        tmp1: str = (__import__('platform').system().lower() if os_specific else 'generic_os')
         if not rel2home: path = self
         else:
             try: path = self.rel2home()
             except ValueError as ve:
                 if strict: raise ve
                 path = self
-        if isinstance(root, str): return P(root) / tmp1 / path
+        if isinstance(root, str):
+            # the following is to avoid the confusing behaviour of A.joinpath(B) if B is absolute.
+            part1 = path.parts[0]
+            if part1 == "/": sanitized_path = path[1:].as_posix()
+            elif ":\\" in part1: sanitized_path = part1.replace(":\\", ":") + "/" + path[1:].as_posix()
+            else: sanitized_path = path.as_posix()
+            return P(root + "/" + tmp1 + "/" + sanitized_path)
         return tmp1 / path
     def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False,  # pylint: disable=W0621, W0622
                  key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False,
@@ -652,3 +660,5 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
 if __name__ == '__main__':
     # print('hi from file_managements')
     pass
+
+# %%
