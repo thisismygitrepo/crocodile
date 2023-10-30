@@ -507,18 +507,18 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             # the following is to avoid the confusing behaviour of A.joinpath(B) if B is absolute.
             part1 = path.parts[0]
             if part1 == "/": sanitized_path = path[1:].as_posix()
-            elif ":\\" in part1: sanitized_path = part1.replace(":\\", ":") + "/" + path[1:].as_posix()
+            # elif ":\\" in part1: sanitized_path = part1.replace(":\\", ":") + "/" + path[1:].as_posix()
             else: sanitized_path = path.as_posix()
             return P(root + "/" + tmp1 + "/" + sanitized_path)
         return tmp1 / path
     def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False,  # pylint: disable=W0621, W0622
-                 key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False,
+                 key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, strict: bool = True,
                  share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
         if remotepath is None:
-            rp = localpath.get_remote_path(root=root, os_specific=os_specific) if rel2home else (P(root) / localpath if root is not None else localpath)
+            rp = localpath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)  # if rel2home else (P(root) / localpath if root is not None else localpath)
         else: rp = P(remotepath)
         from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬆️'*5} UPLOADING {localpath.as_posix()} to {cloud}:{rp.as_posix()}") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell").capture()
@@ -534,10 +534,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             return tmp
         return self
     def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
-                   key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, overwrite: bool = True, merge: bool = False, os_specific: bool = False, transfers: int = 10, root: str = "myhome", verbose: bool = True):
+                   key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True,
+                   transfers: int = 10, root: str = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
         remotepath = self  # .expanduser().absolute()
         localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
-        if rel2home: remotepath = remotepath.get_remote_path(root=root, os_specific=os_specific)
+        remotepath = remotepath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
         remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""; localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
         from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬇️' * 5} DOWNLOADING {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell")
