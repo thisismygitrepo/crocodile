@@ -67,7 +67,7 @@ class DBMS:
         del state["insp"]
         del state["eng"]
         if self.path:
-            state['path'] = self.path.collapseuser()
+            state['path'] = self.path.collapseuser(strict=False)
         return state
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
