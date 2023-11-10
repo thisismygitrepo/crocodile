@@ -112,6 +112,9 @@ except Exception as e:
 
     else:  # just run croshell.py interactively
         res = f"{interpreter} {interactivity} --profile {get_ipython_profile(P.cwd())} --no-banner -m crocodile.croshell"  # --term-title croshell
+        from IPython import start_ipython
+        start_ipython(argv=res.split(' ')[1:])
+        return
         # Clear-Host;
         # # --autocall 1 in order to enable shell-like behaviour: e.g.: P x is interpretred as P(x)
 
