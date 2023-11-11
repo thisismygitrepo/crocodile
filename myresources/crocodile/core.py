@@ -298,7 +298,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         _ = attrs
         import pandas as pd
         if as_config and not return_str:
-            install_n_import("rich").inspect(self, value=False, title=title, docs=False, sort=False)
+            from rich import inspect
+            inspect(self, value=False, title=title, docs=False, dunder=False, sort=False)
             return None
         if not bool(self):
             if return_str: return f"Empty Struct."

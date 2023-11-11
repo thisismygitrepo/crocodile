@@ -533,13 +533,15 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 raise RuntimeError(f"💥 Could not get link for {self}.")
             return tmp
         return self
-    def from_cloud(self, cloud: str, localpath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
+    def from_cloud(self, cloud: str, remotepath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
                    key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True,
                    transfers: int = 10, root: Optional[str] = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
-        remotepath = self  # .expanduser().absolute()
-        localpath = P(localpath).expanduser().absolute() if localpath is not None else P.home().joinpath(remotepath.rel2home())
-        remotepath = remotepath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
-        remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""; localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
+        if remotepath is None:
+            remotepath = self.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
+            remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""
+        else: remotepath = P(remotepath)
+        localpath = self.expanduser().absolute()
+        localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
         from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬇️' * 5} DOWNLOADING {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)

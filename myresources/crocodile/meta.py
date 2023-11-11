@@ -350,8 +350,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             source_obj.delete(sure=True); print("\n")
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
+        if source is None:
+            assert target is not None, f"If source is not specified, target must be specified."
+
         if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
-        if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc="Check if source is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
+        if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc=f"Check if source `{source}` is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             if r:
                 tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser(strict=False)", desc="Searching for files in source", return_obj=True, verbose=False)
                 assert isinstance(tmp11, List), f"Could not resolve source path {source} due to error"
@@ -381,7 +384,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if z: target_obj = target_obj.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
         print("\n"); return target_obj
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
-        scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc="Scouting source path on remote", return_obj=True, verbose=False)
+        scout = self.run_py(cmd=f"obj=tb.SSH.scout(r'{source}', z={z}, r={r})", desc=f"Scouting source `{source}` path on remote", return_obj=True, verbose=False)
         assert isinstance(scout, Scout)
         if not z and scout.is_dir and scout.files is not None:
             if r:
