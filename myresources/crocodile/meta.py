@@ -331,7 +331,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         source_file = self.run_py(f"""{cmd}\npath = tb.Save.pickle(obj=obj, path=tb.P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]
         return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
-        if init: print(f"{'>'*15} SFTP SENDING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
+        if init: print(f"{'⬆️' * 5} SFTP UPLOADING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         source_obj = P(source).expanduser().absolute()
         if not z and source_obj.is_dir():
             if r is True:
@@ -339,7 +339,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
                 return list(tmp)
             print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
-        if z: print(f"ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
+        if z: print(f"🗜️ ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source_obj).expanduser().absolute().collapseuser(strict=True); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
@@ -350,10 +350,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             source_obj.delete(sure=True); print("\n")
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
-        if source is None:
-            assert target is not None, f"If source is not specified, target must be specified."
-
-        if init: print(f"{'<'*15} SFTP RECEIVING FROM `{source}` TO `{target}`")
+        if init: print(f"{'⬇️' * 5} SFTP DOWNLOADING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(tb.P(r'{source}').expanduser().absolute().is_dir())", desc=f"Check if source `{source}` is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             if r:
                 tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser(strict=False)", desc="Searching for files in source", return_obj=True, verbose=False)

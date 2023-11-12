@@ -520,8 +520,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if remotepath is None:
             rp = localpath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)  # if rel2home else (P(root) / localpath if root is not None else localpath)
         else: rp = P(remotepath)
-        from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬆️'*5} UPLOADING {localpath.as_posix()} to {cloud}:{rp.as_posix()}") if verbose else None
-        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell").capture()
+        rclone_cmd = f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
+        from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`") if verbose else None
+        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell").capture()
         _ = [item.delete(sure=True) for item in to_del]; _ = print(f"{'⬆️'*5} UPLOAD COMPLETED.") if verbose else None
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
         if share:
@@ -542,8 +543,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: remotepath = P(remotepath)
         localpath = self.expanduser().absolute()
         localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
-        from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬇️' * 5} DOWNLOADING {cloud}:{remotepath.as_posix()} ==> {localpath.as_posix()}") if verbose else None
-        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}""", shell="powershell")
+        rclone_cmd = f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
+        from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`") if verbose else None
+        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
