@@ -3,7 +3,7 @@
 """Crocodile Shell
 """
 
-import argparse
+# import argparse
 import os
 import random
 from rich import pretty, inspect, progress, traceback, print as pprint
@@ -89,23 +89,6 @@ def print_logo(logo: str):
     print("\n")
 
 
-def build_parser():
-    parser = argparse.ArgumentParser(description="Generic Parser to launch a script in a separate window.")
-    parser.add_argument("--cmd", "-c", dest="cmd", help="Python command.", default="")
-    parser.add_argument("--file", "-f", dest="file", help="Python command.", default="")
-
-    args = parser.parse_args()
-    # tb.Struct(args.__dict__).print(as_config=True)
-    if args.file:
-        code = P(args.file).read_text()
-        print(code)
-        exec(code, globals())  # type: ignore # pylint: disable=W0122
-    elif args.cmd:
-        print(args.cmd)
-        exec(args.cmd, globals())  # type: ignore # pylint: disable=W0122
-
-
 if __name__ == "__main__":
     print_header()
     print_logo(logo="crocodile")
-    build_parser()

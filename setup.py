@@ -70,14 +70,13 @@ setup(
     # include_package_data=True,
     install_requires=[
         # CORE:
-        "numpy",
-        "pandas",
+        "numpy",  # number crunching
+        "pandas",  # number crunching
         "tabulate",  # pandas optional for pretty printing of tables
-        "matplotlib",
-        "psutil",
+        "matplotlib",  # viz
 
         # Accessories
-        "psutil",
+        "psutil",  # monitor processes.
         "joblib",  # multitasking
         "ipython",  # interactive python
         "fire",  # for automatic CLI interface
@@ -87,21 +86,12 @@ setup(
         "paramiko",  # for SSH
         "requests",  # interacting with web
         "colorlog",  # for colored logging
-        # "cycler",
 
-        # Developer Tools
-        # "setuptools",  # for packaging  # correct place is in .toml
-        # "wheel",
-        # "twine",  # for pushing package to pypi.org
-        # "pytest",
-        # popular alternative to builtint unittest  # consider splitting requirements to development and production versions.
-        # "scikit-image",  # image processing. Heavy-weight.
-        # torch
-        # tensorflow
     ],
 
     extras_require={
-            'full': ['sqlalchemy', 'tensorflow', 'scikit-learn', 'dash', 'dash_daq', 'dash_bootstrap_components']
+            'full': ['sqlalchemy', 'tensorflow', 'torch', 'scikit-learn', 'dash', 'dash_daq', 'dash_bootstrap_components',
+		     'setuptools', 'wheel', 'twine']
                     },
 
 )

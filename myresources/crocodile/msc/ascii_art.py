@@ -103,6 +103,7 @@ def font_box_color(logo: str):
     _cmd = f'figlet -f "{font}" "{logo}" | boxes -d "{box_style}" | lolcatjs'
     # print(_cmd)
     os.system(_cmd)  # | lolcat
+    # print("after")
 
 
 def charachter_color(logo: str):
