@@ -495,7 +495,7 @@ class CloudManager:
     def fetch_cloud_live(self):
         remote = CloudManager.base_path
         localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager_live").create()
-        alternative_base = remote.from_cloud(cloud=self.cloud, rel2home=True, localpath=localpath.delete(sure=True), verbose=False)
+        alternative_base = localpath.delete(sure=True).from_cloud(cloud=self.cloud, remotepath=remote.get_remote_path(root="myhome", rel2home=True), verbose=False)
         return alternative_base
     @staticmethod
     def prepare_servers_report(cloud_root: tb.P):
