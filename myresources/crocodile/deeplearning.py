@@ -472,7 +472,8 @@ class BaseModel(ABC):
                  split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None):
         if x_test is None and y_test is None and names_test is None:
             x_test, y_test, others_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
-            names_test_resolved = others_test[0]
+            if len(others_test) > 0: names_test_resolved = others_test[0]
+            else: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         elif names_test is None and x_test is not None:
             names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
