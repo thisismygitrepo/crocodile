@@ -42,9 +42,9 @@ class EvaluationData:
     names: list[str]
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
-        print("")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
+        print("EvaluationData Object")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
         _ = tb.S(self.__dict__).print()
-        return "EvaluationData Object"
+        return ""
 
 
 @dataclass
