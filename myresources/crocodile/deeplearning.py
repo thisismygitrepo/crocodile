@@ -339,7 +339,7 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz: bool = True, weight_string: Optional[str] = None,
+    def fit(self, viz: bool = True, weight_name: Optional[str] = None,
             val_sample_weight: Optional['npt.NDArray[np.float64]'] = None, sample_weight: Optional['npt.NDArray[np.float64]'] = None,
             verbose: str = "auto", callbacks: Optional[list[Any]] = None,
             validation_freq: int = 1, workers: int = 1, use_multiprocessing: bool = False,
@@ -349,12 +349,18 @@ class BaseModel(ABC):
         y_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="train")]
         x_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="test")]
         y_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="test")]
-        if weight_string is not None:
-            assert weight_string in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
-            train_weight_str = self.data.specs.get_split_strings(strings=[weight_string], which_split="train")[0]
-            test_weight_str = self.data.specs.get_split_strings(strings=[weight_string], which_split="test")[0]
-            sample_weight = self.data.split[train_weight_str]
-            val_sample_weight = self.data.split[test_weight_str]
+        if weight_name is not None:
+            assert weight_name in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
+            if sample_weight is None:
+                train_weight_str = self.data.specs.get_split_strings(strings=[weight_name], which_split="train")[0]
+                sample_weight = self.data.split[train_weight_str]
+            else:
+                print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
+            if val_sample_weight is None:
+                test_weight_str = self.data.specs.get_split_strings(strings=[weight_name], which_split="test")[0]
+                val_sample_weight = self.data.split[test_weight_str]
+            else:
+                print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
 
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
