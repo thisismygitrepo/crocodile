@@ -351,15 +351,21 @@ class BaseModel(ABC):
         y_test = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.op_names, which_split="test")]
         if weight_name is not None:
             assert weight_name in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
-            train_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="train")[0]
-            test_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="test")[0]
-            sample_weight = self.data.split[train_weight_str]
-            val_sample_weight = self.data.split[test_weight_str]
+            if sample_weight is None:
+                train_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="train")[0]
+                sample_weight = self.data.split[train_weight_str]
+            else:
+                print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
+            if val_sample_weight is None:
+                test_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="test")[0]
+                val_sample_weight = self.data.split[test_weight_str]
+            else:
+                print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
 
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
         default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
-                                                y=y_train[z0] if len(y_train) == 1 else y_train,
+                                                y=y_train[0] if len(y_train) == 1 else y_train,
                                                 validation_data=(x_test, y_test) if val_sample_weight is None else (x_test, y_test, val_sample_weight),
                                                 batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle,
                                                 )
