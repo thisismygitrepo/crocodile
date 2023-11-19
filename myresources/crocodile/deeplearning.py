@@ -337,7 +337,13 @@ class BaseModel(ABC):
         # Create a new compiler object
         self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
         # in both cases: pass the specs to the compiler if we have TF framework
-        if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
+        if self.hp.pkg.__name__ == "tensorflow" and compile_model:
+            try: self.model.compile(**self.compiler.__dict__)
+            except Exception as ex:
+                _ = ex
+                tb.Struct(self.compiler.__dict__).print(as_config=True, title=f"Model Compilation Specs")
+                print(f"💥 Error while compiling the model.")
+                pass
 
     def fit(self, viz: bool = True, weight_name: Optional[str] = None,
             val_sample_weight: Optional['npt.NDArray[np.float64]'] = None, sample_weight: Optional['npt.NDArray[np.float64]'] = None,

@@ -15,6 +15,9 @@ from dataclasses import field
 from typing import Optional, Any
 
 
+k = tf.keras
+
+
 @dl.dataclass
 class HParams(dl.HParams):
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
@@ -78,7 +81,7 @@ class DataReader(dl.DataReader):
 class Model(dl.BaseModel):
     def __init__(self, hp: HParams, data: DataReader, plot: bool = False):
         super(Model, self).__init__(hp=hp, data=data)
-        tf.keras.backend.set_floatx(self.hp.precision)
+        k.backend.set_floatx(self.hp.precision)
         self.model = self.get_model()
         self.compile()  # add optimizer and loss and metrics.
         self.build(sample_dataset=False)  # build the model (shape will be extracted from data supplied) if not passed.
@@ -87,7 +90,7 @@ class Model(dl.BaseModel):
 
     def get_model(self):
         _ = self  # your crazy model goes here:
-        m = tf.keras.Sequential([tf.keras.layers.Dense(5), tf.keras.layers.Dense(1)])
+        m = k.Sequential([k.layers.Dense(5), k.layers.Dense(1)])
         return m
 
     def test(self):
