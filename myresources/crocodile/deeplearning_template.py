@@ -15,7 +15,7 @@ from dataclasses import field
 from typing import Optional, Any
 
 
-k = tf.keras
+k = tf.keras  # type: ignore  pylint: disable=no-member
 
 
 @dl.dataclass
@@ -105,8 +105,6 @@ class Model(dl.BaseModel):
 
 
 def main():
-    # noinspection PyUnresolvedReferences
-    # from crocodile.msc.dl_template import HParams, DataReader, Model
     hp = HParams()
     d = DataReader(hp)
     d.load_trianing_data()
@@ -121,5 +119,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
     pass

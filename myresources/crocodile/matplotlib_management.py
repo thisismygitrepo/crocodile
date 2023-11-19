@@ -530,7 +530,7 @@ class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as 
 
 
 class LineArtist(FigureManager):  # This object knows how to draw a figure from curve-type data.
-    def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn', figpolicy: FigurePolicy = FigurePolicy.add_new, figsize: tuple[int, int] = (14, 8)):
+    def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn-v0_8-dark', figpolicy: FigurePolicy = FigurePolicy.add_new, figsize: tuple[int, int] = (14, 8)):
         super().__init__(figpolicy=figpolicy)
         self.style = style
         self.title = title

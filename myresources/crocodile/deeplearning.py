@@ -192,7 +192,7 @@ class DataReader:
                     print(f"Populated other shapes: {self.specs.other_shapes}")
                     raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
 
-        from sklearn.model_selection import train_test_split  # type: ignore
+        from sklearn.model_selection import train_test_split
         args = [data_dict[item] for item in strings]
         result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **split_kwargs if split_kwargs is not None else {})
         self.split = {}  # dict(train_loader=None, test_loader=None)
@@ -302,6 +302,12 @@ class BaseModel(ABC):
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
         self.model: Any = self.get_model()  # should be populated upon instantiation.
+
+        # import importlib
+        __module = self.__class__.__module__
+        if __module.startswith('__main__'):
+            print("💀 Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
+
         self.compiler: Compiler
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
         # self.plotter = NullAuto
@@ -347,7 +353,7 @@ class BaseModel(ABC):
 
     def fit(self, viz: bool = True, weight_name: Optional[str] = None,
             val_sample_weight: Optional['npt.NDArray[np.float64]'] = None, sample_weight: Optional['npt.NDArray[np.float64]'] = None,
-            verbose: str = "auto", callbacks: Optional[list[Any]] = None,
+            verbose: Union[int, str] = "auto", callbacks: Optional[list[Any]] = None,
             validation_freq: int = 1, workers: int = 1, use_multiprocessing: bool = False,
             **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
@@ -373,7 +379,7 @@ class BaseModel(ABC):
         default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
                                                 y=y_train[0] if len(y_train) == 1 else y_train,
                                                 validation_data=(x_test, y_test) if val_sample_weight is None else (x_test, y_test, val_sample_weight),
-                                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle,
+                                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, shuffle=self.hp.shuffle,
                                                 )
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq, workers=workers, use_multiprocessing=use_multiprocessing)
@@ -465,9 +471,10 @@ class BaseModel(ABC):
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
                  split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None):
         if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, names_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
+            x_test, y_test, others_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
+            names_test_resolved = others_test[0]
         elif names_test is None and x_test is not None:
-            names_test = [str(item) for item in np.arange(start=0, stop=len(x_test))]
+            names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
         # ==========================================================================
         y_pred_raw = self.infer(x_test)
@@ -475,16 +482,16 @@ class BaseModel(ABC):
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
-        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test), legend="Prediction")
-        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test), legend="Ground Truth")
+        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test_resolved), legend="Prediction")
+        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test_resolved), legend="Ground Truth")
         # if loss_df is not None:
-            # if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test
+            # if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test_resolved
             # else:
             #     for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
         # loss_name = results.loss_df.columns.to_list()[0]  # first loss path
         # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
-        # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
-        results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test[0]], loss_df=loss_df)
+        # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test_resolved)]
+        results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test_resolved], loss_df=loss_df)
         if viz:
             self.viz(results, **(viz_kwargs or {}))
         return results
@@ -548,7 +555,7 @@ class BaseModel(ABC):
                  'module_path_rh': module_path_rh,
                  'cwd_rh': tb.P.cwd().collapseuser().as_posix(),
                  }
-        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str)
+        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str, indent=4)
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
         return self.hp.save_dir
 
@@ -615,9 +622,9 @@ class BaseModel(ABC):
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
     def plot_model(self, dpi: int = 150, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
-        import tensorflow as tf
+        from tensorflow import keras  # type: ignore pylint: disable=no-name-in-module, import-error
         path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
-        tf.keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
+        keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
         print(f"Successfully plotted the model @ {path.as_uri()}")
         return path
 
@@ -739,7 +746,7 @@ class Losses:
     def get_log_square_loss_class():
         import tensorflow as tf
 
-        class LogSquareLoss(tf.keras.losses.Loss):
+        class LogSquareLoss(tf.keras.losses.Loss):  # type: ignore  # pylint: disable=no-member
             def __init__(self, *args: Any, **kwargs: Any):
                 super().__init__(*args, **kwargs)
                 self.name = "LogSquareLoss"

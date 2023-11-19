@@ -54,9 +54,10 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
 
 
 @save_decorator(".json")
-def json(obj: Any, path: PLike, indent: Optional[str] = None, encoding: str = 'utf-8', **kwargs: Any):
+def json(obj: Any, path: PLike, indent: Union[str, int, None] = None, encoding: str = 'utf-8', **kwargs: Any):
     _ = encoding
-    return Path(path).write_text(__import__("json").dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
+    import json as jsonlib
+    return Path(path).write_text(jsonlib.dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
 @save_decorator(".yml")
 def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
     with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
