@@ -172,7 +172,7 @@ class Terminal:
         tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
         if shell == "default":
             if self.machine == "Windows": start_cmd = "powershell"  # default shell on Windows is cmd which is not very useful. (./source is not available)
-            else: start_cmd  = "bash -c source"
+            else: start_cmd  = "bash"
         else: start_cmd = shell
         if verbose:
             from machineconfig.utils.utils import print_programming_script
