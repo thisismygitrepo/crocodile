@@ -27,8 +27,8 @@ class Specs:
     op_shapes: list[tuple[int, ...]] = field(default_factory=list)
     other_shapes: list[tuple[int, ...]] = field(default_factory=list)
     def get_all_names(self): return self.ip_names + self.op_names + self.other_names
-    def get_split_names(self, strings: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
-        keys_ip = [item + f"_{which_split}" for item in strings]
+    def get_split_names(self, names: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
+        keys_ip = [item + f"_{which_split}" for item in names]
         return keys_ip
 
 
@@ -351,8 +351,8 @@ class BaseModel(ABC):
         y_test = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.op_names, which_split="test")]
         if weight_name is not None:
             assert weight_name in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
-            train_weight_str = self.data.specs.get_split_names(strings=[weight_name], which_split="train")[0]
-            test_weight_str = self.data.specs.get_split_names(strings=[weight_name], which_split="test")[0]
+            train_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="train")[0]
+            test_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="test")[0]
             sample_weight = self.data.split[train_weight_str]
             val_sample_weight = self.data.split[test_weight_str]
 
