@@ -493,8 +493,7 @@ class BaseModel(ABC):
         # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
         # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test_resolved)]
         results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test_resolved], loss_df=loss_df)
-        if viz:
-            self.viz(results, **(viz_kwargs or {}))
+        if viz: self.viz(results, **(viz_kwargs or {}))
         return results
 
     def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
