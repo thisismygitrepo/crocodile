@@ -339,21 +339,32 @@ class BaseModel(ABC):
         # in both cases: pass the specs to the compiler if we have TF framework
         if self.hp.pkg.__name__ == "tensorflow" and compile_model: self.model.compile(**self.compiler.__dict__)
 
-    def fit(self, viz: bool = True, val_sample_weights: Optional['npt.NDArray[np.float64]'] = None, **kwargs: Any):
+    def fit(self, viz: bool = True, weight_string: Optional[str] = None,
+            val_sample_weight: Optional['npt.NDArray[np.float64]'] = None, sample_weight: Optional['npt.NDArray[np.float64]'] = None,
+            verbose: str = "auto", callbacks: Optional[list[Any]] = None,
+            validation_freq: int = 1, workers: int = 1, use_multiprocessing: bool = False,
+            **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
         x_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="train")]
         y_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="train")]
         x_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="test")]
         y_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="test")]
+        if weight_string is not None:
+            assert weight_string in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
+            train_weight_str = self.data.specs.get_split_strings(strings=[weight_string], which_split="train")[0]
+            test_weight_str = self.data.specs.get_split_strings(strings=[weight_string], which_split="test")[0]
+            sample_weight = self.data.split[train_weight_str]
+            val_sample_weight = self.data.split[test_weight_str]
 
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
         default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
                                                 y=y_train[0] if len(y_train) == 1 else y_train,
-                                                validation_data=(x_test, y_test) if val_sample_weights is None else (x_test, y_test, val_sample_weights),
-                                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle, callbacks=[])
+                                                validation_data=(x_test, y_test) if val_sample_weight is None else (x_test, y_test, val_sample_weight),
+                                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle,
+                                                )
         default_settings.update(kwargs)
-        hist = self.model.fit(**default_settings)
+        hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq, workers=workers, use_multiprocessing=use_multiprocessing)
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
@@ -461,7 +472,7 @@ class BaseModel(ABC):
         # loss_name = results.loss_df.columns.to_list()[0]  # first loss path
         # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
         # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test)]
-        results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test], loss_df=loss_df)
+        results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test[0]], loss_df=loss_df)
         if viz:
             self.viz(results, **(viz_kwargs or {}))
         return results
@@ -485,7 +496,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only: bool = True, version: str = '0', strict: bool = True, **kwargs: Any):
+    def save_class(self, weights_only: bool = True, version: str = 'v0', strict: bool = True, **kwargs: Any):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -499,7 +510,7 @@ class BaseModel(ABC):
         tb.Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
-        save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_v{version}').create()  # model save goes into data path.
+        save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
         else: self.save_model(save_dir)
 
