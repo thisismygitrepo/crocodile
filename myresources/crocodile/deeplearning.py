@@ -26,8 +26,8 @@ class Specs:
     ip_shapes: list[tuple[int, ...]] = field(default_factory=list)
     op_shapes: list[tuple[int, ...]] = field(default_factory=list)
     other_shapes: list[tuple[int, ...]] = field(default_factory=list)
-    def get_all_strings(self): return self.ip_names + self.op_names + self.other_names
-    def get_split_strings(self, strings: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
+    def get_all_names(self): return self.ip_names + self.op_names + self.other_names
+    def get_split_names(self, strings: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
         keys_ip = [item + f"_{which_split}" for item in strings]
         return keys_ip
 
@@ -42,9 +42,9 @@ class EvaluationData:
     names: list[str]
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
-        print("")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
+        print("EvaluationData Object")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
         _ = tb.S(self.__dict__).print()
-        return "EvaluationData Object"
+        return ""
 
 
 @dataclass
@@ -161,7 +161,7 @@ class DataReader:
 
     def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
         # populating data specs ip / op shapes based on arguments sent to this method.
-        strings = self.specs.get_all_strings()
+        strings = self.specs.get_all_names()
         keys = list(data_dict.keys())
         if len(strings) != len(keys) or set(keys) != set(strings):
             tb.S(self.specs.__dict__).print(as_config=True, title="Specs Declared")
@@ -205,9 +205,9 @@ class DataReader:
     def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
                        use_slice: bool = False, split: Literal["train", "test"] = "test", size: Optional[int] = None) -> tuple[list[Any], list[Any], list[Any]]:
         assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
-        keys_ip = self.specs.get_split_strings(self.specs.ip_names, which_split=split)
-        keys_op = self.specs.get_split_strings(self.specs.op_names, which_split=split)
-        keys_others = self.specs.get_split_strings(self.specs.other_names, which_split=split)
+        keys_ip = self.specs.get_split_names(self.specs.ip_names, which_split=split)
+        keys_op = self.specs.get_split_names(self.specs.op_names, which_split=split)
+        keys_others = self.specs.get_split_names(self.specs.other_names, which_split=split)
 
         tmp = self.split[keys_ip[0]]
         assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
@@ -345,6 +345,7 @@ class BaseModel(ABC):
             validation_freq: int = 1, workers: int = 1, use_multiprocessing: bool = False,
             **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
+<<<<<<< HEAD
         x_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="train")]
         y_train = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.op_names, which_split="train")]
         x_test = [self.data.split[item] for item in self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="test")]
@@ -361,11 +362,23 @@ class BaseModel(ABC):
                 val_sample_weight = self.data.split[test_weight_str]
             else:
                 print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
+=======
+        x_train = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.ip_names, which_split="train")]
+        y_train = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.op_names, which_split="train")]
+        x_test = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.ip_names, which_split="test")]
+        y_test = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.op_names, which_split="test")]
+        if weight_name is not None:
+            assert weight_name in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
+            train_weight_str = self.data.specs.get_split_names(strings=[weight_name], which_split="train")[0]
+            test_weight_str = self.data.specs.get_split_names(strings=[weight_name], which_split="test")[0]
+            sample_weight = self.data.split[train_weight_str]
+            val_sample_weight = self.data.split[test_weight_str]
+>>>>>>> a395a8308e7c841c7f6ae70fd8da5aaee8522d44
 
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
         default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
-                                                y=y_train[0] if len(y_train) == 1 else y_train,
+                                                y=y_train[z0] if len(y_train) == 1 else y_train,
                                                 validation_data=(x_test, y_test) if val_sample_weight is None else (x_test, y_test, val_sample_weight),
                                                 batch_size=self.hp.batch_size, epochs=self.hp.epochs, verbose=1, shuffle=self.hp.shuffle,
                                                 )
@@ -627,8 +640,8 @@ class BaseModel(ABC):
         :return:
         """
         try:
-            keys_ip = self.data.specs.get_split_strings(self.data.specs.ip_names, which_split="test")
-            keys_op = self.data.specs.get_split_strings(self.data.specs.op_names, which_split="test")
+            keys_ip = self.data.specs.get_split_names(self.data.specs.ip_names, which_split="test")
+            keys_op = self.data.specs.get_split_names(self.data.specs.op_names, which_split="test")
         except TypeError as te:
             raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
