@@ -171,17 +171,23 @@ class Terminal:
         if self.machine == "Linux": script = "#!/bin/bash" + "\n" + script  # `source` is only available in bash.
         tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
         if shell == "default":
-            if self.machine == "Windows": start_cmd = "powershell"  # default shell on Windows is cmd which is not very useful. (./source is not available)
-            else: start_cmd  = "bash"
-        else: start_cmd = shell
+            if self.machine == "Windows":
+                start_cmd = "powershell"  # default shell on Windows is cmd which is not very useful. (./source is not available)
+                full_command: Union[list[str], str] = [start_cmd, str(tmp_file)]
+            else:
+                start_cmd  = "."
+                full_command = f"{start_cmd} {tmp_file}"
+        else:
+            full_command = [shell, str(tmp_file)]
+
         if verbose:
             from machineconfig.utils.utils import print_programming_script
             print_programming_script(script, lexer="shell", desc="Script to be executed:")
             import rich.progress as pb
             with pb.Progress(transient=True) as progress:
                 _task = progress.add_task("Running Script", total=None)
-                resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
-        else: resp = subprocess.run([start_cmd, str(tmp_file)], stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
+                resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
+        else: resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         return Response.from_completed_process(resp)
     @staticmethod
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
