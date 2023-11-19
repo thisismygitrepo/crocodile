@@ -91,8 +91,9 @@ setup(
 
     extras_require={
             'full': ['sqlalchemy', 'tensorflow', 'torch', 'scikit-learn', 'dash', 'dash_daq', 'dash_bootstrap_components',
-		     'setuptools', 'wheel', 'twine']
-                    },
+                     'click',
+                     'setuptools', 'wheel', 'twine']
+                },
 
 )
 
