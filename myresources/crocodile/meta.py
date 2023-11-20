@@ -344,7 +344,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp = source_obj.search("*", folders=False, r=True)
                 tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
                 return list(tmp)
-            print(f"tb.Meta.SSH Error: source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
+            print(f"tb.Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
+            raise RuntimeError
         if z: print(f"🗜️ ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source_obj).expanduser().absolute().collapseuser(strict=True); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
@@ -363,7 +364,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 assert isinstance(tmp11, List), f"Could not resolve source path {source} due to error"
                 for file in tmp11:
                     self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
-            print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag."); raise RuntimeError
+            print(f"source `{source}` is a directory! either set r=True for recursive sending or raise zip_first flag.")
+            raise RuntimeError
         if z:
             tmp: Response = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False)
             tmp2 = tmp.op2path(strict_returncode=True, strict_err=True)
