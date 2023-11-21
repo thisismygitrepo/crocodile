@@ -93,7 +93,9 @@ def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict e
     with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
     _ = r
     return mydict
-def ini(path: PLike): assert Path(path).exists(); import configparser; res = configparser.ConfigParser(); res.read(filenames=[str(path)]); return res
+def ini(path: PLike):
+    if not Path(path).exists(): raise FileNotFoundError(f"File not found: {path}")
+    import configparser; res = configparser.ConfigParser(); res.read(filenames=[str(path)]); return res
 def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
 def npy(path: PLike, **kwargs: Any):
     import numpy as np
