@@ -50,6 +50,7 @@ class BoxStyles:
 
 class CowStyles:
     eyes = ['-b', '-d', '-g', '-h', '-l', '-L', '-n', '-N', '-p', '-s', '-t', '-w', '-y']
+    # this one for the package installed with sudo apt install cowsay and is located at /usr/games/cowsay. See cowsay -l
     figures = ['apt', 'bunny', 'cheese', 'cock', 'cower', 'daemon', 'default', 'dragon',
                'dragon-and-cow', 'duck', 'elephant', 'elephant-in-snake', 'eyes', 'fox', 'ghostbusters',
                'gnu', 'kangaroo', 'kiss', 'milk',
@@ -106,7 +107,7 @@ def font_box_color(logo: str):
     # print("after")
 
 
-def charachter_color(logo: str):
+def character_color(logo: str):
     assert platform.system() == 'Windows', 'This function is only for Windows.'
     # from rgbprint import gradient_scroll, Color
     # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)

@@ -51,14 +51,14 @@ _ = D, L, E, S, inspect, progress, pprint, traceback, pd, np
 
 
 def print_logo(logo: str):
-    from crocodile.msc.ascii_art import font_box_color, charachter_color, character_or_box_color
+    from crocodile.msc.ascii_art import font_box_color, character_color, character_or_box_color
     if platform.system() == "Windows":
         _1x = P.home().joinpath(r"AppData/Roaming/npm/figlet").exists()
         _2x = P.home().joinpath(r"AppData/Roaming/npm/lolcatjs").exists()
         _3x = P.home().joinpath(r"AppData/Local/Microsoft/WindowsApps/boxes.exe").exists()
         if _1x and _2x and _3x:
             if random.choice([True, True, False]): font_box_color(logo)
-            else: charachter_color(logo)
+            else: character_color(logo)
         else:
             print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]

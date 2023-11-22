@@ -181,8 +181,8 @@ class Terminal:
             full_command = [shell, str(tmp_file)]
 
         if verbose:
-            from machineconfig.utils.utils import print_programming_script
-            print_programming_script(script, lexer="shell", desc="Script to be executed:")
+            from machineconfig.utils.utils import print_code
+            print_code(code=script, lexer="shell", desc="Script to be executed:")
             import rich.progress as pb
             with pb.Progress(transient=True) as progress:
                 _task = progress.add_task("Running Script", total=None)
