@@ -15,7 +15,7 @@ class Zellij:
     @staticmethod
     def get_current_zellij_session() -> str:
         try:
-            return tb.L(tb.Terminal().run("zellij ls").op.split("\n")).filter(lambda x: "(current)" in x).list[0].split(" [Created")[0]
+            return tb.L(tb.Terminal().run("zellij ls --no-formatting").op.split("\n")).filter(lambda x: "(current)" in x).list[0].split(" [Created")[0]
         except IndexError as ie:
             print(f"""Fails if there is no zellij session running, fails if there is no (current) suffix against the session name.""")
             raise ie
@@ -39,7 +39,7 @@ class Zellij:
             # if isinstance(ssh, SelfSSH):
             # resp = tb.Terminal().run("zellij ls").op.split("\n")
             # else:
-            resp = [item.split(" [Created")[0] for item in ssh.run("zellij ls", verbose=False).op.split("\n")]
+            resp = [item.split(" [Created")[0] for item in ssh.run("zellij ls --no-formatting", verbose=False).op.split("\n")]
             if sess_name in resp:
                 print(f"--> Session {resp} has started at the remote.")
                 time.sleep(6)
