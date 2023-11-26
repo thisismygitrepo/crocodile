@@ -169,17 +169,18 @@ class Terminal:
         return Response.from_completed_process(resp)
     def run_script(self, script: str, shell: SHELLS = "default", verbose: bool = False):
         if self.machine == "Linux": script = "#!/bin/bash" + "\n" + script  # `source` is only available in bash.
-        tmp_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
+        script_file = P.tmpfile(name="tmp_shell_script", suffix=".ps1" if self.machine == "Windows" else ".sh", folder="tmp_scripts").write_text(script, newline={"Windows": None, "Linux": "\n"}[self.machine])
         if shell == "default":
             if self.machine == "Windows":
                 start_cmd = "powershell"  # default shell on Windows is cmd which is not very useful. (./source is not available)
-                full_command: Union[list[str], str] = [start_cmd, str(tmp_file)]
+                full_command: Union[list[str], str] = [start_cmd, str(script_file)]  # shell=True will cause this to be a string anyway (with space separation)
             else:
-                start_cmd  = "."
-                full_command = f"{start_cmd} {tmp_file}"
+                start_cmd  = "bash"
+                full_command = f"{start_cmd} {script_file}"
+                # full_command = [start_cmd, str(script_file)]
         else:
-            full_command = [shell, str(tmp_file)]
-
+            # full_command = [shell, str(tmp_file)]
+            full_command = f"{shell} {script_file}"
         if verbose:
             from machineconfig.utils.utils import print_code
             print_code(code=script, lexer="shell", desc="Script to be executed:")

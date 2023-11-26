@@ -36,12 +36,10 @@ class Zellij:
     @staticmethod
     def asssert_session_started(ssh: Union[tb.SSH, SelfSSH], sess_name: str):
         while True:
-            # if isinstance(ssh, SelfSSH):
-            # resp = tb.Terminal().run("zellij ls").op.split("\n")
-            # else:
-            resp = [item.split(" [Created")[0] for item in ssh.run("zellij ls --no-formatting", verbose=False).op.split("\n")]
-            if sess_name in resp:
-                print(f"--> Session {resp} has started at the remote.")
+            raw_resp = ssh.run("zellij ls --no-formatting", verbose=False).op.split("\n")
+            current_sessions = [item.split(" [Created")[0] for item in raw_resp if "EXITED" not in item]
+            if sess_name in current_sessions:
+                print(f"--> Session {sess_name} has started at the remote.")
                 time.sleep(6)
                 break
             time.sleep(2)
