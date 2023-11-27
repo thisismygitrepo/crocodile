@@ -639,9 +639,10 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
         self.expire = str2timedelta(expire) if isinstance(expire, str) else expire
         self.name = name if isinstance(name, str) else str(self.source_func)
     @property
-    def age(self):  # can fail if called before cache is populated and path doesn't exists
-        if self.path is None: return datetime.now() - self.time_produced
-        # if not self.path.exists(): return
+    def age(self):
+        """Throws AttributeError if called before cache is populated and path doesn't exists"""
+        if self.path is None:  # memory-based cache.
+            return datetime.now() - self.time_produced
         return datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__.update(state); self.path = P.home() / self.path if self.path is not None else self.path
     def __getstate__(self) -> dict[str, Any]: state = self.__dict__.copy(); state["path"] = self.path.rel2home() if self.path is not None else state["path"]; return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
@@ -651,9 +652,10 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
                 age = datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Reading cached values from `{self.path}`. Lag = {age} ...")
                 self.cache = self.reader(self.path)
+                return self(fresh=False)  # may be the cache is old ==> check that by passing it through the logic again.
             else:
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from {self.source_func}. Previous cache never existed or a there was an explicit fresh order.")
-                self.cache = self.source_func()
+                self.cache = self.source_func()  # fresh data.
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
         else:  # cache exists
