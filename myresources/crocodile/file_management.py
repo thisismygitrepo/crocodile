@@ -196,7 +196,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
         else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
-    def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
+    # def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
         return self.write_text(modify_text(txt_raw=self.read_text(encoding=encoding), txt_search=txt_search, txt_alt=txt_alt, replace_line=replace_line, notfound_append=notfound_append, prepend=prepend), encoding=encoding)
@@ -238,13 +238,15 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         `inliue`: the method acts on the path object itself instead of creating a new one if this flag is raised.
         `orig`: whether the method returns the original path object or a new one."""
     def prepend(self, prefix: str, suffix: Optional[str] = None, verbose: bool = True, **kwargs: Any):
+        """Returns a new path object with the name prepended to the stem of the path."""
         return self._return(self.parent.joinpath(prefix + self.trunk + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)  # Path('.ssh').suffix fails, 'bruh' fixes it.
     def append(self, name: str = '', index: bool = False, suffix: Optional[str] = None, verbose: bool = True, **kwargs: Any) -> 'P':
+        """Returns a new path object with the name appended to the stem of the path. If `index` is True, the name will be the index of the path in the parent directory."""
         if index: return self.append(name=f'_{len(self.parent.search(f"*{self.trunk}*"))}', index=False, verbose=verbose, suffix=suffix, **kwargs)
-        return self._return(self.parent.joinpath(self.trunk + (name or "_" + str(timestamp())) + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)
+        return self._return(self.parent.joinpath(self.trunk + (name or ("_" + str(timestamp()))) + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)
     def with_trunk(self, name: str, verbose: bool = True, **kwargs: Any): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", verbose=verbose, **kwargs)  # Complementary to `with_stem` and `with_suffix`
     def with_name(self, name: str, verbose: bool = True, inplace: bool = False, **kwargs: Any): assert type(name) is str, "name must be a string."; return self._return(self.parent / name, verbose=verbose, operation="rename", inplace=inplace, **kwargs)
-    def switch(self, key: str, val: str, verbose: bool = True, **kwargs: Any): return self._return(P(str(self).replace(key, val)), operation="rename", verbose=verbose, **kwargs)  # Like string replce method, but `replace` is an already defined method."""
+    def switch(self, key: str, val: str, verbose: bool = True, **kwargs: Any): return self._return(P(str(self).replace(key, val)), operation="rename", verbose=verbose, **kwargs)  # Like string replace method, but `replace` is an already defined method."""
     def switch_by_index(self, idx: int, val: str, verbose: bool = True, **kwargs: Any): return self._return(P(*[val if index == idx else value for index, value in enumerate(self.parts)]), operation="rename", verbose=verbose, **kwargs)
     # ============================= attributes of object ======================================
     @property
