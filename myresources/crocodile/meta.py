@@ -176,11 +176,8 @@ class Terminal:
                 full_command: Union[list[str], str] = [start_cmd, str(script_file)]  # shell=True will cause this to be a string anyway (with space separation)
             else:
                 start_cmd  = "bash"
-                full_command = f"{start_cmd} {script_file}"
-                # full_command = [start_cmd, str(script_file)]
-        else:
-            # full_command = [shell, str(tmp_file)]
-            full_command = f"{shell} {script_file}"
+                full_command = f"{start_cmd} {script_file}"  # full_command = [start_cmd, str(script_file)]
+        else: full_command = f"{shell} {script_file}"  # full_command = [shell, str(tmp_file)]
         if verbose:
             from machineconfig.utils.utils import print_code
             print_code(code=script, lexer="shell", desc="Script to be executed:")
@@ -190,17 +187,6 @@ class Terminal:
                 resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         else: resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         return Response.from_completed_process(resp)
-    @staticmethod
-    def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
-        if __import__('os').name == 'nt':
-            try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
-            except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
-        else: return __import__('os').getuid() == 0  # Check for root on Posix
-    @staticmethod
-    def run_as_admin(file: PLike, params: Any, wait: bool = False):
-        proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)
-        if wait: time.sleep(1)
-        return proce_info
     def run_async(self, *cmds: str, new_window: bool = True, shell: Optional[str] = None, terminal: Optional[str] = None):  # Runs SYSTEM commands like subprocess.Popen
         """Opens a new terminal, and let it run asynchronously. Maintaining an ongoing conversation with another process is very hard. It is adviseable to run all
         commands in one go without interaction with an ongoing channel. Use this only for the purpose of producing a different window and humanly interact with it. Reference: https://stackoverflow.com/questions/54060274/dynamic-communication-between-main-and-subprocess-in-python & https://www.youtube.com/watch?v=IynV6Y80vws and https://www.oreilly.com/library/view/windows-powershell-cookbook/9781449359195/ch01.html"""
@@ -223,7 +209,20 @@ class Terminal:
         if shell is None and self.machine == "Windows": shell = "pwsh"
         window = "start" if new_window and self.machine == "Windows" else ""
         os.system(f"{window} {terminal} {shell} {shell_script}")
-    pickle_to_new_session = staticmethod(lambda obj, cmd="": Terminal().run_py(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}"""))
+    @staticmethod
+    def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
+        if __import__('os').name == 'nt':
+            try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
+            except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
+        else: return __import__('os').getuid() == 0  # Check for root on Posix
+    @staticmethod
+    def run_as_admin(file: PLike, params: Any, wait: bool = False):
+        proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)
+        if wait: time.sleep(1)
+        return proce_info
+    @staticmethod
+    def pickle_to_new_session(obj: Any, cmd: str = ""):
+        return Terminal().run_py(f"""path = tb.P(r'{Save.pickle(obj=obj, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}')\n obj = path.readit()\npath.delete(sure=True, verbose=False)\n {cmd}""")
     @staticmethod
     def import_to_new_session(func: Union[None, Callable[[Any], Any]] = None, cmd: str = "", header: bool = True, interactive: bool = True, ipython: bool = True, run: bool = False, **kwargs: Any):
         load_kwargs_string = f"""kwargs = tb.P(r'{Save.pickle(obj=kwargs, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()\nkwargs.print()\n""" if kwargs else "\n"
@@ -257,7 +256,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.port: int = port
         self.proxycommand: Optional[str] = None
         import platform
-        import paramiko
+        import paramiko  # type: ignore
         # username, hostname = __import__("getpass").getuser(), platform.node()
         if isinstance(host, str):
             try:
@@ -441,7 +440,7 @@ class Scheduler:
             try: self.routine(self)
             except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
-            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.')[0]}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
+            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self); return  # that's probably the only kind of exception that can rise during sleep.
         self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")

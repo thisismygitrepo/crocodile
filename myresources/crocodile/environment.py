@@ -185,7 +185,10 @@ class PathVar:
             command = fr'[Environment]::SetEnvironmentVariable("Path", $env:PATH + ";{path}", "{scope}")'
             result = backup + command
             return result  # if run is False else tm.run(result, shell="powershell").print()
-        else: tb.P.home().joinpath(".bashrc").append_text(f"export PATH='{path}:$PATH'")
+        else:
+            file = tb.P.home().joinpath(".bashrc")
+            txt = file.read_text()
+            file.write_text(txt + f"\nexport PATH='{path}:$PATH'", encoding="utf-8")
 
     @staticmethod
     def set_permanetly(path: str, scope: Literal["User", "system"] = "User"):
