@@ -198,7 +198,7 @@ class Terminal:
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
-        script = ((Terminal.get_header(wdir=wdir) if header else "") + script) + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
+        script = (Terminal.get_header(wdir=wdir) if header else "") + script + ("\ntb.DisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts/terminal").write_text(f"""print(r'''{script}''')""" + "\n" + script)
         print(f"Script to be executed asyncronously: ", py_script.absolute().as_uri())
         shell_script = f"""
@@ -240,7 +240,12 @@ class Terminal:
     @staticmethod
     def replicate_session(cmd: str = ""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}""")
     @staticmethod
-    def get_header(wdir: OPLike = None): return f"""\n# >> Code prepended\nimport crocodile.toolbox as tb""" + (f"""\ntb.sys.path.insert(0, r'{wdir}')""" if wdir is not None else '') + f"""\n# >> End of header, start of script passed\n"""
+    def get_header(wdir: OPLike = None): return f"""
+# >> Code prepended
+import crocodile.toolbox as tb
+{'''tb.sys.path.insert(0, r'{wdir}') ''' if wdir is not None else ''}
+# >> End of header, start of script passed
+"""
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
