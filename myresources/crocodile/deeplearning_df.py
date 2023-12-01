@@ -149,6 +149,12 @@ class DataFrameHander:
         self.imputer: SimpleImputer = imputer
         self.scaler: Union[RobustScaler, StandardScaler] = scaler
 
+    @property
+    def cols_encoded(self):
+        """all numerical columns to be used as inputs to the model. Used in getstate, setstate, design model, etc."""
+        onehot_names: list[str] = list(self.encoder_onehot.get_feature_names_out())
+        return onehot_names + self.cols_ordinal + self.cols_numerical
+
     def __getstate__(self):
         atts: list[str] = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
         res = {}
@@ -205,12 +211,6 @@ class DataFrameHander:
         df = self.clipper_numerical.transform(df)
         df = self.impute_standardize(df=df)
         return df
-
-    @property
-    def encoded_columns(self):
-        """all numerical columns to be used as inputs to the model. Used in getstate, setstate, design model, etc."""
-        onehot_names: list[str] = list(self.encoder_onehot.get_feature_names_out())
-        return onehot_names + self.cols_ordinal + self.cols_numerical
 
 
 def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
