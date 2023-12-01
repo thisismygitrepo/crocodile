@@ -11,7 +11,8 @@ import numpy.typing as npt
 from sklearn.preprocessing import StandardScaler, RobustScaler  # type: ignore
 from sklearn.impute import SimpleImputer  # type: ignore
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder  # type: ignore
-import crocodile.toolbox as tb
+# import crocodile.toolbox as tb
+from crocodile.file_management import P, install_n_import
 # from crocodile.deeplearning import DataReader
 
 
@@ -157,9 +158,9 @@ class DataFrameHander:
         return res
 
     @staticmethod
-    def profile_dataframe(df: pd.DataFrame, save_path: Optional[tb.P] = None, silent: bool = False, explorative: bool = True):
+    def profile_dataframe(df: pd.DataFrame, save_path: Optional[P] = None, silent: bool = False, explorative: bool = True):
         # path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report{appendix}.html").create(parents_only=True)
-        profile_report = tb.install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
+        profile_report = install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
         # from ydata_profiling import ProfileReport as profile_report
         # profile_report = pandas_profiling.()
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
@@ -167,7 +168,7 @@ class DataFrameHander:
         if save_path is not None: report.to_file(save_path)
 
     @staticmethod
-    def gui_dataframe(df: 'pd.DataFrame'): tb.install_n_import("pandasgui").show(df)
+    def gui_dataframe(df: 'pd.DataFrame'): install_n_import("pandasgui").show(df)
 
     def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
@@ -194,14 +195,22 @@ class DataFrameHander:
         self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_onehot])
         self.encoder_onehot.fit(df[self.cols_onehot])
         self.encoder_ordinal.fit(df[self.cols_ordinal])
-
-        onehot_names: list[str] = list(self.encoder_onehot.get_feature_names_out())
-        self.cols_x_encoded_float = onehot_names + self.cols_ordinal + self.cols_numerical
-        # all numerical columns to be used as inputs to the model. Used in getstate, setstate, design model, etc.
-
         self.clipper_numerical.fit(df[self.cols_numerical])
         self.imputer.fit(df[self.cols_numerical])
         self.scaler.fit(df[self.cols_ordinal + self.cols_numerical])
+
+    def clip_encode_impute_scale(self, df: 'pd.DataFrame', precision: str) -> 'pd.DataFrame':
+        df = self.clipper_categorical.transform(df)
+        df = self.encode(df, precision=precision)
+        df = self.clipper_numerical.transform(df)
+        df = self.impute_standardize(df=df)
+        return df
+
+    @property
+    def encoded_columns(self):
+        """all numerical columns to be used as inputs to the model. Used in getstate, setstate, design model, etc."""
+        onehot_names: list[str] = list(self.encoder_onehot.get_feature_names_out())
+        return onehot_names + self.cols_ordinal + self.cols_numerical
 
 
 def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
