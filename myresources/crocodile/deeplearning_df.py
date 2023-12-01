@@ -178,11 +178,11 @@ class DataFrameHander:
 
     def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
-        df[self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
+        df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
         tmp = self.encoder_onehot.transform(df[self.cols_onehot])
         df.drop(columns=self.cols_onehot, inplace=True)
         df[self.encoder_onehot.get_feature_names_out()] = tmp
-        df[self.cols_numerical] = df[self.cols_numerical].to_numpy().astype(precision)
+        df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy().astype(precision)
         return df
 
     def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
