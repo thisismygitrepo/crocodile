@@ -190,6 +190,19 @@ class DataFrameHander:
         # return pd.DataFrame(res, columns=columns)
         return df
 
+    def fit(self, df: 'pd.DataFrame'):
+        self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_onehot])
+        self.encoder_onehot.fit(df[self.cols_onehot])
+        self.encoder_ordinal.fit(df[self.cols_ordinal])
+
+        onehot_names: list[str] = list(self.encoder_onehot.get_feature_names_out())
+        self.cols_x_encoded_float = onehot_names + self.cols_ordinal + self.cols_numerical
+        # all numerical columns to be used as inputs to the model. Used in getstate, setstate, design model, etc.
+
+        self.clipper_numerical.fit(df[self.cols_numerical])
+        self.imputer.fit(df[self.cols_numerical])
+        self.scaler.fit(df[self.cols_ordinal + self.cols_numerical])
+
 
 def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
     assert len(ip.shape) == 2, f"Expected 2D array, but got {len(ip.shape)}D array"
