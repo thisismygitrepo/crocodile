@@ -226,5 +226,13 @@ def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
     return total_nan_count
 
 
+def try_dfh():
+    df = pd.DataFrame(np.random.randn(100, 3), columns=list('ABC'))
+    dfh = DataFrameHander(scaler=RobustScaler(), imputer=SimpleImputer(), cols_ordinal=['A'], cols_onehot=['B'], cols_numerical=['C'], encoder_onehot=OneHotEncoder(), encoder_ordinal=OrdinalEncoder(),
+                          clipper_categorical=CategoricalClipper(), clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98))
+    dfh.fit(df)
+    df = dfh.clip_encode_impute_scale(df, precision='float32')
+
+
 if __name__ == "__main__":
     pass

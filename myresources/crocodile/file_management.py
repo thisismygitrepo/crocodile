@@ -313,8 +313,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         tmp: int = {k: v for k, v in zip(['b', 'kb', 'mb', 'gb', 'B', 'KB', 'MB', 'GB'], 2 * [1024 ** item for item in range(4)])}[units]
         return round(total_size / tmp, 1)
     def time(self, which: Literal["m", "c", "a"] = "m", **kwargs: Any):
+        """* `m`: last mofidication of content, i.e. the time it was created. 
+        * `c`: last status change (its inode is changed, permissions, path, but not content)
+        * `a`: last access
+        """
         tmp = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
-        return datetime.fromtimestamp(tmp, **kwargs)  # m last mofidication of content, i.e. the time it was created. c last status change (its inode is changed, permissions, path, but not content) a: last access
+        return datetime.fromtimestamp(tmp, **kwargs)
     def stats(self) -> dict[str, Any]: return dict(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
     def _type(self): return ("📄" if self.is_file() else ("📁" if self.is_dir() else "👻NotExist")) if self.absolute() else "📍Relative"
