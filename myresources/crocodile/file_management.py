@@ -305,6 +305,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         elif "http" in str(self): return "🕸️ URL " + str(self.as_url_str())
         else: return "📍 Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
     # def __str__(self): return self.as_url_str() if "http" in self else self._str
+    def pistol(self):
+        import os
+        os.system(f"pistol {self}")
     def size(self, units: str = 'mb'):  # ===================================== File Specs ==========================================================================================
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         tmp: int = {k: v for k, v in zip(['b', 'kb', 'mb', 'gb', 'B', 'KB', 'MB', 'GB'], 2 * [1024 ** item for item in range(4)])}[units]
