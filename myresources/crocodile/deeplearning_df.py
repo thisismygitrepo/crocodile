@@ -180,8 +180,8 @@ class DataFrameHander:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
         df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
         tmp = self.encoder_onehot.transform(df[self.cols_onehot])
-        df.drop(columns=self.cols_onehot, inplace=True)
-        df[self.encoder_onehot.get_feature_names_out()] = tmp
+        df = df.drop(columns=self.cols_onehot)  # consider inplace=True but make sure it doesn't raise copy warning
+        df.loc[:, self.encoder_onehot.get_feature_names_out()] = tmp
         df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy().astype(precision)
         return df
 
@@ -193,7 +193,7 @@ class DataFrameHander:
         df[self.imputer.get_feature_names_out()] = res
         res = self.scaler.transform(df[self.scaler.get_feature_names_out()])
         assert isinstance(res, np.ndarray), f"Scaler returned {type(res)}, but expected np.ndarray"
-        df[self.scaler.get_feature_names_out()] = res
+        df.loc[:, self.scaler.get_feature_names_out()] = res
         # return pd.DataFrame(res, columns=columns)
         return df
 
