@@ -201,7 +201,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         elif isinstance(key, int): return self.list[key]
         # assert isinstance(key, slice)
         return List(self.list[key])  # type: ignore # noqa: call-overload  # slices
-    def apply(self, func: Union[Callable[[T], T2], Callable[[T, T2], T3]], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda _x: True,
+    def apply(self, func: Union[Callable[[T], T3], Callable[[T, T2], T3]], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda _x: True,
               jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], verbose: bool = False, desc: Optional[str] = None, **kwargs: Any,
               ) -> 'Union[List[Union[T2, T3]], List[T3]]':
         # if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
