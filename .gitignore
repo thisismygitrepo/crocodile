@@ -9,6 +9,7 @@ __pycache__/
 .idea/
 .vscode
 .ve
+.venv
 
 # C extensions
 *.so
