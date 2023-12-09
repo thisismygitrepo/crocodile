@@ -217,7 +217,8 @@ class Terminal:
         else: return __import__('os').getuid() == 0  # Check for root on Posix
     @staticmethod
     def run_as_admin(file: PLike, params: Any, wait: bool = False):
-        proce_info = install_n_import("win32com", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)
+        proce_info = install_n_import(library="win32com", package="pywin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)
+        # TODO update PATH for this to take effect immediately.
         if wait: time.sleep(1)
         return proce_info
     @staticmethod

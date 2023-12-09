@@ -307,21 +307,34 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     # def __str__(self): return self.as_url_str() if "http" in self else self._str
     def pistol(self):
         import os
-        os.system(f"pistol {self}")
-    def size(self, units: str = 'mb'):  # ===================================== File Specs ==========================================================================================
+        os.system(command=f"pistol {self}")
+    def size(self, units: Literal['b', 'kb', 'mb', 'gb'] = 'mb') -> float:  # ===================================== File Specs ==========================================================================================
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
-        tmp: int = {k: v for k, v in zip(['b', 'kb', 'mb', 'gb', 'B', 'KB', 'MB', 'GB'], 2 * [1024 ** item for item in range(4)])}[units]
-        return round(total_size / tmp, 1)
+        tmp: int
+        match units:
+            case "b": tmp = 1024 ** 0
+            case "kb": tmp = 1024 ** 1
+            case "mb": tmp = 1024 ** 2
+            case "gb": tmp = 1024 ** 3
+        return round(number=total_size / tmp, ndigits=1)
     def time(self, which: Literal["m", "c", "a"] = "m", **kwargs: Any):
-        """* `m`: last mofidication of content, i.e. the time it was created. 
+        """* `m`: last mofidication of content, i.e. the time it was created.
         * `c`: last status change (its inode is changed, permissions, path, but not content)
-        * `a`: last access
+        * `a`: last access (read)
         """
-        tmp = {"m": self.stat().st_mtime, "a": self.stat().st_atime, "c": self.stat().st_ctime}[which]
+        match which:
+            case "m": tmp = self.stat().st_mtime
+            case "a": tmp = self.stat().st_atime
+            case "c": tmp = self.stat().st_ctime
         return datetime.fromtimestamp(tmp, **kwargs)
     def stats(self) -> dict[str, Any]: return dict(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
     # ================================ String Nature management ====================================
-    def _type(self): return ("📄" if self.is_file() else ("📁" if self.is_dir() else "👻NotExist")) if self.absolute() else "📍Relative"
+    def _type(self):
+        if self.absolute():
+            if self.is_file(): return "📄"
+            elif self.is_dir(): return "📁"
+            return "👻NotExist"
+        return "📍Relative"
     def clickable(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().resolve().as_uri()), inlieu)
     def as_url_str(self) -> 'str': return self.as_posix().replace("https:/", "https://").replace("http:/", "http://")
     def as_url_obj(self):
@@ -345,14 +358,17 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         _ = self.parent.create(parents=parents) if parents else None; super(P, self).touch(mode=mode, exist_ok=exist_ok); return self
     def symlink_from(self, src_folder: OPLike = None, src_file: OPLike = None, verbose: bool = False, overwrite: bool = False):
         assert self.expanduser().exists(), "self must exist if this method is used."
-        if src_file is not None: assert src_folder is None, "You can only pass source or source_dir, not both."; result = P(src_file).expanduser().absolute()
-        else: result = P(src_folder or P.cwd()).expanduser().absolute() / self.name
+        if src_file is not None:
+            assert src_folder is None, "You can only pass source or source_dir, not both."
+        result = P(src_folder or P.cwd()).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
     def symlink_to(self, target: PLike, verbose: bool = True, overwrite: bool = False, orig: bool = False):  # pylint: disable=W0237
         self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
-        if __import__("platform").system() == "Windows" and not (tm := __import__("crocodile").meta.Terminal).is_user_admin():  # you cannot create symlink without priviliages.
-            tm.run_as_admin(file=__import__("sys").executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"", wait=2)
+        from platform import system
+        from crocodile.meta import Terminal
+        if system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
+            Terminal.run_as_admin(file=__import__("sys").executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"", wait=True)
         else: super(P, self.expanduser()).symlink_to(str(target))
         return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target)}")
     def resolve(self, strict: bool = False):
@@ -501,9 +517,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def get_env():
         import crocodile.environment as env
         return env
-    def share_on_cloud(self) -> 'P': return P(__import__("requests").put(f"https://transfer.sh/{self.expanduser().name}", self.expanduser().absolute().read_bytes()).text)
+    def share_on_cloud(self, timeout: int = 60_000) -> 'P':
+        import requests
+        return P(requests.put(url=f"https://transfer.sh/{self.expanduser().name}", data=self.expanduser().absolute().read_bytes(), timeout=timeout).text)
     def share_on_network(self, username: OPLike = None, password: Optional[str] = None): from crocodile.meta import Terminal; Terminal(stdout=None).run(f"sharing {self} {('--username ' + str(username)) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
-    def to_qr(self, text: bool = True, path: OPLike = None):
+    def to_qr(self, text: bool = True, path: OPLike = None) -> None:
         qrcode = install_n_import("qrcode"); qr = qrcode.QRCode()
         qr.add_data(str(self) if "http" in str(self) else (self.read_text() if text else self.read_bytes()))
         import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0)
