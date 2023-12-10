@@ -169,14 +169,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             self.search("*").apply(lambda x: x.move(folder=path.parent, content=False, overwrite=overwrite)); return path  # contents live within this directory.
         if overwrite: tmp_path = slf.rename(path.parent.absolute() / randstr()); path.delete(sure=True, verbose=verbose); tmp_path.rename(path)  # works if moving a path up and parent has same name
         else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
-        _ = print(f"MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
+        _ = print(f"🚚 MOVED {repr(self)} ==> {repr(path)}`") if verbose else None; return path
     def copy(self, folder: OPLike = None, name: OPLike = None, path: OPLike = None, content: bool = False, verbose: bool = True, append: Optional[str] = None, overwrite: bool = False, orig: bool = False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
         dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
         dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
         _ = dest.delete(sure=True) if not content and overwrite and dest.exists() else None
         if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
-        if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); _ = print(f"COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
+        if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); _ = print(f"🖨️ COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
         elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); _ = print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
         else: print(f"💥 Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
@@ -573,9 +573,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""
         else: remotepath = P(remotepath)
         localpath = self.expanduser().absolute()
-        localpath += ".zip" if unzip else ""; localpath += ".enc" if decrypt else ""
+        localpath += ".zip" if unzip else ""
+        localpath += ".enc" if decrypt else ""
         rclone_cmd = f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
-        from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`") if verbose else None
+        from crocodile.meta import Terminal, subprocess
+        _ = print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)

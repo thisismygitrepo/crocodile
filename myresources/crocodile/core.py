@@ -346,6 +346,18 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         return fig
 
 
+def robust_call(func: Callable[[], Any], retry: int = 3, sleep: float = 1.0):
+    try:
+        return func()
+    except Exception as ex:
+        if retry == 0: raise ex
+        else:
+            print(f"💥 Robust call failed with {ex}, retrying {retry} more times after sleeping for {sleep} seconds.")
+            import time
+            time.sleep(sleep)
+            return robust_call(func, retry=retry - 1, sleep=sleep)
+
+
 def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None:
     import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
 def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
