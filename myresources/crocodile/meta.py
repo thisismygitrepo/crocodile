@@ -9,7 +9,6 @@ import time
 import logging
 import subprocess
 import sys
-from functools import wraps
 from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO, TypeAlias, Literal, TypeVar
 from dataclasses import dataclass
 
@@ -505,10 +504,13 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
 
 
 class RepeatUntilNoException:
-    def __init__(self, retry: int = 3, sleep: float = 1.0):
+    def __init__(self, retry: int = 3, sleep: float = 1.0, timeout: Optional[float] = None):
         self.retry = retry
         self.sleep = sleep
+        self.timeout = timeout
     def __call__(self, func: Callable[[], T]) -> Callable[[], T]:
+        from functools import wraps
+        if self.timeout is not None: func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
         @wraps(wrapped=func)
         def wrapper(*args: Any, **kwargs: Any):
             for _ in range(self.retry):
