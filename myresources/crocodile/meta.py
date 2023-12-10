@@ -9,7 +9,8 @@ import time
 import logging
 import subprocess
 import sys
-from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO, TypeAlias, Literal
+from functools import wraps
+from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO, TypeAlias, Literal, TypeVar
 from dataclasses import dataclass
 
 
@@ -17,6 +18,7 @@ _ = IO, TextIO
 SHELLS: TypeAlias = Literal["default", "cmd", "powershell", "pwsh", "bash"]  # pwsh.exe is PowerShell (community) and powershell.exe is Windows Powershell (msft)
 CONSOLE: TypeAlias = Literal["wt", "cmd"]
 MACHINE: TypeAlias = Literal["Windows", "Linux", "Darwin"]
+T = TypeVar('T')
 
 
 @dataclass
@@ -273,9 +275,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 self.username = config_dict["user"]
                 self.host = host
                 self.port = int(config_dict.get("port", port))
-                sshkey = tmp[0] if type(tmp := config_dict.get("identityfile", sshkey)) is list else tmp
+                tmp = config_dict.get("identityfile", sshkey)
+                if isinstance(tmp, list): sshkey = tmp[0]
+                else: sshkey = tmp
                 self.proxycommand = config_dict.get("proxycommand", None)
-                if sshkey is not None: sshkey = tmp[0] if type(tmp := config.lookup("*").get("identityfile", sshkey)) is list else tmp
+                if sshkey is not None:
+                    tmp = config.lookup("*").get("identityfile", sshkey)
+                    if type(tmp) is list: sshkey = tmp[0]
+                    else: sshkey = tmp
             except (FileNotFoundError, KeyError):
                 assert "@" in host or ":" in host, f"Host must be in the form of `username@hostname:port` or `username@hostname` or `hostname:port`, but it is: {host}"
                 if "@" in host: self.username, self.hostname = host.split("@")
@@ -297,8 +304,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
-        try: self.sftp = self.ssh.open_sftp()
-        except Exception as err: self.sftp = None; print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
+        try:
+            self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
+        except Exception as err:
+            self.sftp = None
+            print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
         def view_bar(slf: Any, a: Any, b: Any): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
         self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
         self._local_distro: Optional[str] = None
@@ -492,6 +502,25 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
     readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
     _ = print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
+
+
+class RobustCall:
+    def __init__(self, retry: int = 3, sleep: float = 1.0):
+        self.retry = retry
+        self.sleep = sleep
+    def __call__(self, func: Callable[[], T]) -> Callable[[], T]:
+        @wraps(wrapped=func)
+        def wrapper(*args, **kwargs):
+            for _ in range(self.retry):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as ex:
+                    print(f"💥 Robust call failed with {ex}, retrying {self.retry} more times after sleeping for {self.sleep} seconds.")
+                    time.sleep(self.sleep)
+            raise RuntimeError(f"💥 Robust call failed after {self.retry} retries.")
+        return wrapper
+
+
 def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 def monkey_patch(class_inst: Any, func: Callable[[Any], Any]): setattr(class_inst.__class__, func.__name__, func)
 # def capture_locals(func: Callable[[Any], Any], scope: dict[str, Any], args: Optional[Any] = None, self: Optional[str] = None, update_scope: bool = True):
