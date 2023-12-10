@@ -181,7 +181,7 @@ class DataFrameHander:
         df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
         tmp = self.encoder_onehot.transform(df[self.cols_onehot])
         df = df.drop(columns=self.cols_onehot)  # consider inplace=True but make sure it doesn't raise copy warning
-        df.loc[:, self.encoder_onehot.get_feature_names_out()] = tmp
+        df.loc[:, self.encoder_onehot.get_feature_names_out()] = tmp  # type: ignore
         df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy().astype(precision)
         return df
 

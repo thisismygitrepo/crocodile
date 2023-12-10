@@ -504,13 +504,13 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
 
 
-class RobustCall:
+class RepeatUntilNoException:
     def __init__(self, retry: int = 3, sleep: float = 1.0):
         self.retry = retry
         self.sleep = sleep
     def __call__(self, func: Callable[[], T]) -> Callable[[], T]:
         @wraps(wrapped=func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any):
             for _ in range(self.retry):
                 try:
                     return func(*args, **kwargs)
