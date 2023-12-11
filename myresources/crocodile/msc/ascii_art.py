@@ -111,14 +111,14 @@ def character_color(logo: str):
     assert platform.system() == 'Windows', 'This function is only for Windows.'
     # from rgbprint import gradient_scroll, Color
     # gradient_scroll(ArtLib.cowsay("crocodile"), start_color=0x4BBEE3, end_color=Color.medium_violet_red, times=3)
-    _new_art = P.temp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
+    _new_art = P.tmp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
     _new_art.write_text(ArtLib.cowsay(logo))  # utf-8 encoding?
     os.system(f'type {_new_art} | lolcatjs')  # | lolcat
 
 
 def character_or_box_color(logo: str):
     assert platform.system() == 'Linux', 'This function is only for Linux.'
-    _new_art = P.temp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
+    _new_art = P.tmp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
     get_art(logo, artlib=None, file=str(_new_art), verbose=False)
     os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
 
