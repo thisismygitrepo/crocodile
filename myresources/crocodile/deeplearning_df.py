@@ -121,7 +121,9 @@ class NumericalClipper:
             series = df.loc[:, col]
             df.loc[:, col] = series.clip(lower=self.value_min[col], upper=self.value_max[col])
         return df
-
+    def fit_transform(self, df: pd.DataFrame):
+        self.fit(df)
+        return self.transform(df)
     @staticmethod
     def clip_values(y: 'pd.Series[float]', quant_min: float = 0.98, quant_max: float = 0.02):
         los_clip_uppper_hrs = y.quantile(quant_max)
