@@ -348,6 +348,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def validate_name(self, replace: str = '_'): return validate_name(self.trunk, replace=replace)
     # ========================== override =======================================
     def write_text(self, data: str, encoding: str = 'utf-8', newline: Optional[str] = None) -> 'P':
+        self.parent.mkdir(parents=True, exist_ok=True)
         super(P, self).write_text(data, encoding=encoding, newline=newline); return self
     def read_text(self, encoding: Optional[str] = 'utf-8') -> str: return super(P, self).read_text(encoding=encoding)
     def write_bytes(self, data: bytes, overwrite: bool = False) -> 'P':

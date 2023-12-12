@@ -251,8 +251,8 @@ import crocodile.toolbox as tb
 
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
-    def __init__(self, host: Optional[str] = None, username: Optional[str] = None, hostname: Optional[str] = None, tmate_sess: Optional[str] = None, sshkey: Optional[str] = None, pwd: Optional[str] = None, port: int = 22, ve: Optional[str] = "ve", compress: bool = False):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        self.tmate_sess = tmate_sess
+    def __init__(self, host: Optional[str] = None, username: Optional[str] = None, hostname: Optional[str] = None, sshkey: Optional[str] = None, pwd: Optional[str] = None, port: int = 22, ve: Optional[str] = "ve", compress: bool = False):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
+        # self.tmate_sess = tmate_sess
         self.pwd = pwd
         self.ve = ve
         self.compress = compress  # Defaults: (1) use localhost if nothing provided.
@@ -264,7 +264,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.proxycommand: Optional[str] = None
         import platform
         import paramiko  # type: ignore
-        # username, hostname = __import__("getpass").getuser(), platform.node()
+        import getpass
         if isinstance(host, str):
             try:
                 import paramiko.config as pconfig
@@ -286,7 +286,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 assert "@" in host or ":" in host, f"Host must be in the form of `username@hostname:port` or `username@hostname` or `hostname:port`, but it is: {host}"
                 if "@" in host: self.username, self.hostname = host.split("@")
                 else:
-                    self.username = username or __import__("getpass").getuser()
+                    self.username = username or getpass.getuser()
                     self.hostname = host
                 if ":" in self.hostname:
                     self.hostname, port_ = self.hostname.split(":")
@@ -412,7 +412,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if r:
                 tmp: List[P] = scout.files.apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
                 return tmp.list[0]
-            else: print(f"source is a directory! either set r=True for recursive sending or raise zip_first flag.")
+            else: print(f"Source is a directory! either set `r=True` for recursive sending or raise `zip_first=True` flag.")
         target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout.source_full
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z: target = target.unzip(inplace=True, content=True); self.run_py(f"tb.P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)

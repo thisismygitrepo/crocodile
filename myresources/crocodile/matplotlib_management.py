@@ -432,9 +432,9 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
     @staticmethod
     def set_ax_size(ax: Axes, w: float, h: float, units: Literal["inches", "pixels"] = 'inches'):
-        l, r, t, b = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom  # type: ignore
+        left, r, t, b = ax.figure.subplotpars.left, ax.figure.subplotpars.right, ax.figure.subplotpars.top, ax.figure.subplotpars.bottom  # type: ignore
         _ = units
-        if isinstance(ax.figure, Figure): ax.figure.set_size_inches(float(w) / (r - l), float(h) / (t - b))
+        if isinstance(ax.figure, Figure): ax.figure.set_size_inches(float(w) / (r - left), float(h) / (t - b))
     @staticmethod
     def get_ax_size(ax: Axes, units: Literal["inches", "pixels"] = "inches"):
         assert ax.figure is not None, "Figure is not defined yet."
