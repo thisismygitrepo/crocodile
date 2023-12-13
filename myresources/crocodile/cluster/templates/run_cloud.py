@@ -18,13 +18,12 @@ try:
 except (FileNotFoundError, KeyError, IndexError):
     to_email_default = 'random@email.com'
     email_config_name_default = 'enaut'
-try:
-    default_cloud: str = Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
-except (FileNotFoundError, KeyError, IndexError):
-    default_cloud = 'gdrive'
+
+try: default_cloud: str = Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
+except (FileNotFoundError, KeyError, IndexError): default_cloud = 'gdrive'
 
 
-def run_on_cloud(func: Union[str, Callable[..., Any]], split: int, reset_cloud: bool = False, reset_local: bool = False):
+def run_on_cloud(func: Union[str, Callable[[WorkloadParams], Any]], split: int, reset_cloud: bool = False, reset_local: bool = False):
     if hasattr(func, '__doc__'): description = str(func.__doc__)
     else: description = "Description of running an expensive function"
     config = RemoteMachineConfig(

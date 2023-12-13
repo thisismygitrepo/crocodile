@@ -50,6 +50,7 @@ class Log(logging.Logger):  #
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path  # proper update to this value by self.add_filehandler()
         if dialect == "colorlog":
+            install_n_import("colorlog")
             import colorlog
             module: Any = colorlog
             processed_fmt: Any = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
@@ -303,8 +304,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
-        try:
-            self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
+        try: self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
         except Exception as err:
             self.sftp = None
             print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
@@ -359,9 +359,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp = source_obj.search("*", folders=False, r=True)
                 tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
                 return list(tmp)
-            else:
-                print(f"tb.Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
-                raise RuntimeError
+            else: raise RuntimeError(f"tb.Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
         if z: print(f"🗜️ ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None: target = P(source_obj).expanduser().absolute().collapseuser(strict=True); assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=tb.P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
@@ -378,11 +376,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if r:
                 tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser(strict=False)", desc="Searching for files in source", return_obj=True, verbose=False)
                 assert isinstance(tmp11, List), f"Could not resolve source path {source} due to error"
-                for file in tmp11:
-                    self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
-            else:
-                print(f"source `{source}` is a directory! either set r=True for recursive sending or raise zip_first flag.")
-                raise RuntimeError
+                for file in tmp11: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
+            else: raise RuntimeError(f"source `{source}` is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if z:
             tmp: Response = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False)
             tmp2 = tmp.op2path(strict_returncode=True, strict_err=True)
