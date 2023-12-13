@@ -72,57 +72,62 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 
 
 # %% =================================== File ============================================
-def read(path: PLike, **kwargs: Any):
-    suffix = Path(path).suffix[1:]
-    if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
-    if suffix == "sqlite":
-        from crocodile.database import DBMS
-        return DBMS.from_local_db(path=path)
-    try: return getattr(Read, suffix)(str(path), **kwargs)
-    except AttributeError as err:
-        if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
-        if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-        try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
-        except ImportError as err2: print(f"💥 Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
-def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
-    try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
-    except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
-    _ = r
-    return mydict
-def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict etc
-    with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
-    _ = r
-    return mydict
-def ini(path: PLike):
-    if not Path(path).exists() or Path(path).is_dir(): raise FileNotFoundError(f"File not found: {path}")
-    import configparser; res = configparser.ConfigParser(); res.read(filenames=[str(path)]); return res
-def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
-def npy(path: PLike, **kwargs: Any):
-    import numpy as np
-    data = np.load(str(path), allow_pickle=True, **kwargs)
-    # data = data.item() if data.dtype == np.object else data
-    return data
 # def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
-def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
-def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return __import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name)
-def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
-def dill(path: PLike, **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
-def vanilla_pickle(path: PLike, **kwargs: Any): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
-def txt(path: PLike, encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
+
 class Read:
-    read = staticmethod(read)
-    json = staticmethod(json)
-    yaml = staticmethod(yaml)
-    ini = staticmethod(ini)
-    npy = staticmethod(npy)
-    csv = staticmethod(csv)
+    @staticmethod
+    def read(path: PLike, **kwargs: Any):
+        suffix = Path(path).suffix[1:]
+        if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
+        if suffix == "sqlite":
+            from crocodile.database import DBMS
+            return DBMS.from_local_db(path=path)
+        try: return getattr(Read, suffix)(str(path), **kwargs)
+        except AttributeError as err:
+            if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
+            if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
+            try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
+            except ImportError as err2: print(f"💥 Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
+    @staticmethod
+    def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
+        try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
+        except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
+        _ = r
+        return mydict
+    @staticmethod
+    def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict etc
+        with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
+        _ = r
+        return mydict
+    @staticmethod
+    def ini(path: PLike):
+        if not Path(path).exists() or Path(path).is_dir(): raise FileNotFoundError(f"File not found: {path}")
+        import configparser; res = configparser.ConfigParser(); res.read(filenames=[str(path)]); return res
+    @staticmethod
+    def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
+
+    @staticmethod
+    def npy(path: PLike, **kwargs: Any):
+        import numpy as np
+        data = np.load(str(path), allow_pickle=True, **kwargs)
+        # data = data.item() if data.dtype == np.object else data
+        return data
+    @staticmethod
+    def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
+
+    @staticmethod
+    def vanilla_pickle(path: PLike, **kwargs: Any): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
     pkl = staticmethod(vanilla_pickle)
-    vanilla_pickle = staticmethod(vanilla_pickle)
     pickle = staticmethod(vanilla_pickle)
-    dill = staticmethod(dill)
-    py = staticmethod(py)
-    toml = staticmethod(toml)
-    txt = staticmethod(txt)
+    @staticmethod
+    def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
+    @staticmethod
+    def dill(path: PLike, **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+
+    @staticmethod
+    def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return __import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name)
+    @staticmethod
+    def txt(path: PLike, encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
 
 
 def modify_text(txt_raw: str, txt_search: str, txt_alt: Union[str, Callable[[str], str]], replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):

@@ -385,8 +385,7 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
                 for ax in self.fig.axes:
                     for im in ax.images: im.set_cmap(cmap)  # type: ignore
             else:
-                for im in ax.images:
-                    im.set_cmap(cmap)
+                for im in ax.images: im.set_cmap(cmap)
             self.message = f"Color map changed to {ax.images[0].cmap.name}"  # type: ignore
     def show_pix_val(self, event: Any):
         if (ax := event.inaxes) is not None:
