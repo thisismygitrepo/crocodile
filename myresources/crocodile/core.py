@@ -48,7 +48,7 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
             path.parent.mkdir(parents=True, exist_ok=True)
             func(path=path, obj=obj, **kwargs)
             if verbose:
-                try: print(f"💽 SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB")  # |  Directory: `{path.parent.absolute().as_uri()}`
+                try: print(f"💽 SAVED {desc or path.name} {obj.__class__.__name__}: {Display.f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB")  # |  Directory: `{path.parent.absolute().as_uri()}`
                 except UnicodeEncodeError as err: print(f"crocodile.core: Warning: UnicodeEncodeError: {err}")
             return path
         return wrapper
@@ -132,7 +132,7 @@ class Base(object):
 
 class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
     def __init__(self, obj_list: Union[ListType[T], None, Iterator[T], Iterable[T]] = None) -> None: super().__init__(); self.list = list(obj_list) if obj_list is not None else []
-    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
     def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]):
         res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)])
         _ = print(res) if not return_str else None; _ = kwargs
@@ -252,7 +252,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def spawn_from_values(self, values: Union[list[Any], List[Any]]) -> 'Struct': return self.from_keys_values(list(self.keys()), values)
     def spawn_from_keys(self, keys: Union[list[str], List[str]]) -> 'Struct': return self.from_keys_values(keys, list(self.values()))
     def to_default(self, default: Optional[Callable[[], Any]] = lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
-    def __str__(self, sep: str = "\n"): return config(self.__dict__, sep=sep)
+    def __str__(self, sep: str = "\n"): return Display.config(self.__dict__, sep=sep)
     def __getattr__(self, item: str) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError as ke: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from ke  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
@@ -292,7 +292,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         import pandas as pd
         import numpy as np
         col2: List[Any] = self.values().apply(lambda x: str(type(x)).split("'")[1])
-        col3: List[Any] = self.values().apply(lambda x: get_repr(x, justify=justify, limit=limit).replace("\n", " "))
+        col3: List[Any] = self.values().apply(lambda x: Display.get_repr(x, justify=justify, limit=limit).replace("\n", " "))
         array = np.array([self.keys(), col2, col3]).T
         res: pd.DataFrame = pd.DataFrame(array, columns=["key", "dtype", "details"])
         return res if not return_str else str(res)
@@ -309,7 +309,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
             else: print(f"Empty Struct."); return None
         else:
             if as_yaml or as_config:
-                tmp: str = install_n_import("yaml", package="pyyaml").dump(self.__dict__) if as_yaml else config(self.__dict__, justify=justify, **kwargs)
+                tmp: str = install_n_import("yaml", package="pyyaml").dump(self.__dict__) if as_yaml else Display.config(self.__dict__, justify=justify, **kwargs)
                 if return_str: return tmp
                 else:
                     from rich.syntax import Syntax
@@ -345,32 +345,31 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         fig.show()
         return fig
 
-
-def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None:
-    import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
-def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
-def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: str = 'fixed', **kwargs: Any) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
-def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
-def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
-def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
-def outline(array: 'Any', name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; _ = print(str_) if printit else None; return str_
-def get_repr(data: Any, justify: int = 15, limit: int = 10000, direc: str = "<") -> str:
-    if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
-    elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {get_repr(data.keys().to_list())}."
-    else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
-    return f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
-def print_string_list(mylist: list[Any], char_per_row: int = 125, sep: str = " ", style: Callable[[Any], str] = str, _counter: int = 0):
-    for item in mylist: _ = print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 class Display:
-    set_pandas_display = staticmethod(set_pandas_display)
-    set_pandas_auto_width = staticmethod(set_pandas_auto_width)
-    set_numpy_display = staticmethod(set_numpy_display)
-    config = staticmethod(config)
-    f = staticmethod(f)
-    eng = staticmethod(eng)
-    outline = staticmethod(outline)
-    get_repr = staticmethod(get_repr)
-    print_string_list = staticmethod(print_string_list)  # or D = type('D', (object, ), dict(set_pandas_display
+    @staticmethod
+    def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None:
+        import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
+    @staticmethod
+    def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
+    @staticmethod
+    def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: str = 'fixed', **kwargs: Any) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
+    @staticmethod
+    def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+    @staticmethod
+    def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
+    @staticmethod
+    def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+    @staticmethod
+    def outline(array: 'Any', name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; _ = print(str_) if printit else None; return str_
+    @staticmethod
+    def get_repr(data: Any, justify: int = 15, limit: int = 10000, direc: str = "<") -> str:
+        if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
+        elif dtype in {"DataFrame", "Series"}: str_ = f"Pandas DF: shape = {data.shape}, dtype = {data.dtypes}." if dtype == 'DataFrame' else f"Pandas Series: Length = {len(data)}, Keys = {Display.get_repr(data.keys().to_list())}."
+        else: str_ = f"shape = {data.shape}, dtype = {data.dtype}." if dtype == 'ndarray' else repr(data)
+        return Display.f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
+    @staticmethod
+    def print_string_list(mylist: list[Any], char_per_row: int = 125, sep: str = " ", style: Callable[[Any], str] = str, _counter: int = 0):
+        for item in mylist: _ = print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 
 
 if __name__ == '__main__':
