@@ -128,7 +128,6 @@ class Read:
         import dill
         obj = dill.loads(str=P(path).read_bytes(), **kwargs)
         return obj
-
     @staticmethod
     def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return __import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name)
     @staticmethod

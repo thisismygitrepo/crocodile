@@ -55,42 +55,50 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
     return decorator
 
 
-@save_decorator(".json")
-def json(obj: Any, path: PLike, indent: Union[str, int, None] = None, encoding: str = 'utf-8', **kwargs: Any):
-    _ = encoding
-    import json as jsonlib
-    return Path(path).write_text(jsonlib.dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
-@save_decorator(".yml")
-def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-    with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
-@save_decorator(".toml")
-def toml(obj: dict[Any, Any], path: PLike, encoding: str = 'utf-8'): return Path(path).write_text(install_n_import("toml").dumps(obj), encoding=encoding)
-@save_decorator(".ini")
-def ini(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-    conf = install_n_import("configparser").ConfigParser(); conf.read_dict(obj)
-    with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
-@save_decorator(".csv")
-def csv(obj: Any, path: PLike): return obj.to_frame('dtypes').reset_index().to_csv(str(path) + ".dtypes")
-@save_decorator(".npy")
-def npy(obj: Any, path: PLike, **kwargs: Any): return __import__('numpy').save(path, obj, **kwargs)
-# @save_decorator(".mat")
-# def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
-@save_decorator(".pkl")
-def vanilla_pickle(obj: Any, path: PLike, **kwargs: Any): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
-@save_decorator(".pkl")
-def pickle(obj: Any, path: PLike, r: bool = False, **kwargs: Any): return Path(path).write_bytes(__import__("dill").dumps(obj, recurse=r, **kwargs))  # In IPyconsole of Pycharm, this works only if object is of a an imported class. Don't use with objects defined at main.
-def pickles(obj: Any, r: bool = False, **kwargs: Any): return __import__("dill").dumps(obj, r=r, **kwargs)
+# def pickles(obj: Any, r: bool = False, **kwargs: Any): return __import__("dill").dumps(obj, r=r, **kwargs)
 class Save:
-    json = json
-    yaml = yaml
-    toml = toml
-    ini = ini
-    csv = csv
-    npy = npy
-    # mat = mat
-    vanilla_pickle = vanilla_pickle
-    pickle = pickle
-    pickles = pickles
+    @staticmethod
+    @save_decorator(".json")
+    def json(obj: Any, path: PLike, indent: Union[str, int, None] = None, encoding: str = 'utf-8', **kwargs: Any):
+        _ = encoding
+        import json as jsonlib
+        return Path(path).write_text(jsonlib.dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
+    @staticmethod
+    @save_decorator(".yml")
+    def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
+        with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
+    @staticmethod
+    @save_decorator(".toml")
+    def toml(obj: dict[Any, Any], path: PLike, encoding: str = 'utf-8'): return Path(path).write_text(install_n_import("toml").dumps(obj), encoding=encoding)
+    @staticmethod
+    @save_decorator(".ini")
+    def ini(obj: dict[Any, Any], path: PLike, **kwargs: Any):
+        conf = install_n_import("configparser").ConfigParser(); conf.read_dict(obj)
+        with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
+    @staticmethod
+    @save_decorator(".csv")
+    def csv(obj: Any, path: PLike): return obj.to_frame('dtypes').reset_index().to_csv(str(path) + ".dtypes")
+    @staticmethod
+    @save_decorator(".npy")
+    def npy(obj: Any, path: PLike, **kwargs: Any): return __import__('numpy').save(path, obj, **kwargs)
+    # @save_decorator(".mat")
+    # def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
+    @staticmethod
+    @save_decorator(".pkl")
+    def vanilla_pickle(obj: Any, path: PLike, **kwargs: Any): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
+    @staticmethod
+    @save_decorator(".pkl")
+    def pickle(obj: Any, path: PLike, **kwargs: Any):
+        import pickle
+        data = pickle.dumps(obj=obj, **kwargs)
+        return Path(path).write_bytes(data=data)
+        # pickles = pickles
+    @staticmethod
+    @save_decorator(".pkl")
+    def dill(obj: Any, path: PLike, **kwargs: Any):
+        import dill
+        data = dill.dumps(obj=obj, **kwargs)
+        return Path(path).write_bytes(data=data)
 
 
 # ====================================== Object Management ====================================
