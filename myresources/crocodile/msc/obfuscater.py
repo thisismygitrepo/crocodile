@@ -4,14 +4,24 @@
 
 import crocodile.toolbox as tb
 from typing import Any, Optional
+import base64
+
+
+def obfuscate(seed: str, data: str):
+    xored = ''.join(chr(ord(x) ^ ord(y)) for (x,y) in zip(data, seed*len(data)))
+    return base64.urlsafe_b64encode(xored.encode()).decode()
+
+
+def deobfuscate(seed: str, data: str):
+    xored = base64.urlsafe_b64decode(data.encode()).decode()
+    return ''.join(chr(ord(x) ^ ord(y)) for (x,y) in zip(xored, seed*len(xored)))
 
 
 class Obfuscator(tb.Base):
-    def __init__(self, directory: str, noun: bool = False, suffix: str = "same", **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, directory: str, noun: bool = False, suffix: str = "same") -> None:
+        super().__init__()
         self.directory = tb.P(directory).expanduser().absolute()
         assert self.directory.is_dir()
-        # self.directory_r_obf = tb.randstr(noun=self.noun)
         self.real_to_phony: dict[str, str] = {}  # reltive string -> relative string
         self.phony_to_real: dict[str, str] = {}  # reltive string -> relative string
         self.noun = noun
@@ -47,7 +57,11 @@ class Obfuscator(tb.Base):
             base.joinpath(path_real.relative_to(self.directory)).symlink_to(path_obf)
 
     @staticmethod
-    def lcd(path1: tb.P, path2: tb.P): return tb.P("/".join([part1 for part1, part2 in zip(tb.P(path1).expanduser().absolute().parts, tb.P(path2).expanduser().absolute().parts) if part1 == part2]))
+    def lcd(path1: tb.P, path2: tb.P):
+        it1 = tb.P(path1).expanduser().absolute().parts
+        it2 = tb.P(path2).expanduser().absolute().parts
+        parts = [part1 for part1, part2 in zip(it1, it2) if part1 == part2]
+        return tb.P("/".join(parts))
 
     def _execute_map(self, path: tb.P, forward: bool) -> None:
         assert path.is_dir()
@@ -66,9 +80,7 @@ class Obfuscator(tb.Base):
 
     def build_map(self):
         assert len(self.real_to_phony) == 0
-        # self.folders_abs = self.directory.search("*", files=False, r=True)
-        # self.files_abs = self.directory.search("*", folders=False, r=True)
-        self._build_map(self.directory, "")
+        self._build_map(path=self.directory, path_r_obf="")
         self.display()
 
     def _build_map(self, path: tb.P, path_r_obf: str):

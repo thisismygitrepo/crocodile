@@ -5,7 +5,7 @@ File
 
 # %%
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
+from crocodile.core import List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime, timedelta
 from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal, NoReturn, Protocol
 
@@ -17,9 +17,9 @@ SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
 
 
 # %% =============================== Security ================================================
-def obscure(msg: bytes) -> bytes: return __import__("base64").urlsafe_b64encode(__import__("zlib").compress(msg, 9))
+def obscure(msg: bytes) -> bytes: import base64; import zlib; return base64.urlsafe_b64encode(zlib.compress(msg, 9))
 def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
-def hashpwd(password: str): import bcrypt; return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+def hashpwd(password: str): import bcrypt; return bcrypt.hashpw(password=password.encode(), salt=bcrypt.gensalt()).decode()
 def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
     import base64
     if salt is None:
@@ -123,7 +123,10 @@ class Read:
     @staticmethod
     def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
     @staticmethod
-    def dill(path: PLike, **kwargs: Any) -> Any: obj = __import__("dill").loads(P(path).read_bytes(), **kwargs); return Struct(obj) if type(obj) is dict else obj
+    def dill(path: PLike, **kwargs: Any) -> Any:
+        import dill
+        obj = dill.loads(str=P(path).read_bytes(), **kwargs)
+        return obj
 
     @staticmethod
     def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return __import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name)
@@ -163,7 +166,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); _ = print(f"🗑️ ❌ DELETED {repr(self)}.") if verbose else None; return self
     def send2trash(self, verbose: bool = True) -> 'P':
         if self.exists():
-            install_n_import("send2trash").send2trash(self.resolve().str)
+            install_n_import(library="send2trash").send2trash(self.resolve().str)
             _ = print(f"🗑️ TRASHED {repr(self)}") if verbose else None; return self  # do not expand user symlinks.
         elif verbose: print(f"💥 Could NOT trash {self}"); return self
         return self
@@ -540,7 +543,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         qr.add_data(str(self) if "http" in str(self) else (self.read_text() if text else self.read_bytes()))
         import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0)
         print(f.read()); _ = qr.make_image().save(path) if path is not None else None
-    def get_remote_path(self, root: Optional[str], os_specific: bool = False, rel2home: bool = True, strict: bool = True) -> 'P':
+    def get_remote_path(self, root: Optional[str], os_specific: bool = False, rel2home: bool = True, strict: bool = True, obfuscate: bool = False) -> 'P':
         tmp1: str = (__import__('platform').system().lower() if os_specific else 'generic_os')
         if not rel2home: path = self
         else:
@@ -548,22 +551,24 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             except ValueError as ve:
                 if strict: raise ve
                 path = self
-        if isinstance(root, str):
-            # the following is to avoid the confusing behaviour of A.joinpath(B) if B is absolute.
+        if obfuscate:
+            from crocodile.msc.obfuscater import obfuscate as obfuscate_func
+            path = path.with_name(name=obfuscate_func(seed=P.home().joinpath('dotfiles/creds/data/obfuscation_seed').read_text().rstrip(), data=path.name))
+        if isinstance(root, str):  # the following is to avoid the confusing behaviour of A.joinpath(B) if B is absolute.
             part1 = path.parts[0]
             if part1 == "/": sanitized_path = path[1:].as_posix()
-            # elif ":\\" in part1: sanitized_path = part1.replace(":\\", ":") + "/" + path[1:].as_posix()
             else: sanitized_path = path.as_posix()
             return P(root + "/" + tmp1 + "/" + sanitized_path)
         return tmp1 / path
-    def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False, encrypt: bool = False,  # pylint: disable=W0621, W0622
+    def to_cloud(self, cloud: str, remotepath: OPLike = None, zip: bool = False,encrypt: bool = False,  # pylint: disable=W0621, W0622
                  key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, strict: bool = True,
+                 obfuscate: bool = False,
                  share: bool = False, verbose: bool = True, os_specific: bool = False, transfers: int = 10, root: Optional[str] = "myhome") -> 'P':
         localpath, to_del = self.expanduser().absolute(), []
         if zip: localpath = localpath.zip(inplace=False); to_del.append(localpath)
         if encrypt: localpath = localpath.encrypt(key=key, pwd=pwd, inplace=False); to_del.append(localpath)
         if remotepath is None:
-            rp = localpath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)  # if rel2home else (P(root) / localpath if root is not None else localpath)
+            rp = localpath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict, obfuscate=obfuscate)  # if rel2home else (P(root) / localpath if root is not None else localpath)
         else: rp = P(remotepath)
         rclone_cmd = f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
         from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`") if verbose else None
@@ -580,7 +585,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             return tmp
         return self
     def from_cloud(self, cloud: str, remotepath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
-                   key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True,
+                   key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True, obfuscate: bool = False,
                    transfers: int = 10, root: Optional[str] = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
         if remotepath is None:
             remotepath = self.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
