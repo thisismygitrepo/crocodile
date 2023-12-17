@@ -23,7 +23,24 @@ def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/s
 
 class Email:
     @staticmethod
-    def get_source_of_truth(): return tb.P.home().joinpath("dotfiles/machineconfig/emails.ini").readit()
+    def get_source_of_truth():
+        path = tb.P.home().joinpath("dotfiles/machineconfig/emails.ini")
+        if not path.exists():
+            raise FileNotFoundError(f"""File not found: {path}. It should be an ini file with this structure
+[resend]
+api_key = xxx
+
+[config1]
+email_add = a@b.com
+password = 123
+smtp_host = a@b.com
+smtp_port = 465
+imap_host = b@c.com
+imap_port = 465
+encryption = ssl
+
+""")
+        return tb.Read.ini(path=path)
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
@@ -88,8 +105,25 @@ class Email:
     def close(self): self.server.quit()    # Closing is vital as many servers do not allow mutiple connections.
 
     @staticmethod
-    def send_and_close(config_name: str, to: str, subject: str, msg: str):
-        tmp = Email(config=Email.get_source_of_truth()[config_name]); tmp.send_message(to, subject, msg); tmp.close()
+    def send_and_close(config_name: Optional[str], to: str, subject: str, msg: str):
+        """If config_name is None, it sends from a generic email address."""
+        if config_name is None:
+            resend = tb.install_n_import("resend")
+            try:
+                resend.api_key = Email.get_source_of_truth()['resend']['api_key']
+            except KeyError as ke:
+                raise KeyError("You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file.") from ke
+            r = resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": to,
+            "subject": subject,
+            "html": msg
+            })
+            return r
+        else:
+            tmp = Email(config=Email.get_source_of_truth()[config_name])
+            tmp.send_message(to, subject, msg)
+            tmp.close()
 
 
 class PhoneNotification:  # security concerns: avoid using this.

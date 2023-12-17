@@ -585,7 +585,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             return tmp
         return self
     def from_cloud(self, cloud: str, remotepath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621
-                   key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True, obfuscate: bool = False,
+                   key: Optional[bytes] = None, pwd: Optional[str] = None, rel2home: bool = False, os_specific: bool = False, strict: bool = True,
                    transfers: int = 10, root: Optional[str] = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
         if remotepath is None:
             remotepath = self.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
@@ -596,7 +596,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         localpath += ".enc" if decrypt else ""
         rclone_cmd = f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
         from crocodile.meta import Terminal, subprocess
-        _ = print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`") if verbose else None
+        if verbose: print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`")
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
