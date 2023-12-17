@@ -121,7 +121,8 @@ encryption = ssl
             })
             return r
         else:
-            tmp = Email(config=Email.get_source_of_truth()[config_name])
+            config = dict(Email.get_source_of_truth()[config_name])
+            tmp = Email(config=config)
             tmp.send_message(to, subject, msg)
             tmp.close()
 
