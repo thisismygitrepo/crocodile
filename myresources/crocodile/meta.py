@@ -486,12 +486,12 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
     if obj_path is not None:
         text += f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator
         try:
-            repo = install_n_import("git", "gitpython").Repo(obj_path.parent, search_parent_directories=True)
+            repo = install_n_import(library="git", package="gitpython").Repo(obj_path.parent, search_parent_directories=True)
             text += f"# Last Commit\n{repo.git.execute('git log -1')}{separator}# Remote Repo\n{repo.git.execute('git remote -v')}{separator}"
             try: tmppp = obj_path.relative_to(repo.working_dir).as_posix()
             except Exception: tmppp = ""  # type: ignore
             text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{tmppp}{separator}"
-        except Exception: text += f"Could not read git repository @ `{obj_path.parent}`.\n"
+        except Exception as ex: text += f"Could not read git repository @ `{obj_path.parent}`\n{ex}.\n"
     text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
     _ = print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None

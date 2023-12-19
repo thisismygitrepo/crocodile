@@ -177,7 +177,12 @@ class DataReader:
             self.specs.op_shapes = []
             self.specs.other_shapes = []
             for data_name, data_value in data_dict.items():
-                a_shape = data_value.iloc[0].shape if type(data_value) in {pd.DataFrame, pd.Series} else np.array(data_value[0]).shape
+                if type(data_value) in {pd.DataFrame, pd.Series}:
+                    a_shape = data_value.iloc[0].shape
+                else:
+                    try: item = data_value[0]
+                    except IndexError as ie: raise IndexError(f"Data name: {data_name}, data value: {data_value}") from ie
+                    a_shape = np.array(item).shape
                 if data_name in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
                 elif data_name in self.specs.op_names: self.specs.op_shapes.append(a_shape)
                 elif data_name in self.specs.other_names: self.specs.other_shapes.append(a_shape)

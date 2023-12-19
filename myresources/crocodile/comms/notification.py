@@ -109,10 +109,8 @@ encryption = ssl
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
             resend = tb.install_n_import("resend")
-            try:
-                resend.api_key = Email.get_source_of_truth()['resend']['api_key']
-            except KeyError as ke:
-                raise KeyError("You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file.") from ke
+            try: resend.api_key = Email.get_source_of_truth()['resend']['api_key']
+            except KeyError as ke: raise KeyError("You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file.") from ke
             r = resend.Emails.send({
             "from": "onboarding@resend.dev",
             "to": to,
