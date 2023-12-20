@@ -9,29 +9,23 @@ rich
 psutil
 
 # dev
-mypy
-dash
-plotly
-dash_bootstrap_components
-dash_daq
-tensorflow
+#mypy
+#dash
+#plotly
+#dash_bootstrap_components
+#dash_daq
+#tensorflow
+#tensorboard
 sqlalchemy
-scikit-learn
-
-# gdrive
-# google-api-python-client  # The Google APIs Client Library for Python:  https://developers.google.com/drive/api/quickstart/python
-# google-auth
-# google_auth_oauthlib  # libraries for user authorization
-# google-auth-httplib2  # libraries for user authorizatio (AS WELL)
+# scikit-learn
 
 
 # Accessories
 joblib  # multitasking
-pip  # package management.
-setuptools  # for packaging
-wheel  # for packaging
-twine  # for pushing package to pypi.org
-pytest  # popular alternative to builtint unittest
+#setuptools  # for packaging
+#wheel  # for packaging
+#twine  # for pushing package to pypi.org
+# pytest  # popular alternative to builtint unittest
 ipython  # interactive python
 # jupyterlab  # for jupyter notebook
 fire  # for automatic CLI interface
@@ -44,7 +38,8 @@ paramiko  # for SSH
 requests  # interacting with web
 pyyaml  # storing yaml files.
 
-# scikit-image  # image processing.  heavy weight library.
-# torch  # for deep learning
-# tensorflow  # for deep learning
-# tensorboard
+colorlog
+
+click
+#types-requests
+#types-paramiko
