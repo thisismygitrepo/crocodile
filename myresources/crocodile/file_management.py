@@ -121,7 +121,11 @@ class Read:
     def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
 
     @staticmethod
-    def vanilla_pickle(path: PLike, **kwargs: Any): return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
+    def vanilla_pickle(path: PLike, **kwargs: Any):
+        try: return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
+        except Exception as ex:
+            print(f"💥 Failed to load pickle file {path} with error: {ex}")
+            raise ex
     pkl = staticmethod(vanilla_pickle)
     pickle = staticmethod(vanilla_pickle)
     @staticmethod
@@ -451,7 +455,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else:
             arcname_obj = P(arcname or slf.name)
             if arcname_obj.name != slf.name: arcname_obj /= slf.name  # arcname has to start from somewhere and end with filename
-            if slf.is_file(): path = Compression.zip_file(ip_path=str(slf), op_path=str(path + f".zip" if path.suffix != ".zip" else path), arcname=arcname_obj, mode=mode, **kwargs)
+            if slf.is_file():
+                path = Compression.zip_file(ip_path=str(slf), op_path=str(path + f".zip" if path.suffix != ".zip" else path), arcname=str(arcname_obj), mode=mode, **kwargs)
             else:
                 if content: root_dir, base_dir = slf, "."
                 else: root_dir, base_dir = slf.split(at=str(arcname_obj[0]), sep=1)[0], str(arcname_obj)
@@ -464,8 +469,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
         slf = zipfile = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
-            if (ztype := [item for item in (".zip", ".7z", "") if item in str(slf)][0]) == "": return slf
-            zipfile, name = slf.split(at=str(List(slf.parts).filter(lambda x: ztype in x)[0]), sep=-1)
+            tmp__ = [item for item in (".zip", ".7z", "") if item in str(slf)]
+            ztype = tmp__[0]
+            if ztype == "": return slf
+            zipfile, name__ = slf.split(at=str(List(slf.parts).filter(lambda x: ztype in x)[0]), sep=-1)
+            name = str(name__)
         folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
         folder = folder if not content else folder.parent
         if slf.suffix == ".7z":
