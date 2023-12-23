@@ -108,9 +108,13 @@ encryption = ssl
     def send_and_close(config_name: Optional[str], to: str, subject: str, msg: str):
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
+            config = Email.get_source_of_truth()
             resend = tb.install_n_import("resend")
-            try: resend.api_key = Email.get_source_of_truth()['resend']['api_key']
+            try:
+                resend.api_key = config['resend']['api_key']
+                to = config["resend"]["signup_email"]
             except KeyError as ke: raise KeyError("You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file.") from ke
+
             r = resend.Emails.send({
             "from": "onboarding@resend.dev",
             "to": to,
