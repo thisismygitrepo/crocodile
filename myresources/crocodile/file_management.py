@@ -733,7 +733,8 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
 
     @staticmethod
     def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> Callable[[Callable[[], 'T']], 'Cache']:
-        def decorator(source_func: Callable[[], 'T']) -> 'Cache': return Cache(source_func=source_func, expire=expire, logger=logger, path=path, saver=saver, reader=reader, name=name)
+        def decorator(source_func: Callable[[], 'T']) -> 'Cache':
+            return Cache(source_func=source_func, expire=expire, logger=logger, path=path, saver=saver, reader=reader, name=name)
         return decorator
 
 
