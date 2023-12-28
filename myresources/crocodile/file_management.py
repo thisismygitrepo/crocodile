@@ -730,7 +730,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 else: self.save(self.cache, self.path)
             else:
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
-        return self.cache  # type: ignore
+        return self.cache
 
     @staticmethod
     def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.pickle,
