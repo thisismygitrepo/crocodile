@@ -690,7 +690,8 @@ class PrintFunc(Protocol):
 
 
 class Cache(Generic['T']):  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
-    def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
+    def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
+                 saver: Callable[[T, PLike], Any] = Save.pickle, reader: Callable[[PLike], T] = Read.pickle, name: Optional[str] = None) -> None:
         self.cache: Optional['T'] = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path: Optional[P] = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
