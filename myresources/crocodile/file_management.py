@@ -691,7 +691,7 @@ class PrintFunc(Protocol):
 
 class Cache:  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
     def __init__(self, source_func: Callable[[], 'T'], expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> None:
-        self.cache: Optional[T] = None  # fridge content
+        self.cache: Optional['T'] = None  # fridge content
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path: Optional[P] = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.time_produced = datetime.now()  # if path is None else
@@ -730,6 +730,11 @@ class Cache:  # This class helps to accelrate access to latest data coming from 
             else:
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
         return self.cache  # type: ignore
+
+    @staticmethod
+    def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.vanilla_pickle, reader: Callable[[PLike], T] = Read.read, name: Optional[str] = None) -> Callable[[Callable[[], 'T']], 'Cache']:
+        def decorator(source_func: Callable[[], 'T']) -> 'Cache': return Cache(source_func=source_func, expire=expire, logger=logger, path=path, saver=saver, reader=reader, name=name)
+        return decorator
 
 
 if __name__ == '__main__':

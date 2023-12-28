@@ -520,7 +520,7 @@ class BaseModel(ABC):
                 loss_dict[name].append(np.array(loss).item())
         return pd.DataFrame(loss_dict)
 
-    def save_class(self, weights_only: bool = True, version: str = 'v0', strict: bool = True, **kwargs: Any):
+    def save_class(self, weights_only: bool = True, version: str = 'v0', strict: bool = True, desc: str = ""):
         """Simply saves everything:
         1. Hparams
         2. Data specs
@@ -532,7 +532,7 @@ class BaseModel(ABC):
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
         tb.Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, **kwargs)
+        try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
