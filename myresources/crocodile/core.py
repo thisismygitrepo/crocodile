@@ -4,8 +4,9 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union, Generic, TypeVar, Type, List as ListType, Any, Iterator, Callable, Iterable, Hashable, Protocol
+from typing import Optional, Union, Generic, TypeVar, Type, Literal, List as ListType, Any, Iterator, Callable, Iterable, Hashable, Protocol
 import datetime
+
 
 _Slice = TypeVar('_Slice', bound='Slicable')
 class Slicable(Protocol):
@@ -210,7 +211,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         # assert isinstance(key, slice)
         return List(self.list[key])  # type: ignore # noqa: call-overload  # slices
     def apply(self, func: Union[Callable[[T], T3], Callable[[T, T2], T3]], *args: Any, other: Optional['List[T]'] = None, filt: Callable[[T], bool] = lambda _x: True,
-              jobs: Optional[int] = None, prefer: Optional[str] = [None, 'processes', 'threads'][0], verbose: bool = False, desc: Optional[str] = None, **kwargs: Any,
+              jobs: Optional[int] = None, prefer: Optional[Literal['processes', 'threads']] = None, verbose: bool = False, desc: Optional[str] = None, **kwargs: Any,
               ) -> 'Union[List[Union[T2, T3]], List[T3]]':
         # if depth > 1: self.apply(lambda x: x.apply(func, *args, other=other, jobs=jobs, depth=depth - 1, **kwargs))
         from tqdm import tqdm
