@@ -503,7 +503,7 @@ class RepeatUntilNoException:
         self.retry = retry
         self.sleep = sleep
         self.timeout = timeout
-    def __call__(self, func: Callable[[], T]) -> Callable[[], T]:
+    def __call__(self, func: Callable[..., T]) -> Callable[..., T]:
         from functools import wraps
         if self.timeout is not None: func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
         @wraps(wrapped=func)
