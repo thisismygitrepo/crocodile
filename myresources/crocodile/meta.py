@@ -241,7 +241,10 @@ class Terminal:
         else: load_func_string = f"""obj = tb.P(r'{Save.pickle(obj=func, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()"""
         return Terminal().run_py(load_func_string + load_kwargs_string + f"\n{cmd}\n" + run_string, header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
-    def replicate_session(cmd: str = ""): __import__("dill").dump_session(file := P.tmpfile(suffix=".pkl"), main=sys.modules[__name__]); Terminal().run_py(script=f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}""")
+    def replicate_session(cmd: str = ""):
+        import dill; file = file = P.tmpfile(suffix=".pkl")
+        script = f"""path = tb.P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}"""
+        dill.dump_session(file, main=sys.modules[__name__]); Terminal().run_py(script=script)
     @staticmethod
     def get_header(wdir: OPLike = None): return f"""
 # >> Code prepended
@@ -519,6 +522,13 @@ class RepeatUntilNoException:
                     time.sleep(self.sleep)
             raise RuntimeError(f"💥 Robust call failed after {self.retry} retries.")
         return wrapper
+
+
+# @RepeatUntilNoException()
+# def add(a: int, b: int):
+#     return a + b
+
+# c = add(1, 2)
 
 
 def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)

@@ -4,16 +4,16 @@ This module contains classes that can be used to preprocess dataframes for deep 
 """
 
 
-from typing import Optional, Any, Union
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
 from sklearn.preprocessing import StandardScaler, RobustScaler  # type: ignore
 from sklearn.impute import SimpleImputer  # type: ignore
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder  # type: ignore
-# import crocodile.toolbox as tb
 from crocodile.file_management import P, install_n_import
+# import crocodile.toolbox as tb
 # from crocodile.deeplearning import DataReader
+from typing import Optional, Any, Union
 
 
 class CategoricalClipper:
