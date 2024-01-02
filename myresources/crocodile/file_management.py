@@ -222,8 +222,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def download(self, folder: OPLike = None, name: Optional[str]= None, allow_redirects: bool = True, timeout: Optional[int] = None, params: Any = None) -> 'P':
         import requests
         response = requests.get(self.as_url_str(), allow_redirects=allow_redirects, timeout=timeout, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
-        # assert response is not error
-        assert response.status_code == 200, f"Download failed with status code {response.status_code}"
+        assert response.status_code == 200, f"Download failed with status code {response.status_code}\n{response.text}"
         # if memory: return response  # r.contents is bytes encoded as per docs of requests.
         if name is not None: f_name = name
         else: f_name = validate_name(str(P(response.history[-1].url).name if len(response.history) > 0 else P(response.url).name))
