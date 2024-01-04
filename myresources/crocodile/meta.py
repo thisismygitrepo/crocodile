@@ -524,11 +524,11 @@ class RepeatUntilNoException:
         return wrapper
 
 
-# @RepeatUntilNoException()
-# def add(a: int, b: int):
-#     return a + b
+@RepeatUntilNoException()
+def add(a: int, b: int):
+    return a + b, "done"
 
-# c = add(1, 2)
+c = add(1, 2)
 
 
 def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)

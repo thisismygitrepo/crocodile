@@ -61,9 +61,8 @@ class Save:
     @staticmethod
     @save_decorator(".json")
     def json(obj: Any, path: PLike, indent: Union[str, int, None] = None, encoding: str = 'utf-8', **kwargs: Any):
-        _ = encoding
         import json as jsonlib
-        return Path(path).write_text(jsonlib.dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding="utf-8")
+        return Path(path).write_text(jsonlib.dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding=encoding)
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
@@ -101,6 +100,7 @@ class Save:
         data = dill.dumps(obj=obj, **kwargs)
         return Path(path).write_bytes(data=data)
 
+# Save.json()
 
 # ====================================== Object Management ====================================
 class Base(object):

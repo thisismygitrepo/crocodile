@@ -684,6 +684,7 @@ class Compression:
 
 
 T = TypeVar('T')
+T2 = TypeVar('T2')
 
 
 class PrintFunc(Protocol):
@@ -691,6 +692,7 @@ class PrintFunc(Protocol):
 
 
 class Cache(Generic[T]):  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""
+    # source_func: Callable[[], T]
     def __init__(self, source_func: Callable[[], T], expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
                  saver: Callable[[T, PLike], Any] = Save.pickle, reader: Callable[[PLike], T] = Read.pickle, name: Optional[str] = None) -> None:
         self.cache: Optional[T] = None  # fridge content
@@ -734,19 +736,25 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
         return self.cache
 
     @staticmethod
-    def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None, saver: Callable[[T, PLike], Any] = Save.pickle,
-                     reader: Callable[[PLike], T] = Read.pickle, name: Optional[str] = None
-                     ):
-        def decorator(source_func: Callable[[], T]):
-            return Cache(source_func=source_func, expire=expire, logger=logger, path=path, saver=saver, reader=reader, name=name)
+    def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
+                    #  saver: Callable[[T2, PLike], Any] = Save.pickle,
+                    #  reader: Callable[[PLike], T2] = Read.pickle,
+                     name: Optional[str] = None):  # -> Callable[..., 'Cache[T2]']:
+        def decorator(source_func: Callable[[], T2]) -> Cache['T2']:
+            res = Cache(source_func=source_func, expire=expire, logger=logger, path=path, name=name)
+            return res
         return decorator
 
+
+# add: Cache[int]
+# def save_int(a: int, path: PLike): Save.pickle(a, path)
+def read_int(path: PLike) -> int: return Read.pickle(path)
 
 
 @Cache.as_decorator()
 def add():
     a, b = 2, "2"
-    return a + int(b)
+    return a + int(b), 2
 
 
 def add2():
@@ -754,6 +762,7 @@ def add2():
     return a + int(b)
 
 def func():
+
     res = add()
     add3 = Cache(source_func=add2)
     res2 = add3()
