@@ -626,11 +626,15 @@ class BaseModel(ABC):
         hp_class: Type[HParams] = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
-    def plot_model(self, dpi: int = 150, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
+    def plot_model(self, dpi: int = 150, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
         from tensorflow import keras  # type: ignore pylint: disable=no-name-in-module, import-error
         path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
-        keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
-        print(f"Successfully plotted the model @ {path.as_uri()}")
+        try:
+            keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
+            print(f"Successfully plotted the model @ {path.as_uri()}")
+        except Exception as ex:
+            if strict: raise ex
+            else: print(f"Failed to plot the model. Error: {ex}")
         return path
 
     def build(self, sample_dataset: bool = False, ip_shapes: Optional[list[tuple[int, ...]]] = None, ip: Optional[list['npt.NDArray[np.float64]']] = None, verbose: bool = True):
