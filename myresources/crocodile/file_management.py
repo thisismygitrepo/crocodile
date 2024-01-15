@@ -467,7 +467,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder: OPLike = None, path: OPLike = None, name: Optional[str]= None, verbose: bool = True, content: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False,
               pwd: Optional[str] = None, tmp: bool = False, pattern: Optional[str] = None, merge: bool = False) -> 'P':
-        _ = merge
+        assert merge is False, f"I have not implemented this yet"
         assert path is None, f"I have not implemented this yet"
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
         slf = zipfile = self.expanduser().resolve()
@@ -593,7 +593,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell").capture()
         _ = [item.delete(sure=True) for item in to_del]; _ = print(f"{'⬆️'*5} UPLOAD COMPLETED.") if verbose else None
-        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
+        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         if share:
             if verbose: print("🔗 SHARING FILE")
             res = Terminal().run(f"""rclone link '{cloud}:{rp.as_posix()}'""", shell="powershell").capture()
@@ -617,7 +617,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         from crocodile.meta import Terminal, subprocess
         if verbose: print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`")
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
-        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
+        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
         return localpath
@@ -628,7 +628,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: print(f"SYNCING 🔄️ {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
         rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += (" --delete-during" if delete else ""); from crocodile.meta import Terminal, subprocess; _ = print(rclone_cmd) if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
-        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False)
+        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         return self
     @property  # kept at the bottom because it confuses the linters
     def str(self) -> str: return str(self)  # or self._str
@@ -722,7 +722,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 self.cache = self.reader(self.path)
                 return self(fresh=False)  # may be the cache is old ==> check that by passing it through the logic again.
             else:
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from {self.source_func}. Previous cache never existed or a there was an explicit fresh order.")
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from {self.source_func}. Previous cache never existed or there was an explicit fresh order.")
                 self.cache = self.source_func()  # fresh data.
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
@@ -762,6 +762,7 @@ def add():
 def add2():
     a, b = 2, "2"
     return a + int(b)
+
 
 def func():
 
