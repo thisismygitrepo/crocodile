@@ -312,7 +312,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             at = self.parts[index]  # this is needed below.
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
         if sep == 0: return one, two  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
-        elif sep == 1: return one, at / two   # append it to right portion
+        elif sep == 1: return one, P(at) / two   # append it to right portion
         elif sep == -1: return one / at, two  # append it to left portion.
         else: raise ValueError(f"`sep` should take a value from the set [-1, 0, 1] but got {sep}")
     def __repr__(self):  # this is useful only for the console

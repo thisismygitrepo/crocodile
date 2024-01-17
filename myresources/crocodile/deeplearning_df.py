@@ -32,17 +32,19 @@ This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__ = state
 
-    def fit(self, df: pd.DataFrame) -> 'CategoricalClipper':
-        print("\n")
-        print(f"Fitting Categorical Clipper".center(100, '-'))
+    def fit(self, df: pd.DataFrame, verbose: bool = True) -> 'CategoricalClipper':
+        if verbose:
+            print("\n")
+            print(f"Fitting Categorical Clipper".center(100, '-'))
 
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
             series_na = series.isna()
             if series_na.sum() != 0:
-                print(f"Column `{col}` has {series.isna().sum()} NaN, NA, None values. These will be dropped before clipping.")
-                print("Percentage of Nulls before dropping = ", series_na.mean() * 100)
+                if verbose:
+                    print(f"Column `{col}` has {series.isna().sum()} NaN, NA, None values. These will be dropped before clipping.")
+                    print("Percentage of Nulls before dropping = ", series_na.mean() * 100)
                 series = series[~series_na]
             self.pre_percentage_counts[col] = series.value_counts(normalize=True) * 100
             self.post_percentage_counts[col], self.mapper[col] = self.create_others_category(self.pre_percentage_counts[col], thresh=self.thresh, others_name=self.others_name)
@@ -51,7 +53,7 @@ This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, 
             self.pre_percentage_counts[col].index.name = name
             self.post_percentage_counts[col].name = "Percentage"
             self.post_percentage_counts[col].index.name = name
-            print(f"`{col}` categories pre-clipper:\n{self.pre_percentage_counts[col].to_markdown()}\n\n`{col}` categories post-clipper:\n{self.post_percentage_counts[col].to_markdown()}")
+            if verbose: print(f"`{col}` categories pre-clipper:\n{self.pre_percentage_counts[col].to_markdown()}\n\n`{col}` categories post-clipper:\n{self.post_percentage_counts[col].to_markdown()}")
         return self
     def transform(self, df: pd.DataFrame, inplace: bool = True):
         if self.columns is None: raise RuntimeError("Fit the encoder first")
@@ -98,13 +100,13 @@ class NumericalClipper:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__ = state
 
-    def fit(self, df: 'pd.DataFrame'):
+    def fit(self, df: 'pd.DataFrame', verbose: bool = True):
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
             self.value_min[col] = series.quantile(self.quant_min)
             self.value_max[col] = series.quantile(self.quant_max)
-        self.viz()
+        if verbose: self.viz()
         return self
 
     def viz(self) -> None:
