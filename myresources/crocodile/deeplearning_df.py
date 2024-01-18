@@ -64,8 +64,8 @@ This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, 
                 df.loc[:, col] = series.map(self.mapper[col])
             return df
 
-    def fit_transform(self, df: pd.DataFrame, inplace: bool = True):
-        self.fit(df)
+    def fit_transform(self, df: pd.DataFrame, inplace: bool = True, verbose: bool = True):
+        self.fit(df, verbose=verbose)
         return self.transform(df, inplace=inplace)
 
     @staticmethod
@@ -201,11 +201,11 @@ class DataFrameHander:
         # return pd.DataFrame(res, columns=columns)
         return df
 
-    def fit(self, df: 'pd.DataFrame'):
-        self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_onehot])
+    def fit(self, df: 'pd.DataFrame', verbose: bool = True):
+        self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_onehot], verbose=verbose)
         self.encoder_onehot.fit(df[self.cols_onehot])
         self.encoder_ordinal.fit(df[self.cols_ordinal])
-        self.clipper_numerical.fit(df.loc[:, self.cols_numerical])
+        self.clipper_numerical.fit(df.loc[:, self.cols_numerical], verbose=verbose)
         self.imputer.fit(df[self.cols_numerical])
         self.scaler.fit(df[self.cols_ordinal + self.cols_numerical])
 
