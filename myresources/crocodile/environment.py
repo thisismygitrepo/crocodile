@@ -90,10 +90,6 @@ class NetworkAddresses(TypedDict):
 
 
 def get_network_addresses() -> NetworkAddresses:
-    # netifaces = tb.install_n_import(package="netifaces2", library="netifaces2")
-    # netifaces = tb.install_n_import(library="netifaces", package="netifaces2")
-    # subnet_mask = netifaces.ifaddresses(netifaces.gateways()['default'][netifaces.AF_INET][1])[netifaces.AF_INET][0]['netmask']
-    # default_gateway = netifaces.gateways()['default'][netifaces.AF_INET][0]
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join((f"{mac}012X")[i:i + 2] for i in range(0, 12, 2))  # type: ignore
