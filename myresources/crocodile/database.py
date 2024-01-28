@@ -122,9 +122,9 @@ class DBMS:
             result = res_func(result)
         return result if not df else pd.DataFrame(result)
 
-    def execute(self, command: str, df: bool = False):
+    def execute(self, command: str):
         with self.eng.begin() as conn: result = conn.execute(text(command))
-        return result if not df else pd.DataFrame(result)
+        return result.all()
 
     # def execute_script(self, command: str, df: bool = False):
     #     with self.eng.begin() as conn: result = conn.executescript(text(command))

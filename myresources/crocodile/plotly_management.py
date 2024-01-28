@@ -48,11 +48,24 @@ CONFIG = SimpleNamespace(displayModeBar=True,  # always visible.
                          )
 
 
+def get_random_port() -> int:
+    import random
+    port = random.randint(1024, 49151)
+    def is_port_in_use(port: int) -> bool:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+    if is_port_in_use(port):
+        return get_random_port()
+    return port
+
+
 class App:
     @staticmethod
     def run(app: Any, debug: bool = False, port: Optional[int] = None, start_browser: bool = True, lan_share: bool = True):
         host = "localhost"  # 0.0.0.0"  #  "127.0.0.1"
-        port__ = tb.randstr(lower=False, upper=False, length=4) if port is None else port  # Random ports prevent multile programs from crashing into each other.
+        if port is None: port__ = get_random_port()
+        else: port__ = port
         # pynoinspection HTTP
         if start_browser:
             try: tb.P(rf'http://{host}:{port__}/')()
