@@ -124,7 +124,7 @@ class DBMS:
 
     def execute(self, command: str):
         with self.eng.begin() as conn: result = conn.execute(text(command))
-        return result.all()
+        return result
 
     # def execute_script(self, command: str, df: bool = False):
     #     with self.eng.begin() as conn: result = conn.executescript(text(command))

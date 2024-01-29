@@ -419,10 +419,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             item_ = P(item)
             if all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]):
                 processed.append(item_)
-        # processed = List([P(item) for item in raw if (lambda item_: all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]))(P(item))])
         if not win_order: return List(processed)
         import re
-        # return processed if not win_order else processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in __import__("re").split('([0-9]+)', x.stem)])
         processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', string=x.stem)])
         return List(processed)
 

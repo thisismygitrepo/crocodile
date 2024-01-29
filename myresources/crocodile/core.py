@@ -339,9 +339,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                 return str(res)
 
     @staticmethod
-    def concat_values(*dicts: dict[Any, Any], orient: str = 'list') -> 'Struct':
+    def concat_values(*dicts: dict[Any, Any], orient: Literal["dict", "list", "series", "split", "tight", "index"] = 'list') -> 'Struct':
         import pandas as pd
-        assert orient in ["dict", "list", "series", "split", "tight", "index"]
         return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe()).list).to_dict(orient=orient))  # type: ignore
     def plot_plt(self, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
         from crocodile.matplotlib_management import LineArtist
@@ -353,6 +352,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         fig = px.line(self.__dict__)
         fig.show()
         return fig
+
 
 class Display:
     @staticmethod
