@@ -139,7 +139,8 @@ class Response:
                 self.output.__dict__[key] = val.read().decode().rstrip()
         return self
     def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", capture: bool = True, strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
-        _ = self.capture() if capture else None; success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
+        if capture: self.capture()
+        success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
         if assert_success: assert success, self.print(capture=False, desc=desc)
         _ = print(desc) if success else self.print(capture=False, desc=desc); return self
     def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
@@ -347,7 +348,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd
         raw = self.ssh.exec_command(cmd)
         res = Response(stdin=raw[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)  # type: ignore
-        _ = res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False) if not verbose else res.print(); self.terminal_responses.append(res); return res
+        if not verbose: res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False)
+        else: res.print()
+        self.terminal_responses.append(res); return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False) -> Union[Any, Response]:
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_remote_repr()}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
@@ -379,7 +382,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if r:
                 tmp11 = self.run_py(f"obj=tb.P(r'{source}').search(folders=False, r=True).collapseuser(strict=False)", desc="Searching for files in source", return_obj=True, verbose=False)
                 assert isinstance(tmp11, List), f"Could not resolve source path {source} due to error"
-                for file in tmp11: self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
+                for file in tmp11:
+                    self.copy_to_here(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False)
             else: raise RuntimeError(f"source `{source}` is a directory! either set r=True for recursive sending or raise zip_first flag.")
         if z:
             tmp: Response = self.run_py(f"print(tb.P(r'{source}').expanduser().zip(inplace=False, verbose=False))", desc=f"Zipping source file {source}", verbose=False)
@@ -387,10 +391,10 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if not isinstance(tmp2, P): raise RuntimeError(f"Could not zip {source} due to {tmp.err}")
             else: source = tmp2
         if target is None:
-            tmpx = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser(strict=False))", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
+            tmpx = self.run_py(f"print(tb.P(r'{P(source).as_posix()}').collapseuser(strict=False).as_posix())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
             if isinstance(tmpx, P): target = tmpx
             else: raise RuntimeError(f"Could not resolve target path {target} due to error")
-            assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+            assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home.\n{target=}"
         target_obj = P(target).expanduser().absolute().create(parents_only=True); target_obj += '.zip' if z and '.zip' not in target_obj.suffix else ''
         if "~" in str(source):
             tmp3 = self.run_py(f"print(tb.P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path()
@@ -428,9 +432,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             source_rel2home = source_full.zip()
         files = source_full.search(folders=False, r=True).apply(lambda x: x.collapseuser()) if r and exists and is_dir else None
         return Scout(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
-    def print_summary(self):   # ip=rsp.ip, op=rsp.op
-        install_n_import("tabulate"); df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode))); print("\nSummary of operations performed:"); print(df.to_markdown())
-        _ = print("\nAll operations completed successfully.\n") if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))) else print("\nSome operations failed. \n"); return df
+    def print_summary(self):
+        install_n_import("tabulate")
+        df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
+        print("\nSummary of operations performed:")
+        print(df.to_markdown())
+        if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))): print("\nAll operations completed successfully.\n")
+        else: print("\nSome operations failed. \n")
+        return df
 
 
 class Scheduler:
@@ -497,7 +506,7 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         except Exception as ex: text += f"Could not read git repository @ `{obj_path.parent}`\n{ex}.\n"
     text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
     readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
-    _ = print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}") if verbose else None
+    if verbose: print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}")
     if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
 
 

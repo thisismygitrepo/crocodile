@@ -169,8 +169,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     Furthermore, those methods are accompanied with print statement explaining what happened to the object."""
     def delete(self, sure: bool = False, verbose: bool = True) -> 'P':  # slf = self.expanduser().resolve() don't resolve symlinks.
         if not sure: _ = print(f"❌ Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
-        if not self.exists(): self.unlink(missing_ok=True); _ = print(f"❌ Could NOT DELETE nonexisting file {repr(self)}. ") if verbose else None; return self  # broken symlinks exhibit funny existence behaviour, catch them here.
-        _ = self.unlink(missing_ok=True) if self.is_file() or self.is_symlink() else __import__("shutil").rmtree(self, ignore_errors=False); _ = print(f"🗑️ ❌ DELETED {repr(self)}.") if verbose else None; return self
+        if not self.exists():
+            self.unlink(missing_ok=True)
+            if verbose: print(f"❌ Could NOT DELETE nonexisting file {repr(self)}. ") 
+            return self  # broken symlinks exhibit funny existence behaviour, catch them here.
+        if self.is_file() or self.is_symlink(): self.unlink(missing_ok=True)
+        else: __import__("shutil").rmtree(self, ignore_errors=False)
+        if verbose: print(f"🗑️ ❌ DELETED {repr(self)}.")
+        return self
     def send2trash(self, verbose: bool = True) -> 'P':
         if self.exists():
             install_n_import(library="send2trash").send2trash(self.resolve().str)
@@ -238,7 +244,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
                     if strict: raise FileExistsError(f"File {res} already exists.")
-                    else: _ = print(f"⚠️ SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.") if verbose else None; return self if orig else res
+                    else:
+                        if verbose: print(f"⚠️ SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.")
+                        return self if orig else res
                 self.rename(res)
                 msg = msg or f"RENAMED {repr(self)} ➡️ {repr(res)}"
             elif operation == "delete":
@@ -371,7 +379,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         super(P, self).write_text(data, encoding=encoding, newline=newline); return self
     def read_text(self, encoding: Optional[str] = 'utf-8') -> str: return super(P, self).read_text(encoding=encoding)
     def write_bytes(self, data: bytes, overwrite: bool = False) -> 'P':
-        slf = self.expanduser().absolute(); _ = slf.delete(sure=True) if overwrite and slf.exists() else None; res = super(P, slf).write_bytes(data)
+        slf = self.expanduser().absolute()
+        if overwrite and slf.exists(): slf.delete(sure=True)
+        res = super(P, slf).write_bytes(data)
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self
     def touch(self, mode: int = 0o666, parents: bool = True, exist_ok: bool = True) -> 'P':  # pylint: disable=W0237
