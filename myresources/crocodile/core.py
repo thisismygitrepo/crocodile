@@ -134,9 +134,12 @@ class Base(object):
     def get_state(obj: Any, repr_func: Callable[[Any], dict[str, Any]] = lambda x: x, exclude: Optional[list[str]] = None) -> dict[str, Any]:
         if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]): return repr_func(obj)
         return (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).__dict__)
-    def viz_composition_heirarchy(self, depth: int = 3, obj: Any = None, filt: Optional[Callable[[Any], None]] = None):
-        install_n_import("objgraph").show_refs([self] if obj is None else [obj], max_depth=depth, filename=str(filename := Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")), filter=filt)
-        _ = __import__("os").startfile(str(filename.absolute())) if __import__("sys").platform == "win32" else None; return filename
+    @staticmethod
+    def viz_composition_heirarchy(obj: Any, depth: int = 3, filt: Optional[Callable[[Any], None]] = None):
+        filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")
+        install_n_import("objgraph").show_refs([obj], max_depth=depth, filename=str(filename), filter=filt)
+        # if __import__("sys").platform == "win32": __import__("os").startfile(str(filename.absolute()))
+        return filename
 
 
 class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""

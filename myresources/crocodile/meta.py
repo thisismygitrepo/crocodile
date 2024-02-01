@@ -445,13 +445,13 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
 class Scheduler:
     def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000,
                  exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'Scheduler'], Any]] = None,
-                 logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None):
+                 logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None, records: Optional[list[list[Any]]] = None):
         self.routine = routine  # main routine to be repeated every `wait` time period
         self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
         self.exception_handler = exception_handler if exception_handler is not None else self.default_exception_handler
         self.sess_start_time = datetime.now()  # to be reset at .run
-        self.records = List([])
+        self.records: list[list[Any]] = records if records is not None else []
         self.cycle: int = 0
         self.max_cycles: int = max_cycles
         self.sess_stats = sess_stats or (lambda _sched: {})
