@@ -75,7 +75,8 @@ class DBMS:
         self.refresh()
 
     @classmethod
-    def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any): return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
+    def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any):
+        return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table: str, sch: Optional[str] = None):
         assert self.meta is not None
@@ -105,7 +106,9 @@ class DBMS:
             else: return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
-        return create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+        res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+        print(f"Database at {path.as_uri()} is ready.")
+        return res
 
     # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
