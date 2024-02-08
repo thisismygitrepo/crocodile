@@ -44,7 +44,7 @@ Temp = Tmp
 
 tmp = os.getenv("PATH")
 if isinstance(tmp, str):
-    tmp_path: tb.L[P] = L(tmp.split(sep)).apply(P)  # type: ignore
+    tmp_path: L[P] = L(tmp.split(sep)).apply(P)  # type: ignore
 else:
     tmp_path = L()
 PATH = tmp_path
