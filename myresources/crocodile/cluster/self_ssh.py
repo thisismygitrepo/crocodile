@@ -2,9 +2,9 @@
 """SelfSSh
 """
 
-import crocodile.toolbox as tb
+
 from crocodile.file_management import PLike
-from crocodile.meta import MACHINE
+from crocodile.meta import MACHINE, Terminal
 from typing import Optional, Any
 import getpass
 import platform
@@ -28,7 +28,7 @@ class SelfSSH:
         return None
     def run(self, cmd: str, desc: str = "", verbose: bool = False):
         _ = desc, verbose
-        return tb.Terminal().run(cmd, shell="powershell")
+        return Terminal().run(cmd, shell="powershell")
     def run_py(self, cmd: str, verbose: bool = False, desc: str = ''):
         _ = verbose, cmd, desc
         exec(cmd)  # type: ignore # pylint: disable=exec-used
@@ -45,7 +45,7 @@ class SelfSSH:
     def get_local_repr(self, add_machine: bool = False): return self.get_remote_repr(add_machine=add_machine).replace("REMOTE", "LOCAL")
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"):
         _ = cmd, shell, new_window, terminal
-        # return tb.Terminal().run_async("", new_window=True, shell=shell)
+        # return Terminal().run_async("", new_window=True, shell=shell)
         # Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
         if platform.system() == "Windows":
             subprocess.Popen(["wt", "--profile", "pwsh"], stdin=subprocess.PIPE, shell=True)

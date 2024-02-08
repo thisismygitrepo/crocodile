@@ -4,13 +4,14 @@ Notify User Upon Completion
 """
 
 from crocodile.comms.notification import Email
-import crocodile.toolbox as tb
+from crocodile.core import Struct as S
+from crocodile.file_management import P
 from crocodile.cluster.remote_machine import FileManager
 from crocodile.cluster.loader_runner import EmailParams
 
 error_message = ''
-exec_times = tb.S()
-res_folder = tb.P()
+exec_times = S()
+res_folder = P()
 
 email_params = EmailParams.from_empty()
 manager = FileManager.from_pickle(email_params.file_manager_path)

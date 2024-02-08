@@ -3,8 +3,10 @@
 Runner
 """
 
-import crocodile.toolbox as tb
-from crocodile.meta import MACHINE
+from crocodile.core import List as L, Struct as S, install_n_import
+from crocodile.file_management import P, Save, Read
+# from crocodile.meta import SSH
+from crocodile.meta import MACHINE, Scheduler
 from rich import inspect
 from rich.console import Console
 import pandas as pd
@@ -34,9 +36,9 @@ class WorkloadParams:
     job_id: str = ''
     @property
     def save_suffix(self) -> str: return f"machine_{self.idx_start}_{self.idx_end}"
-    def split_to_jobs(self, jobs: Optional[int] = None) -> tb.List['WorkloadParams']:
+    def split_to_jobs(self, jobs: Optional[int] = None) -> L['WorkloadParams']:
         # Note: like MachineLoadCalculator get_kwargs, the behaviour is to include the edge cases on both ends of subsequent intervals.
-        res = tb.L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=self.idx_max, jobs=self.jobs))
+        res = L(range(self.idx_start, self.idx_end, 1)).split(to=jobs or self.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=self.idx_max, jobs=self.jobs))
         for idx, item in enumerate(res): item.idx = idx
         return res
     def get_section_from_series(self, series: list[pd.Timestamp]):
@@ -46,7 +48,7 @@ class WorkloadParams:
         min_start = series[min_idx_start]
         min_end = series[min_idx_end]
         return min_start, min_end
-    def print(self): tb.S(self.__dict__).print(as_config=True, title=f"Job Workload")
+    def print(self): S(self.__dict__).print(as_config=True, title=f"Job Workload")
     def viz(self):
         print(f"This machine will execute ({(self.idx_end - self.idx_start) / self.idx_max * 100:.2f}%) of total job workload.")
         print(f"This share of workload will be split among {self.jobs} of threads on this machine.")
@@ -81,7 +83,7 @@ class JobParams:
 
     def auto_commit(self):
         from git.repo import Repo
-        repo = Repo(tb.P(self.repo_path_rh).expanduser(), search_parent_directories=True)
+        repo = Repo(P(self.repo_path_rh).expanduser(), search_parent_directories=True)
         # do a commit if the repo is dirty
         if repo.is_dirty():
             repo.git.add(update=True)
@@ -89,62 +91,62 @@ class JobParams:
             print(f"⚠️ Repo {repo.working_dir} was dirty, auto-committed.")
         else: print(f"✅ Repo {repo.working_dir} was clean, no auto-commit.")
 
-    def is_installabe(self) -> bool: return True if "setup.py" in tb.P(self.repo_path_rh).expanduser().absolute().listdir().apply(str) else False
+    def is_installabe(self) -> bool: return True if "setup.py" in P(self.repo_path_rh).expanduser().absolute().listdir().apply(str) else False
     @staticmethod
     def from_empty() -> 'JobParams':
         return JobParams(repo_path_rh="", file_path_rh="", file_path_r="", func_module="", func_class="", func_name="", description="", ssh_repr="", ssh_repr_remote="", error_message="", session_name="", tab_name="", file_manager_path="")
     @staticmethod
-    def from_func(func: Union[Callable[[Any], Any], tb.P, str]) -> 'JobParams':
-        # if callable(self.func): executed_obj = f"""**{self.func.__name__}** from *{tb.P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
-        if callable(func) and not isinstance(func, tb.P):
+    def from_func(func: Union[Callable[[Any], Any], P, str]) -> 'JobParams':
+        # if callable(self.func): executed_obj = f"""**{self.func.__name__}** from *{P(self.func.__code__.co_filename).collapseuser().as_posix()}*"""  # for email.
+        if callable(func) and not isinstance(func, P):
             func_name = func.__name__
             func_module = func.__module__
             if func_module == "<run_path>":  # function imported through readpy module.
-                func_module = tb.P(func.__globals__['__file__']).name
+                func_module = P(func.__globals__['__file__']).name
             assert func_module != "__main__", f"Function must be defined in a module, not in __main__. Consider importing `{func.__name__}` or, restart this session and import the contents of this module."
             if func.__name__ != func.__qualname__:
                 # print(f"Passed function {func} is a method of a class.")
-                func_file, func_class = tb.P(func.__code__.co_filename), func.__qualname__.split(".")[0]
+                func_file, func_class = P(func.__code__.co_filename), func.__qualname__.split(".")[0]
             else:
                 # print(f"Passed function {func} is not a method of a class.")
-                func_file, func_class = tb.P(func.__code__.co_filename), None
-        elif type(func) is str or type(func) is tb.P:
-            func_file = tb.P(func)
+                func_file, func_class = P(func.__code__.co_filename), None
+        elif type(func) is str or type(func) is P:
+            func_file = P(func)
             # func = None
             func_class = None
             func_name = None
             func_module = func_file.stem
         else: raise TypeError(f"Passed function {func} is not a callable or a path to a python file.")
         try:
-            repo_path = tb.P(tb.install_n_import("git", "gitpython").Repo(func_file, search_parent_directories=True).working_dir)
+            repo_path = P(install_n_import("git", "gitpython").Repo(func_file, search_parent_directories=True).working_dir)
             func_relative_file = func_file.relative_to(repo_path)
         except Exception as e:
             print(e)
             repo_path, func_relative_file = func_file.parent, func_file.name
         return JobParams(repo_path_rh=repo_path.collapseuser().as_posix(), file_path_rh=repo_path.collapseuser().joinpath(func_relative_file).collapseuser().as_posix(),
-                         file_path_r=tb.P(func_relative_file).as_posix(),
+                         file_path_r=P(func_relative_file).as_posix(),
                          func_module=func_module, func_class=func_class, func_name=func_name,
                          description="", ssh_repr="", ssh_repr_remote="", error_message="",
                          session_name="", tab_name="", file_manager_path="")
 
     def get_execution_line(self, workload_params: Optional[WorkloadParams], parallelize: bool, wrap_in_try_except: bool) -> str:
-        # tb.P(self.repo_path_rh).name}.{self.file_path_r.replace(".py", '').replace('/', '.')#
+        # P(self.repo_path_rh).name}.{self.file_path_r.replace(".py", '').replace('/', '.')#
         # if func_module is not None:
         #     # noinspection PyTypeChecker
         #     module = __import__(func_module, fromlist=[None])
         #     exec_obj = module.__dict__[func_name] if not bool(func_class) else getattr(module.__dict__[func_class], func_name)
         # elif func_name is not None:
         #     # This approach is not conducive to parallelization since "mymod" is not pickleable.
-        #     module = SourceFileLoader("mymod", tb.P.home().joinpath(rel_full_path).as_posix()).load_module()  # loading the module assumes its not a script, there should be at least if __name__ == __main__ wrapping any script.
+        #     module = SourceFileLoader("mymod", P.home().joinpath(rel_full_path).as_posix()).load_module()  # loading the module assumes its not a script, there should be at least if __name__ == __main__ wrapping any script.
         #     exec_obj = getattr(module, func_name) if not bool(func_class) else getattr(getattr(module, func_class), func_name)
         # else:
-        #     module = tb.P.home().joinpath(rel_full_path).readit()  # uses runpy to read .py files.
+        #     module = P.home().joinpath(rel_full_path).readit()  # uses runpy to read .py files.
         #     exec_obj = module  # for README.md generation.
 
         if workload_params is not None: base = f"""
 workload_params = WorkloadParams(**{workload_params.__dict__})
-repo_path = tb.P(rf'{self.repo_path_rh}').expanduser().absolute()
-file_root = tb.P(rf'{self.file_path_rh}').expanduser().absolute().parent
+repo_path = P(rf'{self.repo_path_rh}').expanduser().absolute()
+file_root = P(rf'{self.file_path_rh}').expanduser().absolute().parent
 tb.sys.path.insert(0, repo_path.str)
 tb.sys.path.insert(0, file_root.str)
 """
@@ -163,7 +165,7 @@ func = {self.func_class}.{self.func_name}
         else: base = f"""
 res = None  # in case the file did not define it.
 # --------------------------------- SCRIPT AS IS
-{tb.P(self.file_path_rh).expanduser().read_text()}
+{P(self.file_path_rh).expanduser().read_text()}
 # --------------------------------- END OF SCRIPT AS IS
 """
 
@@ -174,10 +176,10 @@ res = func(workload_params=workload_params, **func_kwargs)
 kwargs_workload = {list(workload_params.split_to_jobs().apply(lambda a_kwargs: a_kwargs.__dict__))}
 workload_params = []
 for idx, x in enumerate(kwargs_workload):
-    tb.S(x).print(as_config=True, title=f"Instance {{idx}}")
+    S(x).print(as_config=True, title=f"Instance {{idx}}")
     workload_params.append(WorkloadParams(**x))
 print("\\n" * 2)
-res = tb.L(workload_params).apply(lambda a_workload_params: func(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.jobs})
+res = L(workload_params).apply(lambda a_workload_params: func(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.jobs})
 """
         else: base += f"""
 res = func(**func_kwargs)
@@ -212,19 +214,19 @@ class EmailParams:
 
 
 class FileManager:
-    running_path          = tb.P(f"~/tmp_results/remote_machines/file_manager/running_jobs.pkl")
-    queue_path            = tb.P(f"~/tmp_results/remote_machines/file_manager/queued_jobs.pkl")
-    history_path          = tb.P(f"~/tmp_results/remote_machines/file_manager/history_jobs.pkl")
-    shell_script_path_log = tb.P(f"~/tmp_results/remote_machines/file_manager/last_cluster_script.txt")
-    default_base          = tb.P(f"~/tmp_results/remote_machines/jobs")
+    running_path          = P(f"~/tmp_results/remote_machines/file_manager/running_jobs.pkl")
+    queue_path            = P(f"~/tmp_results/remote_machines/file_manager/queued_jobs.pkl")
+    history_path          = P(f"~/tmp_results/remote_machines/file_manager/history_jobs.pkl")
+    shell_script_path_log = P(f"~/tmp_results/remote_machines/file_manager/last_cluster_script.txt")
+    default_base          = P(f"~/tmp_results/remote_machines/jobs")
     @staticmethod
-    def from_pickle(path: Union[str, tb.P]):
+    def from_pickle(path: Union[str, P]):
         fm = FileManager(job_id='1', remote_machine_type='Windows', lock_resources=True, max_simulataneous_jobs=1, base=None)
-        fm.__setstate__(dict(tb.P(path).expanduser().readit()))
+        fm.__setstate__(dict(P(path).expanduser().readit()))
         return fm
     def __getstate__(self): return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
-    def __init__(self, job_id: str, remote_machine_type: MACHINE, lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, tb.P, None] = None):
+    def __init__(self, job_id: str, remote_machine_type: MACHINE, lock_resources: bool, max_simulataneous_jobs: int = 1, base: Union[str, P, None] = None):
         """Log files to track execution process:
         * A text file that cluster deletes at the begining then write to at the end of each job.
         * pickle of Machine and clusters objects.
@@ -237,7 +239,7 @@ class FileManager:
 
         self.submission_time = pd.Timestamp.now()
 
-        self.base_dir = tb.P(base).collapseuser() if bool(base) else FileManager.default_base
+        self.base_dir = P(base).collapseuser() if bool(base) else FileManager.default_base
         status: JOB_STATUS
         status = 'queued'
         self.job_root = self.base_dir.joinpath(f"{status}/{self.job_id}")
@@ -273,7 +275,7 @@ class FileManager:
         return f". {script_path}"
     def fire_command_to_clip_memory(self, launch_method: LAUNCH_METHOD):
         print("Execution command copied to clipboard 📋")
-        print(self.get_fire_command(launch_method=launch_method)); tb.install_n_import("clipboard").copy(self.get_fire_command(launch_method=launch_method))
+        print(self.get_fire_command(launch_method=launch_method)); install_n_import("clipboard").copy(self.get_fire_command(launch_method=launch_method))
         print("\n")
     def get_job_status(self, session_name: str, tab_name: str) -> JOB_STATUS:
         pid_path = self.execution_log_dir.expanduser().joinpath("pid.txt")
@@ -309,12 +311,12 @@ class FileManager:
         except FileNotFoundError:
             print(f"Queue file was deleted by the locking job, creating an empty one and saving it.")
             queue_file = []
-            tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
+            Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         job_ids = [job.job_id for job in queue_file]
         if self.job_id not in job_ids:
             print(f"Adding this job {self.job_id} to the queue and saving it. {len(queue_file)=}")
             queue_file.append(job_status)
-            tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
+            Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         return queue_file
 
     def get_resources_unlocking(self):  # this one works at shell level in case python script failed.
@@ -334,7 +336,7 @@ echo "Unlocked resources"
             except FileNotFoundError:
                 print(f"Running file was deleted by the locking job, making one.")
                 running_file = []
-                tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
+                Save.pickle(obj=running_file, path=self.running_path.expanduser())
 
             queue_file = self.add_to_queue(job_status=this_job)
 
@@ -349,7 +351,7 @@ echo "Unlocked resources"
             except psutil.NoSuchProcess:
                 print(f"Next job in queue {next_job_in_queue} has no associated process, removing it from the queue.")
                 queue_file.pop(0)
-                tb.Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
+                Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
                 continue
 
             # --------------- Clearning up running_file from dead processes -----------------
@@ -360,9 +362,9 @@ echo "Unlocked resources"
                 try: proc = psutil.Process(pid=running_job.pid)
                 except psutil.NoSuchProcess:
                     print(f"Locking process with pid {running_job.pid} is dead. Ignoring this lock file.")
-                    tb.S(running_job.__dict__).print(as_config=True, title="Ignored Lock File Details")
+                    S(running_job.__dict__).print(as_config=True, title="Ignored Lock File Details")
                     running_file.remove(running_job)
-                    tb.Save.pickle(obj=running_file, path=self.running_path.expanduser())
+                    Save.pickle(obj=running_file, path=self.running_path.expanduser())
                     found_dead_process = True
                     continue  # for for loop
                 attrs_txt = ['status', 'memory_percent', 'exe', 'num_ctx_switches',
@@ -371,8 +373,8 @@ echo "Unlocked resources"
                 # if self.remote_machine_type == 'Windows': attrs_txt += ['num_handles']
                 # environ, memory_maps, 'io_counters'
                 attrs_objs = ['memory_info', 'memory_full_info', 'cpu_times', 'ionice', 'threads', 'open_files', 'connections']
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)
-                inspect(tb.Struct(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)
+                inspect(S(proc.as_dict(attrs=attrs_objs)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)
+                inspect(S(proc.as_dict(attrs=attrs_txt)), value=False, title=f"Process holding the Lock (pid = {running_job.pid})", docs=False, sort=False)
 
             if found_dead_process: continue  # repeat while loop logic.
             running_job = running_file[0]  # arbitrary job in the running file.
@@ -381,7 +383,7 @@ echo "Unlocked resources"
             this_specs = {f"Submission time": this_job.submission_time, f"Time now": pd.Timestamp.now(),
                           f"Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - this_job.submission_time,
                           f"Time consumed by locking job so far (job_id = {running_job.job_id}) so far ⏰": pd.Timestamp.now() - running_job.start_time}
-            tb.S(this_specs).print(as_config=True, title=f"This Job `{this_job.job_id}` Details")
+            S(this_specs).print(as_config=True, title=f"This Job `{this_job.job_id}` Details")
             console.rule(title=f"Resources are locked by another job `{running_job.job_id}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
             print("\n")
             time.sleep(sleep_time_mins * 60)
@@ -396,7 +398,7 @@ echo "Unlocked resources"
 
         if job_status in queue_file: queue_file.remove(job_status)
         print(f"Removed current job from waiting queue and added it to the running queue. Saving both files.")
-        tb.Save.pickle(obj=queue_file, path=queue_path)
+        Save.pickle(obj=queue_file, path=queue_path)
 
         running_path = self.running_path.expanduser()
         try: running_file: list[JobStatus] = running_path.readit()
@@ -405,7 +407,7 @@ echo "Unlocked resources"
         assert job_status not in running_file, f"Job status {job_status} is already in the running file. This should not happen."
         assert len(running_file) < self.max_simulataneous_jobs, f"Number of running jobs ({len(running_file)}) is greater than the maximum allowed ({self.max_simulataneous_jobs}). This method should not be called in the first place."
         running_file.append(job_status)
-        tb.Save.pickle(obj=running_file, path=running_path)
+        Save.pickle(obj=running_file, path=running_path)
 
     def unlock_resources(self):
         if self.lock_resources is False: return True
@@ -420,7 +422,7 @@ echo "Unlocked resources"
         if this_job is not None:
             running_file.remove(this_job)
         console.print(f"Resources have been released by this job `{self.job_id}`. Saving new running file")
-        tb.Save.pickle(path=self.running_path.expanduser(), obj=running_file)
+        Save.pickle(path=self.running_path.expanduser(), obj=running_file)
         start_time = pd.to_datetime(self.execution_log_dir.expanduser().joinpath("start_time.txt").readit(), utc=False)
         end_time = pd.Timestamp.now()
         item = {"job_id": self.job_id, "start_time": start_time, "end_time": end_time, "submission_time": self.submission_time}
@@ -429,7 +431,7 @@ echo "Unlocked resources"
         else: hist = []
         hist.append(item)
         print(f"Saved history file to {hist_file} with {len(hist)} items.")
-        tb.Save.pickle(obj=hist, path=hist_file)
+        Save.pickle(obj=hist, path=hist_file)
         # this is further handled by the calling script in case this function failed.
 
 
@@ -452,19 +454,19 @@ class LogEntry:
 
 
 class CloudManager:
-    base_path = tb.P(f"~/tmp_results/remote_machines/cloud")
+    base_path = P(f"~/tmp_results/remote_machines/cloud")
     server_interval_sec: int = 60 * 5
     num_claim_checks: int = 3
     inter_check_interval_sec: int = 15
     def __init__(self, max_jobs: int, cloud: Optional[str] = None, reset_local: bool = False) -> None:
         if reset_local:
             print("☠️ Resetting local cloud cache ☠️. Locally created / completed jobs not yet synced will not make it to the cloud.")
-            tb.P(self.base_path).expanduser().delete(sure=True)
-        self.status_root: tb.P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
+            P(self.base_path).expanduser().delete(sure=True)
+        self.status_root: P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
         self.max_jobs: int = max_jobs
         if cloud is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
-            self.cloud = tb.Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
+            self.cloud = Read.ini(DEFAULTS_PATH)['general']['rclone_config_name']
         else: self.cloud = cloud
         self.lock_claimed = False
         from crocodile.cluster.remote_machine import RemoteMachine
@@ -482,23 +484,23 @@ class CloudManager:
             log['running'] = pd.DataFrame(columns=cols)
             log['completed'] = pd.DataFrame(columns=cols)
             log['failed'] = pd.DataFrame(columns=cols)
-            tb.Save.vanilla_pickle(obj=log, path=path.create(parents_only=True), verbose=False)
+            Save.vanilla_pickle(obj=log, path=path.create(parents_only=True), verbose=False)
             return log
-        return tb.Read.vanilla_pickle(path=path)
+        return Read.vanilla_pickle(path=path)
     def write_log(self, log: dict[JOB_STATUS, 'pd.DataFrame']):
         # assert self.claim_lock, f"method should never be called without claiming the lock first. This is a cloud-wide file."
         if not self.lock_claimed: self.claim_lock()
-        tb.Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
+        Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
         return NoReturn
 
     # =================== CLOUD MONITORING ===================
     def fetch_cloud_live(self):
         remote = CloudManager.base_path
-        localpath = tb.P.tmp().joinpath(f"tmp_dirs/cloud_manager_live").create()
+        localpath = P.tmp().joinpath(f"tmp_dirs/cloud_manager_live").create()
         alternative_base = localpath.delete(sure=True).from_cloud(cloud=self.cloud, remotepath=remote.get_remote_path(root="myhome", rel2home=True), verbose=False)
         return alternative_base
     @staticmethod
-    def prepare_servers_report(cloud_root: tb.P):
+    def prepare_servers_report(cloud_root: P):
         from crocodile.cluster.remote_machine import RemoteMachine
         workers_root = cloud_root.joinpath(f"workers").search("*")
         res: dict[str, list[RemoteMachine]] = {}
@@ -506,7 +508,7 @@ class CloudManager:
         for a_worker in workers_root:
             running_jobs = a_worker.joinpath("running_jobs.pkl")
             times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
-            res[a_worker.name] = tb.Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
+            res[a_worker.name] = Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
         servers_report = pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())})
         return servers_report
     def run_monitor(self):
@@ -521,7 +523,7 @@ class CloudManager:
             print(f"🔒 Lock is held by: {lock_owner}")
             print("🧾 Log File:")
             log_path = alternative_base.joinpath("logs.pkl")
-            if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = tb.Read.vanilla_pickle(path=log_path)
+            if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = Read.vanilla_pickle(path=log_path)
             else:
                 print(f"Log file doesn't exist! 🫤 must be that cloud is getting purged or something 🤔 ")
                 log = {}
@@ -544,7 +546,7 @@ class CloudManager:
             print("👷 Workers:")
             servers_report = self.prepare_servers_report(cloud_root=alternative_base)
             pprint(servers_report.to_markdown())
-        sched = tb.Scheduler(routine=routine, wait=f"5m")
+        sched = Scheduler(routine=routine, wait=f"5m")
         sched.run()
 
     # ================== CLEARNING METHODS ===================
@@ -561,7 +563,7 @@ class CloudManager:
             entry = LogEntry.from_dict(row.to_dict())
             if entry.run_machine != this_machine: continue
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
-            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             status = rm.file_manager.get_job_status(session_name=rm.job_params.session_name, tab_name=rm.job_params.tab_name)
             if status == "running":
                 print(f"Job `{entry.name}` is still running, added to running jobs.")
@@ -594,7 +596,7 @@ class CloudManager:
         for _idx, row in log["failed"].iterrows():
             entry = LogEntry.from_dict(row.to_dict())
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
-            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             entry.note += f"| Job failed @ {entry.run_machine}"
             entry.pid = None
             entry.cmd = None
@@ -632,7 +634,7 @@ class CloudManager:
             entry.end_time = None
             entry.run_machine = None
             entry.session_name = None
-            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             rm.file_manager.execution_log_dir.expanduser().joinpath("status.txt").delete(sure=True)
             rm.file_manager.execution_log_dir.expanduser().joinpath("pid.txt").delete(sure=True)
             log["queued"] = pd.concat([log["queued"], pd.DataFrame([entry.__dict__])], ignore_index=True)
@@ -648,7 +650,7 @@ class CloudManager:
             self.start_jobs_if_possible()
             self.get_running_jobs_statuses()
             self.release_lock()
-        sched = tb.Scheduler(routine=routine, wait=f"{self.server_interval_sec}s")
+        sched = Scheduler(routine=routine, wait=f"{self.server_interval_sec}s")
         return sched.run()
 
     def get_running_jobs_statuses(self):
@@ -674,7 +676,7 @@ class CloudManager:
             elif status == "queued": raise RuntimeError(f"I thought I'm working strictly with running jobs, and I encountered unexpected a job with `queued` status.")
             else: raise ValueError(f"I receieved a status that I don't know how to handle `{status}`")
         self.running_jobs = [a_rm for a_rm in self.running_jobs if a_rm.config.job_id not in jobs_ids_to_be_removed_from_running]
-        tb.Save.vanilla_pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
+        Save.vanilla_pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
         self.status_root.to_cloud(cloud=self.cloud, rel2home=True, verbose=False)  # no need for lock as this writes to a folder specific to this machine.
     def start_jobs_if_possible(self):
         """This is the only authority responsible for moving jobs from queue df to running df."""
@@ -690,7 +692,7 @@ class CloudManager:
         while len(self.running_jobs) < self.max_jobs:
             queue_entry = LogEntry.from_dict(log["queued"].iloc[idx].to_dict())
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
-            rm: RemoteMachine = tb.Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             if rm.config.allowed_remotes is not None and f"{getpass.getuser()}@{platform.node()}" not in rm.config.allowed_remotes:
                 print(f"Job `{queue_entry.name}` is not allowed to run on this machine. Skipping ...")
                 idx += 1

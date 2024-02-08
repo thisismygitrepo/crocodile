@@ -3,7 +3,8 @@
 Cluster Template
 """
 
-import crocodile.toolbox as tb
+from crocodile.core import List as L
+from crocodile.file_management import P
 from crocodile.cluster.distribute import WorkloadParams
 from crocodile.cluster.distribute import RemoteMachineConfig, LoadCriterion, Cluster, ThreadLoadCalculator
 from typing import Any
@@ -11,15 +12,15 @@ from typing import Any
 
 class ExpensiveComputation:
     @staticmethod
-    def func_single_job(workload_params: WorkloadParams, *args: Any, **kwargs: Any) -> tb.P:
+    def func_single_job(workload_params: WorkloadParams, *args: Any, **kwargs: Any) -> P:
         from crocodile.cluster.templates.utils import expensive_function
         res = expensive_function(workload_params=workload_params, *args, **kwargs)
         return res
 
     @staticmethod
-    def func(workload_params: WorkloadParams, **kwargs: Any) -> tb.P:
-        per_job_workload_params = tb.L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=workload_params.idx_max, jobs=workload_params.jobs))
-        res: list[tb.P] = tb.L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(workload_params=a_workload_params, **kwargs), jobs=workload_params.jobs).list
+    def func(workload_params: WorkloadParams, **kwargs: Any) -> P:
+        per_job_workload_params = L(range(workload_params.idx_start, workload_params.idx_end, 1)).split(to=workload_params.jobs).apply(lambda sub_list: WorkloadParams(idx_start=sub_list.list[0], idx_end=sub_list.list[-1] + 1, idx_max=workload_params.idx_max, jobs=workload_params.jobs))
+        res: list[P] = L(per_job_workload_params).apply(lambda a_workload_params: ExpensiveComputation.func_single_job(workload_params=a_workload_params, **kwargs), jobs=workload_params.jobs).list
         return res[0]
 
     @staticmethod
@@ -60,7 +61,7 @@ def try_run_on_cluster():
     c.open_mux(machines_per_tab=1)
     c.check_job_status()
     c.download_results()
-    tb.L(c.machines).delete_remote_results()
+    L(c.machines).delete_remote_results()
     return c
 
 

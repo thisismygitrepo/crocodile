@@ -3,9 +3,13 @@
 dl
 """
 
-import crocodile.toolbox as tb
-from crocodile.file_management import P, Path
+
+# from crocodile.file_management import P, Path
 from crocodile.matplotlib_management import ImShow
+from crocodile.core import List as L, Struct as S, Base
+from crocodile.file_management import P, Save, Path, Read
+from crocodile.meta import Experimental
+
 # from matplotlib.pyplot import hist
 import numpy as np
 import numpy.typing as npt
@@ -43,7 +47,7 @@ class EvaluationData:
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
         print("EvaluationData Object")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
-        _ = tb.S(self.__dict__).print()
+        _ = S(self.__dict__).print()
         return ""
 
 
@@ -85,8 +89,8 @@ class HParams:
     batch_size: int
     epochs: int
     # ================== General ==============================
-    name: str  # field(default_factory=lambda: "model-" + tb.randstr(noun=True))
-    root: tb.P  # = tb.P.tmp(folder="tmp_models")
+    name: str  # field(default_factory=lambda: "model-" + randstr(noun=True))
+    root: P  # = P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
     pkg_name: Literal['tensorflow', 'torch'] = 'tensorflow'
@@ -98,25 +102,25 @@ class HParams:
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError:
             data = self.__dict__
-        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
-        tb.Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
+        Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
+        Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
     def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any):
-        data: dict[str, Any] = tb.Read.vanilla_pickle(path=tb.P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+        data: dict[str, Any] = Read.vanilla_pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
-    # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + tb.Struct(self.__dict__).print(as_config=True, return_str=True)
+    # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + S(self.__dict__).print(as_config=True, return_str=True)
     @property
     def pkg(self):
         if self.pkg_name not in ("tensorflow", "torch"): raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
         return __import__("tensorflow") if self.pkg_name == "tensorflow" else __import__("torch")
     @property
-    def save_dir(self) -> tb.P: return (tb.P(self.root) / self.name).create()
+    def save_dir(self) -> P: return (P(self.root) / self.name).create()
 
 
 class DataReader:
-    subpath = tb.P("metadata/data_reader")
+    subpath = P("metadata/data_reader")
     """This class holds the dataset for training and testing.
     """
     def __init__(self, hp: SubclassedHParams,  # type: ignore
@@ -131,16 +135,16 @@ class DataReader:
         # self.df_handler = df_handler
     def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
-        base = (tb.P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
+        base = (P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError: data = self.__dict__
-        tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
-        tb.Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
+        Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
+        Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
-    def from_saved_data(cls, path: Union[str, tb.P], hp: SubclassedHParams,  # type: ignore
+    def from_saved_data(cls, path: Union[str, P], hp: SubclassedHParams,  # type: ignore
                         **kwargs: Any):
-        path = tb.P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
-        data: dict[str, Any] = tb.Read.vanilla_pickle(path)
+        path = P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
+        data: dict[str, Any] = Read.vanilla_pickle(path)
         obj = cls(hp=hp, **kwargs)
         obj.__setstate__(data)
         return obj
@@ -153,10 +157,10 @@ class DataReader:
     def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
     def __repr__(self):
         print(f"DataReader Object with these keys: \n")
-        tb.S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
+        S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
         if bool(self.split):
             print("Split-Data Table:")
-            tb.S(self.split).print(as_config=False, title="Split Data")  # table print
+            S(self.split).print(as_config=False, title="Split Data")  # table print
         return f"--" * 50
 
     def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
@@ -164,8 +168,8 @@ class DataReader:
         strings = self.specs.get_all_names()
         keys = list(data_dict.keys())
         if len(strings) != len(keys) or set(keys) != set(strings):
-            tb.S(self.specs.__dict__).print(as_config=True, title="Specs Declared")
-            # tb.S(data_dict).print(as_config=True, title="Specs Declared")
+            S(self.specs.__dict__).print(as_config=True, title="Specs Declared")
+            # S(data_dict).print(as_config=True, title="Specs Declared")
             print(f"data_dict keys: {keys}")
             raise ValueError(f"Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
 
@@ -204,7 +208,7 @@ class DataReader:
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
-        tb.Struct(self.split).print()
+        S(self.split).print()
         print(f"==================================================================")
 
     def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
@@ -352,7 +356,7 @@ class BaseModel(ABC):
             try: self.model.compile(**self.compiler.__dict__)
             except Exception as ex:
                 _ = ex
-                tb.Struct(self.compiler.__dict__).print(as_config=True, title=f"Model Compilation Specs")
+                S(self.compiler.__dict__).print(as_config=True, title=f"Model Compilation Specs")
                 print(f"💥 Error while compiling the model.")
                 pass
 
@@ -442,7 +446,7 @@ class BaseModel(ABC):
         return self.model.summary()
     def config(self): _ = [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
     def plot_loss(self, *args: Any, **kwargs: Any):
-        res = tb.Struct.concat_values(*self.history)
+        res = S.concat_values(*self.history)
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         if hasattr(self.compiler.loss, "name"): y_label = self.compiler.loss.name
         else: y_label = self.compiler.loss.__name__
@@ -531,8 +535,8 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        tb.Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try: tb.Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, desc=desc)
+        Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        try: Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}').create()  # model save goes into data path.
         if weights_only: self.save_weights(save_dir)
@@ -549,7 +553,7 @@ class BaseModel(ABC):
             print(ex)
             module = None
         if module is not None and hasattr(module, '__file__') and module.__file__ is not None:
-            module_path_rh = tb.P(module.__file__).resolve().collapseuser().as_posix()
+            module_path_rh = P(module.__file__).resolve().collapseuser().as_posix()
         else:
             module_path_rh = None
         specs = {'__module__': __module,
@@ -558,27 +562,27 @@ class BaseModel(ABC):
                  'hp_class': self.hp.__class__.__name__,
                  # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
                  'module_path_rh': module_path_rh,
-                 'cwd_rh': tb.P.cwd().collapseuser().as_posix(),
+                 'cwd_rh': P.cwd().collapseuser().as_posix(),
                  }
-        tb.Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str, indent=4)
+        Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str, indent=4)
         print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
         return self.hp.save_dir
 
     @classmethod
     def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[Type[SubclassedHParams]] = None, data_class: Optional[Type[SubclassedDataReader]] = None,
                            device_name: Optional[Device] = None, verbose: bool = True):
-        path = tb.P(path)
+        path = P(path)
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
-            hp_obj = tb.Read.vanilla_pickle(path=path / HParams.subpath + "hparams.HParams.pkl")
+            hp_obj = Read.vanilla_pickle(path=path / HParams.subpath + "hparams.HParams.pkl")
         if device_name: hp_obj.device_name = device_name
         if hp_obj.root != path.parent:
             hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
 
         if data_class is not None: d_obj: SubclassedDataReader = data_class.from_saved_data(path, hp=hp_obj)
         else:
-            d_obj = tb.Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
+            d_obj = Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
         # if type(hp_obj) is Generic[HParams]:
         d_obj.hp = hp_obj  # type: ignore
         # else:rd
@@ -586,7 +590,7 @@ class BaseModel(ABC):
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
         history_path = path / "metadata/training/history.pkl"
-        if history_path.exists(): history: list[dict[str, Any]] = tb.Read.vanilla_pickle(path=history_path)
+        if history_path.exists(): history: list[dict[str, Any]] = Read.vanilla_pickle(path=history_path)
         else: history = []
         model_obj.history = history
         _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
@@ -594,7 +598,7 @@ class BaseModel(ABC):
 
     @classmethod
     def from_class_model(cls, path: Union[str, Path, P]):
-        path = tb.P(path)
+        path = P(path)
         hp_obj = HParams.from_saved_data(path)
         data_obj = DataReader.from_saved_data(path, hp=hp_obj)
         directory = path.search('*_save_*')
@@ -604,8 +608,8 @@ class BaseModel(ABC):
 
     @classmethod
     def from_path(cls, path_model: Union[str, Path, P], **kwargs: Any) -> 'SubclassedBaseModel':  # type: ignore
-        path_model = tb.P(path_model).expanduser().absolute()
-        specs = tb.Read.json(path=path_model.joinpath('metadata/code_specs.json'))
+        path_model = P(path_model).expanduser().absolute()
+        specs = Read.json(path=path_model.joinpath('metadata/code_specs.json'))
         print(f"Loading up module: `{specs['__module__']}`.")
         import importlib
         try:
@@ -614,13 +618,13 @@ class BaseModel(ABC):
             print(ex)
             print(f"ModuleNotFoundError: Attempting to try again after appending path with `cwd`: `{specs['cwd_rh']}`.")
             import sys
-            sys.path.append(tb.P(specs['cwd_rh']).expanduser().absolute().str)
+            sys.path.append(P(specs['cwd_rh']).expanduser().absolute().str)
             try:
                 module = importlib.import_module(specs['__module__'])
             except ModuleNotFoundError as ex2:
                 print(ex2)
                 print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
-                module = load_class(tb.P(specs['module_path_rh']).expanduser().absolute().as_posix())
+                module = load_class(P(specs['module_path_rh']).expanduser().absolute().as_posix())
         model_class: SubclassedBaseModel = getattr(module, specs['model_class'])
         data_class: Type[DataReader] = getattr(module, specs['data_class'])
         hp_class: Type[HParams] = getattr(module, specs['hp_class'])
@@ -668,8 +672,8 @@ class BaseModel(ABC):
         if verbose:
             print("\n")
             print("Build Test".center(50, '-'))
-            tb.Struct.from_keys_values(keys_ip, tb.L(ips).apply(lambda x: x.shape)).print(as_config=True, title="Input shapes:")
-            tb.Struct.from_keys_values(keys_op, tb.L(ops).apply(lambda x: x.shape)).print(as_config=True, title=f"Output shape:")
+            S.from_keys_values(keys_ip, L(ips).apply(lambda x: x.shape)).print(as_config=True, title="Input shapes:")
+            S.from_keys_values(keys_op, L(ops).apply(lambda x: x.shape)).print(as_config=True, title=f"Output shape:")
             print("\n\nStats on output data for random normal input:")
             try:
                 res = []
@@ -683,7 +687,7 @@ class BaseModel(ABC):
             print("\n")
 
 
-class Ensemble(tb.Base):
+class Ensemble(Base):
     def __init__(self, hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader], model_class: Type[SubclassedBaseModel], size: int = 10, **kwargs: Any):
         """
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
@@ -716,20 +720,20 @@ class Ensemble(tb.Base):
     @classmethod
     def from_saved_models(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class,  # type: ignore
-                        path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
-        obj.models = list(tb.P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
+                        path=parent_dir, size=len(P(parent_dir).search('*__model__*')))
+        obj.models = list(P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
     def from_saved_weights(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class,  # type: ignore
-                        path=parent_dir, size=len(tb.P(parent_dir).search('*__model__*')))
-        obj.models = list(tb.P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))  # type: ignore
+                        path=parent_dir, size=len(P(parent_dir).search('*__model__*')))
+        obj.models = list(P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))  # type: ignore
         return obj
 
     @staticmethod
     def from_path(path: Union[str, Path, P]) -> list[SubclassedBaseModel]:  # type: ignore
-        tmp = tb.P(path).expanduser().absolute().search("*")
+        tmp = P(path).expanduser().absolute().search("*")
         tmp2 = tmp.apply(BaseModel.from_path)
         return list(tmp2)  # type: ignore
 
@@ -744,7 +748,7 @@ class Ensemble(tb.Base):
             self.performance.append(self.models[i].evaluate(aslice=slice(0, -1), viz=False))
             if save:
                 self.models[i].save_class()
-                tb.Save.vanilla_pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")
+                Save.vanilla_pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
@@ -792,7 +796,7 @@ class HPTuning:
         import tensorflow as tf
         self.pkg = tf
         self.dir = None
-        self.params = tb.List()
+        self.params = L()
         self.acc_metric = None
         self.metrics = None
 
@@ -844,8 +848,8 @@ class HPTuning:
 #     def __call__(self, ktp): pass
 
 #     def tune(self):
-#         kt = tb.install_n_import("kerastuner")
-#         self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=tb.P.tmp('my_dir'), project_name='intro_to_kt')
+#         kt = install_n_import("kerastuner")
+#         self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=P.tmp('my_dir'), project_name='intro_to_kt')
 
 
 def batcher(func_type: str = 'function'):

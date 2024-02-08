@@ -6,7 +6,8 @@ dl template
 import numpy as np
 # import numpy.typing as npt
 import matplotlib.pyplot as plt
-import crocodile.toolbox as tb
+from crocodile.core import randstr
+from crocodile.file_management import P
 import crocodile.deeplearning as dl
 from crocodile.deeplearning import EvaluationData
 from crocodile.matplotlib_management import FigureManager, Axes
@@ -21,8 +22,8 @@ k = tf.keras  # type: ignore  pylint: disable=no-member
 @dl.dataclass
 class HParams(dl.HParams):
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
-    name: str = field(default_factory=lambda: "model-" + tb.randstr(noun=True))
-    root: tb.P = tb.P.tmp(folder="tmp_models")
+    name: str = field(default_factory=lambda: "model-" + randstr(noun=True))
+    root: P = P.tmp(folder="tmp_models")
     pkg_name = 'tensorflow'
     # device_name: Device=Device.gpu0
     # ===================== Data ==============================

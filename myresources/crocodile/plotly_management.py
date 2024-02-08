@@ -2,7 +2,11 @@
 """P
 """
 
-import crocodile.toolbox as tb
+
+from crocodile.file_management import P
+from crocodile.core import randstr
+from crocodile.meta import Terminal
+
 # import pandas as pd
 
 import plotly.graph_objects as go
@@ -22,7 +26,7 @@ from types import SimpleNamespace
 import sys
 
 pio.renderers.default = "browser"
-tm = tb.Terminal()
+tm = Terminal()
 _ = Input, Output, State, dcc, html, daq, ctx, sys, dbc
 __ = go, px, make_subplots
 
@@ -68,7 +72,7 @@ class App:
         else: port__ = port
         # pynoinspection HTTP
         if start_browser:
-            try: tb.P(rf'http://{host}:{port__}/')()
+            try: P(rf'http://{host}:{port__}/')()
             except Exception as ex:
                 print(ex)
         app.run_server(debug=debug, port=port__, host="0.0.0.0" if lan_share else "localhost")  # , processes=2, threaded=False)
@@ -81,7 +85,7 @@ class App:
             'primary': '#00EA64',
             'secondary': '#6E6E6E',
         }
-        return dash.Dash(name=name + tb.randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
+        return dash.Dash(name=name + randstr(), external_stylesheets=[r'https://codepen.io/chriddyp/pen/bWLwgP.css'])
         # [dbc.themes.DARKLY])
         #
     # @staticmethod

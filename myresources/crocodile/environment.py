@@ -2,8 +2,10 @@
 """Env
 """
 
-import crocodile.toolbox as tb
-from crocodile.meta import SHELLS
+
+from crocodile.core import List as L
+from crocodile.file_management import P
+from crocodile.meta import SHELLS, Terminal
 import platform
 import getpass
 import os
@@ -12,18 +14,15 @@ from typing import Union, Literal, Optional, TypedDict
 from dataclasses import dataclass
 
 
-P = tb.P
-L = tb.L
-
 system = platform.system()  # Linux or Windows
-myhome = tb.P(f"myhome/{platform.system().lower()}")
+myhome = P(f"myhome/{platform.system().lower()}")
 
 OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # PATH separator, this is special for PATH object, not to be confused with P.sep (normal paths), usually / or \
-# env = tb.Struct(dict(os.environ)).clean_view
+# env = S(dict(os.environ)).clean_view
 exe = P(sys.executable)
 
-tm = tb.Terminal()
+tm = Terminal()
 
 # ============================== Common Paths ============================
 
@@ -45,7 +44,7 @@ Temp = Tmp
 
 tmp = os.getenv("PATH")
 if isinstance(tmp, str):
-    tmp_path: tb.L[tb.P] = L(tmp.split(sep)).apply(P)  # type: ignore
+    tmp_path: tb.L[P] = L(tmp.split(sep)).apply(P)  # type: ignore
 else:
     tmp_path = L()
 PATH = tmp_path
@@ -159,7 +158,7 @@ class PathVar:
     def append_temporarily(dirs: list[str], kind: Literal['append', 'prefix', 'replace'] = "append"):
         dirs_ = []
         for path in dirs:
-            path_rel = tb.P(path).collapseuser(strict=False)
+            path_rel = P(path).collapseuser(strict=False)
             if path_rel.as_posix() in PATH or str(path_rel) in PATH or path_rel.expanduser().str in PATH or path_rel.expanduser().as_posix() in PATH: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
             else:
                 dirs_.append(path_rel.as_posix() if system == "Linux" else str(path_rel))
@@ -181,8 +180,8 @@ class PathVar:
     def append_permanently(path: str, scope: Literal["User", "system"] = "User"):
         if system == "Windows":
             # AVOID THIS AND OPT TO SAVE IT IN $profile.
-            a_tmp_path = tb.P.tmpfile(suffix=".path_backup")
-            if tb.P(path) in PATH:
+            a_tmp_path = P.tmpfile(suffix=".path_backup")
+            if P(path) in PATH:
                 print(f"Path passed `{path}` is already in PATH, skipping the appending.")
                 return None
             backup = fr'$env:PATH >> {a_tmp_path}; '
@@ -190,7 +189,7 @@ class PathVar:
             result = backup + command
             return result  # if run is False else tm.run(result, shell="powershell").print()
         else:
-            file = tb.P.home().joinpath(".bashrc")
+            file = P.home().joinpath(".bashrc")
             txt = file.read_text()
             file.write_text(txt + f"\nexport PATH='{path}:$PATH'", encoding="utf-8")
 
@@ -201,7 +200,7 @@ class PathVar:
         To see impact of change, you will need to restart the process from which the shell started. This is probably windows explorer.
         This can be achieved by suspending the process, alternatively you need to logoff and on.
         This is because environment variables are inherited from parent process, and so long explorere is not updated, restarting the shell would not help."""
-        tmpfile = tb.P.tmpfile(suffix=".path_backup")
+        tmpfile = P.tmpfile(suffix=".path_backup")
         print(f"Saving original path to {tmpfile}")
         backup = fr'$env:PATH >> {tmpfile}; '
         result = backup + fr'[Environment]::SetEnvironmentVariable("Path", "{path}", "{scope}")'
@@ -231,10 +230,10 @@ def get_shell_profiles(shell: SHELLS):
     return ShellProfile()
 
 
-def construct_path(path_list: list[str]): return tb.L(set(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
+def construct_path(path_list: list[str]): return L(set(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
 def get_path_defined_files(string_: str = "*.exe"):
     res = PATH.search(string_).reduce(lambda x, y: x + y)
-    tb.L(res).print()
+    L(res).print()
     return res
 
 

@@ -122,7 +122,7 @@ class Base(object):
     def save_code(self, path: Union[str, Path]):
         if hasattr(module := __import__("inspect").getmodule(self), "__file__"): file = Path(module.__file__)
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
-        _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8')); return Path(path) if type(path) is str else path  # path could be tb.P, better than Path
+        _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8')); return Path(path) if type(path) is str else path  # path could be P, better than Path
     def get_attributes(self, remove_base_attrs: bool = True, return_objects: bool = False, fields: bool = True, methods: bool = True):
         import inspect
         remove_vals = Base().get_attributes(remove_base_attrs=False) if remove_base_attrs else []

@@ -10,6 +10,7 @@ from rich import pretty, inspect, progress, traceback, print as pprint
 from rich.text import Text
 from rich.console import Console
 
+import crocodile.toolbox as tb
 import crocodile
 from crocodile.core import *  # type: ignore # pylint: disable=W0401,W0614 # noqa: F403,F401
 from crocodile.file_management import P
@@ -19,7 +20,7 @@ from crocodile.meta import *  # type: ignore # noqa: F403,F401 # pylint: disable
 from crocodile import meta
 # import crocodile.environment as env
 from crocodile.matplotlib_management import *  # noqa: F403,F401 # type: ignore # pylint: disable=W0401,W0614
-import crocodile.toolbox as tb
+
 import numpy as np
 import pandas as pd
 import platform

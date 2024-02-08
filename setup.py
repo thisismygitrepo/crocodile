@@ -12,7 +12,7 @@ with open("README.md", "r", encoding="utf-8") as file:
     long_desc = file.read()  # to help adding README to PyPi website not only Github
 
 # get python modules:
-# tb.P("./myresources").search("*.py", r=True).apply(lambda x: x.split(at="myresources", sep=-1)[1].as_posix().replace("/", ".")[:-3]).filter(lambda x: "__init__" not in x).list
+# P("./myresources").search("*.py", r=True).apply(lambda x: x.split(at="myresources", sep=-1)[1].as_posix().replace("/", ".")[:-3]).filter(lambda x: "__init__" not in x).list
 
 setup(
     name='crocodile',

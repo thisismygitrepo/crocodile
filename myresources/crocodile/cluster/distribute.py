@@ -10,7 +10,10 @@ from enum import Enum
 from dataclasses import dataclass
 import psutil
 import numpy as np
-import crocodile.toolbox as tb
+
+from crocodile.core import randstr, List as L, Struct as S, install_n_import
+from crocodile.file_management import P, Save
+from crocodile.meta import SSH, Terminal
 from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, WorkloadParams, LAUNCH_METHOD
 from rich.console import Console
 # from platform import system
@@ -92,16 +95,16 @@ class Cluster:
         state["func"] = None
         return state
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__.update(state)
-    def save(self) -> tb.P:
+    def save(self) -> P:
         path = self.root_dir.joinpath("cluster.Cluster.pkl")
-        tb.Save.vanilla_pickle(obj=self.__getstate__(), path=path)
+        Save.vanilla_pickle(obj=self.__getstate__(), path=path)
         return path
     @staticmethod
     def load(job_id: str, base: Optional[str] = None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
-    def get_cluster_path(job_id: str, base: Union[str, tb.P, None] = None):
-        if base is None: base_obj = tb.P.home().joinpath(rf"tmp_results/remote_machines")
-        else: base_obj = tb.P(base)
+    def get_cluster_path(job_id: str, base: Union[str, P, None] = None):
+        if base is None: base_obj = P.home().joinpath(rf"tmp_results/remote_machines")
+        else: base_obj = P(base)
         return base_obj.joinpath(f"job_id__{job_id}")
     def __init__(self,
                  func: Callable[..., Any],
@@ -114,18 +117,18 @@ class Cluster:
                  ditch_unavailable_machines: bool = False,
                  description: str = "",
                  job_id: Optional[str] = None,
-                 base_dir: Union[str, tb.P, None] = None):
-        self.job_id = job_id or tb.randstr(noun=True)
+                 base_dir: Union[str, P, None] = None):
+        self.job_id = job_id or randstr(noun=True)
         self.root_dir = self.get_cluster_path(self.job_id, base=base_dir)
         self.results_downloaded = False
 
         self.thread_load_calc: ThreadLoadCalculator = thread_load_calc or ThreadLoadCalculator()
         self.machine_load_calc: MachineLoadCalculator = MachineLoadCalculator(load_criterion=LoadCriterion[self.thread_load_calc.load_criterion.name + "_norm"], )
 
-        sshz: list[tb.SSH] = []
+        sshz: list[SSH] = []
         for an_ssh_params in ssh_params:
             try:
-                tmp = tb.SSH(**an_ssh_params)
+                tmp = SSH(**an_ssh_params)
                 sshz.append(tmp)
             except Exception as ex:
                 print(f"Couldn't connect to {an_ssh_params}")
@@ -133,7 +136,7 @@ class Cluster:
                 else: raise Exception(f"Couldn't connect to {an_ssh_params}") from ex  # type: ignore # pylint: disable=W0719
 
         # lists of similar length:
-        self.sshz: list[tb.SSH] = sshz
+        self.sshz: list[SSH] = sshz
         self.machines: list[RemoteMachine] = []
         self.machines_specs: list[MachineSpecs] = []
         self.threads_per_machine: list[int] = []
@@ -153,7 +156,7 @@ class Cluster:
         print("\n" * 2)
         console.rule(title=f"kwargs of functions to be run on machines")
         for an_ssh, a_kwarg in zip(self.sshz, self.workload_params):
-            tb.S(a_kwarg.__dict__).print(as_config=True, title=an_ssh.get_remote_repr())
+            S(a_kwarg.__dict__).print(as_config=True, title=an_ssh.get_remote_repr())
     def print_commands(self, launch_method: LAUNCH_METHOD):
         print("\n" * 2)
         console.rule(title="Commands to run on each machine:")
@@ -186,8 +189,8 @@ class Cluster:
 
     def viz_load_ratios(self) -> None:
         if not self.workload_params: raise RuntimeError("func_kwargs_list is None. You need to run generate_standard_kwargs() first.")
-        plt = tb.install_n_import("plotext")
-        names = tb.L(self.sshz).apply(lambda x: x.get_remote_repr(add_machine=True)).list
+        plt = install_n_import("plotext")
+        names = L(self.sshz).apply(lambda x: x.get_remote_repr(add_machine=True)).list
 
         plt.simple_multiple_bar(names, [[machine_specs.cpu for machine_specs in self.machines_specs], [machine_specs.ram for machine_specs in self.machines_specs]], title=f"Resources per machine", labels=["#cpu threads", "memory size"])
         plt.show()
@@ -195,7 +198,7 @@ class Cluster:
         plt.simple_bar(names, self.machine_load_calc.load_ratios, width=100, title=f"Load distribution for machines using criterion `{self.machine_load_calc.load_criterion}`")
         plt.show()
 
-        tmp = tb.S(dict(zip(names, tb.L((np.array(self.machine_load_calc.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
+        tmp = S(dict(zip(names, L((np.array(self.machine_load_calc.load_ratios) * 100).round(1)).apply(lambda x: f"{int(x)}%")))).print(as_config=True, justify=75, return_str=True)
         assert isinstance(tmp, str)
         self.machine_load_calc.load_ratios_repr = tmp
         print(self.machine_load_calc.load_ratios_repr)
@@ -222,7 +225,7 @@ class Cluster:
 
     def open_mux(self, machines_per_tab: int = 1, window_number: Optional[int] = None):
         self.machines_per_tab = machines_per_tab
-        self.window_number = window_number if window_number is not None else 0  # tb.randstr(length=3, lower=False, upper=False)
+        self.window_number = window_number if window_number is not None else 0  # randstr(length=3, lower=False, upper=False)
         cmd = f"wt -w {self.window_number} "
         for idx, m in enumerate(self.machines):
 
@@ -233,7 +236,7 @@ class Cluster:
 
         print("Terminal launch command:\n", cmd)
         if cmd.endswith("`;"): cmd = cmd[:-2]
-        tb.Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
+        Terminal().run_async(*cmd.replace("`;", ";").split(" "))  # `; only for powershell, cmd is okay for ; as it is not a special character
         rm_last = self.machines[-1]
         rm_last.get_session_manager().asssert_session_started(ssh=rm_last.ssh, sess_name=rm_last.job_params.session_name)
 
@@ -251,7 +254,7 @@ class Cluster:
         self.save()
         return self
 
-    def check_job_status(self) -> None: tb.L(self.machines).apply(lambda machine: machine.check_job_status())
+    def check_job_status(self) -> None: L(self.machines).apply(lambda machine: machine.check_job_status())
     def download_results(self):
         if self.results_downloaded:
             print(f"All results downloaded to {self.root_dir} 🤗")
@@ -262,13 +265,13 @@ class Cluster:
                 print(f"Results are not ready for machine {a_m}.")
                 print(f"Try to run `.check_job_status()` to check if the job is done and obtain results path.")
                 continue
-            # results_folder = tb.P(a_m.results_path).expanduser()
+            # results_folder = P(a_m.results_path).expanduser()
             if a_m.results_downloaded is False:
                 print("\n")
                 console.rule(f"Downloading results from {a_m}")
                 print("\n")
                 a_m.download_results(target=None)  # TODO another way of resolve multiple machines issue is to create a directory at downlaod_results time.
-        if tb.L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
+        if L(self.machines).results_downloaded.to_numpy().sum() == len(self.machines):
             print(f"All results downloaded to {self.root_dir} 🤗")
             self.results_downloaded = True
 

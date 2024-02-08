@@ -4,14 +4,15 @@
 
 from argparse import ArgumentParser
 # from gooey import Gooey  #, GooeyParser
-import crocodile.toolbox as tb
+from crocodile.core import install_n_import
+from crocodile.file_management import Read
 # from crocodile.cluster.distribute import Cluster, WorkloadParams
 from crocodile.cluster.remote_machine import RemoteMachineConfig
 # from crocodile.cluster.utils import expensive_function
 from machineconfig.utils.utils import DEFAULTS_PATH
 # from typing import Any, Optional
 
-Gooey = tb.install_n_import("gooey").Gooey
+Gooey = install_n_import("gooey").Gooey
 
 
 @Gooey(program_name="Cluster Launcher", program_description='Cofigure remote cluster and launch jobs.')  # type: ignore
@@ -62,7 +63,7 @@ def main() -> RemoteMachineConfig:
     parser.add_argument('-v', '--notify_upon_completion', help='Notify upon completion', action='store_true', default=True)
 
     try:
-        section = tb.Read.ini(DEFAULTS_PATH)['general']
+        section = Read.ini(DEFAULTS_PATH)['general']
         to_email = section['to_email']
         email_config_name = section['email_config_name']
     except (FileNotFoundError, KeyError, IndexError):

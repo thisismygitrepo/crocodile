@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 import time
 import platform
 import getpass
-import crocodile.toolbox as tb
+
+from crocodile.core import randstr, Struct as S
+from crocodile.file_management import P, Save, Read
+from crocodile.meta import SSH
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
 from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, FileManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager, LogEntry
@@ -26,11 +29,11 @@ console = Console()
 @dataclass
 class RemoteMachineConfig:
     # conn
-    job_id: str = field(default_factory=lambda: tb.randstr(noun=True))
+    job_id: str = field(default_factory=lambda: randstr(noun=True))
     base_dir: str = f"~/tmp_results/remote_machines/jobs"
     description: str = ""
     ssh_params: dict[str, Union[str, int]] = field(default_factory=lambda: {})
-    ssh_obj: Union[tb.SSH, SelfSSH, None] = None
+    ssh_obj: Union[SSH, SelfSSH, None] = None
 
     # data
     copy_repo: bool = False
@@ -66,13 +69,13 @@ class RemoteMachineConfig:
         if self.notify_upon_completion and self.to_email is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
             try:
-                section = tb.Read.ini(DEFAULTS_PATH)['general']
+                section = Read.ini(DEFAULTS_PATH)['general']
                 self.to_email = section['to_email']
             except (FileNotFoundError, KeyError, IndexError) as err: raise ValueError(f"Email address is not provided. 🤷‍♂️ & default could not be read @ `{DEFAULTS_PATH}`") from err
         if self.notify_upon_completion and self.email_config_name is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
             try:
-                section = tb.Read.ini(DEFAULTS_PATH)['general']
+                section = Read.ini(DEFAULTS_PATH)['general']
                 self.email_config_name = section['email_config_name']
             except (FileNotFoundError, KeyError, IndexError) as err: raise ValueError(f"Email config name is not provided. 🤷‍♂️ & default could not be read @ `{DEFAULTS_PATH}`") from err
 
@@ -81,7 +84,7 @@ class RemoteMachine:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): self.__dict__ = state
     def __repr__(self): return f"Compute Machine {self.ssh.get_remote_repr(add_machine=True)}"
-    def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list[tb.P]] = None):
+    def __init__(self, func: Union[str, Callable[..., Any]], config: RemoteMachineConfig, func_kwargs: Optional[dict[str, Any]] = None, data: Optional[list[P]] = None):
         self.config: RemoteMachineConfig = config
         self.job_params: JobParams = JobParams.from_func(func=func)
         if self.config.install_repo is True: assert self.job_params.is_installabe()
@@ -90,7 +93,7 @@ class RemoteMachine:
         self.kwargs = func_kwargs or {}
         self.data = data if data is not None else []
         # conn
-        self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else tb.SSH(**self.config.ssh_params)  # type: ignore
+        self.ssh = self.config.ssh_obj if self.config.ssh_obj is not None else SSH(**self.config.ssh_params)  # type: ignore
         # scripts
         self.file_manager = FileManager(job_id=self.config.job_id, remote_machine_type=self.ssh.get_remote_machine(), base=self.config.base_dir, max_simulataneous_jobs=self.config.max_simulataneous_jobs, lock_resources=self.config.lock_resources)
         # flags
@@ -98,7 +101,7 @@ class RemoteMachine:
         self.submitted: bool = False
         self.scipts_generated: bool = False
         self.results_downloaded: bool = False
-        self.results_path: Optional[tb.P] = None
+        self.results_path: Optional[P] = None
 
     def get_session_manager(self): return Zellij() if self.ssh.get_remote_machine() != "Windows" else WindowsTerminal()
     def fire(self, run: bool = False, open_console: bool = True, launch_method: LAUNCH_METHOD = "remotely") -> tuple[int, str]:
@@ -113,7 +116,7 @@ class RemoteMachine:
                 # This is a workaround that uses the same existing session and make special tab for new jobs, until zellij implements detached session capability.
                 # no need to assert session started, as it is already started. Plus, The lack of suffix `sess_name (current)` creates problems.
                 self.job_params.session_name = sess_name
-                tb.Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
+                Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
             else:
                 # As for Windows Terminal, there is another problem preventing us from using the same window; there is no kill-pane or kill-tab or even kill-window, the only way is to kill process (kills window).
                 # Thus, we can't terminate a job unless it has a window of its own. So we follow that apporach here.
@@ -164,12 +167,12 @@ class RemoteMachine:
         self.job_params.ssh_repr_remote = self.ssh.get_remote_repr()
         self.job_params.description = self.config.description
         self.job_params.file_manager_path = self.file_manager.file_manager_path.collapseuser().as_posix()
-        self.job_params.session_name = "TS-" + tb.randstr(noun=True)  # TS: TerminalSession-CloudManager, to distinguish from other sessions created manually.
-        self.job_params.tab_name = f'🏃‍♂️{self.file_manager.job_id}'  # tb.randstr(noun=True)
+        self.job_params.session_name = "TS-" + randstr(noun=True)  # TS: TerminalSession-CloudManager, to distinguish from other sessions created manually.
+        self.job_params.tab_name = f'🏃‍♂️{self.file_manager.job_id}'  # randstr(noun=True)
         execution_line = self.job_params.get_execution_line(parallelize=self.config.parallelize, workload_params=self.config.workload_params, wrap_in_try_except=self.config.wrap_in_try_except)
-        py_script = tb.P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
+        py_script = P(cluster.__file__).parent.joinpath("script_execution.py").read_text(encoding="utf-8").replace("params = JobParams.from_empty()", f"params = {self.job_params}").replace("# execution_line", execution_line)
         if self.config.notify_upon_completion:
-            executed_obj = f"""File *{tb.P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_r).collapseuser().as_posix()}*"""  # for email.
+            executed_obj = f"""File *{P(self.job_params.repo_path_rh).joinpath(self.job_params.file_path_r).collapseuser().as_posix()}*"""  # for email.
             assert self.config.email_config_name is not None, "Email config name is not provided. 🤷‍♂️"
             assert self.config.to_email is not None, "Email address is not provided. 🤷‍♂️"
             email_params = EmailParams(addressee=self.ssh.get_local_repr(add_machine=True),
@@ -178,20 +181,20 @@ class RemoteMachine:
                                        executed_obj=executed_obj,
                                        file_manager_path=self.file_manager.file_manager_path.collapseuser().as_posix(),
                                        to_email=self.config.to_email, email_config_name=self.config.email_config_name)
-            email_script = tb.P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("email_params = EmailParams.from_empty()", f"email_params = {email_params}").replace('manager = FileManager.from_pickle(params.file_manager_path)', '')
+            email_script = P(cluster.__file__).parent.joinpath("script_notify_upon_completion.py").read_text(encoding="utf-8").replace("email_params = EmailParams.from_empty()", f"email_params = {email_params}").replace('manager = FileManager.from_pickle(params.file_manager_path)', '')
             py_script = py_script.replace("# NOTIFICATION-CODE-PLACEHOLDER", email_script)
-        ve_path = tb.P(self.job_params.repo_path_rh).expanduser().joinpath(".ve_path")
-        if ve_path.exists(): ve_name = tb.P(ve_path.read_text()).expanduser().name
+        ve_path = P(self.job_params.repo_path_rh).expanduser().joinpath(".ve_path")
+        if ve_path.exists(): ve_name = P(ve_path.read_text()).expanduser().name
         else:
             import sys
-            ve_name = tb.P(sys.executable).parent.parent.name
+            ve_name = P(sys.executable).parent.parent.name
         shell_script = f"""
 
 # EXTRA-PLACEHOLDER-PRE
 
 echo "~~~~~~~~~~~~~~~~SHELL START~~~~~~~~~~~~~~~"
 {'~/scripts/devops -w update' if self.config.update_essential_repos else ''}
-{f'cd {tb.P(self.job_params.repo_path_rh).collapseuser().as_posix()}'}
+{f'cd {P(self.job_params.repo_path_rh).collapseuser().as_posix()}'}
 . activate_ve {ve_name}
 {'git pull' if self.config.update_repo else ''}
 {'pip install -e .' if self.config.install_repo else ''}
@@ -212,10 +215,10 @@ deactivate
         # shell_script_path.write_text(shell_script, encoding='utf-8', newline={"Windows": None, "Linux": "\n"}[ssh.get_remote_machine()])  # LF vs CRLF requires py3.10
         with open(file=self.file_manager.shell_script_path.expanduser().create(parents_only=True), mode='w', encoding="utf-8", newline={"Windows": None, "Linux": "\n"}[self.ssh.get_remote_machine()]) as file: file.write(shell_script)
         self.file_manager.py_script_path.expanduser().create(parents_only=True).write_text(py_script, encoding='utf-8')  # py_version = sys.version.split(".")[1]
-        tb.Save.vanilla_pickle(obj=self.kwargs, path=self.file_manager.kwargs_path.expanduser(), verbose=False)
-        tb.Save.vanilla_pickle(obj=self.file_manager.__getstate__(), path=self.file_manager.file_manager_path.expanduser(), verbose=False)
-        tb.Save.vanilla_pickle(obj=self.config, path=self.file_manager.remote_machine_config_path.expanduser(), verbose=False)
-        tb.Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
+        Save.vanilla_pickle(obj=self.kwargs, path=self.file_manager.kwargs_path.expanduser(), verbose=False)
+        Save.vanilla_pickle(obj=self.file_manager.__getstate__(), path=self.file_manager.file_manager_path.expanduser(), verbose=False)
+        Save.vanilla_pickle(obj=self.config, path=self.file_manager.remote_machine_config_path.expanduser(), verbose=False)
+        Save.vanilla_pickle(obj=self, path=self.file_manager.remote_machine_path.expanduser(), verbose=False)
         job_status: JOB_STATUS = "queued"
         self.file_manager.execution_log_dir.expanduser().create().joinpath("status.txt").write_text(job_status)
         print("\n")
@@ -223,7 +226,7 @@ deactivate
     def show_scripts(self) -> None:
         Console().print(Panel(Syntax(self.file_manager.shell_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared shell script"))
         Console().print(Panel(Syntax(self.file_manager.py_script_path.expanduser().read_text(encoding='utf-8'), lexer="ps1" if self.ssh.get_remote_machine() == "Windows" else "sh", theme="monokai", line_numbers=True), title="prepared python script"))
-        inspect(tb.Struct(shell_script=repr(tb.P(self.file_manager.shell_script_path).expanduser()), python_script=repr(tb.P(self.file_manager.py_script_path).expanduser()), kwargs_file=repr(tb.P(self.file_manager.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
+        inspect(S(shell_script=repr(P(self.file_manager.shell_script_path).expanduser()), python_script=repr(P(self.file_manager.py_script_path).expanduser()), kwargs_file=repr(P(self.file_manager.kwargs_path).expanduser())), title="Prepared scripts and files.", value=False, docs=False, sort=False)
 
     def wait_for_results(self, sleep_minutes: int = 10) -> None:
         assert self.submitted, "Job even not submitted yet. 🤔"
@@ -235,7 +238,7 @@ deactivate
         self.download_results()
         if self.config.notify_upon_completion: pass
 
-    def check_job_status(self) -> Optional[tb.P]:
+    def check_job_status(self) -> Optional[P]:
         if not self.submitted:
             print("Job even not submitted yet. 🤔")
             return None
@@ -271,7 +274,7 @@ deactivate
             except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
             print("\n")
 
-            self.results_path = tb.P(results_folder)
+            self.results_path = P(results_folder)
             return self.results_path
         return None
 
@@ -283,7 +286,7 @@ deactivate
         return self
     def delete_remote_results(self):
         if self.results_path is not None:
-            self.ssh.run_py(cmd=f"tb.P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
+            self.ssh.run_py(cmd=f"P(r'{self.results_path.as_posix()}').delete(sure=True)", verbose=False)
             return self
         else:
             print("Results path is unknown until job execution is finalized. 🤔\nTry checking the job status first.")
@@ -300,7 +303,7 @@ deactivate
         cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
         from copy import deepcopy
         self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
-        self.file_manager.base_dir = tb.P(self.config.base_dir).collapseuser()
+        self.file_manager.base_dir = P(self.config.base_dir).collapseuser()
         wl = WorkloadParams().split_to_jobs(jobs=split)
         rms: list[RemoteMachine] = []
         new_log_entries: list[LogEntry] = []

@@ -115,7 +115,7 @@ Invoke-WebRequest https://raw.githubusercontent.com/thisismygitrepo/machineconfi
 That's as easy as taking candy from a baby; whenever you start a Python file, preface it with following in order to unleash the library:
 
 ```
-import crocodile.toolbox as tb
+
 ```
 
 
@@ -131,7 +131,7 @@ EX2: Suppose you want to know how many lines of code in your repository. The pro
 
 To achieve this, all you need is an eminently readable one-liner.
 ```python
-tb.P.cwd().search("*.py", r=True).read_text().split('\n').apply(len).to_numpy().sum()
+P.cwd().search("*.py", r=True).read_text().split('\n').apply(len).to_numpy().sum()
 ```
 
 How does this make perfect sense?

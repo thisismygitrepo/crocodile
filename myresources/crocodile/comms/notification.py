@@ -3,7 +3,9 @@
 """
 # import numpy as np
 # import matplotlib.pyplot as plt
-import crocodile.toolbox as tb
+
+from crocodile.core import install_n_import
+from crocodile.file_management import P, Read
 import smtplib
 import imaplib
 # from email import message
@@ -18,13 +20,13 @@ from typing import Optional, Any, Union
 """
 
 
-def get_gtihub_markdown_css(): return tb.P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download_to_memory().text
+def get_gtihub_markdown_css(): return P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download_to_memory().text
 
 
 class Email:
     @staticmethod
     def get_source_of_truth():
-        path = tb.P.home().joinpath("dotfiles/machineconfig/emails.ini")
+        path = P.home().joinpath("dotfiles/machineconfig/emails.ini")
         if not path.exists():
             raise FileNotFoundError(f"""File not found: {path}. It should be an ini file with this structure
 [resend]
@@ -40,7 +42,7 @@ imap_port = 465
 encryption = ssl
 
 """)
-        return tb.Read.ini(path=path)
+        return Read.ini(path=path)
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
@@ -84,7 +86,7 @@ encryption = ssl
 </style>
 <body>
 <div class="markdown-body">
-{tb.install_n_import("markdown").markdown(body)}
+{install_n_import("markdown").markdown(body)}
 </div>
 </body>
 </html>"""
@@ -109,7 +111,7 @@ encryption = ssl
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
             config = Email.get_source_of_truth()
-            resend = tb.install_n_import("resend")
+            resend = install_n_import("resend")
             try:
                 resend.api_key = config['resend']['api_key']
                 to = config["resend"]["signup_email"]
@@ -128,14 +130,22 @@ encryption = ssl
             tmp.send_message(to, subject, msg)
             tmp.close()
 
+    @staticmethod
+    def send_m365(to: list[str], subject: str, msg: str, attachments: Optional[list[P]] = None):
+        from crocodile.meta import Terminal
+        to_str = ",".join(to)
+        attachments_str = " ".join([f"--attachment {str(p)}" for p in attachments]) if attachments is not None else ""
+        cmd = f"""m365 outlook mail send --verbose --saveToSentItems --importance normal --bodyContentType Text --bodyContents "{msg}" --subject "{subject}" --to {to_str} {attachments_str}"""
+        Terminal().run(cmd)
+
 
 class PhoneNotification:  # security concerns: avoid using this.
     def __init__(self, bulletpoint_token: str):
-        pushbullet = tb.install_n_import("pushbullet")
+        pushbullet = install_n_import("pushbullet")
         self.api = pushbullet.Pushbullet(bulletpoint_token)
     def send_notification(self, title: str = "Note From Python", body: str = "A notfication"): self.api.push_note(title=title, body=body)
     @staticmethod
-    def open_website(): tb.P(r"https://www.pushbullet.com/").readit()
+    def open_website(): P(r"https://www.pushbullet.com/").readit()
     @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
     def try_me(bulletpoint_token: str): n = PhoneNotification(bulletpoint_token); n.send_notification()
 

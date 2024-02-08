@@ -4,12 +4,13 @@ This module contains utility functions for the cluster module.
 """
 
 import inspect
-import crocodile.toolbox as tb
+from crocodile.core import Save
+from crocodile.file_management import P
 from crocodile.cluster.remote_machine import WorkloadParams
 from typing import Optional, Any, Callable
 
 
-def expensive_function(workload_params: WorkloadParams, sim_dict: Optional[dict[str, Any]] = None) -> tb.P:
+def expensive_function(workload_params: WorkloadParams, sim_dict: Optional[dict[str, Any]] = None) -> P:
     import time
     from rich.progress import track
     print(f"Hello, I am one thread of an expensive function, and I just started running ...")
@@ -21,8 +22,8 @@ def expensive_function(workload_params: WorkloadParams, sim_dict: Optional[dict[
     print(f"I'm done, I crunched numbers from {workload_params.idx_start} to {workload_params.idx_end}.")
     _ = workload_params.idx_max
 
-    save_dir = tb.P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
-    tb.Save.vanilla_pickle(obj={'a': 1}, path=save_dir.joinpath(f"trial_func_result.pkl"))
+    save_dir = P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
+    Save.vanilla_pickle(obj={'a': 1}, path=save_dir.joinpath(f"trial_func_result.pkl"))
     return save_dir
 
 

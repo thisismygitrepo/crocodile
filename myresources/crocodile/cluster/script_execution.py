@@ -6,9 +6,13 @@ Job Execution Script
 import os
 import getpass
 import platform
-import crocodile.toolbox as tb
+
+from crocodile.core import Struct as S
+from crocodile.file_management import P, Read
+# from crocodile.meta import SSH
 from crocodile.cluster.loader_runner import JobParams, FileManager, WorkloadParams, JOB_STATUS
 from crocodile.cluster.remote_machine import RemoteMachineConfig
+from crocodile.meta import Experimental, Terminal
 from importlib.machinery import SourceFileLoader
 from rich.console import Console
 from rich.panel import Panel
@@ -37,7 +41,7 @@ manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_sta
 time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
 manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
-func_kwargs = tb.Read.vanilla_pickle(path=manager.kwargs_path.expanduser())
+func_kwargs = Read.vanilla_pickle(path=manager.kwargs_path.expanduser())
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -47,8 +51,8 @@ func_kwargs = tb.Read.vanilla_pickle(path=manager.kwargs_path.expanduser())
 print("\n" * 2)
 console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
 print("\n" * 2)
-console.print(f"Executing {tb.P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_r} : {params.func_name}", style="bold blue")
-if isinstance(func_kwargs, dict): tb.S(func_kwargs).print(title="kwargs", as_config=True)
+console.print(f"Executing {P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_r} : {params.func_name}", style="bold blue")
+if isinstance(func_kwargs, dict): S(func_kwargs).print(title="kwargs", as_config=True)
 else: inspect(func_kwargs, value=False, title=f"kwargs from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
 print("\n" * 2)
 
@@ -64,14 +68,14 @@ print("\n" * 2)
 # ######################### END OF EXECUTION #############################
 
 
-if type(res) is tb.P or (type(res) is str and tb.P(res).expanduser().exists()):
-    res_folder = tb.P(res).expanduser()
+if type(res) is P or (type(res) is str and P(res).expanduser().exists()):
+    res_folder = P(res).expanduser()
 else:
-    res_folder = tb.P.tmp(folder=rf"tmp_dirs/{manager.job_id}").create()
+    res_folder = P.tmp(folder=rf"tmp_dirs/{manager.job_id}").create()
     console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
     print("\n\n")
     # try:
-        # tb.Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
+        # Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
     # except TypeError as e:
         # print(e)
         # print(f"Could not pickle res object to path `{res_folder.joinpath('result.pkl').collapseuser().as_posix()}`.")
@@ -79,7 +83,7 @@ else:
 time_at_execution_end_utc = pd.Timestamp.utcnow()
 time_at_execution_end_local = pd.Timestamp.now()
 delta = time_at_execution_end_utc - time_at_execution_start_utc
-exec_times = tb.S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc 🌍⏰": time_at_execution_end_utc,
+exec_times = S({"start_utc 🌍⏲️": time_at_execution_start_utc, "end_utc 🌍⏰": time_at_execution_end_utc,
                    "start_local ⏲️": time_at_execution_start_local, "end_local ⏰": time_at_execution_end_local, "delta ⏳": delta,
                    "submission_time": manager.submission_time, "wait_time": time_at_execution_start_local - manager.submission_time})
 
@@ -97,7 +101,7 @@ else:
 print(f"job {manager.job_id} is completed.")
 
 
-tb.Experimental.generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
+Experimental.generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
 
 Job executed via tb.cluster.Machine
 remote: {params.ssh_repr}
@@ -129,18 +133,18 @@ ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
 
 if params.session_name != "":
     if platform.system() == "Linux":
-        tb.Terminal().run(f"""zellij --session {params.session_name} action new-tab --name results  """)
+        Terminal().run(f"""zellij --session {params.session_name} action new-tab --name results  """)
         # --layout ~/code/machineconfig/src/machineconfig/settings/zellij/layouts/d.kdl --cwd {res_folder.as_posix()}
-        tb.Terminal().run(f"""zellij --session {params.session_name} action write-chars "cd {res_folder.as_posix()};lf" """)
+        Terminal().run(f"""zellij --session {params.session_name} action write-chars "cd {res_folder.as_posix()};lf" """)
     elif platform.system() == "Windows":
-        tb.Terminal().run(f"""wt --window {params.session_name} new-tab --title results -startingDirectory {res_folder.as_posix()} lf """)
+        Terminal().run(f"""wt --window {params.session_name} new-tab --title results -startingDirectory {res_folder.as_posix()} lf """)
 
 
 # NOTIFICATION-CODE-PLACEHOLDER
 
 
 manager.unlock_resources()
-rm_conf: RemoteMachineConfig = tb.Read.vanilla_pickle(path=manager.remote_machine_config_path.expanduser())
+rm_conf: RemoteMachineConfig = Read.vanilla_pickle(path=manager.remote_machine_config_path.expanduser())
 
 
 if rm_conf.kill_on_completion:
@@ -150,7 +154,7 @@ if rm_conf.kill_on_completion:
         current_session = Zellij.get_current_zellij_session()
         # Zellij.close_tab(sess_name=params.session_name, tab_name=params.tab_name)
         print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
-        tb.Terminal().run(f"zellij --session {current_session} go-to-tab-name '{params.tab_name}'; sleep 2; zellij --session {current_session} action close-tab").print()  # i.e. current tab
+        Terminal().run(f"zellij --session {current_session} go-to-tab-name '{params.tab_name}'; sleep 2; zellij --session {current_session} action close-tab").print()  # i.e. current tab
     elif platform.system() == "Windows":
         print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
         from machineconfig.utils.procs import ProcessManager
