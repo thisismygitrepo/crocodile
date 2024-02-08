@@ -9,6 +9,7 @@ from crocodile.file_management import P
 from crocodile.cluster.remote_machine import FileManager
 from crocodile.cluster.loader_runner import EmailParams
 
+
 error_message = ''
 exec_times = S()
 res_folder = P()

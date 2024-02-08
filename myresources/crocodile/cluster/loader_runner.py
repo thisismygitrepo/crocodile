@@ -5,7 +5,6 @@ Runner
 
 from crocodile.core import List as L, Struct as S, install_n_import
 from crocodile.file_management import P, Save, Read
-# from crocodile.meta import SSH
 from crocodile.meta import MACHINE, Scheduler
 from rich import inspect
 from rich.console import Console

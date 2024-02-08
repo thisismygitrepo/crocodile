@@ -15,6 +15,7 @@ from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
 from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, FileManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager, LogEntry
 import crocodile.cluster as cluster
+
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich import inspect
