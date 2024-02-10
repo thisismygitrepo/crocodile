@@ -4,8 +4,10 @@ Core
 """
 
 from pathlib import Path
-from typing import Optional, Union, Generic, TypeVar, Type, Literal, List as ListType, Any, Iterator, Callable, Iterable, Hashable, Protocol
+from typing import Optional, Union, Generic, TypeVar, Type, Literal, List as ListType, Any, Iterator, Callable, Iterable, Hashable, Protocol, ParamSpec, Concatenate
 import datetime
+
+_ = Concatenate
 
 
 _Slice = TypeVar('_Slice', bound='Slicable')
@@ -17,7 +19,7 @@ T = TypeVar('T')
 T2 = TypeVar('T2')
 T3 = TypeVar('T3')
 PLike = Union[str, Path]
-
+PS = ParamSpec('PS')
 
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace: str = '_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
@@ -36,7 +38,8 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
 
 def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
     def decorator(func: Callable[..., Any]):
-        def wrapper(obj: Any, path: Union[str, Path, None] = None, verbose: bool = True, add_suffix: bool = False, desc: str = "", class_name: str = "", **kwargs: Any):
+        def wrapper(obj: Any, path: Union[str, Path, None] = None, verbose: bool = True, add_suffix: bool = False, desc: str = "", class_name: str = "",
+                    **kwargs: Any):
             if path is None:
                 path = Path.home().joinpath("tmp_results/tmp_files").joinpath(randstr(noun=True))
                 _ = print(f"tb.core: Warning: Path not passed to {func}. A default path has been chosen: {Path(path).absolute().as_uri()}") if verbose else None
@@ -127,7 +130,7 @@ class Base(object):
         import inspect
         remove_vals = Base().get_attributes(remove_base_attrs=False) if remove_base_attrs else []
         attrs: List[Any] = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=remove_vals)
-        attrs: List[Any] = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
+        attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
     def print(self, dtype: bool = False, attrs: bool = False, **kwargs: Any): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     @staticmethod
