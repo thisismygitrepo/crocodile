@@ -60,7 +60,7 @@ This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, 
         if not inplace: raise NotImplementedError
         else:
             for col in self.columns:
-                series = df.loc[:, col]
+                series = df.loc[:, col].copy()
                 df.loc[:, col] = series.map(self.mapper[col])
             return df
 
