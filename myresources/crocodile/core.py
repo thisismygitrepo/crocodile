@@ -69,7 +69,9 @@ class Save:
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-        with open(Path(path), 'w', encoding="utf-8") as file: __import__("yaml").dump(obj, file, **kwargs)
+        import yaml
+        with open(Path(path), 'w', encoding="utf-8") as file:
+            yaml.dump(obj, file, **kwargs)
     @staticmethod
     @save_decorator(".toml")
     def toml(obj: dict[Any, Any], path: PLike, encoding: str = 'utf-8'): return Path(path).write_text(install_n_import("toml").dumps(obj), encoding=encoding)
@@ -88,7 +90,9 @@ class Save:
     # def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
     @staticmethod
     @save_decorator(".pkl")
-    def vanilla_pickle(obj: Any, path: PLike, **kwargs: Any): return Path(path).write_bytes(__import__("pickle").dumps(obj, **kwargs))
+    def vanilla_pickle(obj: Any, path: PLike, **kwargs: Any):
+        import pickle
+        return Path(path).write_bytes(data=pickle.dumps(obj, **kwargs))
     @staticmethod
     @save_decorator(".pkl")
     def pickle(obj: Any, path: PLike, **kwargs: Any):

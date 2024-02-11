@@ -7,6 +7,9 @@ File
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime, timedelta
+import os
+import sys
+import subprocess
 from typing import Any, Optional, Union, Callable, TypeVar, TypeAlias, Literal, NoReturn, Protocol, Generic
 
 
@@ -26,8 +29,8 @@ def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -
     if salt is None:
         import hashlib
         m = hashlib.sha256()
-        m.update(password.encode("utf-8"))
-        return base64.urlsafe_b64encode(m.digest())  # make url-safe bytes required by Ferent.
+        m.update(password.encode(encoding="utf-8"))
+        return base64.urlsafe_b64encode(s=m.digest())  # make url-safe bytes required by Ferent.
     from cryptography.hazmat.primitives import hashes; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     return base64.urlsafe_b64encode(PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations, backend=None).derive(password.encode()))
 def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True, iteration: Optional[int] = None, gen_key: bool = False) -> bytes:
@@ -36,9 +39,9 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), f"❌ You can either pass key or pwd, or none of them, but not both."
         import secrets
-        iteration = iteration or secrets.randbelow(1_000_000)
-        salt = secrets.token_bytes(16) if salted else None
-        key_resolved = pwd2key(pwd, salt, iteration)
+        iteration = iteration or secrets.randbelow(exclusive_upper_bound=1_000_000)
+        salt = secrets.token_bytes(nbytes=16) if salted else None
+        key_resolved = pwd2key(password=pwd, salt=salt, iterations=iteration)
     elif key is None:
         if gen_key:
             key_resolved = Fernet.generate_key()
@@ -59,9 +62,9 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
     if pwd is not None:
         assert key is None, f"❌ You can either pass key or pwd, or none of them, but not both."
         if salted:
-            decoded = base64.urlsafe_b64decode(token); salt, iterations, token = decoded[:16], decoded[16:20], __import__("base64").urlsafe_b64encode(decoded[20:])
-            key_resolved = pwd2key(pwd, salt, int.from_bytes(iterations, 'big'))
-        else: key_resolved = pwd2key(pwd)  # trailing `;` prevents IPython from caching the result.
+            decoded = base64.urlsafe_b64decode(token); salt, iterations, token = decoded[:16], decoded[16:20], base64.urlsafe_b64encode(decoded[20:])
+            key_resolved = pwd2key(password=pwd, salt=salt, iterations=int.from_bytes(bytes=iterations, byteorder='big'))
+        else: key_resolved = pwd2key(password=pwd)  # trailing `;` prevents IPython from caching the result.
     elif type(key) is bytes:
         assert pwd is None, f"❌ You can either pass key or pwd, or none of them, but not both."
         key_resolved = key  # passsed explicitly
@@ -95,7 +98,8 @@ class Read:
             except ImportError as err2: print(f"💥 Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
     @staticmethod
     def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
-        try: mydict = __import__("json").loads(P(path).read_text(), **kwargs)
+        import json
+        try: mydict = json.loads(P(path).read_text(), **kwargs)
         except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
         _ = r
         return mydict
@@ -171,7 +175,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if not sure: _ = print(f"❌ Did NOT DELETE because user is not sure. file: {repr(self)}.") if verbose else None; return self
         if not self.exists():
             self.unlink(missing_ok=True)
-            if verbose: print(f"❌ Could NOT DELETE nonexisting file {repr(self)}. ") 
+            if verbose: print(f"❌ Could NOT DELETE nonexisting file {repr(self)}. ")
             return self  # broken symlinks exhibit funny existence behaviour, catch them here.
         if self.is_file() or self.is_symlink(): self.unlink(missing_ok=True)
         else: __import__("shutil").rmtree(self, ignore_errors=False)
@@ -213,10 +217,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         except IOError as ioe: raise IOError from ioe
     def start(self, opener: Optional[str] = None):
         if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
-        if __import__("sys").platform == "win32":  # double quotes fail with cmd. # __import__("os").startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
-            __import__("subprocess").Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
-        elif __import__("sys").platform == 'linux': __import__("subprocess").call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
-        else: __import__("subprocess").call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
+        if sys.platform == "win32":  # double quotes fail with cmd. # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
+            subprocess.Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
+        elif sys.platform == 'linux': subprocess.call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
+        else: subprocess.call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
     def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
     # def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
@@ -335,7 +339,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: return "📍 Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
     # def __str__(self): return self.as_url_str() if "http" in self else self._str
     def pistol(self):
-        import os
         os.system(command=f"pistol {self}")
     def size(self, units: Literal['b', 'kb', 'mb', 'gb'] = 'mb') -> float:  # ===================================== File Specs ==========================================================================================
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
@@ -400,7 +403,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         from platform import system
         from crocodile.meta import Terminal
         if system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
-            Terminal.run_as_admin(file=__import__("sys").executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"", wait=True)
+            Terminal.run_as_admin(file=sys.executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"", wait=True)
         else: super(P, self.expanduser()).symlink_to(str(target))
         return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target)}")
     def resolve(self, strict: bool = False):
@@ -443,8 +446,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         target_path = self.parent if parents_only else self
         target_path.mkdir(parents=parents, exist_ok=exist_ok)
         return self
-    def chdir(self) -> 'P': __import__("os").chdir(str(self.expanduser())); return self
-    def listdir(self) -> List['P']: return List(__import__("os").listdir(self.expanduser().resolve())).apply(lambda x: P(x))  # pylint: disable=W0108
+    def chdir(self) -> 'P': os.chdir(str(self.expanduser())); return self
+    def listdir(self) -> List['P']: return List(os.listdir(self.expanduser().resolve())).apply(lambda x: P(x))  # pylint: disable=W0108
     @staticmethod
     def tempdir() -> 'P': return P(__import__("tempfile").mktemp())
     @staticmethod
@@ -600,7 +603,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             rp = localpath.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict, obfuscate=obfuscate)  # if rel2home else (P(root) / localpath if root is not None else localpath)
         else: rp = P(remotepath)
         rclone_cmd = f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
-        from crocodile.meta import Terminal, subprocess; _ = print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`") if verbose else None
+        from crocodile.meta import Terminal; _ = print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell").capture()
         _ = [item.delete(sure=True) for item in to_del]; _ = print(f"{'⬆️'*5} UPLOAD COMPLETED.") if verbose else None
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
@@ -624,7 +627,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         localpath += ".zip" if unzip else ""
         localpath += ".enc" if decrypt else ""
         rclone_cmd = f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
-        from crocodile.meta import Terminal, subprocess
+        from crocodile.meta import Terminal
         if verbose: print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`")
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
@@ -685,7 +688,7 @@ class Compression:
         with __import__("lzma").open(ip_path) as file: P(op_path).write_bytes(file.read())
     @staticmethod
     def tar(path: str, op_path: str):
-        with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(path), arcname=__import__("os").path.basename(path))
+        with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(path), arcname=os.path.basename(path))
         return P(op_path)
     @staticmethod
     def untar(path: str, op_path: str, fname: Optional[str]= None, mode: str = 'r', **kwargs: Any):
