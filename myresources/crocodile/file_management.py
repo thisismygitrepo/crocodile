@@ -741,8 +741,12 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
         else:  # cache exists
-            age = self.age
-            if self.age > self.expire:
+            try:
+                age = self.age
+            except AttributeError:  # path doesn't exist (may be deleted)
+                self.cache = None  # reset cache to prevent arriving here again.
+                return self(fresh=fresh)
+            if age > self.expire:
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Updating cache from {self.source_func}. Age = {age} ...")
                 self.cache = self.source_func()
                 if self.path is None: self.time_produced = datetime.now()
