@@ -60,8 +60,8 @@ This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, 
         if not inplace: raise NotImplementedError
         else:
             for col in self.columns:
-                series = df.loc[:, col].copy()
-                df.loc[:, col] = series.map(self.mapper[col])
+                series = df.loc[:, col]
+                df.loc[:, col] = series.map(self.mapper[col]).copy()
             return df
 
     def fit_transform(self, df: pd.DataFrame, inplace: bool = True, verbose: bool = True):
