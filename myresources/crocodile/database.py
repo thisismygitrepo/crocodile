@@ -137,7 +137,7 @@ class DBMS:
     def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
         sch = sch or self.sch or 'main'
         if table is None:
-            table = self.sch_tab[sch][0]
+            table = L(self.sch_tab[sch]).sample(size=1).list[0]
             print(f"Reading table `{table}` from schema `{sch}`")
         if self.con:
             res = self.con.execute(text(f'''SELECT * FROM {self._get_table_identifier(table, sch)} '''))
