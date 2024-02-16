@@ -475,7 +475,12 @@ class Scheduler:
         summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
         tmp = Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False)
         assert isinstance(tmp, str)
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100); self.logger.critical(f"\n--> Logger history.\n" + str(self.get_records_df()))
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
+        df = self.get_records_df()
+        df["start"] = df["start"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
+        df["finish"] = df["finish"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
+        df["duration"] = df["duration"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
+        self.logger.critical(f"\n--> Logger history.\n" + str(df))
         return self
     def default_exception_handler(self, ex: Union[Exception, KeyboardInterrupt], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
