@@ -249,7 +249,7 @@ class Terminal:
     @staticmethod
     def get_header(wdir: OPLike = None): return f"""
 # >> Code prepended
-
+import crocodile.toolbox as tb
 {'''tb.sys.path.insert(0, r'{wdir}') ''' if wdir is not None else ''}
 # >> End of header, start of script passed
 """
