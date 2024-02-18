@@ -239,7 +239,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             except (KeyError, IndexError):
                 f_name = validate_name(str(P(response.history[-1].url).name if len(response.history) > 0 else P(response.url).name))
         return (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(f_name).create(parents_only=True).write_bytes(response.content)
-    def _return(self, res: 'P', inlieu: bool = False, inplace: bool = False, operation: Optional[str] = None, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
+    def _return(self, res: 'P', operation: Literal['rename', 'delete', 'Whack'], inlieu: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
         if inlieu:
             self._str = str(res)  # type: ignore # pylint: disable=W0201
         if inplace:
@@ -247,7 +247,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             if operation == "rename":
                 if overwrite and res.exists(): res.delete(sure=True, verbose=verbose)
                 if not overwrite and res.exists():
-                    if strict: raise FileExistsError(f"File {res} already exists.")
+                    if strict: raise FileExistsError(f"❌ RENAMING failed. File `{res}` already exists.")
                     else:
                         if verbose: print(f"⚠️ SKIPPED RENAMING {repr(self)} ➡️ {repr(res)} because FileExistsError and scrict=False policy.")
                         return self if orig else res
@@ -299,12 +299,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def __radd__(self, other: PLike) -> 'P':
         return self.parent.joinpath(str(other) + self.name)  # other + P and `other` doesn't know how to make this addition.
     def __sub__(self, other: PLike) -> 'P': res = P(str(self).replace(str(other), "")); return (res[1:] if str(res[0]) in {"\\", "/"} else res) if len(res) else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
-    def rel2cwd(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu)
-    def rel2home(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu)  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
+    def rel2cwd(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu=inlieu, operation='Whack')
+    def rel2home(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu=inlieu, operation='Whack')  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
     def collapseuser(self, strict: bool = True, placeholder: str = "~") -> 'P':  # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
         if (str(self).startswith(placeholder) or P.home().as_posix() not in self.resolve().as_posix()): return self
-        return self._return(P(placeholder) / (self.expanduser().absolute().resolve(strict=strict) - P.home()))  # resolve also solves the problem of Windows case insensitivty.
+        return self._return(res=P(placeholder) / (self.expanduser().absolute().resolve(strict=strict) - P.home()), operation='Whack')  # resolve also solves the problem of Windows case insensitivty.
     def __getitem__(self, slici: Union[int, list[int], slice]):
         if isinstance(slici, list): return P(*[self[item] for item in slici])
         elif isinstance(slici, int): return P(self.parts[slici])
@@ -367,13 +367,13 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             elif self.is_dir(): return "📁"
             return "👻NotExist"
         return "📍Relative"
-    def clickable(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().resolve().as_uri()), inlieu)
+    def clickable(self, inlieu: bool = False) -> 'P': return self._return(res=P(self.expanduser().resolve().as_uri()), inlieu=inlieu, operation='Whack')
     def as_url_str(self) -> 'str': return self.as_posix().replace("https:/", "https://").replace("http:/", "http://")
     def as_url_obj(self):
         import urllib3
         tmp = urllib3.connection_from_url(str(self))
         return tmp
-    def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu)
+    def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu=inlieu, operation='Whack')
     def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def as_str(self) -> str: return str(self)
     def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
@@ -405,7 +405,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
             Terminal.run_as_admin(file=sys.executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"", wait=True)
         else: super(P, self.expanduser()).symlink_to(str(target))
-        return self._return(P(target), inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target)}")
+        return self._return(P(target), operation='Whack', inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target)}")
     def resolve(self, strict: bool = False):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self

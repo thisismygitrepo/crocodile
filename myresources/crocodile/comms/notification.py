@@ -140,9 +140,15 @@ encryption = ssl
 
 
 class PhoneNotification:  # security concerns: avoid using this.
-    def __init__(self, bulletpoint_token: str):
+    def __init__(self, token: Optional[str]):
+        if token is None:
+            path = P.home().joinpath("dotfiles/machineconfig/phone_notification.ini")
+            ini = Read.ini(path)
+            token_ = ini["default"]["token"]
+        else:
+            token_ = token
         pushbullet = install_n_import("pushbullet")
-        self.api = pushbullet.Pushbullet(bulletpoint_token)
+        self.api = pushbullet.Pushbullet(token_)
     def send_notification(self, title: str = "Note From Python", body: str = "A notfication"): self.api.push_note(title=title, body=body)
     @staticmethod
     def open_website(): P(r"https://www.pushbullet.com/").readit()
