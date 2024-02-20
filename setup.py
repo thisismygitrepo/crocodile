@@ -94,7 +94,7 @@ setup(
                     #  'torch',
                      'scikit-learn', 'dash', 'dash_daq', 'dash_bootstrap_components',
                      'click',
-                     'types-requests', 'types-paramiko',
+                     'types-requests', 'types-paramiko', 'types-tqdm',
                      'setuptools', 'wheel', 'twine']
                 },
 

@@ -83,7 +83,7 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 
 class Read:
     @staticmethod
-    def read(path: PLike, **kwargs: Any):
+    def read(path: PLike, **kwargs: Any) -> Any:
         suffix = Path(path).suffix[1:]
         if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
         if suffix == "sqlite":

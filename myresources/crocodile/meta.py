@@ -528,11 +528,11 @@ class RepeatUntilNoException:
         if self.timeout is not None: func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
         @wraps(wrapped=func)
         def wrapper(*args: PS.args, **kwargs: PS.kwargs):
-            for _ in range(self.retry):
+            for idx in range(self.retry):
                 try:
                     return func(*args, **kwargs)
                 except Exception as ex:
-                    print(f"💥 Robust call failed with {ex}, retrying {self.retry} more times after sleeping for {self.sleep} seconds.")
+                    print(f"💥 Robust call failed with {ex}, retrying {idx}/{self.retry} more times after sleeping for {self.sleep} seconds.")
                     time.sleep(self.sleep)
             raise RuntimeError(f"💥 Robust call failed after {self.retry} retries.")
         return wrapper
