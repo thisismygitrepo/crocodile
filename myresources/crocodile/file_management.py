@@ -399,15 +399,15 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
     def symlink_to(self, target: PLike, verbose: bool = True, overwrite: bool = False, orig: bool = False, strict: bool = True):  # pylint: disable=W0237
         self.parent.create()
-        target = P(target).expanduser().resolve().exists()
-        if strict: assert target, f"Target path `{target}` doesn't exist. This will create a broken link."
+        target_obj = P(target).expanduser().resolve()
+        if strict: assert target_obj.exists(), f"Target path `{target}` (aka `{target_obj}`) doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         from platform import system
         from crocodile.meta import Terminal
         if system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
-            Terminal.run_as_admin(file=sys.executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target)}')\"", wait=True)
-        else: super(P, self.expanduser()).symlink_to(str(target))
-        return self._return(P(target), operation='Whack', inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target)}")
+            Terminal.run_as_admin(file=sys.executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target_obj)}')\"", wait=True)
+        else: super(P, self.expanduser()).symlink_to(str(target_obj))
+        return self._return(target_obj, operation='Whack', inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target_obj)}")
     def resolve(self, strict: bool = False):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
