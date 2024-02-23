@@ -2,13 +2,13 @@
 """Meta
 """
 
-import os
 from crocodile.core import randstr, str2timedelta, Save, install_n_import, List, Struct
 from crocodile.file_management import P, datetime, OPLike, PLike
 import time
 import logging
 import subprocess
 import sys
+import os
 from typing import Union, Any, Optional, Callable, TextIO, BinaryIO, IO, TypeAlias, Literal, TypeVar, ParamSpec
 from dataclasses import dataclass
 
@@ -160,7 +160,7 @@ class Terminal:
     # def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-    def run(self, *cmds: str, shell: Optional[SHELLS] = None, check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
+    def run(self, *cmds: str, shell: Optional[SHELLS] = "default", check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.

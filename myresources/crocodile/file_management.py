@@ -397,8 +397,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             assert src_folder is None, "You can only pass source or source_dir, not both."
         result = P(src_folder or P.cwd()).expanduser().absolute() / self.name
         return result.symlink_to(self, verbose=verbose, overwrite=overwrite)
-    def symlink_to(self, target: PLike, verbose: bool = True, overwrite: bool = False, orig: bool = False):  # pylint: disable=W0237
-        self.parent.create(); assert (target := P(target).expanduser().resolve()).exists(), f"Target path `{target}` doesn't exist. This will create a broken link."
+    def symlink_to(self, target: PLike, verbose: bool = True, overwrite: bool = False, orig: bool = False, strict: bool = True):  # pylint: disable=W0237
+        self.parent.create()
+        target = P(target).expanduser().resolve().exists()
+        if strict: assert target, f"Target path `{target}` doesn't exist. This will create a broken link."
         if overwrite and (self.is_symlink() or self.exists()): self.delete(sure=True, verbose=verbose)
         from platform import system
         from crocodile.meta import Terminal
