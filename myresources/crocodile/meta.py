@@ -48,7 +48,8 @@ class Log(logging.Logger):  #
             name = randstr(noun=True)
             print(f"Logger name not passed. It is recommended to pass a name indicating the owner.")
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
-        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}."); self.file_path = file_path  # proper update to this value by self.add_filehandler()
+        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
+        self.file_path = file_path  # proper update to this value by self.add_filehandler()
         if dialect == "colorlog":
             install_n_import("colorlog")
             import colorlog
@@ -82,16 +83,27 @@ class Log(logging.Logger):  #
         else: logger = Log(name=name, dialect="logging", l_level=l_level, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
         install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
     def add_streamhandler(self, s_level: int = logging.DEBUG, fmt: Optional[Any] = None, module: Any = logging, name: str = "myStreamHandler"):
-        shandler = module.StreamHandler(); shandler.setLevel(level=s_level); shandler.setFormatter(fmt=fmt); shandler.set_name(name); self.addHandler(shandler); print(f"    Level {s_level} stream handler for Logger `{self.name}` is created.")
+        shandler = module.StreamHandler()
+        shandler.setLevel(level=s_level)
+        shandler.setFormatter(fmt=fmt)
+        shandler.set_name(name)
+        self.addHandler(shandler)
+        print(f"    Level {s_level} stream handler for Logger `{self.name}` is created.")
     def add_filehandler(self, file_path: OPLike = None, fmt: Optional[Any] = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
-        fhandler = logging.FileHandler(filename := (P.tmpfile(name="logger_" + self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()), mode=mode)
-        fhandler.setFormatter(fmt=fmt); fhandler.setLevel(level=f_level); fhandler.set_name(name); self.addHandler(fhandler); self.file_path = filename.collapseuser(); print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
+        filename = P.tmpfile(name=self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()
+        fhandler = logging.FileHandler(filename=filename, mode=mode)
+        fhandler.setFormatter(fmt=fmt)
+        fhandler.setLevel(level=f_level); fhandler.set_name(name)
+        self.addHandler(fhandler)
+        self.file_path = filename.collapseuser()
+        print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self):
         List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message"))
         for level in range(0, 60, 5): self.log(msg=f"This is a message of level {level}", level=level)
     def get_history(self, lines: int = 200, to_html: bool = False):
         assert isinstance(self.file_path, P), f"Logger `{self.name}` does not have a file handler. Thus, no history is available."
-        logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:]); return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
+        logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:])
+        return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
 
 @dataclass

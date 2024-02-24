@@ -458,8 +458,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def tmpdir(prefix: str = "") -> 'P': return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     @staticmethod
     def tmpfile(name: Optional[str]= None, suffix: str = "", folder: OPLike = None, tstamp: bool = False, noun: bool = False) -> 'P':
-        tmp = randstr(noun=noun) if name is not None else str(name)
-        return P.tmp(file=tmp + "_" + randstr() + (("_" + str(timestamp())) if tstamp else "") + suffix, folder=folder or "tmp_files")
+        if name is None: name_concrete = randstr(noun=noun)
+        else: name_concrete = name
+        return P.tmp(file=name_concrete + "_" + randstr() + (("_" + str(timestamp())) if tstamp else "") + suffix, folder=folder or "tmp_files")
     @staticmethod
     def tmp(folder: OPLike = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P':
         return P(root).expanduser().joinpath(folder or "").joinpath(file or "").create(parents_only=True if file else False)
