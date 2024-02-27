@@ -21,6 +21,31 @@ from typing import Optional, Any, Union
 
 
 def get_gtihub_markdown_css(): return P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download_to_memory().text
+def md2html(body: str):
+    # add gtihub markdown stylesheet
+    return f"""
+<!DOCTYPE html>
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+{get_gtihub_markdown_css()}
+    .markdown-body {{
+        box-sizing: border-box;
+        min-width: 200px;
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 45px;
+        line-height: 1.8;
+    }}
+    @media (max-width: 767px) {{.markdown-body {{padding: 15px;}}
+    }}
+</style>
+<body>
+<div class="markdown-body">
+{install_n_import(library="markdown").markdown(body)}
+</div>
+</body>
+</html>"""
 
 
 class Email:
@@ -66,30 +91,7 @@ encryption = ssl
         # <link rel="stylesheet" href="github-markdown.css">
         # <link type="text/css" rel="stylesheet" href="https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css" />
 
-        if txt_to_html:  # add gtihub markdown stylesheet
-            body = f"""
-<!DOCTYPE html>
-<html>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-{get_gtihub_markdown_css()}
-    .markdown-body {{
-        box-sizing: border-box;
-        min-width: 200px;
-        max-width: 980px;
-        margin: 0 auto;
-        padding: 45px;
-        line-height: 1.8;
-    }}
-    @media (max-width: 767px) {{.markdown-body {{padding: 15px;}}
-    }}
-</style>
-<body>
-<div class="markdown-body">
-{install_n_import("markdown").markdown(body)}
-</div>
-</body>
-</html>"""
+        if txt_to_html: body = md2html(body=body)
         msg.attach(MIMEText(body, "html"))
         # if attachments is None: attachments = []  # see: https://fedingo.com/how-to-send-html-mail-with-attachment-using-python/
         # for attachment in attachmenthrs: msg.attach(attachment.read_bytes(), filename=attachment.stem, maintype="image", subtype=attachment.suffix)
@@ -107,7 +109,7 @@ encryption = ssl
     def close(self): self.server.quit()    # Closing is vital as many servers do not allow mutiple connections.
 
     @staticmethod
-    def send_and_close(config_name: Optional[str], to: str, subject: str, msg: str):
+    def send_and_close(config_name: Optional[str], to: str, subject: str, body: str):
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
             config = Email.get_source_of_truth()
@@ -121,13 +123,13 @@ encryption = ssl
             "from": "onboarding@resend.dev",
             "to": to,
             "subject": subject,
-            "html": msg
+            "html": md2html(body=body)
             })
             return r
         else:
             config = dict(Email.get_source_of_truth()[config_name])
             tmp = Email(config=config)
-            tmp.send_message(to, subject, msg)
+            tmp.send_message(to=to, subject=subject, body=body)
             tmp.close()
 
     @staticmethod
