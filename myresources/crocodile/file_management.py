@@ -3,7 +3,6 @@
 File
 """
 
-# %%
 
 from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime, timedelta
@@ -621,7 +620,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         rclone_cmd = f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
         from crocodile.meta import Terminal; _ = print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`") if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell").capture()
-        _ = [item.delete(sure=True) for item in to_del]; _ = print(f"{'⬆️'*5} UPLOAD COMPLETED.") if verbose else None
+        _ = [item.delete(sure=True) for item in to_del]
+        _ = print(f"{'⬆️'*5} UPLOAD COMPLETED.") if verbose else None
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         if share:
             if verbose: print("🔗 SHARING FILE")
@@ -637,7 +637,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                    transfers: int = 10, root: Optional[str] = "myhome", verbose: bool = True, overwrite: bool = True, merge: bool = False,):
         if remotepath is None:
             remotepath = self.get_remote_path(root=root, os_specific=os_specific, rel2home=rel2home, strict=strict)
-            remotepath += ".zip" if unzip else ""; remotepath += ".enc" if decrypt else ""
+            remotepath += ".zip" if unzip else ""
+            remotepath += ".enc" if decrypt else ""
         else: remotepath = P(remotepath)
         localpath = self.expanduser().absolute()
         localpath += ".zip" if unzip else ""
@@ -653,9 +654,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def sync_to_cloud(self, cloud: str, sync_up: bool = False, sync_down: bool = False, os_specific: bool = False, rel2home: bool = True, transfers: int = 10, delete: bool = False, root: Optional[str] = "myhome", verbose: bool = True):
         tmp1, tmp2 = self.expanduser().absolute().create(parents_only=True).as_posix(), self.get_remote_path(root=root, os_specific=os_specific).as_posix()
         source, target = (tmp1, f"{cloud}:{tmp2 if rel2home else tmp1}") if sync_up else (f"{cloud}:{tmp2 if rel2home else tmp1}", tmp1)  # in bisync direction is irrelavent.
-        if not sync_down and not sync_up: _ = print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`") if verbose else None; rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
+        if not sync_down and not sync_up:
+             _ = print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`") if verbose else None
+             rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
         else: print(f"SYNCING 🔄️ {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
-        rclone_cmd += f" --progress --transfers={transfers} --verbose"; rclone_cmd += (" --delete-during" if delete else ""); from crocodile.meta import Terminal, subprocess; _ = print(rclone_cmd) if verbose else None
+        rclone_cmd += f" --progress --transfers={transfers} --verbose"
+        rclone_cmd += (" --delete-during" if delete else "")
+        from crocodile.meta import Terminal
+        _ = print(rclone_cmd) if verbose else None
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         return self
