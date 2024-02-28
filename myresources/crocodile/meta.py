@@ -263,7 +263,7 @@ class Terminal:
     def get_header(wdir: OPLike, toolbox: bool): return f"""
 # >> Code prepended
 {"from crocodile.toolbox import *" if toolbox else "# No toolbox import."}
-{'''tb.sys.path.insert(0, r'{wdir}') ''' if wdir is not None else "No path insertion."}
+{'''tb.sys.path.insert(0, r'{wdir}') ''' if wdir is not None else "# No path insertion."}
 # >> End of header, start of script passed
 """
 

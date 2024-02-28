@@ -655,8 +655,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         tmp1, tmp2 = self.expanduser().absolute().create(parents_only=True).as_posix(), self.get_remote_path(root=root, os_specific=os_specific).as_posix()
         source, target = (tmp1, f"{cloud}:{tmp2 if rel2home else tmp1}") if sync_up else (f"{cloud}:{tmp2 if rel2home else tmp1}", tmp1)  # in bisync direction is irrelavent.
         if not sync_down and not sync_up:
-             _ = print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`") if verbose else None
-             rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
+            _ = print(f"SYNCING 🔄️ {source} {'<>' * 7} {target}`") if verbose else None
+            rclone_cmd = f"""rclone bisync '{source}' '{target}' --resync --remove-empty-dirs """
         else: print(f"SYNCING 🔄️ {source} {'>' * 15} {target}`"); rclone_cmd = f"""rclone sync '{source}' '{target}' """
         rclone_cmd += f" --progress --transfers={transfers} --verbose"
         rclone_cmd += (" --delete-during" if delete else "")
