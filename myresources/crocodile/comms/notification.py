@@ -133,12 +133,23 @@ encryption = ssl
             tmp.close()
 
     @staticmethod
-    def send_m365(to: list[str], subject: str, msg: str, attachments: Optional[list[P]] = None):
+    def send_m365(to: list[str], subject: str, body: Optional[str], body_file: Optional[str], attachments: Optional[list[P]] = None):
+        if body_file is not None:
+            assert body is None, "You cannot pass both body and body_file."
+            body_file_path = P(body_file)
+            assert body_file_path.exists(), f"File not found: {body_file_path}"
+        else:
+            assert body is not None, "You must pass either body or body_file."
         from crocodile.meta import Terminal
         to_str = ",".join(to)
         attachments_str = " ".join([f"--attachment {str(p)}" for p in attachments]) if attachments is not None else ""
-        cmd = f"""m365 outlook mail send --verbose --saveToSentItems --importance normal --bodyContentType Text --bodyContents "{msg}" --subject "{subject}" --to {to_str} {attachments_str}"""
-        Terminal().run(cmd)
+
+        if body_file is not None:
+            body_arg = f"--bodyContents @{body_file_path}"
+        else:
+            body_arg = f'"{body}"'
+        cmd = f"""m365 outlook mail send --verbose --saveToSentItems --importance normal --bodyContentType Text --bodyContents {body_arg} --subject "{subject}" --to {to_str} {attachments_str}"""
+        Terminal().run(cmd, shell="powershell")
 
 
 class PhoneNotification:  # security concerns: avoid using this.

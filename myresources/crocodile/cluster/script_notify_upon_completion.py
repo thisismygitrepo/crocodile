@@ -58,6 +58,6 @@ ssh.copy_to_here(r'{res_folder.collapseuser().as_posix()}', r=False, zip_first=F
 
 try:
     Email.send_and_close(config_name=email_params.email_config_name, to=email_params.to_email,
-                         subject=f"Execution Completion Notification, job_id = {manager.job_id}", msg=msg)
+                         subject=f"Execution Completion Notification, job_id = {manager.job_id}", body=msg)
     print(f'FINISHED sending notification email to `{email_params.to_email}`')
 except Exception as e: print(f"Error sending email: {e}")
