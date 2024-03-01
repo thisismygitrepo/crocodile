@@ -13,7 +13,7 @@ import imaplib
 # from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional, Any, Union
+from typing import Optional, Any, Union, Literal
 
 """
 
@@ -133,12 +133,13 @@ encryption = ssl
             tmp.close()
 
     @staticmethod
-    def send_m365(to: list[str], subject: str, body: Optional[str], body_file: Optional[str], attachments: Optional[list[P]] = None):
+    def send_m365(to: list[str], subject: str, body: Optional[str], body_file: Optional[str], body_content_type: Literal["HTML", "Text"], attachments: Optional[list[P]] = None):
         if body_file is not None:
             assert body is None, "You cannot pass both body and body_file."
             body_file_path = P(body_file)
             assert body_file_path.exists(), f"File not found: {body_file_path}"
         else:
+            body_file_path = None
             assert body is not None, "You must pass either body or body_file."
         from crocodile.meta import Terminal
         to_str = ",".join(to)
@@ -148,7 +149,7 @@ encryption = ssl
             body_arg = f"--bodyContents @{body_file_path}"
         else:
             body_arg = f'"{body}"'
-        cmd = f"""m365 outlook mail send --verbose --saveToSentItems --importance normal --bodyContentType Text --bodyContents {body_arg} --subject "{subject}" --to {to_str} {attachments_str}"""
+        cmd = f"""m365 outlook mail send --verbose --saveToSentItems --importance normal --bodyContentType {body_content_type} --bodyContents {body_arg} --subject "{subject}" --to {to_str} {attachments_str}"""
         Terminal().run(cmd, shell="powershell")
 
 
