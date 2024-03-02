@@ -460,7 +460,7 @@ class Scheduler:
                  exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'Scheduler'], Any]] = None,
                  logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None, records: Optional[list[list[Any]]] = None):
         self.routine = routine  # main routine to be repeated every `wait` time period
-        self.wait = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
+        self.wait_sec = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
         self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
         self.exception_handler = exception_handler if exception_handler is not None else self.default_exception_handler
         self.sess_start_time = datetime.now()  # to be reset at .run
@@ -474,8 +474,8 @@ class Scheduler:
             time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
             try: self.routine(self)
             except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
-            time_left = int(self.wait - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
-            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait}s ({time_left}s left)\n" + "-" * 100)
+            time_left = int(self.wait_sec - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
+            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self); return  # that's probably the only kind of exception that can rise during sleep.
         self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
@@ -485,7 +485,7 @@ class Scheduler:
         duration = end_time - self.sess_start_time
         sess_stats = self.sess_stats(self)
         self.records.append([self.sess_start_time, end_time, duration, self.cycle, reason, self.logger.file_path] + list(sess_stats.values()))
-        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
+        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait_sec}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
         tmp = Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False)
         assert isinstance(tmp, str)
         self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
