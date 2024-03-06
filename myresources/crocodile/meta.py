@@ -531,7 +531,7 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
 PS = ParamSpec('PS')
 
 
-class RepeatUntilNoException:
+class RepeatUntilNoException:  # see https://github.com/jd/tenacity
     def __init__(self, retry: int = 3, sleep: float = 1.0, timeout: Optional[float] = None):
         self.retry = retry
         self.sleep = sleep

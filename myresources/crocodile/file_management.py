@@ -758,7 +758,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 self.cache = self.reader(self.path)
                 return self(fresh=False)  # may be the cache is old ==> check that by passing it through the logic again.
             else:
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from {self.source_func}. Previous cache never existed or there was an explicit fresh order.")
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from source func. Previous cache never existed or there was an explicit fresh order.")
                 self.cache = self.source_func()  # fresh data.
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
@@ -769,7 +769,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 self.cache = None  # reset cache to prevent arriving here again.
                 return self(fresh=fresh)
             if age > self.expire:
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Updating cache from {self.source_func}. Age = {age} ...")
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Updating cache from source func. Age = {age} > {self.expire} ...")
                 self.cache = self.source_func()
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
