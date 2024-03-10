@@ -27,7 +27,7 @@ class DBMS:
     * Always use sqlalchemy API and avoid sql-dielect specific language.
     * Engine is provided externally. It is the end-user's business to make this engine.
     """
-    def __init__(self, engine: Engine, sch: Optional[str] = None, vws: bool = False):
+    def __init__(self, engine: Engine, sch: Optional[str] = None, vws: bool = False, inspect: bool = True):
         self.eng: Engine = engine
         self.con: Optional[Connection] = None
         self.ses: Optional[Session] = None
@@ -43,7 +43,7 @@ class DBMS:
         # self.views = None
         # self.sch_tab: Optional[Struct] = None
         # self.sch_vws: Optional[Struct] = None
-        self.refresh()
+        if inspect: self.refresh()
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
 
@@ -55,7 +55,9 @@ class DBMS:
         insp = inspect(subject=self.eng)
         self.insp = insp
         self.schema = L(obj_list=self.insp.get_schema_names())
+        print(f"Inspecting tables of schema: {self.schema}")
         self.sch_tab: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_table_names(schema=x)))}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
+        print(f"Inspecting views of schema: {self.schema}")
         self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_view_names(schema=x)))}
         return self
 
