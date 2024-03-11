@@ -74,7 +74,8 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
     return Fernet(key=key_resolved).decrypt(token)
 def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = False):
     from crocodile.meta import Terminal
-    return Terminal().run(f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """ + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="powershell")
+    s1 = f"""$SecureString = ConvertTo-SecureString "{pwd or P.home().joinpath("dotfiles/creds/data/bitlocker_pwd").read_text()}" -AsPlainText -Force; Unlock-BitLocker -MountPoint "{drive}" -Password $SecureString; """
+    return Terminal().run(s1 + (f'Enable-BitLockerAutoUnlock -MountPoint "{drive}"' if auto_unlock else ''), shell="powershell")
 
 
 # %% =================================== File ============================================
