@@ -59,7 +59,6 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
     return decorator
 
 
-# def pickles(obj: Any, r: bool = False, **kwargs: Any): return __import__("dill").dumps(obj, r=r, **kwargs)
 class Save:
     @staticmethod
     @save_decorator(".json")
@@ -107,7 +106,6 @@ class Save:
         data = dill.dumps(obj=obj, **kwargs)
         return Path(path).write_bytes(data=data)
 
-# Save.json()
 
 # ====================================== Object Management ====================================
 class Base(object):

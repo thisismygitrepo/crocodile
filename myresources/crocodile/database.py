@@ -55,9 +55,9 @@ class DBMS:
         insp = inspect(subject=self.eng)
         self.insp = insp
         self.schema = L(obj_list=self.insp.get_schema_names())
-        print(f"Inspecting tables of schema: {self.schema}")
+        print(f"Inspecting tables of schema: {self.schema.list}")
         self.sch_tab: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_table_names(schema=x)))}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
-        print(f"Inspecting views of schema: {self.schema}")
+        print(f"Inspecting views of schema: {self.schema.list}")
         self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_view_names(schema=x)))}
         return self
 

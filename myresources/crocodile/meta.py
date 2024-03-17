@@ -410,7 +410,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if isinstance(tmpx, P): target = tmpx
             else: raise RuntimeError(f"Could not resolve target path {target} due to error")
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home.\n{target=}"
-        target_obj = P(target).expanduser().absolute().create(parents_only=True); target_obj += '.zip' if z and '.zip' not in target_obj.suffix else ''
+        target_obj = P(target).expanduser().absolute().create(parents_only=True)
+        if z and '.zip' not in target_obj.suffix: target_obj += '.zip'
         if "~" in str(source):
             tmp3 = self.run_py(f"print(P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path()
             if isinstance(tmp3, P): source = tmp3
@@ -420,7 +421,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar:  # type: ignore # pylint: disable=E1129
             assert self.sftp is not None, f"Could not establish SFTP connection to {self.hostname}."
             self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)
-        if z: target_obj = target_obj.unzip(inplace=True, content=True); self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
+        if z:
+            target_obj = target_obj.unzip(inplace=True, content=True)
+            self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
         print("\n"); return target_obj
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
         scout = self.run_py(cmd=f"obj=SSH.scout(r'{source}', z={z}, r={r})", desc=f"Scouting source `{source}` path on remote", return_obj=True, verbose=False)
@@ -470,10 +473,13 @@ class Scheduler:
         self.cycle: int = 0
         self.max_cycles: int = max_cycles
         self.sess_stats = sess_stats or (lambda _sched: {})
-    def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01"):
-        self.max_cycles, self.cycle, self.sess_start_time = max_cycles or self.max_cycles, 0, datetime.now()
+    def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01", starting_cycle: Optional[int] = None):
+        import datetime as dtm
+        if starting_cycle is not None: self.cycle = starting_cycle
+        self.max_cycles, self.sess_start_time = max_cycles or self.max_cycles, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
-            time1 = datetime.now(); self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.utcnow().strftime('%d %H:%M:%S')}")
+            time1 = datetime.now()
+            self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
             try: self.routine(self)
             except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait_sec - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
