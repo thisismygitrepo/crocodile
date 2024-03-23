@@ -221,7 +221,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             subprocess.Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux': subprocess.call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
         else: subprocess.call(["open", self.expanduser().resolve().str]); return self  # works for files and folders alike  # mac
-    def __call__(self, *args: Any, **kwargs: Any) -> 'P': self.start(*args, **kwargs); return self
+    def __call__(self, *args: Any, **kwargs: Any) -> None:
+        self.start(*args, **kwargs)
+        return None
     # def append_text(self, appendix: str) -> 'P': self.write_text(self.read_text() + appendix); return self
     def modify_text(self, txt_search: str, txt_alt: str, replace_line: bool = False, notfound_append: bool = False, prepend: bool = False, encoding: str = 'utf-8'):
         if not self.exists(): self.create(parents_only=True).write_text(txt_search)
