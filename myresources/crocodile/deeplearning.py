@@ -93,9 +93,9 @@ class HParams:
     root: P  # = P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
-    pkg_name: Literal['tensorflow', 'torch'] = 'tensorflow'
-    device_name: Device = Device.gpu0
-    subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
+    pkg_name: Literal['tensorflow', 'torch']  #  = 'tensorflow'
+    device_name: Device  #  = Device.gpu0
+    subpath: str  # = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
     def save(self):
         self.save_dir.joinpath(self.subpath, 'hparams.txt').create(parents_only=True).write_text(str(self))

@@ -46,6 +46,8 @@ class DBMS:
         if inspect: self.refresh()
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
+        if self.path is not None:
+            print(f"Database at {self.path.as_uri()} is ready.")
 
     def refresh(self, sch: Optional[str] = None) -> 'DBMS':  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
@@ -109,7 +111,6 @@ class DBMS:
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
         res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
-        print(f"Database at {path.as_uri()} is ready.")
         return res
 
     # ==================== QUERIES =====================================
