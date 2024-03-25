@@ -7,7 +7,7 @@
 
 </p>
 
-# Welcome to crocodile
+# Welcome to crocodile!
 
 Pythonically facilitate laborious `file management`, `distributed computing`, `scripting` and  `deep learning` workflows.
 
