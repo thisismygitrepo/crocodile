@@ -8,6 +8,7 @@ from typing import Optional, Union, Generic, TypeVar, Type, Literal, List as Lis
 import datetime
 
 _ = Concatenate
+__ = TypedDict
 
 
 _Slice = TypeVar('_Slice', bound='Slicable')
@@ -250,7 +251,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
 
 class Struct(Base):  # inheriting from dict gives `get` method, should give `__contains__` but not working. # Inheriting from Base gives `save` method.
     """Use this class to keep bits and sundry items. Combines the power of dot notation in classes with strings in dictionaries to provide Pandas-like experience"""
-    def __init__(self, dictionary: Union[dict[Any, Any], Type[object], TypedDict, None] = None, **kwargs: Any):
+    def __init__(self, dictionary: Union[dict[Any, Any], Type[object], None] = None, **kwargs: Any):
         if dictionary is None or isinstance(dictionary, dict): final_dict: dict[str, Any] = {} if dictionary is None else dictionary
         else:
             final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)  # type: ignore

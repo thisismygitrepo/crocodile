@@ -2,26 +2,25 @@
 """plots
 """
 
-from crocodile.core import timestamp, Save, install_n_import, validate_name
-from crocodile.file_management import P, OPLike, PLike
-from crocodile.meta import Terminal
-from crocodile.msc.odds import Cycle
+import pandas as pd
+import numpy as np
+import numpy.typing as npt
 
 import matplotlib.pyplot as plt
-# import matplotlib
 from matplotlib.backend_bases import Event
 from matplotlib import widgets
 from matplotlib.ticker import MultipleLocator
 import matplotlib.colors as mcolors  # type: ignore # noqa # pylint: disable=unused-import
 from matplotlib.colors import CSS4_COLORS  # type: ignore # pylint: disable=unused-import
 from matplotlib.image import AxesImage
-# from matplotlib.colorbar import vi
 from matplotlib import animation
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
-import pandas as pd
-import numpy as np
-import numpy.typing as npt
+
+from crocodile.core import timestamp, Save, install_n_import, validate_name
+from crocodile.file_management import P, OPLike, PLike
+from crocodile.meta import Terminal
+from crocodile.msc.odds import Cycle
 
 import enum
 import subprocess
@@ -168,6 +167,7 @@ class MPEGPipeBased(GIFFileBased):
 
 Saver: TypeAlias = Union[Null, PDF, PNG, GIFFileBased, GIFPipeBased, MPEGFileBased, MPEGPipeBased]
 
+
 # =================================== AUTO SAVERS ==========================================
 class GenericAuto(GenericSave):
     """Parses the data internally, hence requires artist with animate method implemetend. Artist needs to have .fig attribute."""
@@ -273,7 +273,8 @@ class NullAuto(GenericAuto):
 # mcolors.
 
 
-class FigureManager:  # use as base class for Artist & Viewers to give it free animation powers.
+class FigureManager:
+    """Base class for Artist & Viewers to give it free animation powers"""
     def __init__(self, info_loc: Optional[tuple[float, float]] = None, figpolicy: FigurePolicy = FigurePolicy.same):
         self.figpolicy = figpolicy
         self.fig: Optional[Figure] = None
@@ -287,22 +288,26 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         self.cmaps.set_value('viridis')
         self.idx_cycle = Cycle([])
         self.pause: bool = False  # animation
-        self.help_menu = {'_-=+[{]}\\': {'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
-                          "/": {'help': 'Show/Hide info text', 'func': self.text_info},
-                          "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
-                          "tyTY": {'help': 'Change color map', 'func': self.change_cmap},
-                          '<>': {'help': 'Change figure face color', 'func': self.change_facecolor},
-                          "v": {'help': 'Show/Hide pixel values (Toggle)', 'func': self.show_pix_val},
-                          'P': {'help': 'Pause/Proceed (Toggle)', 'func': self.pause_func},
-                          'r': {'help': 'Replay', 'func': self.replay},
-                          '1': {'help': 'Previous Image', 'func': self.previous}, '2': {'help': 'Next Image', 'func': self.next},
-                          'S': {'help': 'Save Object', 'func': self.save},
-                          'c': {'help': 'Show/Hide cursor', 'func': self.show_cursor},
-                          'aA': {'help': 'Show/Hide ticks and their labels', 'func': self.show_ticks},
-                          'alt+a': {'help': 'Show/Hide annotations', 'func': self.toggle_annotate}}  # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before, otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
+        self.help_menu = {
+            '_-=+[{]}\\': {
+            'help': "Adjust Vmin Vmax. Shift + key applies change to all axes \\ toggles auto-brightness ", 'func': self.adjust_brightness},
+            "/": {'help': 'Show/Hide info text', 'func': self.text_info},
+            "h": {'help': 'Show/Hide help menu', 'func': self.show_help},
+            "tyTY": {'help': 'Change color map', 'func': self.change_cmap},
+            '<>': {'help': 'Change figure face color', 'func': self.change_facecolor},
+            "v": {'help': 'Show/Hide pixel values (Toggle)', 'func': self.show_pix_val},
+            'P': {'help': 'Pause/Proceed (Toggle)', 'func': self.pause_func},
+            'r': {'help': 'Replay', 'func': self.replay},
+            '1': {'help': 'Previous Image', 'func': self.previous}, '2': {'help': 'Next Image', 'func': self.next},
+            'S': {'help': 'Save Object', 'func': self.save},
+            'c': {'help': 'Show/Hide cursor', 'func': self.show_cursor},
+            'aA': {'help': 'Show/Hide ticks and their labels', 'func': self.show_ticks},
+            'alt+a': {'help': 'Show/Hide annotations', 'func': FigureManager.toggle_annotate}}  # IMPORTANT: add the 'alt/ctrl+key' versions of key after the key in the dictionary above, not before, otherwise the naked key version will statisfy the condition `is key in this`? in the parser.
         self.auto_brightness, self.pix_vals = False, False; self.boundaries_flag, self.annot_flag = True, False
         self.info_loc = (0.8, 0.01) if info_loc is None else info_loc
-        self.message, self.message_obj, self.cursor = '', None, None
+        self.message = ''
+        self.message_obj: Optional[Any] = None
+        self.cursor = None
     def show_help(self, event: Any):
         default_plt = {"q ": {'help': "Quit Figure."},
                        "Ll": {'help': "change x/y scale to log and back to linear (toggle)"},
@@ -317,7 +322,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
             print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']), "\nDefault plt Keys:\n")
             print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
     # =============== EVENT METHODS ====================================
-    def animate(self): pass  # a method of the artist child class that is inheriting from this class to define behaviour when user press next or previous buttons.
+    def animate(self):
+        raise NotImplementedError("a method of the artist child class that is inheriting from this class to define behaviour when user press next or previous buttons.")
     def connect(self):
         if self.fig is not None: self.fig.canvas.mpl_connect('key_press_event', self.process_key); return self
     def process_key(self, event: Any):
@@ -326,12 +332,17 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         for key, value in self.help_menu.items():
             if event.key in key:
                 value['func'](event)  # type: ignore
-                self.update_info_text(self.message)
+                fig = self.fig
+                if fig is not None:
+                    if self.message_obj: self.message_obj.remove()
+                    self.message_obj = fig.text(*self.info_loc, self.message, fontsize=8)
+                else: print(f"Cant update info text, figure is not defined yet.")
                 break
         if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
     def toggle_annotate(self, event: Any):
         self.annot_flag = not self.annot_flag
-        if event.inaxes and event.inaxes.imageevent.inaxes.images[0].set_picker(True): self.message = f"Annotation flag is toggled to {self.annot_flag}"
+        if event.inaxes and event.inaxes.imageevent.inaxes.images[0].set_picker(True):
+            self.message = f"Annotation flag is toggled to {self.annot_flag}"
     # def annotate(self, event: Any, axis: Optional[Axes] = None, data: Optional[list[Any]] = None):
     #     self.event = event; e = event.mouseevent; ax = e.inaxes if axis is None else axis
     #     if not ax: return None
@@ -344,12 +355,32 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
     #     ax.annot_obj.set_text(f'x:{x}\ny:{y}\nvalue:{z:.3f}')
     #     ax.annot_obj.xy = (x, y)
     #     self.fig.canvas.draw_idle()
-    def save(self, event: Any): _ = event; Save.pickle(path=P.tmpfile(name="figure_manager"), obj=self)
-    def replay(self, event: Any): _ = event; self.pause = False; self.idx_cycle.set_index(0); self.message = 'Replaying'; self.animate()
-    def pause_func(self, event: Any): _ = event; self.pause = not self.pause; self.message = f'Pause flag is set to {self.pause}'; self.animate()
-    def previous(self, event: Any): _ = event; self.idx_cycle.previous(); self.message = f'Previous {self.idx_cycle}'; self.animate()
-    def next(self, event: Any): _ = event; self.idx_cycle.next(); self.message = f'Next {self.idx_cycle}'; self.animate()
-    def text_info(self, event: Any): _ = event; self.message = ''
+    def save(self, event: Any):
+        _ = event
+        Save.pickle(path=P.tmpfile(name="figure_manager"), obj=self)
+    def replay(self, event: Any):
+        _ = event
+        self.pause = False
+        self.idx_cycle.set_index(0)
+        self.message = 'Replaying'; self.animate()
+    def pause_func(self, event: Any):
+        _ = event
+        self.pause = not self.pause
+        self.message = f'Pause flag is set to {self.pause}'
+        self.animate()
+    def previous(self, event: Any):
+        _ = event
+        self.idx_cycle.previous()
+        self.message = f'Previous {self.idx_cycle}'
+        self.animate()
+    def next(self, event: Any):
+        _ = event
+        self.idx_cycle.next()
+        self.message = f'Next {self.idx_cycle}'
+        self.animate()
+    def text_info(self, event: Any):
+        _ = event
+        self.message = ''
     def change_facecolor(self, event: Any):
         assert self.fig is not None, "Figure is not defined yet."
         if event.key == '>': tmp = self.facecolor.next()
@@ -389,7 +420,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
             self.message = f"Color map changed to {ax.images[0].cmap.name}"  # type: ignore
     def show_pix_val(self, event: Any):
         if (ax := event.inaxes) is not None:
-            self.pix_vals = not self.pix_vals; self.message = f"Pixel values flag set to {self.pix_vals}"
+            self.pix_vals = not self.pix_vals
+            self.message = f"Pixel values flag set to {self.pix_vals}"
             if self.pix_vals: self.show_pixels_values(ax)
             else:
                 while len(ax.texts) > 0: _ = [text.remove() for text in ax.texts]
@@ -402,30 +434,43 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         else: ax.cursor_ = None; self.show_cursor(event)  # first call
     def show_ticks(self, event: Any):
         self.boundaries_flag = not self.boundaries_flag
-        if event.key == 'a' and (axis := event.inaxes): self.toggle_ticks(axis); self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
+        axis = event.inaxes
+        if event.key == 'a' and axis:
+            FigureManager.toggle_ticks(axis)
+            self.message = f"Boundaries flag set to {self.boundaries_flag} in {axis}"
         elif self.ax is not None:
-            for ax in self.ax: self.toggle_ticks(ax)
+            for ax in self.ax: FigureManager.toggle_ticks(ax)
     # ====================== class methods ===============================
-    def get_fig(self, figname: str = '', suffix: Optional[str] = None, **kwargs: Any): return FigureManager.get_fig_static(self.figpolicy, figname, suffix, **kwargs)
-    def update_info_text(self, message: str):
-        assert self.message_obj is not None, "Message object is not defined yet."
-        _ = self.message_obj.remove() if self.message_obj else None
-        assert self.fig is not None, "Figure is not defined yet."
-        self.message_obj = self.fig.text(*self.info_loc, message, fontsize=8)
+    @staticmethod
+    def get_fig(figpolicy: FigurePolicy, figname: str = '', suffix: Optional[str] = None, **kwargs: Any):
+        exist = True if figname in plt.get_figlabels() else False
+        if figpolicy is FigurePolicy.same: return plt.figure(num=figname, **kwargs)
+        elif figpolicy is FigurePolicy.add_new: return plt.figure(num=(timestamp(name=figname) if suffix is None else figname + suffix) if exist else figname, **kwargs)
+        elif figpolicy is FigurePolicy.close_create_new:
+            if exist: plt.close(figname)
+            return plt.figure(num=figname, **kwargs)
     @staticmethod
     def maximize_fig() -> None:
-        fig = plt.get_current_fig_manager()
-        if isinstance(fig, Figure): fig.full_screen_toggle()  # TODO not working appropriately ImShow.test() # The command required is backend-dependent and also OS dependent. Doesn't work if figure is not shown yet.
-    def clear_axes(self) -> None:
-        if self.ax is not None:
-            for ax in self.ax: ax.cla()
-    def transperent_fig(self) -> None:
-        assert self.fig is not None, "Figure is not defined yet."
-        self.fig.canvas.manager.window.attributes("-transparentcolor", "white")  # type: ignore
-    def close(self): plt.close(self.fig)
+        fig_manager = plt.get_current_fig_manager()
+        if fig_manager is not None:
+            if hasattr( fig_manager, "full_screen_toggle"): fig_manager.full_screen_toggle()
+            elif hasattr(fig_manager, "window"):
+                fig_manager.resize(*fig_manager.window.maxsize())  # type: ignore
+
+    @staticmethod
+    def clear_axes(axes: Optional[list[Axes]]) -> None:
+        if axes is not None:
+            for ax in axes:
+                ax.cla()
+    @staticmethod
+    def transperent_fig(fig: Optional[Figure]) -> None:
+        assert fig is not None, "Figure is not defined yet."
+        fig.canvas.manager.window.attributes("-transparentcolor", "white")  # type: ignore
+    # @staticmethod
+    # def close(fig: Optional[Figure]): plt.close(fig)
     # ====================== axis helpers ========================
     @staticmethod
-    def grid(ax: Axes, factor: int = 5, x_or_y: str = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
+    def grid(ax: Axes, factor: int = 5, x_or_y: Literal['x', 'y', 'both'] = 'both', color: str = 'gray', alpha1: float = 0.5, alpha2: float = 0.25):
         ax.grid(which='major', axis='x', color='gray', linewidth=0.5, alpha=alpha1); ax.grid(which='major', axis='y', color='gray', linewidth=0.5, alpha=alpha1)
         if x_or_y in {'both', 'x'}: xt = ax.get_xticks(); ax.xaxis.set_minor_locator(MultipleLocator((xt[1] - xt[0]) / factor)); ax.grid(which='minor', axis='x', color=color, linewidth=0.5, alpha=alpha2)
         if x_or_y in {'both', 'y'}: yt = ax.get_yticks(); ax.yaxis.set_minor_locator(MultipleLocator((yt[1] - yt[0]) / factor)); ax.grid(which='minor', axis='y', color=color, linewidth=0.5, alpha=alpha2)
@@ -443,9 +488,14 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         width, height = ax.figure.subplotpars.right - ax.figure.subplotpars.left, ax.figure.subplotpars.top - ax.figure.subplotpars.bottom  # type: ignore
         return w * width, h * height
     @staticmethod
-    def toggle_ticks(an_ax: Axes, state: Optional[bool] = None): _ = [line.set_visible(not line.get_visible() if state is None else state) for line in an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()]
+    def toggle_ticks(an_ax: Axes, state: Optional[bool] = None):
+        lines = an_ax.get_yticklines() + an_ax.get_xticklines() + an_ax.get_xticklabels() + an_ax.get_yticklabels()
+        for line in lines:
+            flag = not line.get_visible() if state is None else state
+            line.set_visible(flag)
     @staticmethod
-    def set_ax_to_real_life_size(ax: Axes, inch_per_unit: float = 1 / 25.4): FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
+    def set_ax_to_real_life_size(ax: Axes, inch_per_unit: float = 1 / 25.4):
+        FigureManager.set_ax_size(ax, (ax.get_xlim()[1] - ax.get_xlim()[0]) * inch_per_unit, (ax.get_ylim()[1] - ax.get_ylim()[0]) * inch_per_unit)
     @staticmethod
     def show_pixels_values(ax: Axes):
         xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
@@ -468,15 +518,8 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         else: raise ValueError("Both nrows and ncols are defined, which is not allowed.")
         return nrows_res, ncols_res
     @staticmethod
-    def findobj(figname: str, obj_name: str): return plt.figure(num=figname).findobj(lambda x: x.get_label() == obj_name)
-    @staticmethod
-    def get_fig_static(figpolicy: FigurePolicy, figname: str = '', suffix: Optional[str] = None, **kwargs: Any):
-        exist = True if figname in plt.get_figlabels() else False
-        if figpolicy is FigurePolicy.same: return plt.figure(num=figname, **kwargs)
-        elif figpolicy is FigurePolicy.add_new: return plt.figure(num=(timestamp(name=figname) if suffix is None else figname + suffix) if exist else figname, **kwargs)
-        elif figpolicy is FigurePolicy.close_create_new:
-            if exist: plt.close(figname)
-            return plt.figure(num=figname, **kwargs)
+    def findobj(figname: str, obj_name: str):
+        return plt.figure(num=figname).findobj(lambda x: x.get_label() == obj_name)
     @staticmethod
     def try_figure_size() -> None:
         fig, ax = plt.subplots()
@@ -508,24 +551,46 @@ class FigureManager:  # use as base class for Artist & Viewers to give it free a
         if test: _ = [plt.plot(aq + idx * 2) for idx, aq in enumerate(np.random.randn(10, 10))]
 
 
-class VisibilityViewer(FigureManager):  # This is used for browsing purpose, as opposed to saving.
+class VisibilityViewer(FigureManager):
+    """
+    This is used for browsing purpose, as opposed to saving.
+    This class works on hiding axes shown on a plot, so that a new plot can be drawn.
+    Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`
+    Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
+    """
     # artist = ['internal', 'external'][1]  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
     parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
     stream = ['clear', 'accumulate', 'update'][1]  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
-    """ This class works on hiding axes shown on a plot, so that a new plot can be drawn. Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`"""
-    def __init__(self, fig: Figure):  # Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
+    def __init__(self, fig: Figure):
         super().__init__()
         self.objs_repo: list[Any] = []  # list of lists of axes and texts.
-        self.fig = fig; self.connect(); self.idx_cycle = Cycle([0])
+        self.fig = fig
+        self.connect()
+        self.idx_cycle = Cycle([])
     def add(self, objs: Any) -> None:
         self.idx_cycle.expand(val=len(self.idx_cycle.list))
         self.objs_repo.append(objs)
         for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else []): obj.set_visible(False)
-        print(f"VViewer added plot number {self.idx_cycle.get_index()}", end='\r')
+        print(f"{self.__class__.__name__} added plot number {self.idx_cycle.get_index()}", end='\r')
     def animate(self):
         for ax in self.objs_repo[self.idx_cycle.prev_index]: ax.set_visible(False)
         for ax in self.objs_repo[self.idx_cycle.get_index()]: ax.set_visible(True)
         self.fig.canvas.draw()  # type: ignore
+    @staticmethod
+    def usage_example():
+        with plt.style.context(style='seaborn-v0_8-dark'):
+            fig = plt.figure()
+            FigureManager.maximize_fig()
+            ax = fig.subplots()
+            assert isinstance(ax, Axes)
+            viewer = VisibilityViewer(fig)
+            for _i in range(10):
+                data1 = np.random.randn(100)
+                obj = ax.plot(data1, label=f'plot number {_i}')
+                viewer.add(obj)
+            FigureManager.grid(ax)
+            viewer.animate()
+            plt.show()
 
 
 class LineArtist(FigureManager):  # This object knows how to draw a figure from curve-type data.
@@ -538,7 +603,7 @@ class LineArtist(FigureManager):  # This object knows how to draw a figure from 
         self.check_b = None
         if ax is None:  # create a figure
             with plt.style.context(style=self.style):  # type: ignore
-                self.fig = self.get_fig(figname, figsize=figsize)
+                self.fig = FigureManager.get_fig(figpolicy=self.figpolicy, figname=figname, figsize=figsize)
                 tmp = self.fig.subplots()
                 assert tmp is not None, "Subplots failed to create axes."
                 if isinstance(tmp, list): self.ax = tmp
@@ -550,6 +615,8 @@ class LineArtist(FigureManager):  # This object knows how to draw a figure from 
         self.visibility_ax = [0.01, 0.05, 0.2, 0.15]
         self.txt: list[str] = []
         self.label: str = label
+    def animate(self):
+        pass
     def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any):
         assert self.ax is not None, "Axes is not defined yet."
         for ax in self.ax:
@@ -651,8 +718,8 @@ class ImShow(FigureManager):
         self.ims: list[AxesImage] = []  # container for images.
         self.cmaps = Cycle(PLT_CMAPS); self.cmaps.set_value('viridis')
         if ax is None:
-            self.fig = self.get_fig(figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white')
-            if figsize is None: self.maximize_fig()
+            self.fig = FigureManager.get_fig(figpolicy=self.figpolicy, figname=figname, figsize=(14, 9) if figsize is None else figsize, facecolor='white')
+            if figsize is None: FigureManager.maximize_fig()
             if gridspec is not None:
                 assert self.fig is not None
                 gs = self.fig.add_gridspec(gridspec[0])
@@ -678,7 +745,7 @@ class ImShow(FigureManager):
         if subplots_adjust is not None and self.fig is not None: self.fig.subplots_adjust(**subplots_adjust)  # type: ignore
         # self.saver = save_type(watch_figs=[self.fig], save_dir=save_dir, save_name=save_name, delay=delay, fps=1000 / delay, **({} if save_kwargs is None else save_kwargs))
         if isinstance(self.ax, list):  # type: ignore
-            for an_ax in self.ax: self.toggle_ticks(an_ax, state=False)
+            for an_ax in self.ax: FigureManager.toggle_ticks(an_ax, state=False)
         self.idx_cycle = Cycle([item for item in range(len(self.img_tensor))])  # self.animate()
     def animate(self):
         for i in range(self.idx_cycle.get_index(), self.n):
