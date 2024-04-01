@@ -554,7 +554,7 @@ class RepeatUntilNoException:  # see https://github.com/jd/tenacity
                     return func(*args, **kwargs)
                 except Exception as ex:
                     print(f"💥 Robust call failed with {ex}, retrying {idx}/{self.retry} more times after sleeping for {self.sleep} seconds.")
-                    time.sleep(self.sleep)
+                    time.sleep(self.sleep * (idx + 1)**2)
             raise RuntimeError(f"💥 Robust call failed after {self.retry} retries.")
         return wrapper
 

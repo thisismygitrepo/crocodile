@@ -563,7 +563,7 @@ class VisibilityViewer(FigureManager):
     stream = ['clear', 'accumulate', 'update'][1]  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
     def __init__(self, fig: Figure):
         super().__init__()
-        self.objs_repo: list[Any] = []  # list of lists of axes and texts.
+        self.objs_repo: list[list[Any]] = []  # list of lists of axes and texts.
         self.fig = fig
         self.connect()
         self.idx_cycle = Cycle([])
@@ -573,9 +573,22 @@ class VisibilityViewer(FigureManager):
         for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else []): obj.set_visible(False)
         print(f"{self.__class__.__name__} added plot number {self.idx_cycle.get_index()}", end='\r')
     def animate(self):
-        for ax in self.objs_repo[self.idx_cycle.prev_index]: ax.set_visible(False)
-        for ax in self.objs_repo[self.idx_cycle.get_index()]: ax.set_visible(True)
-        self.fig.canvas.draw()  # type: ignore
+        for an_obj in self.objs_repo[self.idx_cycle.prev_index]: an_obj.set_visible(False)
+        visible_objs = self.objs_repo[self.idx_cycle.get_index()]
+        for an_obj in visible_objs:
+            an_obj.set_visible(True)
+        x, y = None, None
+        for an_obj in visible_objs:
+            if an_obj.__class__.__name__ == 'Line2D':
+                x, y = an_obj.get_xdata(), an_obj.get_ydata()
+                break
+        fig = self.fig
+        if fig is not None:
+            if x is not None:
+                fig.axes[0].set_xlim(min(x), max(x))
+            if y is not None:
+                fig.axes[0].set_ylim(min(y), max(y))
+            fig.canvas.draw()
     @staticmethod
     def usage_example():
         with plt.style.context(style='seaborn-v0_8-dark'):
@@ -593,7 +606,8 @@ class VisibilityViewer(FigureManager):
             plt.show()
 
 
-class LineArtist(FigureManager):  # This object knows how to draw a figure from curve-type data.
+class LineArtist(FigureManager):
+    """This object knows how to draw a figure from curve-type data."""
     def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn-v0_8-dark', figpolicy: FigurePolicy = FigurePolicy.add_new, figsize: tuple[int, int] = (14, 8)):
         super().__init__(figpolicy=figpolicy)
         self.style = style
