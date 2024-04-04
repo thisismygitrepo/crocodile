@@ -87,7 +87,11 @@ def get_art(comment: Optional[str] = None, artlib: Optional[BOX_OR_CHAR] = None,
     else:
         if style is None: style = random.choice(CowStyles.figures)
         cmd = f"""echo "{comment}" | cowsay -f {style} {to_file}"""
-    res = subprocess.run(cmd, text=True, capture_output=True, shell=True, check=True).stdout
+    try:
+        res = subprocess.run(cmd, text=True, capture_output=True, shell=True, check=True).stdout
+    except subprocess.CalledProcessError as ex:
+        print(ex)
+        return ""
     res = textwrap.indent(res, prefix=prefix)
     if verbose:
         print(f'Using style: {style} from {artlib}', '\n' * 3)
