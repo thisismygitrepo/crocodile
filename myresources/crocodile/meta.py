@@ -518,8 +518,9 @@ class Scheduler:
 #         if handle is not None: return handle(ex, **kwargs)
 #         return run() if run is not None else return_
 def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_code: bool = True, verbose: bool = True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
+    import inspect
     text: str = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
-    obj_path = P(__import__('inspect').getfile(obj)) if obj is not None else None
+    obj_path = P(inspect.getfile(obj)) if obj is not None else None
     path = P(path)
     if obj_path is not None:
         text += f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator
@@ -530,10 +531,25 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
             except Exception: tmppp = ""  # type: ignore
             text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{tmppp}{separator}"
         except Exception as ex: text += f"Could not read git repository @ `{obj_path.parent}`\n{ex}.\n"
-    text += (f"\n\n# Code to reproduce results\n\n```python\n" + __import__("inspect").getsource(obj) + "\n```" + separator) if obj is not None else ""
+    if obj is not None:
+        try: source_code = inspect.getsource(obj)
+        except OSError: source_code = f"Could not read source code from `{obj_path}`."
+        text += (f"\n\n# Code to reproduce results\n\n```python\n" + source_code + "\n```" + separator)
     readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
     if verbose: print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}")
-    if save_source_code: P((obj.__code__.co_filename if hasattr(obj, "__code__") else None) or __import__("inspect").getmodule(obj).__file__).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False); print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri()); return readmepath
+    if save_source_code:
+        if hasattr(obj, "__code__"):
+            save_path = obj.__code__.co_filename
+        else:
+            module_maybe = inspect.getmodule(obj)
+            if module_maybe is not None: save_path = module_maybe.__file__
+            else: save_path = None
+        if save_path is None:
+            print(f"Could not find source code for {obj}.")
+            return readmepath
+        P(save_path).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False)
+        print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+        return readmepath
 
 
 PS = ParamSpec('PS')
@@ -584,7 +600,7 @@ def monkey_patch(class_inst: Any, func: Callable[[Any], Any]): setattr(class_ins
 #     code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix  # added later so it has more overwrite authority.
 #     _ = install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
 # def extract_arguments(func: Callable[[Any], Any], copy2clipboard: bool = False, **kwargs: Any):
-#     ak = Struct(dict((inspect := __import__("inspect")).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and func_kwargs.
+#     ak = Struct(dict((inspect := inspect).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and func_kwargs.
 #     res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(as_config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
 #     ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and func_kwargs = {}
 #     _ = install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
