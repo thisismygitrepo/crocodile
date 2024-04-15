@@ -41,7 +41,7 @@ manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_sta
 time_at_execution_start_utc = pd.Timestamp.utcnow()
 time_at_execution_start_local = pd.Timestamp.now()
 manager.execution_log_dir.expanduser().create().joinpath("start_time.txt").write_text(str(time_at_execution_start_local))
-func_kwargs = Read.vanilla_pickle(path=manager.kwargs_path.expanduser())
+func_kwargs = Read.pickle(path=manager.kwargs_path.expanduser())
 
 # EXTRA-PLACEHOLDER-POST
 
@@ -144,7 +144,7 @@ if params.session_name != "":
 
 
 manager.unlock_resources()
-rm_conf: RemoteMachineConfig = Read.vanilla_pickle(path=manager.remote_machine_config_path.expanduser())
+rm_conf: RemoteMachineConfig = Read.pickle(path=manager.remote_machine_config_path.expanduser())
 
 
 if rm_conf.kill_on_completion:

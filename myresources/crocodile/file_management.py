@@ -125,17 +125,18 @@ class Read:
     def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
 
     @staticmethod
-    def vanilla_pickle(path: PLike, **kwargs: Any):
-        try: return __import__("pickle").loads(P(path).read_bytes(), **kwargs)
+    def pickle(path: PLike, **kwargs: Any):
+        import pickle
+        try: return pickle.loads(P(path).read_bytes(), **kwargs)
         except Exception as ex:
             print(f"💥 Failed to load pickle file {path} with error: {ex}")
             raise ex
-    pkl = staticmethod(vanilla_pickle)
-    pickle = staticmethod(vanilla_pickle)
-    @staticmethod
-    def pickles(bytes_obj: bytes): return __import__("dill").loads(bytes_obj)  # handles imports automatically provided that saved object was from an imported class (not in defined in __main__)
+    # @staticmethod
+    # def pickles(bytes_obj: bytes):
+    #     return __import__("dill").loads(bytes_obj)
     @staticmethod
     def dill(path: PLike, **kwargs: Any) -> Any:
+        """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
         import dill
         obj = dill.loads(str=P(path).read_bytes(), **kwargs)
         return obj

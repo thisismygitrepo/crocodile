@@ -10,7 +10,7 @@ from typing import Optional, Any, Callable
 import pandas as pd
 
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy import create_engine, text, inspect, Engine, Connection
+from sqlalchemy import create_engine, text, inspect as inspect__, Engine, Connection
 from sqlalchemy.engine import Inspector
 from sqlalchemy.sql.schema import MetaData
 from crocodile.core import Struct, Display
@@ -54,7 +54,7 @@ class DBMS:
         self.ses = sessionmaker()(bind=self.eng)  # ORM style
         self.meta = MetaData()
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
-        insp = inspect(subject=self.eng)
+        insp = inspect__(subject=self.eng)
         self.insp = insp
         self.schema = L(obj_list=self.insp.get_schema_names())
         print(f"Inspecting tables of schema: {self.schema.list}")

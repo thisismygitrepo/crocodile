@@ -483,13 +483,13 @@ class CloudManager:
             log['running'] = pd.DataFrame(columns=cols)
             log['completed'] = pd.DataFrame(columns=cols)
             log['failed'] = pd.DataFrame(columns=cols)
-            Save.vanilla_pickle(obj=log, path=path.create(parents_only=True), verbose=False)
+            Save.pickle(obj=log, path=path.create(parents_only=True), verbose=False)
             return log
-        return Read.vanilla_pickle(path=path)
+        return Read.pickle(path=path)
     def write_log(self, log: dict[JOB_STATUS, 'pd.DataFrame']):
         # assert self.claim_lock, f"method should never be called without claiming the lock first. This is a cloud-wide file."
         if not self.lock_claimed: self.claim_lock()
-        Save.vanilla_pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
+        Save.pickle(obj=log, path=self.base_path.joinpath("logs.pkl").expanduser(), verbose=False)
         return NoReturn
 
     # =================== CLOUD MONITORING ===================
@@ -507,7 +507,7 @@ class CloudManager:
         for a_worker in workers_root:
             running_jobs = a_worker.joinpath("running_jobs.pkl")
             times[a_worker.name] = pd.Timestamp.now() - pd.to_datetime(running_jobs.time("m"))
-            res[a_worker.name] = Read.vanilla_pickle(path=running_jobs) if running_jobs.exists() else []
+            res[a_worker.name] = Read.pickle(path=running_jobs) if running_jobs.exists() else []
         servers_report = pd.DataFrame({"machine": list(res.keys()), "#RJobs": [len(x) for x in res.values()], "LastUpdate": list(times.values())})
         return servers_report
     def run_monitor(self):
@@ -522,7 +522,7 @@ class CloudManager:
             print(f"🔒 Lock is held by: {lock_owner}")
             print("🧾 Log File:")
             log_path = alternative_base.joinpath("logs.pkl")
-            if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = Read.vanilla_pickle(path=log_path)
+            if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = Read.pickle(path=log_path)
             else:
                 print(f"Log file doesn't exist! 🫤 must be that cloud is getting purged or something 🤔 ")
                 log = {}
@@ -562,7 +562,7 @@ class CloudManager:
             entry = LogEntry.from_dict(row.to_dict())
             if entry.run_machine != this_machine: continue
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
-            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             status = rm.file_manager.get_job_status(session_name=rm.job_params.session_name, tab_name=rm.job_params.tab_name)
             if status == "running":
                 print(f"Job `{entry.name}` is still running, added to running jobs.")
@@ -595,7 +595,7 @@ class CloudManager:
         for _idx, row in log["failed"].iterrows():
             entry = LogEntry.from_dict(row.to_dict())
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{entry.name}")
-            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             entry.note += f"| Job failed @ {entry.run_machine}"
             entry.pid = None
             entry.cmd = None
@@ -633,7 +633,7 @@ class CloudManager:
             entry.end_time = None
             entry.run_machine = None
             entry.session_name = None
-            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             rm.file_manager.execution_log_dir.expanduser().joinpath("status.txt").delete(sure=True)
             rm.file_manager.execution_log_dir.expanduser().joinpath("pid.txt").delete(sure=True)
             log["queued"] = pd.concat([log["queued"], pd.DataFrame([entry.__dict__])], ignore_index=True)
@@ -691,7 +691,7 @@ class CloudManager:
         while len(self.running_jobs) < self.max_jobs:
             queue_entry = LogEntry.from_dict(log["queued"].iloc[idx].to_dict())
             a_job_path = CloudManager.base_path.expanduser().joinpath(f"jobs/{queue_entry.name}")
-            rm: RemoteMachine = Read.vanilla_pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
+            rm: RemoteMachine = Read.pickle(path=a_job_path.joinpath("data/remote_machine.Machine.pkl"))
             if rm.config.allowed_remotes is not None and f"{getpass.getuser()}@{platform.node()}" not in rm.config.allowed_remotes:
                 print(f"Job `{queue_entry.name}` is not allowed to run on this machine. Skipping ...")
                 idx += 1

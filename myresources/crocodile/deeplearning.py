@@ -108,7 +108,7 @@ class HParams:
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
     def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any):
-        data: dict[str, Any] = Read.vanilla_pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+        data: dict[str, Any] = Read.pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
     # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + S(self.__dict__).print(as_config=True, return_str=True)
     @property
@@ -144,7 +144,7 @@ class DataReader:
     def from_saved_data(cls, path: Union[str, P], hp: SubclassedHParams,  # type: ignore
                         **kwargs: Any):
         path = P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
-        data: dict[str, Any] = Read.vanilla_pickle(path)
+        data: dict[str, Any] = Read.pickle(path)
         obj = cls(hp=hp, **kwargs)
         obj.__setstate__(data)
         return obj
@@ -575,14 +575,14 @@ class BaseModel(ABC):
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
-            hp_obj = Read.vanilla_pickle(path=path / HParams.subpath + "hparams.HParams.pkl")
+            hp_obj = Read.pickle(path=path / HParams.subpath + "hparams.HParams.pkl")
         if device_name: hp_obj.device_name = device_name
         if hp_obj.root != path.parent:
             hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
 
         if data_class is not None: d_obj: SubclassedDataReader = data_class.from_saved_data(path, hp=hp_obj)
         else:
-            d_obj = Read.vanilla_pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
+            d_obj = Read.pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
         # if type(hp_obj) is Generic[HParams]:
         d_obj.hp = hp_obj  # type: ignore
         # else:rd
@@ -590,7 +590,7 @@ class BaseModel(ABC):
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
         history_path = path / "metadata/training/history.pkl"
-        if history_path.exists(): history: list[dict[str, Any]] = Read.vanilla_pickle(path=history_path)
+        if history_path.exists(): history: list[dict[str, Any]] = Read.pickle(path=history_path)
         else: history = []
         model_obj.history = history
         _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
