@@ -48,7 +48,7 @@ def assert_requirements():
     except (FileNotFoundError, subprocess.CalledProcessError) as err:
         # P(r"https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z").download().unzip().search()[0].rename("ffmpeg").move(r"C://")  # P("C:\\ffmpeg\\bin")  # add to PATH
         print("Installinng image magick")
-        if __import__("platform").system() == "Windows":
+        if platform.system() == "Windows":
             Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
             print("You might need to restart your machine before PATH change impact takes place.")
         else: raise NotImplementedError from err
@@ -182,7 +182,8 @@ class GenericAuto(GenericSave):
         self.names_list = names_list
     def animate(self):
         plt.pause(0.5)  # give time for figures to show up before updating them
-        for idx, datum in __import__("tqdm").tqdm(enumerate(self.data)):
+        from tqdm import tqdm
+        for idx, datum in tqdm(enumerate(self.data)):
             self.animator(datum)
             self.saver.add(names=[self.names_list[idx] if self.names_list is not None else str(idx)])
         self.saver.finish()
@@ -201,7 +202,7 @@ class GenericAuto(GenericSave):
 #         print(f"SAVED GIF @ ", P(self.fname).absolute().as_uri())
 #     def animate(self) -> None:
 #         plt.pause(interval=0.5)  # give time for figures to show up before updating them
-#         for idx, datum in __import__("tqdm").tqdm(enumerate(self.data)):
+#         for idx, datum in tqdm(enumerate(self.data)):
 #             self.animator(datum)
 #             self.saver.add(names=[self.names_list[idx] if self.names_list is not None else str(idx)])
 #         self.saver.finish()
