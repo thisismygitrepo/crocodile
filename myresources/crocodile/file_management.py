@@ -21,7 +21,10 @@ _ = Struct  # to be removed in the future
 
 # %% =============================== Security ================================================
 def obscure(msg: bytes) -> bytes: import base64; import zlib; return base64.urlsafe_b64encode(zlib.compress(msg, 9))
-def unobscure(obscured: bytes) -> bytes: return __import__("zlib").decompress(__import__("base64").urlsafe_b64decode(obscured))
+def unobscure(obscured: bytes) -> bytes:
+    import zlib
+    import base64
+    return zlib.decompress(base64.urlsafe_b64decode(obscured))
 def hashpwd(password: str): import bcrypt; return bcrypt.hashpw(password=password.encode(), salt=bcrypt.gensalt()).decode()
 def pwd2key(password: str, salt: Optional[bytes] = None, iterations: int = 10) -> bytes:  # Derive a secret key from a given password and salt"""
     import base64
@@ -79,7 +82,6 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 
 
 # %% =================================== File ============================================
-# def mat(path, remove_meta=False, **kwargs): res = Struct(__import__("scipy.io").__dict__["io"].loadmat(path, **kwargs)); List(res.keys()).filter("x.startswith('__')").apply(lambda x: res.__delattr__(x)) if remove_meta else None; return res
 
 class Read:
     @staticmethod
@@ -92,8 +94,12 @@ class Read:
         try: return getattr(Read, suffix)(str(path), **kwargs)
         except AttributeError as err:
             if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
-            if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'): return __import__("matplotlib").pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-            if suffix == ".parquet": return __import__("pandas").read_parquet(path, **kwargs)
+            if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'):
+                import matplotlib.pyplot as pyplot
+                return pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
+            if suffix == ".parquet":
+                import pandas as pd
+                return pd.read_parquet(path, **kwargs)
             try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
             except ImportError as err2: print(f"💥 Unknown file type. failed to recognize the suffix `{suffix}` of file {path} "); raise ImportError(err) from err2
     @staticmethod
@@ -105,7 +111,9 @@ class Read:
         return mydict
     @staticmethod
     def yaml(path: PLike, r: bool = False) -> Any:  # return could be list or dict etc
-        with open(str(path), "r", encoding="utf-8") as file: mydict = __import__("yaml").load(file, Loader=__import__("yaml").FullLoader)
+        import yaml  # type: ignore
+        with open(str(path), "r", encoding="utf-8") as file:
+            mydict = yaml.load(file, Loader=yaml.FullLoader)
         _ = r
         return mydict
     @staticmethod
@@ -122,7 +130,9 @@ class Read:
         # data = data.item() if data.dtype == np.object else data
         return data
     @staticmethod
-    def csv(path: PLike, **kwargs: Any): return __import__("pandas").read_csv(path, **kwargs)
+    def csv(path: PLike, **kwargs: Any):
+        import pandas as pd
+        return pd.read_csv(path, **kwargs)
 
     @staticmethod
     def pickle(path: PLike, **kwargs: Any):
@@ -141,7 +151,9 @@ class Read:
         obj = dill.loads(str=P(path).read_bytes(), **kwargs)
         return obj
     @staticmethod
-    def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None): return __import__("runpy").run_path(path, init_globals=init_globals, run_name=run_name)
+    def py(path: PLike, init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None):
+        import runpy
+        return runpy.run_path(str(path), init_globals=init_globals, run_name=run_name)
     @staticmethod
     def txt(path: PLike, encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
 
@@ -179,7 +191,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             if verbose: print(f"❌ Could NOT DELETE nonexisting file {repr(self)}. ")
             return self  # broken symlinks exhibit funny existence behaviour, catch them here.
         if self.is_file() or self.is_symlink(): self.unlink(missing_ok=True)
-        else: __import__("shutil").rmtree(self, ignore_errors=False)
+        else:
+            import shutil
+            shutil.rmtree(self, ignore_errors=False)
         if verbose: print(f"🗑️ ❌ DELETED {repr(self)}.")
         return self
     def send2trash(self, verbose: bool = True) -> 'P':
@@ -203,8 +217,13 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
         _ = dest.delete(sure=True) if not content and overwrite and dest.exists() else None
         if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
-        if slf.is_file(): __import__("shutil").copy(str(slf), str(dest)); _ = print(f"🖨️ COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
-        elif slf.is_dir(): dest = dest.parent if content else dest; __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest)); _ = print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}") if verbose else None
+        if slf.is_file():
+            import shutil
+            shutil.copy(str(slf), str(dest)); _ = print(f"🖨️ COPIED {repr(slf)} ==> {repr(dest)}") if verbose else None
+        elif slf.is_dir():
+            dest = dest.parent if content else dest
+            __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest))
+            if verbose: print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}")
         else: print(f"💥 Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
@@ -221,7 +240,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError as ioe: raise IOError from ioe
     def start(self, opener: Optional[str] = None):
-        if str(self).startswith("http") or str(self).startswith("www"): __import__("webbrowser").open(str(self)); return self
+        if str(self).startswith("http") or str(self).startswith("www"):
+            import webbrowser
+            webbrowser.open(str(self)); return self
         if sys.platform == "win32":  # double quotes fail with cmd. # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
             subprocess.Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\''); return self  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux': subprocess.call(["xdg-open", self.expanduser().resolve().str]); return self  # works for files and folders alike
@@ -381,7 +402,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         tmp = urllib3.connection_from_url(str(self))
         return tmp
     def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu=inlieu, operation='Whack')
-    def as_zip_path(self): res = self.expanduser().resolve(); return __import__("zipfile").Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
+    def as_zip_path(self):
+        import zipfile
+        res = self.expanduser().resolve()
+        return zipfile.Path(res)  # .str.split(".zip") tmp=res[1]+(".zip" if len(res) > 2 else ""); root=res[0]+".zip", at=P(tmp).as_posix())  # TODO
     def as_str(self) -> str: return str(self)
     def get_num(self, astring: Optional['str'] = None): int("".join(filter(str.isdigit, str(astring or self.stem))))
     def validate_name(self, replace: str = '_'): return validate_name(self.trunk, replace=replace)
@@ -429,12 +453,19 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: tmp2 = []
         filters = (filters or []) + tmp + tmp2
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
-            root = slf.as_zip_path(); raw = List(root.iterdir()) if not r else List(__import__("zipfile").ZipFile(str(slf)).namelist()).apply(root.joinpath)
-            return raw.filter(lambda zip_path: __import__("fnmatch").fnmatch(zip_path.at, pattern)).filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # .apply(lambda x: P(str(x)))
+            import zipfile
+            import fnmatch
+            root = slf.as_zip_path()
+            if not r:
+                raw = List(root.iterdir())
+            else:
+                raw = List(zipfile.ZipFile(str(slf)).namelist()).apply(root.joinpath)
+            res1 = raw.filter(lambda zip_path: fnmatch.fnmatch(zip_path.at, pattern))  # type: ignore
+            return res1.filter(lambda x: (folders or x.is_file()) and (files or x.is_dir()))  # type: ignore
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else:
             from glob import glob
-            raw = glob(str(slf / "**" / pattern), recursive=r) if r else __import__("glob").glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
+            raw = glob(str(slf / "**" / pattern), recursive=r) if r else glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
         if ".zip" not in slf and compressed:
             tmp = [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]
             raw += List(tmp).reduce()  # type: ignore
@@ -448,7 +479,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', string=x.stem)])
         return List(processed)
 
-    def tree(self, *args: Any, **kwargs: Any): return __import__("crocodile.msc.odds").msc.odds.__dict__['tree'](self, *args, **kwargs)
+    def tree(self, *args: Any, **kwargs: Any):
+        from crocodile.msc.odds import tree
+        return tree(self, *args, **kwargs)
     @property
     def browse(self): return self.search("*").to_struct(key_val=lambda x: ("qq_" + validate_name(str(x)), x)).clean_view
     def create(self, parents: bool = True, exist_ok: bool = True, parents_only: bool = False) -> 'P':
@@ -458,9 +491,13 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def chdir(self) -> 'P': os.chdir(str(self.expanduser())); return self
     def listdir(self) -> List['P']: return List(os.listdir(self.expanduser().resolve())).apply(lambda x: P(x))  # pylint: disable=W0108
     @staticmethod
-    def tempdir() -> 'P': return P(__import__("tempfile").mktemp())
+    def tempdir() -> 'P':
+        import tempfile
+        return P(tempfile.mktemp())
     @staticmethod
-    def temp() -> 'P': return P(__import__("tempfile").gettempdir())
+    def temp() -> 'P':
+        import tempfile
+        return P(tempfile.gettempdir())
     @staticmethod
     def tmpdir(prefix: str = "") -> 'P': return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     @staticmethod
@@ -493,14 +530,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         assert merge is False, f"I have not implemented this yet"
         assert path is None, f"I have not implemented this yet"
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
-        slf = zipfile = self.expanduser().resolve()
+        slf = zipfile__ = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
             tmp__ = [item for item in (".zip", ".7z", "") if item in str(slf)]
             ztype = tmp__[0]
             if ztype == "": return slf
-            zipfile, name__ = slf.split(at=str(List(slf.parts).filter(lambda x: ztype in x)[0]), sep=-1)
+            zipfile__, name__ = slf.split(at=str(List(slf.parts).filter(lambda x: ztype in x)[0]), sep=-1)
             name = str(name__)
-        folder = (zipfile.parent / zipfile.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile.stem)
+        folder = (zipfile__.parent / zipfile__.stem) if folder is None else P(folder).expanduser().absolute().resolve().joinpath(zipfile__.stem)
         folder = folder if not content else folder.parent
         if slf.suffix == ".7z":
             if overwrite: P(folder).delete(sure=True)
@@ -514,10 +551,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else:
             if overwrite:
                 if not content: P(folder).joinpath(name or "").delete(sure=True, verbose=True)  # deletes a specific file / folder that has the same name as the zip file without extension.
-                else: List([x for x in __import__("zipfile").ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(name or "", item.replace("/", "")).delete(sure=True, verbose=True))
-            result = Compression.unzip(zipfile.str, str(folder), None if name is None else P(name).as_posix())
+                else:
+                    import zipfile
+                    List([x for x in zipfile.ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(name or "", item.replace("/", "")).delete(sure=True, verbose=True))
+            result = Compression.unzip(zipfile__.str, str(folder), None if name is None else P(name).as_posix())
             assert isinstance(result, P)
-        return self._return(P(result), inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile)} ==> {repr(result)}")
+        return self._return(P(result), inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile__)} ==> {repr(result)}")
     def tar(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()
         Compression.tar(self.expanduser().resolve().str, op_path=op_path.str); return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
@@ -598,7 +637,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         import io; f = io.StringIO(); qr.print_ascii(out=f); f.seek(0)
         print(f.read()); _ = qr.make_image().save(path) if path is not None else None
     def get_remote_path(self, root: Optional[str], os_specific: bool = False, rel2home: bool = True, strict: bool = True, obfuscate: bool = False) -> 'P':
-        tmp1: str = (__import__('platform').system().lower() if os_specific else 'generic_os')
+        import platform
+        tmp1: str = (platform.system().lower() if os_specific else 'generic_os')
         if not rel2home: path = self
         else:
             try: path = self.rel2home()
@@ -692,37 +732,48 @@ class Compression:
             jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
         return P(op_path)
     @staticmethod
-    def unzip(ip_path: str, op_path: str, fname: Optional[str]= None, password: Optional[str] = None, memory: bool = False, **kwargs: Any):
-        with __import__("zipfile").ZipFile(str(ip_path), 'r') as zipObj:
+    def unzip(ip_path: str, op_path: str, fname: Optional[str]= None, password: Optional[bytes] = None, memory: bool = False, **kwargs: Any):
+        import zipfile
+        with zipfile.ZipFile(str(ip_path), 'r') as zipObj:
             if memory: return {name: zipObj.read(name) for name in zipObj.namelist()} if fname is None else zipObj.read(fname)
             if fname is None: zipObj.extractall(op_path, pwd=password, **kwargs); return P(op_path)
             else: zipObj.extract(member=str(fname), path=str(op_path), pwd=password); return P(op_path) / fname
     @staticmethod
     def gz(file: str, op_path: str):  # see this on what to use: https://stackoverflow.com/questions/10540935/what-is-the-difference-between-tar-and-zip
+        import shutil
+        import gzip
         with open(file, 'rb') as f_in:
-            with __import__("gzip").open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
+            with gzip.open(op_path, 'wb') as f_out: shutil.copyfileobj(f_in, f_out)
         return P(op_path)
     @staticmethod
     def ungz(path: str, op_path: str):
-        with __import__("gzip").open(path, 'r') as f_in, open(op_path, 'wb') as f_out: __import__("shutil").copyfileobj(f_in, f_out)
+        import gzip
+        import shutil
+        with gzip.open(path, 'r') as f_in, open(op_path, 'wb') as f_out: shutil.copyfileobj(f_in, f_out)
         return P(op_path)
     @staticmethod
     def unbz(path: str, op_path: str):
-        with __import__("bz2").BZ2File(path, 'r') as fr, open(str(op_path), 'wb') as fw: __import__("shutil").copyfileobj(fr, fw)
+        import bz2
+        import shutil
+        with bz2.BZ2File(path, 'r') as fr, open(str(op_path), 'wb') as fw: shutil.copyfileobj(fr, fw)
         return P(op_path)
     @staticmethod
     def xz(path: str, op_path: str):
-        with __import__("lzma").open(op_path, "w") as f: f.write(path)
+        import lzma
+        with lzma.open(op_path, "w") as f: f.write(P(path).read_bytes())
     @staticmethod
     def unxz(ip_path: str, op_path: str):
-        with __import__("lzma").open(ip_path) as file: P(op_path).write_bytes(file.read())
+        import lzma
+        with lzma.open(ip_path) as file: P(op_path).write_bytes(file.read())
     @staticmethod
     def tar(path: str, op_path: str):
-        with __import__("tarfile").open(op_path, "w:gz") as tar_: tar_.add(str(path), arcname=os.path.basename(path))
+        import tarfile
+        with tarfile.open(op_path, "w:gz") as tar_: tar_.add(str(path), arcname=os.path.basename(path))
         return P(op_path)
     @staticmethod
     def untar(path: str, op_path: str, fname: Optional[str]= None, mode: str = 'r', **kwargs: Any):
-        with __import__("tarfile").open(str(path), mode) as file:
+        import tarfile
+        with tarfile.open(str(path), mode) as file:
             if fname is None: file.extractall(path=op_path, **kwargs)  # extract all files in the archive
             else: file.extract(fname, **kwargs)
         return P(op_path)

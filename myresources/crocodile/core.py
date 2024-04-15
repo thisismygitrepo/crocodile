@@ -23,18 +23,25 @@ PLike = Union[str, Path]
 PS = ParamSpec('PS')
 
 # ============================== Accessories ============================================
-def validate_name(astring: str, replace: str = '_') -> str: return __import__("re").sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
+def validate_name(astring: str, replace: str = '_') -> str:
+    import re
+    return re.sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
 def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> str: return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift: str) -> datetime.timedelta:  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], float(shift[:-1])
     key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
 def install_n_import(library: str, package: Optional[str] = None, fromlist: Optional[list[str]] = None):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(library, fromlist=fromlist if fromlist is not None else ())
-    except (ImportError, ModuleNotFoundError): __import__("subprocess").check_call([__import__("sys").executable, "-m", "pip", "install", package or library]); return __import__(library, fromlist=fromlist if fromlist is not None else ())
+    except (ImportError, ModuleNotFoundError):
+        import subprocess
+        import sys
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package or library])
+        return __import__(library, fromlist=fromlist if fromlist is not None else ())
 def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bool = True, punctuation: bool = False, safe: bool = False, noun: bool = False) -> str:
     if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     if noun: return install_n_import("randomname").get_name()
-    string = __import__("string"); return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
+    string = __import__("string")
+    return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
 
 def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
@@ -69,7 +76,7 @@ class Save:
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-        import yaml
+        import yaml  # type: ignore
         with open(Path(path), 'w', encoding="utf-8") as file:
             yaml.dump(obj, file, **kwargs)
     @staticmethod
@@ -85,7 +92,9 @@ class Save:
     def csv(obj: Any, path: PLike): return obj.to_frame('dtypes').reset_index().to_csv(str(path) + ".dtypes")
     @staticmethod
     @save_decorator(".npy")
-    def npy(obj: Any, path: PLike, **kwargs: Any): return __import__('numpy').save(path, obj, **kwargs)
+    def npy(obj: Any, path: PLike, **kwargs: Any):
+        import numpy as np
+        return np.save(path, obj, **kwargs)
     # @save_decorator(".mat")
     # def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
     @staticmethod
@@ -109,7 +118,8 @@ class Base(object):
     def __setstate__(self, state: dict[str, Any]): self.__dict__.update(state)
     def __deepcopy__(self, *args: Any, **kwargs: Any):
         obj = self.__class__(*args, **kwargs)
-        obj.__dict__.update(__import__("copy").deepcopy(self.__dict__))
+        import copy
+        obj.__dict__.update(copy.deepcopy(self.__dict__))
         return obj
     def __copy__(self, *args: Any, **kwargs: Any): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
     # def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
