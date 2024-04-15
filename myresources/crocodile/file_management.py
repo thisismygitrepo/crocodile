@@ -131,9 +131,9 @@ class Read:
         except Exception as ex:
             print(f"💥 Failed to load pickle file {path} with error: {ex}")
             raise ex
-    # @staticmethod
-    # def pickles(bytes_obj: bytes):
-    #     return __import__("dill").loads(bytes_obj)
+    @staticmethod
+    def pkl(path: PLike, **kwargs: Any): return Read.pickle(path, **kwargs)
+
     @staticmethod
     def dill(path: PLike, **kwargs: Any) -> Any:
         """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
@@ -209,9 +209,13 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
     def readit(self, reader: Optional[Callable[[PLike], Any]] = None, strict: bool = True, default: Optional[Any] = None, verbose: bool = False, **kwargs: Any) -> 'Any':
-        if not (slf := self.expanduser().resolve()).exists():
-            if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
-            else: _ = (print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}") if verbose else None); return default
+        slf = self.expanduser().resolve()
+        if not slf.exists():
+            if strict:
+                raise FileNotFoundError(f"`{slf}` is no where to be found!")
+            else:
+                if verbose: print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}")
+                return default
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
         filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
