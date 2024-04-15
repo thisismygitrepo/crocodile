@@ -90,16 +90,10 @@ class Save:
     # def mat(mdict, path=None, **kwargs): _ = [mdict.__setitem(key, []) for key, value in mdict.items() if value is None]; from scipy.io import savemat; savemat(str(path), mdict, **kwargs)  # Avoid using mat as it lacks perfect restoration: * `None` type is not accepted. Scalars are conveteed to [1 x 1] arrays.
     @staticmethod
     @save_decorator(".pkl")
-    def vanilla_pickle(obj: Any, path: PLike, **kwargs: Any):
-        import pickle
-        return Path(path).write_bytes(data=pickle.dumps(obj, **kwargs))
-    @staticmethod
-    @save_decorator(".pkl")
     def pickle(obj: Any, path: PLike, **kwargs: Any):
         import pickle
         data = pickle.dumps(obj=obj, **kwargs)
         return Path(path).write_bytes(data=data)
-        # pickles = pickles
     @staticmethod
     @save_decorator(".pkl")
     def dill(obj: Any, path: PLike, **kwargs: Any):

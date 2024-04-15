@@ -9,7 +9,6 @@ from crocodile.cluster.remote_machine import RemoteMachine, FileManager
 
 class Submission:
     """Sends repo, data, root_dir and write execution command."""
-
     @staticmethod
     def transfer_sh(rm: RemoteMachine) -> None:
         print("Using transfer.sh to send data to remote machine.")
@@ -20,7 +19,6 @@ class Submission:
             cloud_download_py_script += f"print('Downloading `{tmp_file.collapseuser()}`.')\n"
             cloud_download_py_script += f"P(r'{tmp_file.share_on_cloud()}').download(folder=r'{P(rm.job_params.repo_path_rh).parent}').decrypt_n_unzip()\n"
             tmp_file.delete(sure=True)
-        # download data
         for _idx, item in enumerate(rm.data):
             cloud_download_py_script += f"P(r'{P(item).share_on_cloud()}').download(folder=r'{item.collapseuser().parent}')\n"
         # save cloud_download_script_py

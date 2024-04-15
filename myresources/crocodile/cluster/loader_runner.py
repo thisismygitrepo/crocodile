@@ -675,7 +675,7 @@ class CloudManager:
             elif status == "queued": raise RuntimeError(f"I thought I'm working strictly with running jobs, and I encountered unexpected a job with `queued` status.")
             else: raise ValueError(f"I receieved a status that I don't know how to handle `{status}`")
         self.running_jobs = [a_rm for a_rm in self.running_jobs if a_rm.config.job_id not in jobs_ids_to_be_removed_from_running]
-        Save.vanilla_pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
+        Save.pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
         self.status_root.to_cloud(cloud=self.cloud, rel2home=True, verbose=False)  # no need for lock as this writes to a folder specific to this machine.
     def start_jobs_if_possible(self):
         """This is the only authority responsible for moving jobs from queue df to running df."""

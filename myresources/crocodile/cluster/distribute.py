@@ -97,7 +97,7 @@ class Cluster:
     def __setstate__(self, state: dict[str, Any]) -> None: self.__dict__.update(state)
     def save(self) -> P:
         path = self.root_dir.joinpath("cluster.Cluster.pkl")
-        Save.vanilla_pickle(obj=self.__getstate__(), path=path)
+        Save.pickle(obj=self.__getstate__(), path=path)
         return path
     @staticmethod
     def load(job_id: str, base: Optional[str] = None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()

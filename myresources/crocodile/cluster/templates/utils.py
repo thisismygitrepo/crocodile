@@ -23,7 +23,7 @@ def expensive_function(workload_params: WorkloadParams, sim_dict: Optional[dict[
     _ = workload_params.idx_max
 
     save_dir = P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
-    Save.vanilla_pickle(obj={'a': 1}, path=save_dir.joinpath(f"trial_func_result.pkl"))
+    Save.pickle(obj={'a': 1}, path=save_dir.joinpath(f"trial_func_result.pkl"))
     return save_dir
 
 

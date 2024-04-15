@@ -102,8 +102,8 @@ class HParams:
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError:
             data = self.__dict__
-        Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
-        Save.vanilla_pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
+        Save.pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
+        Save.pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
@@ -138,8 +138,8 @@ class DataReader:
         base = (P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError: data = self.__dict__
-        Save.vanilla_pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
-        Save.vanilla_pickle(path=base / "data_reader.DataReader.pkl", obj=self)
+        Save.pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
+        Save.pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
     def from_saved_data(cls, path: Union[str, P], hp: SubclassedHParams,  # type: ignore
                         **kwargs: Any):
@@ -535,7 +535,7 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        Save.vanilla_pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         try: Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}').create()  # model save goes into data path.
@@ -748,7 +748,7 @@ class Ensemble(Base):
             self.performance.append(self.models[i].evaluate(aslice=slice(0, -1), viz=False))
             if save:
                 self.models[i].save_class()
-                Save.vanilla_pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")
+                Save.pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
