@@ -164,7 +164,8 @@ class Response:
 
 class Terminal:
     def __init__(self, stdout: Optional[int] = subprocess.PIPE, stderr: Optional[int] = subprocess.PIPE, stdin: Optional[int] = subprocess.PIPE, elevated: bool = False):
-        self.machine: str = __import__("platform").system()
+        import platform
+        self.machine: str = platform.system()
         self.elevated: bool = elevated
         self.stdout = stdout
         self.stderr = stderr
@@ -181,7 +182,8 @@ class Terminal:
         if self.machine == "Windows" and shell in {"powershell", "pwsh"}: my_list = [shell, "-Command"] + my_list  # alternatively, one can run "cmd"
         if self.elevated is False or self.is_user_admin():
             resp: subprocess.CompletedProcess[str] = subprocess.run(my_list, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=check, input=ip)
-        else: resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        else:
+            resp = __import__("ctypes").windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return Response.from_completed_process(resp)
     def run_script(self, script: str, shell: SHELLS = "default", verbose: bool = False):
         if self.machine == "Linux": script = "#!/bin/bash" + "\n" + script  # `source` is only available in bash.
@@ -227,10 +229,10 @@ class Terminal:
         os.system(f"{window} {terminal} {shell} {shell_script}")
     @staticmethod
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
-        if __import__('os').name == 'nt':
+        if os.name == 'nt':
             try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
             except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
-        else: return __import__('os').getuid() == 0  # Check for root on Posix
+        else: return os.getuid() == 0  # Check for root on Posix
     @staticmethod
     def run_as_admin(file: PLike, params: Any, wait: bool = False):
         proce_info = install_n_import(library="win32com", package="pywin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)
@@ -347,9 +349,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         return self._remote_distro
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
     def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
-    def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {__import__('os').environ[name]}; export {name}")
+    def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {os.environ[name]}; export {name}")
     def get_remote_repr(self, add_machine: bool = False) -> str: return f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")
-    def get_local_repr(self, add_machine: bool = False) -> str: return f"{__import__('getpass').getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
+    def get_local_repr(self, add_machine: bool = False) -> str:
+        import getpass
+        return f"{getpass.getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_local_repr(add_machine=True)} >>> SSH TO >>> remote {self.get_remote_repr(add_machine=True)}"
     def run_locally(self, command: str):
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
@@ -452,7 +456,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         return Scout(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):
         install_n_import("tabulate")
-        df = __import__("pandas").DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
+        import pandas as pd
+        df = pd.DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
         print("\nSummary of operations performed:")
         print(df.to_markdown())
         if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))): print("\nAll operations completed successfully.\n")
@@ -487,7 +492,9 @@ class Scheduler:
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self); return  # that's probably the only kind of exception that can rise during sleep.
         self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
-    def get_records_df(self): return __import__("pandas").DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(self).keys()))
+    def get_records_df(self):
+        import pandas as pd
+        return pd.DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(self).keys()))
     def record_session_end(self, reason: str = "Not passed to function."):
         end_time = datetime.now()
         duration = end_time - self.sess_start_time

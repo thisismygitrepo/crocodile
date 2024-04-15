@@ -26,10 +26,11 @@ PS = ParamSpec('PS')
 def validate_name(astring: str, replace: str = '_') -> str:
     import re
     return re.sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
-def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> str: return ((name + '_') if name is not None else '') + __import__("datetime").datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
+def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> str:
+    return ((name + '_') if name is not None else '') + datetime.datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
 def str2timedelta(shift: str) -> datetime.timedelta:  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], float(shift[:-1])
-    key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return __import__("datetime").timedelta(**{key: val})
+    key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return datetime.timedelta(**{key: val})
 def install_n_import(library: str, package: Optional[str] = None, fromlist: Optional[list[str]] = None):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(library, fromlist=fromlist if fromlist is not None else ())
     except (ImportError, ModuleNotFoundError):
@@ -38,10 +39,13 @@ def install_n_import(library: str, package: Optional[str] = None, fromlist: Opti
         subprocess.check_call([sys.executable, "-m", "pip", "install", package or library])
         return __import__(library, fromlist=fromlist if fromlist is not None else ())
 def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bool = True, punctuation: bool = False, safe: bool = False, noun: bool = False) -> str:
-    if safe: return __import__("secrets").token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
+    if safe:
+        import secrets
+        return secrets.token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
     if noun: return install_n_import("randomname").get_name()
-    string = __import__("string")
-    return ''.join(__import__("random").choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
+    import string
+    import random
+    return ''.join(random.choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
 
 
 def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
@@ -128,9 +132,16 @@ class Base(object):
         saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         _ = self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
     @classmethod
-    def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any): obj = cls(*args, **kwargs); obj.__setstate__(dict(__import__("dill").loads(Path(path).read_bytes()))); return obj
+    def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
+        obj = cls(*args, **kwargs)
+        import dill
+        obj.__setstate__(dict(dill.loads(Path(path).read_bytes())))
+        return obj
     def save_code(self, path: Union[str, Path]):
-        if hasattr(module := __import__("inspect").getmodule(self), "__file__"): file = Path(module.__file__)
+        import inspect
+        module = inspect.getmodule(self)
+        if module is not None and hasattr(module, "__file__"):
+            file = Path(module.__file__)  # type: ignore
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
         _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8')); return Path(path) if type(path) is str else path  # path could be P, better than Path
     def get_attributes(self, remove_base_attrs: bool = True, return_objects: bool = False, fields: bool = True, methods: bool = True):
@@ -146,7 +157,8 @@ class Base(object):
         return (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).__dict__)
     @staticmethod
     def viz_composition_heirarchy(obj: Any, depth: int = 3, filt: Optional[Callable[[Any], None]] = None):
-        filename = Path(__import__("tempfile").gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")
+        import tempfile
+        filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")
         install_n_import("objgraph").show_refs([obj], max_depth=depth, filename=str(filename), filter=filt)
         # if __import__("sys").platform == "win32": __import__("os").startfile(str(filename.absolute()))
         return filename
@@ -159,7 +171,10 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)])
         _ = print(res) if not return_str else None; _ = kwargs
         return res if return_str else None
-    def __deepcopy__(self, arg: Any) -> "List[T]": _ = arg; return List([__import__("copy").deepcopy(i) for i in self.list])
+    def __deepcopy__(self, arg: Any) -> "List[T]":
+        _ = arg
+        import copy
+        return List([copy.deepcopy(i) for i in self.list])
     def __bool__(self) -> bool: return bool(self.list)
     def __contains__(self, key: str) -> bool: return key in self.list
     def __copy__(self) -> 'List[T]': return List(self.list.copy())
@@ -183,7 +198,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         tmp = np.random.choice(len(self), size, replace=replace, p=p)
         return List([self.list[item] for item in tmp.tolist()])
     def split(self, every: int = 1, to: Optional[int] = None) -> 'List[List[T]]':
-        every = every if to is None else __import__("math").ceil(len(self) / to)
+        import math
+        every = every if to is None else math.ceil(len(self) / to)
         res: list[List[T]] = []
         for ix in range(0, len(self), every):
             if ix + every < len(self):
@@ -211,7 +227,9 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         for a_val in ((values or []) + ([value] if value else [])):
             if strict or value in self.list: self.list.remove(a_val)
         return self
-    def to_series(self): return __import__("pandas").Series(self.list)
+    def to_series(self):
+        import pandas as pd
+        return pd.Series(self.list)
     def to_list(self) -> list[T]: return self.list
     def to_numpy(self, **kwargs: Any) -> 'Any': import numpy as np; return np.array(self.list, **kwargs)
     def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
@@ -273,7 +291,12 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def from_names(cls, names: list[str], default_: Optional[Any] = None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
     def spawn_from_values(self, values: Union[list[Any], List[Any]]) -> 'Struct': return self.from_keys_values(list(self.keys()), values)
     def spawn_from_keys(self, keys: Union[list[str], List[str]]) -> 'Struct': return self.from_keys_values(keys, list(self.values()))
-    def to_default(self, default: Optional[Callable[[], Any]] = lambda: None): tmp2 = __import__("collections").defaultdict(default); tmp2.update(self.__dict__); self.__dict__ = tmp2; return self
+    def to_default(self, default: Optional[Callable[[], Any]] = lambda: None):
+        import collections
+        tmp2: dict = collections.defaultdict(default)  # type: ignore
+        tmp2.update(self.__dict__)
+        self.__dict__ = tmp2
+        return self
     def __str__(self, sep: str = "\n"): return Display.config(self.__dict__, sep=sep)
     def __getattr__(self, item: str) -> 'Struct':
         try: return self.__dict__[item]
@@ -290,7 +313,9 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def __iter__(self): return iter(self.__dict__.items())
     def __delitem__(self, key: str): del self.__dict__[key]
     def copy(self) -> 'Struct': return Struct(self.__dict__.copy())
-    def to_dataframe(self, *args: Any, **kwargs: Any): return __import__("pandas").DataFrame(self.__dict__, *args, **kwargs)
+    def to_dataframe(self, *args: Any, **kwargs: Any):
+        import pandas as pd
+        return pd.DataFrame(self.__dict__, *args, **kwargs)
     def keys(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
     def values(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
     def items(self, verbose: bool = False, desc: str = "") -> 'List[Any]': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
@@ -372,15 +397,23 @@ class Display:
     def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None:
         import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
     @staticmethod
-    def set_pandas_auto_width(): __import__("pandas").set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
+    def set_pandas_auto_width():
+        import pandas as pd
+        pd.set_option('width', 0)  # this way, pandas is told to detect window length and act appropriately.  For fixed width host windows, this is recommended to avoid chaos due to line-wrapping.
     @staticmethod
-    def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: str = 'fixed', **kwargs: Any) -> None: __import__("numpy").set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
+    def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: Literal['fixed', 'unique', 'maxprec', 'maxprec_equal'] = 'fixed', **kwargs: Any) -> None:
+        import numpy as np
+        np.set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
     @staticmethod
     def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
     @staticmethod
     def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
     @staticmethod
-    def eng(): __import__("pandas").set_eng_float_format(accuracy=3, use_eng_prefix=True); __import__("pandas").options.float_format = '{:, .5f}'.format; __import__("pandas").set_option('precision', 7)  # __import__("pandas").set_printoptions(formatter={'float': '{: 0.3f}'.format})
+    def eng():
+        import pandas as pd
+        pd.set_eng_float_format(accuracy=3, use_eng_prefix=True)
+        # pd.options.float_format = '{:, .5f}'.format
+        pd.set_option('precision', 7)  # pd.set_printoptions(formatter={'float': '{: 0.3f}'.format})
     @staticmethod
     def outline(array: 'Any', name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; _ = print(str_) if printit else None; return str_
     @staticmethod
