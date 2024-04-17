@@ -29,17 +29,6 @@ class Scout:
     files: Optional[List[P]]
 
 
-class Null:
-    def __init__(self, return_: Any = 'self'): self.return_ = return_
-    def __getattr__(self, item: str) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
-    def __getitem__(self, item: str) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
-    def __call__(self, *args: Any, **kwargs: Any) -> 'Null': _ = args, kwargs; return self if self.return_ == 'self' else self.return_
-    def __len__(self): return 0
-    def __bool__(self): return False
-    def __contains__(self, item: str): _ = self, item; return False
-    def __iter__(self): return iter([self])
-
-
 class Log(logging.Logger):  #
     def __init__(self, dialect: Literal["colorlog", "logging", "coloredlogs"] = "colorlog", name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
                  s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False,
@@ -232,7 +221,8 @@ class Terminal:
         if os.name == 'nt':
             try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
             except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
-        else: return os.getuid() == 0  # Check for root on Posix
+        else:
+            return os.getuid() == 0  # Check for root on Posix
     @staticmethod
     def run_as_admin(file: PLike, params: Any, wait: bool = False):
         proce_info = install_n_import(library="win32com", package="pywin32", fromlist=["shell.shell.ShellExecuteEx"]).shell.shell.ShellExecuteEx(lpVerb='runas', lpFile=file, lpParameters=params)

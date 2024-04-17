@@ -10,8 +10,10 @@ from typing import Optional, Any, Callable, TypeVar, Generic
 
 
 def share(path: P):
-    response = install_n_import("requests").post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False, description="its a file, init?", ), files={'file': path.read_bytes()})
+    import requests
+    response = requests.post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False, description="its a file, init?", ), files={'file': path.read_bytes()})
     return response.json()['link'] if ['link'] in response.json() else response.json()
+
 def edit_video(path: P, t_start: float = 0.0, t_end: Optional[float] = None, speed: float = 1.0, suffix: Optional[str] = None, rotate: float = 0.0, volume: float = 1.0, fps: float = 25.0):
     ed = install_n_import("moviepy").editor
     clip = ed.VideoFileClip(path); print(f"{clip.size=}, {clip.duration=}, {clip.fps=}")
@@ -40,7 +42,7 @@ def capture_from_webcam(show: bool = True, wait: bool = True, save: bool = False
 def qr(txt: str): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
 def count_number_of_lines_of_code_in_repo(path: P = P.cwd(), extension: str = ".py", r: bool = True, **kwargs: Any): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
 def profile_memory(command: str):
-    psutil = install_n_import("psutil")
+    import psutil
     before = psutil.virtual_memory()
     exec(command)  # type: ignore # pylint: disable=W0122
     after = psutil.virtual_memory()
@@ -114,6 +116,17 @@ def get_compressable_directories(path: P, max_size_mb: float = 15_000.0):
             if item.is_dir() and len(item.search("*", folders=False, r=True)) > 10:  # too many files ==> compress
                 dirs2compress.append(item)
     return dirs2compress, dirs_violating, files_violating
+
+
+class Null:
+    def __init__(self, return_: Any = 'self'): self.return_ = return_
+    def __getattr__(self, item: str) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
+    def __getitem__(self, item: str) -> 'Null': _ = item; return self if self.return_ == 'self' else self.return_
+    def __call__(self, *args: Any, **kwargs: Any) -> 'Null': _ = args, kwargs; return self if self.return_ == 'self' else self.return_
+    def __len__(self): return 0
+    def __bool__(self): return False
+    def __contains__(self, item: str): _ = self, item; return False
+    def __iter__(self): return iter([self])
 
 
 if __name__ == '__main__':
