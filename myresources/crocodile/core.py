@@ -403,7 +403,7 @@ class Display:
     @staticmethod
     def set_numpy_display(precision: int = 3, linewidth: int = 250, suppress: bool = True, floatmode: Literal['fixed', 'unique', 'maxprec', 'maxprec_equal'] = 'fixed', **kwargs: Any) -> None:
         import numpy as np
-        np.set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, **kwargs)
+        np.set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, formatter={'float_kind':'{:0.2f}'.format}, **kwargs)
     @staticmethod
     def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
     @staticmethod
