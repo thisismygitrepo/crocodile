@@ -19,10 +19,6 @@ from typing import Optional, Literal
 # https://github.com/wasi-master/gradient_figlet/
 # https://github.com/sepandhaghighi/art
 
-"""
-
-"""
-
 
 BOX_OR_CHAR = Literal['boxes', 'cowsay']
 
@@ -60,13 +56,15 @@ class CowStyles:
 
 FIGLET_FONTS = ['banner', 'big', 'standard']
 
-FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'ANSI Regular', 'ANSI Shadow', 'Avatar', 'Banner', 'Banner3-D', 'Banner4',
+FIGJS_FONTS = ['3D Diagonal', '3D-ASCII', '4Max', '5 Line Oblique', 'Acrobatic', 'ANSI Regular', 'ANSI Shadow',
+               'Avatar', 'Banner', 'Banner3-D', 'Banner4',
                'Basic', 'Big Money-ne', 'Big Money-nw', 'Big Money-se', 'Big Money-sw', 'Big', 'Bloody', 'Bolger', 'Braced', 'Bright',
                'DOS Rebel',
                'Elite', 'Epic', 'Flower Power',
                'Fraktur',  # 'Isometric4'. 'AMC Tubes', 'Banner3', Alligator2
                'Star Wars',
-               'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity', "Doom"]  # too large  Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
+               'Sub-Zero', 'The Edge', 'USA Flag', 'Varsity', "Doom"
+               ]  # too large  Crazy 'Sweet', 'Electronic', 'Swamp Land', Crawford, Alligator
 
 
 def get_art(comment: Optional[str] = None, artlib: Optional[BOX_OR_CHAR] = None, style: Optional[str] = None, super_style: str = 'scene', prefix: str = ' ', file: Optional[str] = None, verbose: bool = True):
@@ -124,7 +122,12 @@ def character_or_box_color(logo: str):
     assert platform.system() == 'Linux', 'This function is only for Linux.'
     _new_art = P.tmp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
     get_art(logo, artlib=None, file=str(_new_art), verbose=False)
-    os.system(f"cat {_new_art} | lolcat")  # full path since lolcat might not be in PATH.
+    command = f"cat {_new_art} | lolcat"
+    os.system(command)  # full path since lolcat might not be in PATH.
+    # try:
+    #     output = subprocess.check_output(_cmd, shell=True, stderr=subprocess.STDOUT)
+    # except subprocess.CalledProcessError as e:
+    #     print(f"Command '{_cmd}' returned non-zero exit status {e.returncode}. Output: {e.output}")
 
 
 if __name__ == '__main__':

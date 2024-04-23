@@ -22,7 +22,6 @@ from typing import Optional, Any, Union, Literal
 
 def get_gtihub_markdown_css(): return P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download_to_memory().text
 def md2html(body: str):
-    # add gtihub markdown stylesheet
     return f"""
 <!DOCTYPE html>
 <html>
@@ -32,7 +31,7 @@ def md2html(body: str):
     .markdown-body {{
         box-sizing: border-box;
         min-width: 200px;
-        max-width: 980px;
+        max-width: 1350px;
         margin: 0 auto;
         padding: 45px;
         line-height: 1.8;
