@@ -165,7 +165,9 @@ class Base(object):
 
 
 class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this class to keep items of the same type."""
-    def __init__(self, obj_list: Union[ListType[T], None, Iterator[T], Iterable[T]] = None) -> None: super().__init__(); self.list = list(obj_list) if obj_list is not None else []
+    def __init__(self, obj_list: Union[ListType[T], None, Iterator[T], Iterable[T]] = None) -> None:
+        super().__init__()
+        self.list = list(obj_list) if obj_list is not None else []
     def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
     def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]):
         res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)])
