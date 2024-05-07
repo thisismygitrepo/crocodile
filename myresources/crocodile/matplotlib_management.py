@@ -17,7 +17,7 @@ from matplotlib import animation
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 
-from crocodile.core import timestamp, Save, install_n_import, validate_name
+from crocodile.core import timestamp, Save, validate_name
 from crocodile.file_management import P, OPLike, PLike
 from crocodile.meta import Terminal
 from crocodile.msc.odds import Cycle
@@ -25,15 +25,19 @@ from crocodile.msc.odds import Cycle
 import enum
 import subprocess
 import platform
-from typing import Any, Optional, Literal, TypeAlias, Callable, Union, Type  # , Union
+from typing import Any, Optional, Literal, TypeAlias, Callable, Type, Union
 
 
-_ = install_n_import, PLike
 """TODO: add implementation https://github.com/gustavovelascoh/plot_update
 """
 
-STREAM: TypeAlias = Literal['clear', 'accumulate', 'update']
-SAVE_TYPE: TypeAlias = Literal['MPEGPipeBased', 'MPEGFileBased', 'GIFFileBased', 'GIFPipeBased']
+plt.style.use('dark_background')
+
+
+STREAM: TypeAlias = Literal['clear', 'accumulate', 'update']  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
+ARTIST: TypeAlias = Literal['internal', 'external']  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
+PARSER: TypeAlias = Literal['internal', 'external']  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over.
+SAVE_TYPE: TypeAlias = Literal['Null', 'PDF', 'PNG', 'MPEGPipeBased', 'MPEGFileBased', 'GIFFileBased', 'GIFPipeBased']
 PLT_CMAPS: list[str] = plt.colormaps()  # type: ignore
 
 
@@ -420,14 +424,16 @@ class FigureManager:
                 for im in ax.images: im.set_cmap(cmap)
             self.message = f"Color map changed to {ax.images[0].cmap.name}"  # type: ignore
     def show_pix_val(self, event: Any):
-        if (ax := event.inaxes) is not None:
+        ax = event.inaxes
+        if ax is not None:
             self.pix_vals = not self.pix_vals
             self.message = f"Pixel values flag set to {self.pix_vals}"
             if self.pix_vals: self.show_pixels_values(ax)
             else:
                 while len(ax.texts) > 0: _ = [text.remove() for text in ax.texts]
     def show_cursor(self, event: Any):
-        if not (ax := event.inaxes): return None  # don't do this if c was pressed outside an axis.
+        ax = event.inaxes
+        if not ax: return None  # don't do this if c was pressed outside an axis.
         if hasattr(ax, 'cursor_'):  # is this the first time?
             if ax.cursor_ is None: ax.cursor_ = widgets.Cursor(ax=ax, vertOn=True, horizOn=True, color='red', lw=1.0)
             else: ax.cursor_ = None  # toggle the cursor.
@@ -559,9 +565,9 @@ class VisibilityViewer(FigureManager):
     Once the entire loop is finished, you can browse through the plots with the keyboard Animation linked to `animate`
     Downside: slow if number of axes, lines, texts, etc. are too large. In that case, it is better to avoid this viewer and plot on the fly during animation.
     """
-    # artist = ['internal', 'external'][1]  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
-    parser = ['internal', 'external'][1]  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over. #TODO parallelize this.
-    stream = ['clear', 'accumulate', 'update'][1]  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
+    artist: ARTIST = 'external'
+    parser: PARSER = 'external'
+    stream: STREAM = 'accumulate'
     def __init__(self, fig: Figure):
         super().__init__()
         self.objs_repo: list[list[Any]] = []  # list of lists of axes and texts.
@@ -608,7 +614,9 @@ class VisibilityViewer(FigureManager):
 
 
 class LineArtist(FigureManager):
-    """This object knows how to draw a figure from curve-type data."""
+    artist: ARTIST = 'internal'  # This object knows how to draw a figure from curve-type data.
+    parser: PARSER = 'external'
+    stream: STREAM = 'accumulate'
     def __init__(self, ax: Optional[Axes] = None, figname: str = 'Graph', title: str = '', label: str = 'curve', style: str = 'seaborn-v0_8-dark', figpolicy: FigurePolicy = FigurePolicy.add_new, figsize: tuple[int, int] = (14, 8)):
         super().__init__(figpolicy=figpolicy)
         self.style = style
@@ -627,12 +635,12 @@ class LineArtist(FigureManager):
         else:
             self.ax = [ax]
             self.fig: Figure = ax.figure or None  # type: ignore
-        self.visibility_ax = [0.01, 0.05, 0.2, 0.15]
+        self.visibility_ax: list[float] = [0.01, 0.05, 0.2, 0.15]
         self.txt: list[str] = []
         self.label: str = label
     def animate(self):
         pass
-    def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any):
+    def plot(self, *args: Any, legends: Optional[list[str]] = None, title: Optional[str] = None, **kwargs: Any) -> None:
         assert self.ax is not None, "Axes is not defined yet."
         for ax in self.ax:
             self.line = ax.plot(*args, **kwargs)
@@ -648,7 +656,7 @@ class LineArtist(FigureManager):
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
         return self
-    def plot_twin(self, c1: Any, c2: Any, x: Optional[Any] = None, l1: str = '', l2: str = '', ax: Optional[Axes] = None):
+    def plot_twin(self, c1: Any, c2: Any, x: Optional[Any] = None, l1: str = '', l2: str = '', ax: Optional[Axes] = None) -> None:
         if ax is None:
             if self.ax is not None:
                 ax = self.ax[0]
@@ -660,7 +668,7 @@ class LineArtist(FigureManager):
         twin_ax.legend([line1, line2], [l1, l2])  # type: ignore
         ax.set_ylabel(l1); twin_ax.set_ylabel(l2)
         plt.show()
-    def suptitle(self, title: str):
+    def suptitle(self, title: str) -> None:
         assert self.fig is not None, "Figure is not defined yet."
         self.txt = [str(self.fig.text(0.5, 0.98, title, ha='center', va='center', size=9))]
     def clear(self):
@@ -682,9 +690,9 @@ class LineArtist(FigureManager):
 
 
 # class VisibilityViewerAuto(VisibilityViewer):
-#     # artist = ['internal', 'external'][1]
-#     parser = ['internal', 'external'][0]
-#     stream = ['clear', 'accumulate', 'update'][2]
+#     artist: ARTIST = 'external'
+#     parser: PARSER = 'internal'
+#     stream: STREAM = 'update'
 #     def __init__(self, data: Optional['npt.NDArray[np.float64]'] = None, artist: Optional[Artist] = None, stream: STREAM = 'clear', save_type: Type[Saver] = Null, save_dir: OPLike = None, save_name: Optional[str] = None, delay: int = 1,
 #                  titles: Optional[list[str]] = None, legends: Optional[list[str]] = None, x_labels: Optional[list[str]] = None, pause: bool = True, **kwargs: Any):
 #         """data: tensor of form  NumInputsForAnimation x ArgsPerPlot (to be unstarred) x Input (possible points x signals)
@@ -707,9 +715,9 @@ class LineArtist(FigureManager):
 
 
 class ImShow(FigureManager):
-    # artist = ['internal', 'external'][0]
-    # parser = ['internal', 'external'][0]
-    # stream = ['clear', 'accumulate', 'update'][2]
+    artist: ARTIST = 'internal'
+    parser: PARSER = 'internal'
+    stream: STREAM = 'update'
     def __init__(self, img_tensor: 'npt.NDArray[np.float64]', sup_titles: Optional[list[str]] = None, sub_labels: Optional[list[list[str]]] = None, save_type: Type[Saver] = Null, save_name: Optional[str] = None,
                  save_dir: OPLike = None, save_kwargs: Optional[dict[str, Any]] = None,
                  subplots_adjust: Any = None, gridspec: Any = None, tight: bool = True, info_loc: Optional[tuple[float, float]] = None, nrows: Optional[int] = None, ncols: Optional[int] = None, ax: Optional[Axes] = None,
@@ -792,6 +800,7 @@ class ImShow(FigureManager):
     def test() -> None: ImShow(img_tensor=np.random.rand(12, 10, 80, 120, 3))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
     @staticmethod
     def resize(path: PLike, m: int, n: int):
+        from crocodile.core import install_n_import
         res = install_n_import(library="skimage", package="scikit-image").transform.resize(plt.imread(str(path)), (m, n), anti_aliasing=True)
         plt.imsave(str(path), res)
 
