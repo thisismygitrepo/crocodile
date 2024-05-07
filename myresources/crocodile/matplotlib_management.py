@@ -31,7 +31,7 @@ from typing import Any, Optional, Literal, TypeAlias, Callable, Type, Union
 """TODO: add implementation https://github.com/gustavovelascoh/plot_update
 """
 
-plt.style.use('dark_background')
+# plt.style.use('dark_background')
 
 
 STREAM: TypeAlias = Literal['clear', 'accumulate', 'update']  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
