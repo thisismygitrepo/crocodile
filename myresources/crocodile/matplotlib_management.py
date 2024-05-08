@@ -574,7 +574,7 @@ class VisibilityViewer(FigureManager):
         self.fig = fig
         self.connect()
         self.idx_cycle = Cycle([])
-    def add(self, objs: Any) -> None:
+    def add(self, objs: list[Any]) -> None:
         self.idx_cycle.expand(val=len(self.idx_cycle.list))
         self.objs_repo.append(objs)
         for obj in (self.objs_repo[-2] if len(self.objs_repo) > 1 else []): obj.set_visible(False)

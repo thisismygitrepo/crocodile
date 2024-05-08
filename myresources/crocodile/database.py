@@ -79,8 +79,8 @@ class DBMS:
         self.refresh()
 
     @classmethod
-    def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, **kwargs: Any):
-        return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, **kwargs))
+    def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, pool_size: int = 5, **kwargs: Any):
+        return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, pool_size=pool_size, **kwargs))
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table: str, sch: Optional[str] = None):
         assert self.meta is not None
@@ -102,15 +102,21 @@ class DBMS:
     @staticmethod
     def make_sql_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
         """Establish lazy initialization with database"""
+        from sqlalchemy.pool import StaticPool, NullPool
+        _ = NullPool
         if str(path) == "memory":
             print("Linking to in-memory database.")
             if share_across_threads:
-                from sqlalchemy.pool import StaticPool  # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
+                # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
                 return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
-            else: return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
+            else:
+                return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         print(f"Linking to database at {path.as_uri()}")
-        res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=10, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+        if pool_size == 0:
+            res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+        else:
+            res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
 
     # ==================== QUERIES =====================================
