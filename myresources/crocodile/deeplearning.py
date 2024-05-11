@@ -363,7 +363,7 @@ class BaseModel(ABC):
     def fit(self, viz: bool = True, weight_name: Optional[str] = None,
             val_sample_weight: Optional['npt.NDArray[np.float64]'] = None, sample_weight: Optional['npt.NDArray[np.float64]'] = None,
             verbose: Union[int, str] = "auto", callbacks: Optional[list[Any]] = None,
-            validation_freq: int = 1, use_multiprocessing: bool = False,
+            validation_freq: int = 1,
             **kwargs: Any):
         assert self.data.split is not None, "Split your data before you start fitting."
         x_train = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.ip_names, which_split="train")]
@@ -391,7 +391,7 @@ class BaseModel(ABC):
                                                 batch_size=self.hp.batch_size, epochs=self.hp.epochs, shuffle=self.hp.shuffle,
                                                 )
         default_settings.update(kwargs)
-        hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq, use_multiprocessing=use_multiprocessing)
+        hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq)
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
