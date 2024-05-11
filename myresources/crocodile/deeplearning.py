@@ -203,7 +203,6 @@ class DataReader:
                     print(f"Populated op shapes:    {self.specs.op_shapes}")
                     print(f"Populated other shapes: {self.specs.other_shapes}")
                     raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
-
         from sklearn import model_selection
         tts = model_selection.train_test_split
         args = [data_dict[item] for item in strings]
@@ -311,29 +310,16 @@ class BaseModel(ABC):
     # @abstractmethod
     def __init__(self, hp: SubclassedHParams, data: SubclassedDataReader,  # type: ignore
                  history: Optional[list[dict[str, Any]]] = None):
-        # : Optional[list]
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
         self.model: Any = self.get_model()  # should be populated upon instantiation.
-
-        # import importlib
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
             print("💀 Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
-
         self.compiler: Compiler
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
-        # self.plotter = NullAuto
-        # self.fig = None
-        # self.kwargs = None
-        # self.tmp = None
-        __module = self.__class__.__module__
-        if __module.startswith('__main__'):
-            print("WARNING: Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
-
     def get_model(self):
         raise NotImplementedError
-        # pass
     def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model: bool = True):
         """ Updates compiler attributes. This acts like a setter.
         .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
@@ -343,16 +329,17 @@ class BaseModel(ABC):
         * Must be run prior to fit method.
         * Can be run only after defining model attribute.
         """
-        pkg = self.hp.pkg
-        if self.hp.pkg_name == 'tensorflow':
-            if loss is None: loss = pkg.keras.losses.MeanSquaredError()
-            if optimizer is None: optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
-            if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
-        elif self.hp.pkg_name == 'torch':
-            if loss is None: loss = pkg.nn.MSELoss()
-            if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
-            if metrics is None: metrics = []  # [tmp.MeanSquareError()]
-        else: raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
+        match self.hp.pkg_name:
+            case 'tensorflow':
+                import tensorflow as pkg
+                if loss is None: loss = pkg.keras.losses.MeanSquaredError()
+                if optimizer is None: optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
+                if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
+            case 'torch':
+                import torch as pkg
+                if loss is None: loss = pkg.nn.MSELoss()
+                if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
+                if metrics is None: metrics = []  # [tmp.MeanSquareError()]
         # Create a new compiler object
         self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
         # in both cases: pass the specs to the compiler if we have TF framework
@@ -405,22 +392,25 @@ class BaseModel(ABC):
     def switch_to_sgd(self, epochs: int = 10):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
-        if self.hp.pkg.__name__ == 'tensorflow': new_optimizer = self.hp.pkg.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
-        else: new_optimizer = self.hp.pkg.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
+        match self.hp.pkg_name:
+            case 'tensorflow':
+                import tensorflow as tf
+                new_optimizer = tf.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
+            case 'torch':
+                import torch as t
+                new_optimizer = t.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
     def switch_to_l1(self, epochs: int = 10):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
-        if self.hp.pkg.__name__ == 'tensorflow':
-            self.model.reset_metrics()
         print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
-        if self.hp.pkg.__name__ == 'tensorflow':
-            new_loss = self.hp.pkg.keras.losses.MeanAbsoluteError()
-        else:
-            raise NotImplementedError
-            # import crocodile.deeplearning_torch as tmp
-            # new_loss = tmp.MeanAbsoluteError()
+        match self.hp.pkg_name:
+            case 'tensorflow':
+                import tensorflow as tf
+                self.model.reset_metrics()
+                new_loss = tf.keras.losses.MeanAbsoluteError()
+            case 'torch': raise NotImplementedError
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
 
@@ -464,7 +454,7 @@ class BaseModel(ABC):
         else:
             search_res = P(directory).search('*.weights*')
             path = search_res.list[0].__str__()
-        self.model.load_weights(path).expect_partial()
+        self.model.load_weights(path)  # .expect_partial()
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
