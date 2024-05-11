@@ -116,9 +116,11 @@ def main():
     _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]), viz=True)
     print(m.test())
     m.save_class()
+    # m.save_model()
+    m.load_weights(m.hp.save_dir)
     return m
 
 
 if __name__ == '__main__':
-    # main()
-    pass
+    main()
+    # pass

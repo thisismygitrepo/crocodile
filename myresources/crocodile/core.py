@@ -234,8 +234,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         return pd.Series(self.list)
     def to_list(self) -> list[T]: return self.list
     def to_numpy(self, **kwargs: Any) -> 'Any': import numpy as np; return np.array(self.list, **kwargs)
-    def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct':
-        return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
+    def to_struct(self, key_val: Optional[Callable[[T], tuple[Any, Any]]] = None) -> 'Struct':
+        return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)).list)
     # def index(self, val: int) -> int: return self.list.index(val)
     def slice(self, start: Optional[int] = None, stop: Optional[int] = None, step: Optional[int] = None) -> 'List[T]': return List(self.list[start:stop:step])
     def __getitem__(self, key: Union[int, list[int], '_Slice']) -> Union[T, 'List[T]']:

@@ -3,19 +3,16 @@
 dl
 """
 
-
-# from crocodile.file_management import P, Path
 from crocodile.matplotlib_management import ImShow
 from crocodile.core import List as L, Struct as S, Base
-from crocodile.file_management import P, Save, Path, Read
+from crocodile.file_management import P, Save, PLike, Read
 from crocodile.meta import Experimental
 
-# from matplotlib.pyplot import hist
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from abc import ABC
-from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal
+from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, TypeAlias
 import enum
 from tqdm import tqdm
 import copy
@@ -72,6 +69,7 @@ SubclassedDataReader = TypeVar("SubclassedDataReader", bound='DataReader')
 SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 
+PACKAGE: TypeAlias = Literal['tensorflow', 'torch']
 PRECISON = Literal['float64', 'float32', 'float16']
 
 
@@ -93,7 +91,7 @@ class HParams:
     root: P  # = P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
-    pkg_name: Literal['tensorflow', 'torch'] = 'tensorflow'
+    pkg_name: PACKAGE = 'tensorflow'
     device_name: Device = Device.gpu0
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
@@ -107,14 +105,19 @@ class HParams:
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
-    def from_saved_data(cls, path: Union[str, Path, P], *args: Any, **kwargs: Any):
+    def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
         data: dict[str, Any] = Read.pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
     # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + S(self.__dict__).print(as_config=True, return_str=True)
     @property
     def pkg(self):
-        if self.pkg_name not in ("tensorflow", "torch"): raise ValueError(f"pkg_name must be either `tensorflow` or `torch`")
-        return __import__("tensorflow") if self.pkg_name == "tensorflow" else __import__("torch")
+        match self.pkg_name:
+            case 'tensorflow':
+                import tensorflow as tf
+                return tf
+            case 'torch':
+                import torch  # type: ignore
+                return torch
     @property
     def save_dir(self) -> P: return (P(self.root) / self.name).create()
 
@@ -193,17 +196,18 @@ class DataReader:
                 else: raise ValueError(f"data_name `{data_name}` is not in the specs. I don't know what to do with it.\n{self.specs=}")
             if len(delcared_ip_shapes) != 0 and len(delcared_op_shapes) != 0:
                 if delcared_ip_shapes != self.specs.ip_shapes or delcared_op_shapes != self.specs.op_shapes or delcared_other_shapes != self.specs.other_shapes:
-                    print(f"Declared ip shapes: {delcared_ip_shapes}")
-                    print(f"Declared op shapes: {delcared_op_shapes}")
-                    print(f"Declared other shapes: {delcared_other_shapes}")
-                    print(f"Populated ip shapes: {self.specs.ip_shapes}")
-                    print(f"Populated op shapes: {self.specs.op_shapes}")
+                    print(f"Declared ip shapes:     {delcared_ip_shapes}")
+                    print(f"Declared op shapes:     {delcared_op_shapes}")
+                    print(f"Declared other shapes:  {delcared_other_shapes}")
+                    print(f"Populated ip shapes:    {self.specs.ip_shapes}")
+                    print(f"Populated op shapes:    {self.specs.op_shapes}")
                     print(f"Populated other shapes: {self.specs.other_shapes}")
                     raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
 
-        from sklearn.model_selection import train_test_split
+        from sklearn import model_selection
+        tts = model_selection.train_test_split
         args = [data_dict[item] for item in strings]
-        result = train_test_split(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **split_kwargs if split_kwargs is not None else {})
+        result = tts(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **split_kwargs if split_kwargs is not None else {})
         self.split = {}  # dict(train_loader=None, test_loader=None)
         self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
@@ -430,14 +434,37 @@ class BaseModel(ABC):
         return self.model(*args, **kwargs)
     def viz(self, eval_data: EvaluationData, **kwargs: Any):
         return self.data.viz(eval_data, **kwargs)
-    def save_model(self, directory: Union[str, Path, P]): self.model.save(directory)  # In TF: send only path dir. Save path is saved_model.pb
-    def save_weights(self, directory: Union[str, Path, P]):
-        self.model.save_weights(P(directory).joinpath(self.model.name))  # TF: last part of path is file path.
+    def save_model(self, directory: PLike):
+        match self.hp.pkg_name:
+            case 'tensorflow':
+                # import tensorflow as tf
+                self.model.save(str(directory) + ".keras")
+            case 'torch':
+                self.model.save(directory)
+    def save_weights(self, directory: PLike):
+        match self.hp.pkg_name:
+            case 'tensorflow':
+                self.model.save_weights(P(directory).joinpath(self.model.name) + ".weights.h5")
+            case 'torch':
+                self.model.save_weights(P(directory).joinpath(self.model.name))
     @staticmethod
-    def load_model(directory: Union[str, Path, P]): __import__("tensorflow").keras.models.load_model(str(directory))  # path to directory. file saved_model.pb is read auto.
-    def load_weights(self, directory: Union[str, Path, P]):
+    def load_model(directory: PLike, pkg: PACKAGE):
+        match pkg:
+            case 'tensorflow':
+                import tensorflow as tf
+                tf.keras.models.load_model(str(directory))
+                # path to directory. file saved_model.pb is read auto.
+            case 'torch':
+                raise NotImplementedError
+    def load_weights(self, directory: PLike):
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
-        self.model.load_weights(P(directory).search('*.data*').list[0].__str__().split('.data')[0]).expect_partial()  # requires path to file path.
+        search_res = P(directory).search('*.data*')
+        if len(search_res) > 0:
+            path = search_res.list[0].__str__().split('.data')[0]
+        else:
+            search_res = P(directory).search('*.weights*')
+            path = search_res.list[0].__str__()
+        self.model.load_weights(path).expect_partial()
     def summary(self):
         from contextlib import redirect_stdout
         path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
@@ -569,7 +596,7 @@ class BaseModel(ABC):
         return self.hp.save_dir
 
     @classmethod
-    def from_class_weights(cls, path: Union[str, Path, P], hparam_class: Optional[Type[SubclassedHParams]] = None, data_class: Optional[Type[SubclassedDataReader]] = None,
+    def from_class_weights(cls, path: PLike, hparam_class: Optional[Type[SubclassedHParams]] = None, data_class: Optional[Type[SubclassedDataReader]] = None,
                            device_name: Optional[Device] = None, verbose: bool = True):
         path = P(path)
         if hparam_class is not None:
@@ -589,6 +616,7 @@ class BaseModel(ABC):
             # raise ValueError(f"hp_obj must be of type `HParams` or `Generic[HParams]`. Got {type(hp_obj)}")
         model_obj = cls(hp_obj, d_obj)
         model_obj.load_weights(list(path.search('*_save_*'))[0])
+        # TODO: add argument to this function to choose which version to load.
         history_path = path / "metadata/training/history.pkl"
         if history_path.exists(): history: list[dict[str, Any]] = Read.pickle(path=history_path)
         else: history = []
@@ -597,17 +625,17 @@ class BaseModel(ABC):
         return model_obj
 
     @classmethod
-    def from_class_model(cls, path: Union[str, Path, P]):
+    def from_class_model(cls, path: PLike):
         path = P(path)
         hp_obj = HParams.from_saved_data(path)
         data_obj = DataReader.from_saved_data(path, hp=hp_obj)
         directory = path.search('*_save_*')
-        model_obj = cls.load_model(list(directory)[0])
+        model_obj = cls.load_model(list(directory)[0], pkg='tensorflow')
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
-    @classmethod
-    def from_path(cls, path_model: Union[str, Path, P], **kwargs: Any) -> 'SubclassedBaseModel':  # type: ignore
+    @staticmethod
+    def from_path(path_model: PLike, **kwargs: Any) -> 'SubclassedBaseModel':  # type: ignore
         path_model = P(path_model).expanduser().absolute()
         specs = Read.json(path=path_model.joinpath('metadata/code_specs.json'))
         print(f"Loading up module: `{specs['__module__']}`.")
@@ -624,7 +652,7 @@ class BaseModel(ABC):
             except ModuleNotFoundError as ex2:
                 print(ex2)
                 print(f"ModuleNotFoundError: Attempting to directly loading up `module_path`: `{specs['module_path_rh']}`.")
-                module = load_class(P(specs['module_path_rh']).expanduser().absolute().as_posix())
+                module = _load_class(P(specs['module_path_rh']).expanduser().absolute().as_posix())
         model_class: SubclassedBaseModel = getattr(module, specs['model_class'])
         data_class: Type[DataReader] = getattr(module, specs['data_class'])
         hp_class: Type[HParams] = getattr(module, specs['hp_class'])
@@ -718,21 +746,21 @@ class Ensemble(Base):
         self.performance: list[Any] = []
 
     @classmethod
-    def from_saved_models(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+    def from_saved_models(cls, parent_dir: PLike, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class,  # type: ignore
                         path=parent_dir, size=len(P(parent_dir).search('*__model__*')))
         obj.models = list(P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
-    def from_saved_weights(cls, parent_dir: Union[str, Path, P], model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+    def from_saved_weights(cls, parent_dir: PLike, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class,  # type: ignore
                         path=parent_dir, size=len(P(parent_dir).search('*__model__*')))
         obj.models = list(P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))  # type: ignore
         return obj
 
     @staticmethod
-    def from_path(path: Union[str, Path, P]) -> list[SubclassedBaseModel]:  # type: ignore
+    def from_path(path: PLike) -> list[SubclassedBaseModel]:  # type: ignore
         tmp = P(path).expanduser().absolute().search("*")
         tmp2 = tmp.apply(BaseModel.from_path)
         return list(tmp2)  # type: ignore
@@ -801,7 +829,7 @@ class HPTuning:
         self.metrics = None
 
     @staticmethod
-    def help():
+    def help() -> None:
         """Steps of use: subclass this and do the following:
         * Set directory attribute.
         * set params
@@ -889,7 +917,7 @@ def batcherv2(func_type: str = 'function', order: int = 1):
         return Batch
 
 
-def load_class(file_path: str):
+def _load_class(file_path: str):
     import importlib.util
     module_spec = importlib.util.spec_from_file_location(name="__temp_module__", location=file_path)
     if module_spec is None: raise ValueError(f"Failed to load up module from path: {file_path}")
