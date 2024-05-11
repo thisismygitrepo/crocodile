@@ -468,6 +468,7 @@ class Scheduler:
         self.cycle: int = 0
         self.max_cycles: int = max_cycles
         self.sess_stats = sess_stats or (lambda _sched: {})
+    def __repr__(self): return f"Scheduler with {self.cycle} cycles ran so far. Last cycle was at {self.sess_start_time}."
     def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01", starting_cycle: Optional[int] = None):
         import datetime as dtm
         if starting_cycle is not None: self.cycle = starting_cycle
