@@ -234,7 +234,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         return pd.Series(self.list)
     def to_list(self) -> list[T]: return self.list
     def to_numpy(self, **kwargs: Any) -> 'Any': import numpy as np; return np.array(self.list, **kwargs)
-    def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct': return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
+    def to_struct(self, key_val: Optional[Callable[[T], Any]] = None) -> 'Struct':
+        return Struct.from_keys_values_pairs(self.apply(func=key_val if key_val else lambda x: (str(x), x)))
     # def index(self, val: int) -> int: return self.list.index(val)
     def slice(self, start: Optional[int] = None, stop: Optional[int] = None, step: Optional[int] = None) -> 'List[T]': return List(self.list[start:stop:step])
     def __getitem__(self, key: Union[int, list[int], '_Slice']) -> Union[T, 'List[T]']:
@@ -286,11 +287,12 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     # @staticmethod
     # def recursive_dict(struct) -> 'Struct': _ = [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
     def save_json(self, path: Optional[PLike] = None, indent: Optional[str] = None): return Save.json(obj=self.__dict__, path=path, indent=indent)
-    @classmethod
-    def from_keys_values(cls, k: Iterable[str], v: Iterable[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
-    from_keys_values_pairs = classmethod(lambda cls, my_list: cls({k: v for k, v in my_list}))
-    @classmethod
-    def from_names(cls, names: list[str], default_: Optional[Any] = None) -> 'Struct': return cls.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
+    @staticmethod
+    def from_keys_values(k: Iterable[str], v: Iterable[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
+    @staticmethod
+    def from_keys_values_pairs(my_list: list[tuple[Any, Any]]) -> "Struct": return Struct({k: v for k, v in my_list})
+    @staticmethod
+    def from_names(names: list[str], default_: Optional[Any] = None) -> 'Struct': return Struct.from_keys_values(k=names, v=default_ or [None] * len(names))  # Mimick NamedTuple and defaultdict
     def spawn_from_values(self, values: Union[list[Any], List[Any]]) -> 'Struct': return self.from_keys_values(list(self.keys()), values)
     def spawn_from_keys(self, keys: Union[list[str], List[str]]) -> 'Struct': return self.from_keys_values(keys, list(self.values()))
     def to_default(self, default: Optional[Callable[[], Any]] = lambda: None):
