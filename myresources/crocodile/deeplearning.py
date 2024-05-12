@@ -312,7 +312,8 @@ class BaseModel(ABC):
                  history: Optional[list[dict[str, Any]]] = None):
         self.hp = hp  # should be populated upon instantiation.
         self.data = data  # should be populated upon instantiation.
-        self.model: Any = self.get_model()  # should be populated upon instantiation.
+        self.model: Any
+        # if instantiate_model: self.model = self.get_model()
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
             print("💀 Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
@@ -331,12 +332,14 @@ class BaseModel(ABC):
         """
         match self.hp.pkg_name:
             case 'tensorflow':
-                import tensorflow as pkg
-                if loss is None: loss = pkg.keras.losses.MeanSquaredError()
-                if optimizer is None: optimizer = pkg.keras.optimizers.Adam(self.hp.learning_rate)
+                # import tensorflow as tf
+                # keras = keras
+                import keras
+                if loss is None: loss = keras.losses.MeanSquaredError()
+                if optimizer is None: optimizer = keras.optimizers.Adam(self.hp.learning_rate)
                 if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
             case 'torch':
-                import torch as pkg
+                import torch as pkg  # type: ignore
                 if loss is None: loss = pkg.nn.MSELoss()
                 if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
                 if metrics is None: metrics = []  # [tmp.MeanSquareError()]
@@ -394,8 +397,10 @@ class BaseModel(ABC):
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         match self.hp.pkg_name:
             case 'tensorflow':
-                import tensorflow as tf
-                new_optimizer = tf.keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
+                # import tensorflow as tf
+                # keras = tf.keras
+                import keras
+                new_optimizer = keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
             case 'torch':
                 import torch as t
                 new_optimizer = t.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
@@ -407,9 +412,11 @@ class BaseModel(ABC):
         print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
         match self.hp.pkg_name:
             case 'tensorflow':
-                import tensorflow as tf
+                # import tensorflow as tf
+                # keras = tf.keras
+                import keras
                 self.model.reset_metrics()
-                new_loss = tf.keras.losses.MeanAbsoluteError()
+                new_loss = keras.losses.MeanAbsoluteError()
             case 'torch': raise NotImplementedError
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
@@ -441,8 +448,10 @@ class BaseModel(ABC):
     def load_model(directory: PLike, pkg: PACKAGE):
         match pkg:
             case 'tensorflow':
-                import tensorflow as tf
-                tf.keras.models.load_model(str(directory))
+                # import tensorflow as tf
+                # keras = tf.keras
+                import keras
+                keras.models.load_model(str(directory))
                 # path to directory. file saved_model.pb is read auto.
             case 'torch':
                 raise NotImplementedError
@@ -555,9 +564,10 @@ class BaseModel(ABC):
         Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
         try: Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
-        save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}').create()  # model save goes into data path.
-        if weights_only: self.save_weights(save_dir)
-        else: self.save_model(save_dir)
+        save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
+        if weights_only: self.save_weights(save_dir.create())
+        else:
+            self.save_model(save_dir)
 
         import importlib
         __module = self.__class__.__module__
@@ -649,7 +659,9 @@ class BaseModel(ABC):
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
     def plot_model(self, dpi: int = 150, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
-        from tensorflow import keras  # type: ignore pylint: disable=no-name-in-module, import-error
+        # import tensorflow as tf
+        # keras = tf.keras
+        import keras
         path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
         try:
             keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
@@ -776,8 +788,9 @@ class Losses:
     @staticmethod
     def get_log_square_loss_class():
         import tensorflow as tf
-
-        class LogSquareLoss(tf.keras.losses.Loss):  # type: ignore  # pylint: disable=no-member
+        # keras = tf.keras
+        import keras
+        class LogSquareLoss(keras.losses.Loss):  # type: ignore  # pylint: disable=no-member
             def __init__(self, *args: Any, **kwargs: Any):
                 super().__init__(*args, **kwargs)
                 self.name = "LogSquareLoss"
@@ -794,7 +807,8 @@ class Losses:
         """
         For Tensorflow
         """
-        class MeanMaxError(tf.keras.metrics.Metric):
+        import keras
+        class MeanMaxError(keras.metrics.Metric):
             def __init__(self, name: str = 'MeanMaximumError', **kwargs: Any):
                 super(MeanMaxError, self).__init__(name=name, **kwargs)
                 self.mme = self.add_weight(name='mme', initializer='zeros')

@@ -80,14 +80,15 @@ class DataReader(dl.DataReader):
 
 
 class Model(dl.BaseModel):
-    def __init__(self, hp: HParams, data: DataReader, plot: bool = False):
+    def __init__(self, hp: HParams, data: DataReader, instantiate_model: bool = False, plot: bool = False):
         super(Model, self).__init__(hp=hp, data=data)
         k.backend.set_floatx(self.hp.precision)
-        self.model = self.get_model()
-        self.compile()  # add optimizer and loss and metrics.
-        self.build(sample_dataset=False)  # build the model (shape will be extracted from data supplied) if not passed.
-        self.summary()  # print the model.
-        if plot: self.plot_model()  # make sure this is not called every time the model is instantiated.
+        if instantiate_model:
+            self.model = self.get_model()
+            self.compile()  # add optimizer and loss and metrics.
+            self.build(sample_dataset=False)  # build the model (shape will be extracted from data supplied) if not passed.
+            self.summary()  # print the model.
+            if plot: self.plot_model()  # make sure this is not called every time the model is instantiated.
 
     def get_model(self):
         _ = self  # your crazy model goes here:
