@@ -3,20 +3,18 @@
 dl template
 """
 
+import keras as k
 import numpy as np
-# import numpy.typing as npt
 import matplotlib.pyplot as plt
+
+import crocodile.deeplearning as dl
 from crocodile.core import randstr
 from crocodile.file_management import P
-import crocodile.deeplearning as dl
 from crocodile.deeplearning import EvaluationData
 from crocodile.matplotlib_management import FigureManager, Axes
-import tensorflow as tf
+
 from dataclasses import field
 from typing import Optional, Any
-
-
-k = tf.keras  # type: ignore  pylint: disable=no-member
 
 
 @dl.dataclass
@@ -36,7 +34,7 @@ class HParams(dl.HParams):
     test_split: float = 0.2  # test split
     learning_rate: float = 0.0005
     batch_size: int = 32
-    epochs: int = 30
+    epochs: int = 50
 
 
 class DataReader(dl.DataReader):
@@ -80,7 +78,7 @@ class DataReader(dl.DataReader):
 
 
 class Model(dl.BaseModel):
-    def __init__(self, hp: HParams, data: DataReader, instantiate_model: bool = False, plot: bool = False):
+    def __init__(self, hp: HParams, data: DataReader, instantiate_model: bool = True, plot: bool = False):
         super(Model, self).__init__(hp=hp, data=data)
         k.backend.set_floatx(self.hp.precision)
         if instantiate_model:
@@ -110,13 +108,15 @@ def main():
     hp = HParams()
     d = DataReader(hp)
     d.load_trianing_data()
-    m = Model(hp, d)
-    _fig, ax = plt.subplots(ncols=2)
+    m = Model(hp, d, instantiate_model=True)
+    fig, ax = plt.subplots(ncols=2)
+    fig.set_size_inches(14, 10)
     _res_before = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]), viz=True)
     m.fit()
     _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]), viz=True)
     print(m.test())
     m.save_class(weights_only=False, version="v1")
+    m.save_class(weights_only=True, version="v1")
     # m.save_model()
     # m.load_weights(m.hp.save_dir)
     m2 = Model.from_path(m.hp.save_dir)

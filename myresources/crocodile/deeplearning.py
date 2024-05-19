@@ -96,19 +96,29 @@ class HParams:
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
     def save(self):
-        self.save_dir.joinpath(self.subpath, 'hparams.txt').create(parents_only=True).write_text(str(self))
+        subpath = self.subpath
+        save_dir = self.save_dir
+        self_repr = str(self)
+
+        save_dir.joinpath(subpath, 'hparams.txt').create(parents_only=True).write_text(self_repr)
+
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError:
             data = self.__dict__
-        Save.pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.dat.pkl"), obj=data)
-        Save.pickle(path=self.save_dir.joinpath(self.subpath, "hparams.HParams.pkl"), obj=self)
+
+        Save.pickle(path=save_dir.joinpath(subpath, "hparams.HParams.dat.pkl"), obj=data)
+        Save.pickle(path=save_dir.joinpath(subpath, "hparams.HParams.pkl"), obj=self)
+
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
+
     @classmethod
     def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
         data: dict[str, Any] = Read.pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
+
     # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + S(self.__dict__).print(as_config=True, return_str=True)
+
     @property
     def pkg(self):
         match self.pkg_name:
@@ -116,8 +126,9 @@ class HParams:
                 import tensorflow as tf
                 return tf
             case 'torch':
-                import torch  # type: ignore
-                return torch
+                import torch as t  # type: ignore
+                return t
+
     @property
     def save_dir(self) -> P: return (P(self.root) / self.name).create()
 
@@ -397,12 +408,10 @@ class BaseModel(ABC):
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
         match self.hp.pkg_name:
             case 'tensorflow':
-                # import tensorflow as tf
-                # keras = tf.keras
                 import keras
                 new_optimizer = keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
             case 'torch':
-                import torch as t
+                import torch as t  # type: ignore
                 new_optimizer = t.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
@@ -412,8 +421,6 @@ class BaseModel(ABC):
         print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
         match self.hp.pkg_name:
             case 'tensorflow':
-                # import tensorflow as tf
-                # keras = tf.keras
                 import keras
                 self.model.reset_metrics()
                 new_loss = keras.losses.MeanAbsoluteError()
@@ -431,31 +438,31 @@ class BaseModel(ABC):
         return self.model(*args, **kwargs)
     def viz(self, eval_data: EvaluationData, **kwargs: Any):
         return self.data.viz(eval_data, **kwargs)
-    def save_model(self, directory: PLike):
+    def save_model(self, path: PLike):
         match self.hp.pkg_name:
             case 'tensorflow':
-                # import tensorflow as tf
-                self.model.save(str(directory) + ".keras")
+                path_qualified = str(path) + ".keras"
+                self.model.save(path_qualified)
             case 'torch':
-                self.model.save(directory)
+                self.model.save(path)
     def save_weights(self, directory: PLike):
         match self.hp.pkg_name:
             case 'tensorflow':
-                self.model.save_weights(P(directory).joinpath(self.model.name) + ".weights.h5")
+                path = P(directory).joinpath(self.model.name) + ".weights.h5"
+                self.model.save_weights(path)
             case 'torch':
-                self.model.save_weights(P(directory).joinpath(self.model.name))
+                path = P(directory).joinpath(self.model.name)
+                self.model.save_weights(path)
     @staticmethod
     def load_model(directory: PLike, pkg: PACKAGE):
         match pkg:
             case 'tensorflow':
-                # import tensorflow as tf
-                # keras = tf.keras
                 import keras
-                keras.models.load_model(str(directory))
+                return keras.models.load_model(str(directory))
                 # path to directory. file saved_model.pb is read auto.
             case 'torch':
                 raise NotImplementedError
-    def load_weights(self, directory: PLike):
+    def load_weights(self, directory: PLike) -> None:
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
         search_res = P(directory).search('*.data*')
         if len(search_res) > 0:
@@ -615,7 +622,15 @@ class BaseModel(ABC):
         # else:rd
             # raise ValueError(f"hp_obj must be of type `HParams` or `Generic[HParams]`. Got {type(hp_obj)}")
         model_obj = cls(hp_obj, d_obj)
-        model_obj.load_weights(list(path.search('*_save_*'))[0])
+
+        # Next, load model weights. However, before that, there is no gaurantee that model_obj has .model attribute.
+        if not hasattr(model_obj, "model") or model_obj.model is None:
+            model_obj.model = model_obj.get_model()
+        else:
+            pass
+
+        save_dir_weights = list(path.search('*_save_*'))[0]
+        model_obj.load_weights(directory=save_dir_weights)
         # TODO: add argument to this function to choose which version to load.
         history_path = path / "metadata/training/history.pkl"
         if history_path.exists(): history: list[dict[str, Any]] = Read.pickle(path=history_path)
@@ -631,6 +646,7 @@ class BaseModel(ABC):
         data_obj = DataReader.from_saved_data(path, hp=hp_obj)
         directory = path.search('*_save_*')
         model_obj = cls.load_model(list(directory)[0], pkg='tensorflow')
+        assert model_obj is not None, f"Model could not be loaded from {directory}"
         wrapper_class = cls(hp_obj, data_obj, model_obj)
         return wrapper_class
 
@@ -659,8 +675,6 @@ class BaseModel(ABC):
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
     def plot_model(self, dpi: int = 150, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
-        # import tensorflow as tf
-        # keras = tf.keras
         import keras
         path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
         try:
@@ -788,7 +802,6 @@ class Losses:
     @staticmethod
     def get_log_square_loss_class():
         import tensorflow as tf
-        # keras = tf.keras
         import keras
         class LogSquareLoss(keras.losses.Loss):  # type: ignore  # pylint: disable=no-member
             def __init__(self, *args: Any, **kwargs: Any):
