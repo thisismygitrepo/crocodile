@@ -3,20 +3,21 @@
 dl
 """
 
+import numpy as np
+import numpy.typing as npt
+import pandas as pd
+from tqdm import tqdm
+
 from crocodile.matplotlib_management import ImShow
 from crocodile.core import List as L, Struct as S, Base
 from crocodile.file_management import P, Save, PLike, Read
 from crocodile.meta import Experimental
 
-import numpy as np
-import numpy.typing as npt
-import pandas as pd
-from abc import ABC
-from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, TypeAlias
 import enum
-from tqdm import tqdm
 import copy
+from abc import ABC
 from dataclasses import dataclass, field
+from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, TypeAlias, Protocol
 
 
 @dataclass
@@ -69,8 +70,31 @@ SubclassedDataReader = TypeVar("SubclassedDataReader", bound='DataReader')
 SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 
+HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 PACKAGE: TypeAlias = Literal['tensorflow', 'torch']
 PRECISON = Literal['float64', 'float32', 'float16']
+
+
+class HyperParams(Protocol):
+    # ================== General ==============================
+    name: str
+    root: P
+    pkg_name: PACKAGE
+
+    # ===================== Data ==============================
+    seed: int
+    shuffle: bool
+    precision: PRECISON
+
+    # ===================== Training ==========================
+    test_split: float
+    learning_rate: float
+    batch_size: int
+    epochs: int
+
+
+def get_hp_save_dir(hp: HyperParams):
+    return (P(hp.root) / hp.name).create()
 
 
 @dataclass
@@ -96,7 +120,8 @@ class HParams:
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
     def save(self):
-        subpath = self.subpath
+        # subpath = self.subpath
+        subpath = HPARAMS_SUBPATH
         save_dir = self.save_dir
         self_repr = str(self)
 
@@ -137,7 +162,7 @@ class DataReader:
     subpath = P("metadata/data_reader")
     """This class holds the dataset for training and testing.
     """
-    def __init__(self, hp: SubclassedHParams,  # type: ignore
+    def __init__(self, hp: HyperParams,  # type: ignore
                  specs: Optional[Specs] = None,
                  split: Optional[dict[str, Any]] = None) -> None:
         # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'list[Any]', Tf.RaggedTensor etc.
@@ -149,13 +174,15 @@ class DataReader:
         # self.df_handler = df_handler
     def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
-        base = (P(path) if path is not None else self.hp.save_dir).joinpath(self.subpath).create()
+        base = (P(path) if path is not None else get_hp_save_dir(self.hp)).joinpath(self.subpath).create()
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError: data = self.__dict__
         Save.pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
         Save.pickle(path=base / "data_reader.DataReader.pkl", obj=self)
     @classmethod
-    def from_saved_data(cls, path: Union[str, P], hp: SubclassedHParams,  # type: ignore
+    def from_saved_data(cls, path: Union[str, P],
+                        # hp: SubclassedHParams,  # type: ignore
+                        hp: HyperParams,
                         **kwargs: Any):
         path = P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
         data: dict[str, Any] = Read.pickle(path)
@@ -400,7 +427,7 @@ class BaseModel(ABC):
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
-            artist.fig.savefig(str(self.hp.save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)))
+            artist.fig.savefig(str(get_hp_save_dir(self.hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)))
         return self
 
     def switch_to_sgd(self, epochs: int = 10):
@@ -473,7 +500,7 @@ class BaseModel(ABC):
         self.model.load_weights(path)  # .expect_partial()
     def summary(self):
         from contextlib import redirect_stdout
-        path = self.hp.save_dir.joinpath("metadata/model/model_summary.txt").create(parents_only=True)
+        path = get_hp_save_dir(self.hp).joinpath("metadata/model/model_summary.txt").create(parents_only=True)
         with open(str(path), 'w', encoding='utf-8') as f:
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
@@ -568,10 +595,10 @@ class BaseModel(ABC):
         """
         self.hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        Save.pickle(obj=self.history, path=self.hp.save_dir / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try: Experimental.generate_readme(self.hp.save_dir, obj=self.__class__, desc=desc)
+        Save.pickle(obj=self.history, path=get_hp_save_dir(self.hp) / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        try: Experimental.generate_readme(get_hp_save_dir(self.hp), obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
-        save_dir = self.hp.save_dir.joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
+        save_dir = get_hp_save_dir(self.hp).joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
         if weights_only: self.save_weights(save_dir.create())
         else:
             self.save_model(save_dir)
@@ -598,12 +625,14 @@ class BaseModel(ABC):
                  'module_path_rh': module_path_rh,
                  'cwd_rh': P.cwd().collapseuser().as_posix(),
                  }
-        Save.json(obj=specs, path=self.hp.save_dir.joinpath('metadata/code_specs.json').str, indent=4)
-        print(f'SAVED Model Class @ {self.hp.save_dir.as_uri()}')
-        return self.hp.save_dir
+        Save.json(obj=specs, path=get_hp_save_dir(self.hp).joinpath('metadata/code_specs.json').str, indent=4)
+        print(f'SAVED Model Class @ {get_hp_save_dir(self.hp).as_uri()}')
+        return get_hp_save_dir(self.hp)
 
     @classmethod
-    def from_class_weights(cls, path: PLike, hparam_class: Optional[Type[SubclassedHParams]] = None, data_class: Optional[Type[SubclassedDataReader]] = None,
+    def from_class_weights(cls, path: PLike,
+                           hparam_class: Optional[Type[SubclassedHParams]] = None,
+                           data_class: Optional[Type[SubclassedDataReader]] = None,
                            device_name: Optional[Device] = None, verbose: bool = True):
         path = P(path)
         if hparam_class is not None:
@@ -676,7 +705,7 @@ class BaseModel(ABC):
 
     def plot_model(self, dpi: int = 150, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
         import keras
-        path = self.hp.save_dir.joinpath("metadata/model/model_plot.png")
+        path = get_hp_save_dir(self.hp).joinpath("metadata/model/model_plot.png")
         try:
             keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
             print(f"Successfully plotted the model @ {path.as_uri()}")

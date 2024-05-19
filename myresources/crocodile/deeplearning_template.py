@@ -22,7 +22,7 @@ class HParams(dl.HParams):
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
     name: str = field(default_factory=lambda: "model-" + randstr(noun=True))
     root: P = P.tmp(folder="tmp_models")
-    pkg_name = 'tensorflow'
+    pkg_name: dl.PACKAGE = 'tensorflow'
     # device_name: Device=Device.gpu0
     # ===================== Data ==============================
     seed: int = 234
