@@ -1,5 +1,7 @@
 
-"""Meta
+"""
+This is a module for handling meta operations like logging, terminal operations, SSH, etc.
+
 """
 
 from crocodile.core import randstr, str2timedelta, Save, install_n_import, List, Struct
@@ -30,7 +32,8 @@ class Scout:
 
 
 class Log(logging.Logger):  #
-    def __init__(self, dialect: Literal["colorlog", "logging", "coloredlogs"] = "colorlog", name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
+    def __init__(self, dialect: Literal["colorlog", "logging", "coloredlogs"] = "colorlog",
+                 name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
                  s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False,
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
@@ -162,7 +165,7 @@ class Terminal:
     # def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
     def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
     def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-    def run(self, *cmds: str, shell: Optional[SHELLS] = "default", check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
+    def run(self, *cmds: str, shell: Optional[SHELLS] = "default", check: bool = False, ip: Optional[str] = None) -> Response:  # Runs SYSTEM commands like subprocess.run
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
@@ -347,7 +350,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __repr__(self): return f"local {self.get_local_repr(add_machine=True)} >>> SSH TO >>> remote {self.get_remote_repr(add_machine=True)}"
     def run_locally(self, command: str):
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
-        res = Response(cmd=command); res.output.returncode = os.system(command)
+        res = Response(cmd=command)
+        res.output.returncode = os.system(command)
         return res
     def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_remote_repr().replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
