@@ -281,7 +281,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         else:
             final_dict = (dict(dictionary) if dictionary.__class__.__name__ == "mappingproxy" else dictionary.__dict__)  # type: ignore
         final_dict.update(kwargs)  # type ignore
-        super(Struct, self).__init__(); self.__dict__ = final_dict  # type: ignore
+        super(Struct, self).__init__()
+        self.__dict__ = final_dict  # type: ignore
     # @staticmethod
     # def recursive_struct(mydict: dict[Any, Any]) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     # @staticmethod
@@ -328,7 +329,9 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         if key is not None: return (self.__dict__.get(key, default) if not strict else self[key])
         else: raise ValueError("Either key or keys should be passed.")
     def apply2keys(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': return Struct({kv_func(key, val): val for key, val in self.items(verbose=verbose, desc=desc)})
-    def apply2values(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct': _ = [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]; return self
+    def apply2values(self, kv_func: Callable[[Any, Any], Any], verbose: bool = False, desc: str = "") -> 'Struct':
+        _ = [self.__setitem__(key, kv_func(key, val)) for key, val in self.items(verbose=verbose, desc=desc)]
+        return self
     def apply(self, kv_func: Callable[[Any, Any], Any]) -> 'List[Any]': return self.items().apply(lambda item: kv_func(item[0], item[1]))
     def filter(self, kv_func: Callable[[Any, Any], Any]) -> 'Struct': return Struct({key: self[key] for key, val in self.items() if kv_func(key, val)})
     def inverse(self) -> 'Struct': return Struct({v: k for k, v in self.__dict__.items()})
@@ -399,7 +402,11 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
 class Display:
     @staticmethod
     def set_pandas_display(rows: int = 1000, columns: int = 1000, width: int = 5000, colwidth: int = 40) -> None:
-        import pandas as pd; pd.set_option('display.max_colwidth', colwidth); pd.set_option('display.max_columns', columns); pd.set_option('display.width', width); pd.set_option('display.max_rows', rows)
+        import pandas as pd
+        pd.set_option('display.max_colwidth', colwidth)
+        pd.set_option('display.max_columns', columns)
+        pd.set_option('display.width', width)
+        pd.set_option('display.max_rows', rows)
     @staticmethod
     def set_pandas_auto_width():
         import pandas as pd
@@ -419,7 +426,10 @@ class Display:
         # pd.options.float_format = '{:, .5f}'.format
         pd.set_option('precision', 7)  # pd.set_printoptions(formatter={'float': '{: 0.3f}'.format})
     @staticmethod
-    def outline(array: 'Any', name: str = "Array", printit: bool = True): str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"; _ = print(str_) if printit else None; return str_
+    def outline(array: 'Any', name: str = "Array", printit: bool = True):
+        str_ = f"{name}. Shape={array.shape}. Dtype={array.dtype}"
+        if printit: print(str_)
+        return str_
     @staticmethod
     def get_repr(data: Any, justify: int = 15, limit: int = 10000, direc: str = "<") -> str:
         if (dtype := data.__class__.__name__) in {'list', 'str'}: str_ = data if dtype == 'str' else f"list. length = {len(data)}. " + ("1st item type: " + str(type(data[0])).split("'")[1]) if len(data) > 0 else " "
@@ -428,7 +438,9 @@ class Display:
         return Display.f(str_.replace("\n", ", "), justify=justify, limit=limit, direc=direc)
     @staticmethod
     def print_string_list(mylist: list[Any], char_per_row: int = 125, sep: str = " ", style: Callable[[Any], str] = str, _counter: int = 0):
-        for item in mylist: _ = print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep); _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
+        for item in mylist:
+            _ = print("") if (_counter + len(style(item))) // char_per_row > 0 else print(style(item), end=sep)
+            _counter = len(style(item)) if (_counter + len(style(item))) // char_per_row > 0 else _counter + len(style(item))
 
 
 if __name__ == '__main__':

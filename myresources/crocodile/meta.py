@@ -65,15 +65,22 @@ class Log(logging.Logger):  #
     def get_format(sep: str = ' | ', datefmt: str = "%d %H:%M:%S"):
         _ = datefmt  # TODO: add datefmt to the format string
         return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}"  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
-    def manual_degug(self, path: PLike): _ = self; sys.stdout = open(path, 'w', encoding="utf-8"); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+    def manual_degug(self, path: PLike):
+        _ = self
+        sys.stdout = open(path, 'w', encoding="utf-8")
+        sys.stdout.close()
+        print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
                         'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}  # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         field_styles = {'asctime': {'color': 'green'}, 'hostname': {'color': 'magenta'}, 'levelname': {'color': 'black', 'bold': True}, 'path': {'color': 'blue'}, 'programname': {'color': 'cyan'}, 'username': {'color': 'yellow'}}
-        if verbose: logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
+        if verbose:
+            logger = install_n_import("verboselogs").VerboseLogger(name=name)
+            logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
         else: logger = Log(name=name, dialect="logging", l_level=l_level, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
-        install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
+        install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
+        return logger
     def add_streamhandler(self, s_level: int = logging.DEBUG, fmt: Optional[Any] = None, module: Any = logging, name: str = "myStreamHandler"):
         shandler = module.StreamHandler()
         shandler.setLevel(level=s_level)
@@ -85,7 +92,8 @@ class Log(logging.Logger):  #
         filename = P.tmpfile(name=self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()
         fhandler = logging.FileHandler(filename=filename, mode=mode)
         fhandler.setFormatter(fmt=fmt)
-        fhandler.setLevel(level=f_level); fhandler.set_name(name)
+        fhandler.setLevel(level=f_level)
+        fhandler.set_name(name)
         self.addHandler(fhandler)
         self.file_path = filename.collapseuser()
         print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
@@ -146,12 +154,24 @@ class Response:
         if capture: self.capture()
         success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
         if assert_success: assert success, self.print(capture=False, desc=desc)
-        _ = print(desc) if success else self.print(capture=False, desc=desc); return self
+        if success: print(desc)
+        else: self.print(capture=False, desc=desc)
+        return self
     def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
-        _ = self.capture() if capture else None; install_n_import("rich"); from rich import console; con = console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
-        tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
-        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]), style="white")
-        con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black")); return self
+        if capture: self.capture()
+        install_n_import("rich")
+        from rich import console
+        con = console.Console()
+        from rich.panel import Panel
+        from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
+        tmp1 = Text("Input Command:\n")
+        tmp1.stylize("u bold blue")
+        tmp2 = Text("\nTerminal Response:\n")
+        tmp2.stylize("u bold blue")
+        list_str = [f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]
+        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join(list_str), style="white")
+        con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black"))
+        return self
 
 
 class Terminal:
@@ -163,8 +183,12 @@ class Terminal:
         self.stderr = stderr
         self.stdin = stdin
     # def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
-    def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
-    def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
+    def set_std_pipe(self):
+        self.stdout = subprocess.PIPE
+        self.stderr = subprocess.PIPE
+        self.stdin = subprocess.PIPE
+    def set_std_null(self):
+        self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
     def run(self, *cmds: str, shell: Optional[SHELLS] = "default", check: bool = False, ip: Optional[str] = None) -> Response:  # Runs SYSTEM commands like subprocess.run
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
@@ -223,7 +247,11 @@ class Terminal:
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if os.name == 'nt':
             try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
-            except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
+            except Exception:
+                import traceback
+                traceback.print_exc()
+                print("Admin check failed, assuming not an admin.")
+                return False
         else:
             return os.getuid() == 0  # Check for root on Posix
     @staticmethod
@@ -251,9 +279,11 @@ class Terminal:
         return Terminal().run_py(load_func_string + load_kwargs_string + f"\n{cmd}\n" + run_string, header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
     def replicate_session(cmd: str = ""):
-        import dill; file = file = P.tmpfile(suffix=".pkl")
+        import dill
+        file = P.tmpfile(suffix=".pkl")
         script = f"""path = P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}"""
-        dill.dump_session(file, main=sys.modules[__name__]); Terminal().run_py(script=script)
+        dill.dump_session(file, main=sys.modules[__name__])
+        Terminal().run_py(script=script)
     @staticmethod
     def get_header(wdir: OPLike, toolbox: bool): return f"""
 # >> Code prepended
@@ -312,7 +342,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             raise ValueError("Either host or username and hostname must be provided.")
 
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
-        self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh = paramiko.SSHClient()
+        self.ssh.load_system_host_keys()
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
@@ -320,7 +352,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         except Exception as err:
             self.sftp = None
             print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
-        def view_bar(slf: Any, a: Any, b: Any): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
+        def view_bar(slf: Any, a: Any, b: Any):
+            slf.total = int(b)
+            slf.update(int(a - slf.n))  # update pbar with increment
         self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
         self._local_distro: Optional[str] = None
         self._remote_distro: Optional[str] = None
@@ -336,7 +370,10 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT"): self._remote_machine = "Windows"
             else: self._remote_machine = "Linux"
         return self._remote_machine  # echo %OS% TODO: uname on linux
-    def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
+    def get_local_distro(self):
+        if self._local_distro is None:
+            self._local_distro = install_n_import("distro").name(pretty=True)
+        return self._local_distro
     def get_remote_distro(self):
         if self._remote_distro is None: self._remote_distro = self.run_py("print(install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
         return self._remote_distro
