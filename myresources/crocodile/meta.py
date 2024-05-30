@@ -370,9 +370,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT"): self._remote_machine = "Windows"
             else: self._remote_machine = "Linux"
         return self._remote_machine  # echo %OS% TODO: uname on linux
-    def get_local_distro(self):
+    def get_local_distro(self) -> str:
         if self._local_distro is None:
-            self._local_distro = install_n_import("distro").name(pretty=True)
+            res = install_n_import("distro").name(pretty=True)
+            self._local_distro = res
+            return res
         return self._local_distro
     def get_remote_distro(self):
         if self._remote_distro is None: self._remote_distro = self.run_py("print(install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""

@@ -89,7 +89,8 @@ class Save:
     @staticmethod
     @save_decorator(".ini")
     def ini(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-        conf = install_n_import("configparser").ConfigParser(); conf.read_dict(obj)
+        conf = install_n_import("configparser").ConfigParser()
+        conf.read_dict(obj)
         with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
     @staticmethod
     @save_decorator(".csv")
@@ -125,12 +126,17 @@ class Base(object):
         import copy
         obj.__dict__.update(copy.deepcopy(self.__dict__))
         return obj
-    def __copy__(self, *args: Any, **kwargs: Any): obj = self.__class__(*args, **kwargs); obj.__dict__.update(self.__dict__.copy()); return obj
+    def __copy__(self, *args: Any, **kwargs: Any):
+        obj = self.__class__(*args, **kwargs)
+        obj.__dict__.update(self.__dict__.copy())
+        return obj
     # def eval(self, string_, func=False, other=False): return string_ if type(string_) is not str else eval((("lambda x, y: " if other else "lambda x:") if not str(string_).startswith("lambda") and func else "") + string_ + (self if False else ''))
     # def exec(self, expr: str) -> 'Base': exec(expr); return self  # exec returns None.
     def save(self, path: Union[str, Path, None] = None, add_suffix: bool = True, save_code: bool = False, verbose: bool = True, data_only: bool = True, desc: str = ""):  # + (".dat" if data_only else "")
-        saved_file = Save.pickle(obj=self.__getstate__() if data_only else self, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
-        _ = self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py")) if save_code else None; return self
+        obj = self.__getstate__() if data_only else self
+        saved_file = Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
+        if save_code: self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py"))
+        return self
     @classmethod
     def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
         obj = cls(*args, **kwargs)
@@ -143,7 +149,8 @@ class Base(object):
         if module is not None and hasattr(module, "__file__"):
             file = Path(module.__file__)  # type: ignore
         else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
-        _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8')); return Path(path) if type(path) is str else path  # path could be P, better than Path
+        _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8'))
+        return Path(path) if type(path) is str else path  # path could be P, better than Path
     def get_attributes(self, remove_base_attrs: bool = True, return_objects: bool = False, fields: bool = True, methods: bool = True):
         import inspect
         remove_vals = Base().get_attributes(remove_base_attrs=False) if remove_base_attrs else []
