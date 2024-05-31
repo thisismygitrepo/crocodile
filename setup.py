@@ -1,6 +1,7 @@
 
 """
-PKG
+PKG installer
+
 """
 
 from setuptools import setup
