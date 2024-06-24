@@ -89,7 +89,9 @@ class Save:
     @staticmethod
     @save_decorator(".ini")
     def ini(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-        conf = install_n_import("configparser").ConfigParser()
+        # conf = install_n_import("configparser").ConfigParser()
+        import configparser
+        conf = configparser.ConfigParser()
         conf.read_dict(obj)
         with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
     @staticmethod

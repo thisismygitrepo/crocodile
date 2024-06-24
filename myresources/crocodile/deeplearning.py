@@ -392,8 +392,10 @@ class BaseModel(ABC):
                 print(f"💥 Error while compiling the model.")
                 pass
 
-    def fit(self, viz: bool = True, weight_name: Optional[str] = None,
-            val_sample_weight: Optional['npt.NDArray[np.float64]'] = None, sample_weight: Optional['npt.NDArray[np.float64]'] = None,
+    def fit(self, viz: bool = True,
+            weight_name: Optional[str] = None,
+            val_sample_weight: Optional['npt.NDArray[np.float64]'] = None,
+            sample_weight: Optional['npt.NDArray[np.float64]'] = None,
             verbose: Union[int, str] = "auto", callbacks: Optional[list[Any]] = None,
             validation_freq: int = 1,
             **kwargs: Any):
@@ -408,12 +410,12 @@ class BaseModel(ABC):
                 train_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="train")[0]
                 sample_weight = self.data.split[train_weight_str]
             else:
-                print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
+                print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
             if val_sample_weight is None:
                 test_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="test")[0]
                 val_sample_weight = self.data.split[test_weight_str]
             else:
-                print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_string` argument.")
+                print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
 
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
