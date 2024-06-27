@@ -220,10 +220,13 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def filter(self, func: Callable[[T], bool], which: Callable[[int, T], Union[T, T2]] = lambda _idx, _x: _x) -> 'List[Union[T2, T]]':
         return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> 'List[T]':  # type: ignore
+    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> 'List[T]':
         from functools import reduce
-        if default is None: return List(reduce(func, self.list))  # type: ignore
-        return List(reduce(func, self.list, default))  # type: ignore
+        if default is None:
+            tmp = reduce(func, self.list)
+            return List(tmp)
+        res = reduce(func, self.list, default)
+        return List(res)
     def append(self, item: T) -> 'List[T]': self.list.append(item); return self
     def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
     def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion
