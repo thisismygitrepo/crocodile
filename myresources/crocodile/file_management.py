@@ -129,11 +129,11 @@ class Read:
         _ = r
         return mydict
     @staticmethod
-    def ini(path: PLike):
+    def ini(path: PLike, encoding: Optional[str] = None):
         if not Path(path).exists() or Path(path).is_dir(): raise FileNotFoundError(f"File not found: {path}")
         import configparser
         res = configparser.ConfigParser()
-        res.read(filenames=[str(path)])
+        res.read(filenames=[str(path)], encoding=encoding)
         return res
     @staticmethod
     def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
@@ -466,7 +466,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if res == 0: raise RuntimeError(f"Could not save file on disk.")
         return self
     def touch(self, mode: int = 0o666, parents: bool = True, exist_ok: bool = True) -> 'P':  # pylint: disable=W0237
-        if parents: self.parent.create(parents=parents) 
+        if parents: self.parent.create(parents=parents)
         super(P, self).touch(mode=mode, exist_ok=exist_ok)
         return self
     def symlink_from(self, src_folder: OPLike = None, src_file: OPLike = None, verbose: bool = False, overwrite: bool = False):
