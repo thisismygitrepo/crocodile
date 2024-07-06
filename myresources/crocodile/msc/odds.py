@@ -39,8 +39,11 @@ def capture_from_webcam(show: bool = True, wait: bool = True, save: bool = False
     return frame
 
 
-def qr(txt: str): install_n_import("qrcode").make(txt).save((file := P.tmpfile(suffix=".png")).__str__()); return file()
-def count_number_of_lines_of_code_in_repo(path: P = P.cwd(), extension: str = ".py", r: bool = True, **kwargs: Any): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
+def qr(txt: str):
+    file = P.tmpfile(suffix=".png")
+    install_n_import("qrcode").make(txt).save(file.__str__())
+    return file()
+def count_number_of_lines_of_code_in_repo(path: P, extension: str = ".py", r: bool = True, **kwargs: Any): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
 def profile_memory(command: str):
     import psutil
     before = psutil.virtual_memory()
