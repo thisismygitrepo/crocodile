@@ -11,7 +11,7 @@ from crocodile.meta import Experimental, Terminal, Log, Scheduler, SSH
 from crocodile.meta import logging, subprocess, sys, time
 # from crocodile import run
 from crocodile.file_management import P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
-from crocodile.core import List, Base, Struct, Display, Save
+from crocodile.core import List, Base, Struct, Save, Display
 from crocodile.core import str2timedelta, timestamp, randstr, validate_name, install_n_import
 
 _ = str2timedelta, timestamp, randstr, validate_name, install_n_import

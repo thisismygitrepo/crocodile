@@ -3,18 +3,25 @@
 """
 
 import torch as t
-# import torch.utils.data
+import torch.nn as nn
+from torch.types import Device
+from torch.optim import Optimizer
+from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import numpy.typing as npt
 # import pandas as pd
 
+from crocodile.file_management import P
 import crocodile.deeplearning as dl
 
 from abc import ABC
 # from collections import OrderedDict
-from typing import Optional, Any
+from typing import Optional, Any, TypeVar
 
 
+T = TypeVar('T', bound=Any)
 Flatten = t.nn.Flatten
+_ = Dataset
 
 
 class TorchDataReader(dl.DataReader):
@@ -44,111 +51,125 @@ class TorchDataReader(dl.DataReader):
     #     else: return x
 
 
-# class BaseModel(dl.BaseModel, dl.ABC):
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.odict = OrderedDict
+class BaseModel:
+    def __init__(self, model: nn.Module, loss: Any, optimizer: t.optim.Optimizer, metrics: list[Any]):
+        self.model = model
+        self.loss = loss
+        self.optimizer = optimizer
+        self.metrics = metrics
+        self.history: list[dict[str, Any]] = []
 
-    # @staticmethod
-    # def check_childern_details(mod):
-    #     tot = 0
-    #     for name, layer in mod.named_children():
-    #         params = sum(p.numel() for p in layer.parameters())
-    #         print(f'Layer {name}. # Parameters = ', params)
-    #         tot += params
-    #     print(f"Total = {tot}")
-    #     print("-" * 20)
+    @staticmethod
+    def check_childern_details(model: nn.Module):
+        tot = 0
+        for name, layer in model.named_children():
+            params = sum(p.numel() for p in layer.parameters())
+            print(f'Layer {name}. # Parameters = ', params)
+            tot += params
+        print(f"Total = {tot}")
+        print("-" * 20)
 
-    # def summary(self, detailed=False):
-    #     print(' Summary '.center(50, '='))
-    #     if detailed: self.check_childern_details(self.model)
-    #     else:
-    #         print('Number of weights in the NN = ', sum(p.numel() for p in self.model.parameters()))
-    #         print(''.center(57, '='))
+    @staticmethod
+    def summary(model: nn.Module, detailed: bool = False):
+        print(' Summary '.center(50, '='))
+        if detailed: BaseModel.check_childern_details(model)
+        else:
+            print('Number of weights in the NN = ', sum(p.numel() for p in model.parameters()))
+            print(''.center(57, '='))
 
-    # def save_weights(self, save_dir): t.save()
-    # def save_model(self, save_dir): t.save()
+    def save_model(self, save_dir: P): t.save(self.model, save_dir.joinpath("model.pth"))
+    @staticmethod
+    def load_model(save_dir: P, map_location: Optional[str]):
+        model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location)
+        model.eval()
+        return model
 
-    def load_weights(self, save_dir, map_location=None):
-        if map_location is None:  # auto location.  # load to where ever the model was saved from in the first place
-            if t.cuda.is_available(): self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__()))
-            else: self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location="cpu"))
-        else: self.model.load_state_dict(t.load(save_dir.glob('*.pt').__next__(), map_location=map_location))
+    def save_weights(self, save_dir: P): t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
+    @staticmethod
+    def load_weights(model: nn.Module, save_dir: P, map_location: Optional[str]):
+        # if map_location is None and t.cuda.is_available():
+        #     map_location = "cpu"
+        path = save_dir.joinpath("weights.pth")
+        model.load_state_dict(t.load(path, map_location=map_location))
+        model.eval()
+        return model
+
+    def infer(self, xx: t.Tensor, device: str) -> npt.NDArray[np.float32]:
         self.model.eval()
-
-    def load_model(self, save_dir):  # Model class must be defined somewhere
-        self.model = t.load(self, save_dir.glob('*.pt').__next__())
-        self.model.eval()
-
-    def infer(self, xx: t.Tensor):
-        self.model.eval()
-        xx_ = t.tensor(xx).to(self.hp.device)
+        xx_ = t.tensor(xx).to(device)
         with t.no_grad(): op = self.model(xx_)
         return op.cpu().detach().numpy()
 
-    def fit(self, epochs: Optional[int] = None, plot: bool = True, **kwargs):
+    def fit(self, epochs: int, train_loader: DataLoader[T], test_loader: DataLoader[T], device: Device):
         """
+        Standard training loop for Pytorch models. It is assumed that the model is already on the correct device.
         """
-        if epochs is None: epochs = self.hp.epochs
-        train_losses = []
-        test_losses = []
+        train_losses: list[float] = []
+        test_losses: list[float] = []
         print('Training'.center(100, '-'))
         for an_epoch in range(epochs):
-            # monitor training loss
             train_loss = 0.0
             total_samples = 0
             self.model.train()  # Double checking
-            for i, batch in enumerate(self.data.train_loader):
-                _, loss, batch_length = self.train_step(batch)
-                loss_value = loss.item()
+            for batch_idx, batch in enumerate(train_loader):
+                _output, loss_tensor = BaseModel.train_step(model=self.model, loss_func=self.loss, optimizer=self.optimizer, batch=batch, device=device)
+                batch_length = len(batch[0])
+                loss_value = loss_tensor.item()
                 train_losses.append(loss_value)
                 train_loss += loss_value * batch_length
                 total_samples += batch_length
-                if (i % 20) == 0:
+                if (batch_idx % 20) == 0:
                     print(f'Accumulative loss = {train_loss}', end='\r')
-            # print avg training statistics
             train_loss /= total_samples
             # writer.add_scalar('training loss', train_loss, next(epoch_c))
-            test_loss = self.test(self.data.test_loader)
-            test_losses.append(test_loss[0])
+            test_loss = BaseModel.test(model=self.model, loss_func=self.loss, loader=test_loader, device=device, metrics=self.metrics)
+            # print(test_loss.shape)
+            test_losses.append(test_loss)
             print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss:1.3f}, Test Loss = {test_loss[0]:1.3f}')
-        self.history.append({'loss': train_losses, 'val_loss': test_losses})
-        if plot: self.plot_loss()
+        print('Training Completed'.center(100, '-'))
+        self.history.append({'train_loss': train_losses, 'test_loss': test_losses})
+        return train_losses, test_losses
 
-    def train_step(self, batch: tuple[t.Tensor, t.Tensor]):
-        x, y = batch
-        self.compiler.optimizer.zero_grad()  # clear the gradients of all optimized variables
-        op = self.model(x)
-        loss = self.compiler.loss(op, y)
-        loss.backward()
-        self.compiler.optimizer.step()
-        return op, loss, len(x)
+    @staticmethod
+    def train_step(model: nn.Module, loss_func: nn.Module, optimizer: Optimizer, batch: tuple[t.Tensor, t.Tensor, t.Tensor], device: Device):
+        x, y, _name = batch
+        x = x.to(device)
+        y = y.to(device)
+        optimizer.zero_grad()  # clear the gradients of all optimized variables
+        output = model(x)
+        loss_val = loss_func(output, y)
+        loss_val.backward()
+        optimizer.step()
+        return output, loss_val
 
-    def test_step(self, batch: tuple[t.Tensor, t.Tensor]):
+    @staticmethod
+    def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor], device: Device):
         with t.no_grad():
-            x, y = batch
-            op = self.model(x)
-            loss = self.compiler.loss(op, y)
-            return op, loss, len(x)
+            x, y, _name = batch
+            x = x.to(device)
+            y = y.to(device)
+            op = model(x)
+            loss_val = loss_func(op, y)
+            return op, loss_val
 
-    def test(self, loader):
-        if loader:
-            self.model.eval()
-            losses = []
-            for i, batch in enumerate(loader):
-                prediction, loss, _ = self.test_step(batch)
-                per_batch_losses = [loss.item()]
-                for a_metric in self.compiler.metrics:
-                    loss = a_metric(prediction, y)
-                    per_batch_losses.append(loss.item())
-                losses.append(per_batch_losses)
-            return [np.mean(tmp) for tmp in zip(*losses)]
+    @staticmethod
+    def test(model: nn.Module, loss_func: nn.Module, loader: DataLoader[T], device: Device, metrics: list[nn.Module]):
+        model.eval()
+        losses: list[list[float]] = []
+        for _idx, batch in enumerate(loader):
+            prediction, loss_value = BaseModel.test_step(model=model, loss_func=loss_func, batch=batch, device=device)
+            per_batch_losses: list[float] = [loss_value.item()]
+            for a_metric in metrics:
+                loss_value = a_metric(prediction, batch[1])
+                per_batch_losses.append(loss_value.item())
+            losses.append(per_batch_losses)
+        return np.array(losses).mean(axis=0)
 
-    def deploy(self, dummy_ip=None):
-        if not dummy_ip:
-            dummy_ip = t.randn_like(self.data.split.x_train[:1]).to(self.hp.device)
-        from torch import onnx
-        onnx.export(self.model, dummy_ip, 'onnx_model.onnx', verbose=True)
+    # def deploy(self, dummy_ip=None):
+    #     if not dummy_ip:
+    #         dummy_ip = t.randn_like(self.data.split.x_train[:1]).to(self.hp.device)
+    #     from torch import onnx
+    #     onnx.export(self.model, dummy_ip, 'onnx_model.onnx', verbose=True)
 
 
 # class ImagesModel(BaseModel):
