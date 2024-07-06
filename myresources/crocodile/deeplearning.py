@@ -401,21 +401,21 @@ class BaseModel(ABC):
             **kwargs: Any):
         hp = self.hp
         specs = self.data.specs
-        assert self.data.split is not None, "Split your data before you start fitting."
-        x_train = [self.data.split[item] for item in specs.get_split_names(specs.ip_names, which_split="train")]
-        y_train = [self.data.split[item] for item in specs.get_split_names(specs.op_names, which_split="train")]
-        x_test = [self.data.split[item] for item in specs.get_split_names(specs.ip_names, which_split="test")]
-        y_test = [self.data.split[item] for item in specs.get_split_names(specs.op_names, which_split="test")]
+        split = self.data.split
+        x_train = [split[item] for item in specs.get_split_names(names=specs.ip_names, which_split="train")]
+        y_train = [split[item] for item in specs.get_split_names(names=specs.op_names, which_split="train")]
+        x_test = [split[item] for item in specs.get_split_names(names=specs.ip_names, which_split="test")]
+        y_test = [split[item] for item in specs.get_split_names(names=specs.op_names, which_split="test")]
         if weight_name is not None:
             assert weight_name in specs.other_names, f"weight_string must be one of {specs.other_names}"
             if sample_weight is None:
                 train_weight_str = specs.get_split_names(names=[weight_name], which_split="train")[0]
-                sample_weight = self.data.split[train_weight_str]
+                sample_weight = split[train_weight_str]
             else:
                 print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
             if val_sample_weight is None:
                 test_weight_str = specs.get_split_names(names=[weight_name], which_split="test")[0]
-                val_sample_weight = self.data.split[test_weight_str]
+                val_sample_weight = split[test_weight_str]
             else:
                 print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
 
@@ -521,16 +521,16 @@ class BaseModel(ABC):
         res = S.concat_values(*history)
         return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
 
-    def infer(self, x: Any) -> 'npt.NDArray[np.float64]':
-        """ This method assumes numpy input, datatype-wise and is also preprocessed.
-        NN is put in eval mode.
-        :param x:
-        :return: prediction as numpy
-        """
-        # return self.model(x, training=False)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
-        # https://stackoverflow.com/questions/64199384/tf-keras-model-predict-results-in-memory-leak
-        # https://github.com/tensorflow/tensorflow/issues/44711
-        return self.model.predict(x)
+    # def infer(self, x: Any) -> 'npt.NDArray[np.float64]':
+    #     """ This method assumes numpy input, datatype-wise and is also preprocessed.
+    #     NN is put in eval mode.
+    #     :param x:
+    #     :return: prediction as numpy
+    #     """
+    #     # return self.model(x, training=False)  # Keras automatically handles special layers, can accept dataframes, and always returns numpy.
+    #     # https://stackoverflow.com/questions/64199384/tf-keras-model-predict-results-in-memory-leak
+    #     # https://github.com/tensorflow/tensorflow/issues/44711
+    #     return self.model.predict(x)
 
     # def predict(self, x: Any, **kwargs: Any):
     #     """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
@@ -563,7 +563,7 @@ class BaseModel(ABC):
             names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
         # ==========================================================================
-        y_pred_raw = self.infer(x_test)
+        y_pred_raw = self.model.predict(x_test)
         if not isinstance(y_pred_raw, list): y_pred = [y_pred_raw]
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)

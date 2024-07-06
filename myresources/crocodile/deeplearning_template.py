@@ -59,22 +59,22 @@ class DataReader(dl.DataReader):
         _ = profile_df
         self.split = DataReader.split_the_data(data_dict=self.dataset, populate_shapes=True, specs=self.specs, shuffle=self.hp.shuffle, test_size=self.hp.test_split, random_state=self.hp.seed)
 
-    def viz(self, eval_data: EvaluationData, ax: Optional[Axes] = None, title: str = ""):
-        # _ = names
-        if ax is None:
-            fig, axis = plt.subplots(figsize=(14, 10))
-        else:
-            fig = ax.get_figure()
-            axis = ax
-        x = np.arange(len(eval_data.y_true[0]))
-        axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
-        axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
-        axis.legend()
-        axis.set_title(title or 'Predicted vs True')
-        FigureManager.grid(axis)
-        plt.show(block=False)
-        plt.pause(0.5)  # pause a bit so that the figure is displayed.
-        return fig
+
+def viz(eval_data: EvaluationData, ax: Optional[Axes], title: str):
+    if ax is None:
+        fig, axis = plt.subplots(figsize=(14, 10))
+    else:
+        fig = ax.get_figure()
+        axis = ax
+    x = np.arange(len(eval_data.y_true[0]))
+    axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
+    axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
+    axis.legend()
+    axis.set_title(title or 'Predicted vs True')
+    FigureManager.grid(axis)
+    plt.show(block=False)
+    plt.pause(0.5)  # pause a bit so that the figure is displayed.
+    return fig
 
 
 class Model(dl.BaseModel):
@@ -112,10 +112,13 @@ def main():
     m = Model(hp, d, instantiate_model=True)
     fig, _ax = plt.subplots(ncols=2)
     fig.set_size_inches(14, 10)
-    _res_before = m.evaluate(indices=np.arange(10).tolist())  # , viz_kwargs=dict(title='Before training', ax=ax[0]))
+    _res_before = m.evaluate(indices=np.arange(10).tolist())
+    viz(eval_data=_res_before, ax=_ax[0], title='Before training')
     m.fit()
-    _res_after = m.evaluate(indices=np.arange(10).tolist())  # , viz_kwargs=dict(title='After training', ax=ax[1]))
+    _res_after = m.evaluate(indices=np.arange(10).tolist())
     print(m.test())
+    viz(eval_data=_res_after, ax=_ax[1], title='After training')
+
     m.save_class(weights_only=False, version="v1")
     m.save_class(weights_only=True, version="v1")
     # m.save_model()
