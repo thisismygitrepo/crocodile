@@ -2,15 +2,6 @@
 """
 This is a template for a PyTorch deep learning model.
 
-For model.compile()
-# Debian
-sudo apt-get install python3.11-dev
-
-# Windows:
-pip install --upgrade setuptools
-pip install --upgrade wheel
-pip install --upgrade python-dev
-
 """
 
 
@@ -27,7 +18,7 @@ from crocodile.deeplearning_torch import BaseModel
 from typing import Literal, TypeAlias
 from dataclasses import dataclass
 
-_ = DataLoader, t
+_ = t
 WHICH: TypeAlias = Literal["train", "test"]
 
 
@@ -54,10 +45,8 @@ class DataReader(Dataset[float]):
         self.x: npt.NDArray[np.float32] = np.random.randn(length, hp.in_features).astype(hp.precision)
         self.y: npt.NDArray[np.float32] = np.random.randn(length, 1).astype(hp.precision)
         self.names: npt.NDArray[np.int32] = np.arange(start=0, stop=length, dtype=np.int32)
-
     def __len__(self):
         return len(self.x)
-
     def __getitem__(self, idx: int):
         return self.x[idx], self.y[idx], self.names[idx]
 

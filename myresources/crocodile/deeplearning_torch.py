@@ -1,5 +1,18 @@
 
-"""capitalize
+"""
+For model.compile()
+# Debian
+sudo apt-get install python3.11-dev
+
+# Windows:
+pip install --upgrade setuptools
+pip install --upgrade wheel
+pip install --upgrade python-dev
+
+# for inference
+pip install onnx
+pip install onnxscript
+
 """
 
 import torch as t
@@ -165,11 +178,19 @@ class BaseModel:
             losses.append(per_batch_losses)
         return np.array(losses).mean(axis=0)
 
-    # def deploy(self, dummy_ip=None):
-    #     if not dummy_ip:
-    #         dummy_ip = t.randn_like(self.data.split.x_train[:1]).to(self.hp.device)
+    @staticmethod
+    def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
+        from torch import onnx
+        onnx_program = onnx.dynamo_export(model, args=dummy_ip, verbose=True)
+        save_path = save_dir.joinpath("model.onnx")
+        onnx_program.save(str(save_path))
+
+    # @staticmethod
+    # def load_onnx(save_dir: P):
+    #     save_path = save_dir.joinpath("model.onnx")
     #     from torch import onnx
-    #     onnx.export(self.model, dummy_ip, 'onnx_model.onnx', verbose=True)
+    #     onnx_model = onnx.load(save_path)
+    #     onnx.checker.check_model(onnx_model)
 
 
 # class ImagesModel(BaseModel):
