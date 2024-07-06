@@ -30,17 +30,16 @@ class Specs:
     other_shapes: list[tuple[int, ...]] = field(default_factory=list)
     def get_all_names(self): return self.ip_names + self.op_names + self.other_names
     def get_split_names(self, names: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
-        keys_ip = [item + f"_{which_split}" for item in names]
-        return keys_ip
+        return [item + f"_{which_split}" for item in names]
 
 
 @dataclass
 class EvaluationData:
     x: list[Any]
     y_pred: list[Any]
-    y_pred_pp: Any
+    # y_pred_pp: Any
     y_true: list[Any]
-    y_true_pp: list[Any]
+    # y_true_pp: list[Any]
     names: list[str]
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
@@ -122,7 +121,7 @@ class HParams:
     def save(self):
         # subpath = self.subpath
         subpath = HPARAMS_SUBPATH
-        save_dir = self.save_dir
+        save_dir = get_hp_save_dir(self)
         self_repr = str(self)
 
         save_dir.joinpath(subpath, 'hparams.txt').create(parents_only=True).write_text(self_repr)
@@ -136,14 +135,10 @@ class HParams:
 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
-
     @classmethod
     def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
         data: dict[str, Any] = Read.pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
-
-    # def __repr__(self, **kwargs: Any): return "HParams Object with specs:\n" + S(self.__dict__).print(as_config=True, return_str=True)
-
     @property
     def pkg(self):
         match self.pkg_name:
@@ -153,9 +148,6 @@ class HParams:
             case 'torch':
                 import torch as t  # type: ignore
                 return t
-
-    @property
-    def save_dir(self) -> P: return (P(self.root) / self.name).create()
 
 
 class DataReader:
@@ -327,10 +319,10 @@ class DataReader:
         if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
         else: self.plotter = ImShow(img_tensor=pred, sup_titles=names, labels=['Reconstruction', 'Ground Truth'], origin='lower', **kwargs)
 
-    def viz(self, eval_data: EvaluationData, **kwargs: Any):
-        """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
-        _ = self, eval_data, kwargs
-        return None
+    # def viz(self, eval_data: EvaluationData, **kwargs: Any):
+    #     """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
+    #     _ = self, eval_data, kwargs
+    #     return None
 
 
 @dataclass
@@ -438,8 +430,8 @@ class BaseModel(ABC):
         hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq)
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
-            artist = self.plot_loss()
-            artist.fig.savefig(str(get_hp_save_dir(hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)))
+            artist = BaseModel.plot_loss(self.history, y_label="loss")
+            artist.fig.savefig(fname=str(get_hp_save_dir(hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
         return self
 
     def switch_to_sgd(self, epochs: int = 10):
@@ -469,16 +461,15 @@ class BaseModel(ABC):
         self.compiler.loss = new_loss
         return self.fit(epochs=epochs)
 
-    def preprocess(self, *args: Any, **kwargs: Any):
-        """Converts an object to a numerical form consumable by the NN."""
-        return self.data.preprocess(*args, **kwargs)
-
-    def postprocess(self, *args: Any, **kwargs: Any):
-        return self.data.postprocess(*args, **kwargs)
     def __call__(self, *args: Any, **kwargs: Any):
         return self.model(*args, **kwargs)
-    def viz(self, eval_data: EvaluationData, **kwargs: Any):
-        return self.data.viz(eval_data, **kwargs)
+    # def preprocess(self, *args: Any, **kwargs: Any):
+    #     """Converts an object to a numerical form consumable by the NN."""
+    #     return self.data.preprocess(*args, **kwargs)
+    # def postprocess(self, *args: Any, **kwargs: Any):
+    #     return self.data.postprocess(*args, **kwargs)
+    # def viz(self, eval_data: EvaluationData, **kwargs: Any):
+    #     return self.data.viz(eval_data=eval_data, **kwargs)
     def save_model(self, path: PLike):
         hp = self.hp
         match hp.pkg_name:
@@ -521,13 +512,14 @@ class BaseModel(ABC):
         with open(str(path), 'w', encoding='utf-8') as f:
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
-    def config(self): _ = [print(layer.get_config(), "\n==============================") for layer in self.model.layers]; return None
-    def plot_loss(self, *args: Any, **kwargs: Any):
-        res = S.concat_values(*self.history)
-        assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
-        if hasattr(self.compiler.loss, "name"): y_label = self.compiler.loss.name
-        else: y_label = self.compiler.loss.__name__
-        return res.plot_plt(*args, title="Loss Curve", xlabel="epochs", ylabel=y_label, **kwargs)
+    def config(self):
+        for layer in self.model.layers:
+            print(layer.get_config(), "\n==============================")
+        return None
+    @staticmethod
+    def plot_loss(history: list[dict[str, Any]], y_label: str):
+        res = S.concat_values(*history)
+        return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
 
     def infer(self, x: Any) -> 'npt.NDArray[np.float64]':
         """ This method assumes numpy input, datatype-wise and is also preprocessed.
@@ -540,24 +532,30 @@ class BaseModel(ABC):
         # https://github.com/tensorflow/tensorflow/issues/44711
         return self.model.predict(x)
 
-    def predict(self, x: Any, **kwargs: Any):
-        """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
-        return self.postprocess(self.infer(x), **kwargs)
+    # def predict(self, x: Any, **kwargs: Any):
+    #     """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
+    #     return self.postprocess(self.infer(x), **kwargs)
+    # def deduce(self, obj: Any, viz: bool = True) -> DeductionResult:
+    #     """Assumes that contents of the object are in the form of a batch."""
+        # preprocessed = self.preprocess(obj)
+        # prediction = self.infer(preprocessed)
+        # postprocessed = self.postprocess(prediction)
+        # result = DeductionResult(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
+        # if viz: self.viz(postprocessed, **kwargs)
+        # return result
 
-    def deduce(self, obj: Any, viz: bool = True, **kwargs: Any) -> DeductionResult:
-        """Assumes that contents of the object are in the form of a batch."""
-        preprocessed = self.preprocess(obj, **kwargs)
-        prediction = self.infer(preprocessed)
-        postprocessed = self.postprocess(prediction, **kwargs)
-        result = DeductionResult(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
-        if viz: self.viz(postprocessed, **kwargs)
-        return result
-
-    def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None, y_test: Optional[list['npt.NDArray[np.float64]']] = None, names_test: Optional[list[str]] = None,
-                 aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
-                 split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None):
+    def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None,
+                 y_test: Optional[list['npt.NDArray[np.float64]']] = None,
+                 names_test: Optional[list[str]] = None,
+                 aslice: Optional[slice] = None, indices: Optional[list[int]] = None,
+                 use_slice: bool = False, size: Optional[int] = None,
+                 split: Literal["train", "test"] = "test",
+                #  viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None,
+                 ) -> EvaluationData:
+        specs = self.data.specs
+        split = self.data.split
         if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, others_test = DataReader.sample_dataset(split=self.data.split, specs=self.data.specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=split, size=size)
+            x_test, y_test, others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=split, size=size)
             if len(others_test) > 0: names_test_resolved = others_test[0]
             else: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         elif names_test is None and x_test is not None:
@@ -569,8 +567,8 @@ class BaseModel(ABC):
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
-        y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test_resolved), legend="Prediction")
-        y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test_resolved), legend="Ground Truth")
+        # y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test_resolved), legend="Prediction")
+        # y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test_resolved), legend="Ground Truth")
         # if loss_df is not None:
             # if len(specs.other_names) == 1: loss_df[specs.other_names[0]] = names_test_resolved
             # else:
@@ -578,8 +576,7 @@ class BaseModel(ABC):
         # loss_name = results.loss_df.columns.to_list()[0]  # first loss path
         # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
         # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test_resolved)]
-        results = EvaluationData(x=x_test, y_pred=y_pred, y_pred_pp=y_pred_pp, y_true=y_test, y_true_pp=y_true_pp, names=[str(item) for item in names_test_resolved], loss_df=loss_df)
-        if viz: self.viz(results, **(viz_kwargs or {}))
+        results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved], loss_df=loss_df)
         return results
 
     def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
@@ -635,13 +632,14 @@ class BaseModel(ABC):
             module_path_rh = P(module.__file__).resolve().collapseuser().as_posix()
         else:
             module_path_rh = None
-        specs = {'__module__': __module,
-                 'model_class': self.__class__.__name__,
-                 'data_class': self.data.__class__.__name__,
-                 'hp_class': hp.__class__.__name__,
-                 # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
-                 'module_path_rh': module_path_rh,
-                 'cwd_rh': P.cwd().collapseuser().as_posix(),
+        specs = {
+            '__module__': __module,
+            'model_class': self.__class__.__name__,
+            'data_class': self.data.__class__.__name__,
+            'hp_class': hp.__class__.__name__,
+            # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
+            'module_path_rh': module_path_rh,
+            'cwd_rh': P.cwd().collapseuser().as_posix(),
                  }
         Save.json(obj=specs, path=get_hp_save_dir(hp).joinpath('metadata/code_specs.json').str, indent=4)
         print(f'SAVED Model Class @ {get_hp_save_dir(hp).as_uri()}')
@@ -669,7 +667,6 @@ class BaseModel(ABC):
         # else:rd
             # raise ValueError(f"hp_obj must be of type `HParams` or `Generic[HParams]`. Got {type(hp_obj)}")
         model_obj = cls(hp_obj, d_obj)
-
         # Next, load model weights. However, before that, there is no gaurantee that model_obj has .model attribute.
         if not hasattr(model_obj, "model") or model_obj.model is None:
             model_obj.model = model_obj.get_model()
@@ -721,12 +718,12 @@ class BaseModel(ABC):
         hp_class: Type[HParams] = getattr(module, specs['hp_class'])
         return model_class.from_class_weights(path_model, hparam_class=hp_class, data_class=data_class, **kwargs)
 
-    def plot_model(self, dpi: int = 150, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
+    @staticmethod
+    def plot_model(model: Any, model_root: P, dpi: int = 350, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
         import keras
-        hp = self.hp
-        path = get_hp_save_dir(hp).joinpath("metadata/model/model_plot.png")
+        path = model_root.joinpath("metadata/model/model_plot.png")
         try:
-            keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
+            keras.utils.plot_model(model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
             print(f"Successfully plotted the model @ {path.as_uri()}")
         except Exception as ex:
             if strict: raise ex
