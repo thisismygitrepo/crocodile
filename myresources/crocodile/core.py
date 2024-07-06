@@ -264,14 +264,14 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         iterator: Iterable[Any]
         if other is None:
             iterator = (self.list if not verbose else tqdm(self.list, desc=desc))
-        else: iterator = (zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc))
+        else:
+            iterator = (zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc))
         if jobs:
             from joblib import Parallel, delayed
             if other is None: return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator))  # type: ignore
             return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
         if other is None:
             return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
-        # func_: Callable[[T, T2], T3]
         return List([func(x, y) for x, y in iterator])  # type: ignore
     def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
         import pandas as pd
