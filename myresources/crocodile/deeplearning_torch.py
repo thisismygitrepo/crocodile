@@ -107,25 +107,32 @@ class BaseModel:
         model.eval()
         return model
 
-    def infer(self, xx: t.Tensor, device: str) -> npt.NDArray[np.float32]:
-        self.model.eval()
-        xx_ = t.tensor(xx).to(device)
-        with t.no_grad(): op = self.model(xx_)
+    @staticmethod
+    def infer(model: nn.Module, xx: t.Tensor, device: Device) -> npt.NDArray[np.float32]:
+        model.eval()
+        xx_ = t.tensor(data=xx).to(device=device)
+        with t.no_grad(): op = model(xx_)
         return op.cpu().detach().numpy()
 
     def fit(self, epochs: int, train_loader: DataLoader[T], test_loader: DataLoader[T], device: Device):
         """
         Standard training loop for Pytorch models. It is assumed that the model is already on the correct device.
         """
+        model = self.model
+        loss_func = self.loss
+        optimizer = self.optimizer
+        metrics = self.metrics
+        history: list[dict[str, Any]] = self.history
+
         train_losses: list[float] = []
         test_losses: list[float] = []
         print('Training'.center(100, '-'))
         for an_epoch in range(epochs):
             train_loss = 0.0
             total_samples = 0
-            self.model.train()  # Double checking
+            model.train()  # Double checking
             for batch_idx, batch in enumerate(train_loader):
-                _output, loss_tensor = BaseModel.train_step(model=self.model, loss_func=self.loss, optimizer=self.optimizer, batch=batch, device=device)
+                _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch, device=device)
                 batch_length = len(batch[0])
                 loss_value = loss_tensor.item()
                 train_losses.append(loss_value)
@@ -135,12 +142,12 @@ class BaseModel:
                     print(f'Accumulative loss = {train_loss}', end='\r')
             train_loss /= total_samples
             # writer.add_scalar('training loss', train_loss, next(epoch_c))
-            test_loss = BaseModel.test(model=self.model, loss_func=self.loss, loader=test_loader, device=device, metrics=self.metrics)
+            test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, device=device, metrics=metrics)
             # print(test_loss.shape)
             test_losses.append(test_loss)
             print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss:1.3f}, Test Loss = {test_loss[0]:1.3f}')
         print('Training Completed'.center(100, '-'))
-        self.history.append({'train_loss': train_losses, 'test_loss': test_losses})
+        history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
 
     @staticmethod
@@ -149,8 +156,13 @@ class BaseModel:
         x = x.to(device)
         y = y.to(device)
         optimizer.zero_grad()  # clear the gradients of all optimized variables
-        output = model(x)
-        loss_val = loss_func(output, y)
+        output = model.forward(x)
+        try:
+            loss_val = loss_func(output, y)
+        except:
+            print(f'Output shape = {output.shape}, Y shape = {y.shape}')
+            print('Output dtype = ', output.dtype, 'Y dtype = ', y.dtype)
+            raise
         loss_val.backward()
         optimizer.step()
         return output, loss_val
@@ -264,9 +276,9 @@ class Accuracy(object):
         """Used during training process to find overall accuracy through out an epoch
         """
         self.counter += len(correct)
-        tmpo = t.tensor(t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
-        self.total += tmpo * len(correct)
-        return tmpo
+        tmporary = t.tensor(t.round(t.sigmoid(pred.squeeze())) == correct.squeeze().round()).mean()
+        self.total += tmporary.item() * len(correct)
+        return tmporary
 
     @staticmethod
     def measure(pred: t.Tensor, correct: t.Tensor):
