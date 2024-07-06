@@ -90,6 +90,7 @@ def main():
     save_dir = P.home().joinpath("tmp_results", "deep_learning_models", "pytorch_template").create()
     m.save_model(save_dir=save_dir)
     m.save_weights(save_dir=save_dir)
+    m.save_onnx(save_dir=save_dir, model=m.model, dummy_ip=x)
 
     m1 = BaseModel.load_model(save_dir=save_dir, map_location=None)
     m_init = My2LayerNN(hp=hp)

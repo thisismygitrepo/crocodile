@@ -557,7 +557,7 @@ class BaseModel(ABC):
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
                  split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None):
         if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, others_test = DataReader.sample_dataset(split=self.data.split, specs=self.data.specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=split, size=size)
+            x_test, y_test, others_test = DataReader.sample_dataset(split=self.data.split, specs=self.data.specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=split, size=size or self.hp.batch_size)
             if len(others_test) > 0: names_test_resolved = others_test[0]
             else: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         elif names_test is None and x_test is not None:
@@ -694,7 +694,7 @@ class BaseModel(ABC):
         directory = path.search('*_save_*')
         model_obj = cls.load_model(list(directory)[0], pkg='tensorflow')
         assert model_obj is not None, f"Model could not be loaded from {directory}"
-        wrapper_class = cls(hp_obj, data_obj, model_obj)
+        wrapper_class = cls(hp_obj, data_obj, model_obj)  # type: ignore
         return wrapper_class
 
     @staticmethod
