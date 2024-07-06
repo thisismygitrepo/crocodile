@@ -549,13 +549,14 @@ class BaseModel(ABC):
                  names_test: Optional[list[str]] = None,
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None,
                  use_slice: bool = False, size: Optional[int] = None,
-                 split: Literal["train", "test"] = "test",
+                 which_split: Literal["train", "test"] = "test",
                 #  viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None,
                  ) -> EvaluationData:
         specs = self.data.specs
         split = self.data.split
+        size = size or self.hp.batch_size
         if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=split, size=size)
+            x_test, y_test, others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=which_split, size=size)
             if len(others_test) > 0: names_test_resolved = others_test[0]
             else: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         elif names_test is None and x_test is not None:
@@ -839,10 +840,10 @@ class Ensemble(Base):
                 self.models[i].hp.seed = np.random.randint(0, 1000)
                 self.data.split = DataReader.split_the_data(specs=specs, data_dict=data_dict, populate_shapes=populate_shapes, shuffle=True, random_state=self.data.hp.seed, test_size=self.data.hp.test_split)
             self.models[i].fit(**kwargs)
-            self.performance.append(self.models[i].evaluate(aslice=slice(0, -1), viz=False))
+            self.performance.append(self.models[i].evaluate(aslice=slice(0, -1)))
             if save:
                 self.models[i].save_class()
-                Save.pickle(obj=self.performance, path=self.models[i].hp.save_dir / "performance.pkl")
+                Save.pickle(obj=self.performance, path=get_hp_save_dir(self.models[i].hp) / "performance.pkl")
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()

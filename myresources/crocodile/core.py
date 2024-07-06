@@ -226,9 +226,9 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         from functools import reduce
         if default is None:
             tmp = reduce(func, self.list)
-            return List(tmp)
+            return List(tmp)  # type: ignore
         res = reduce(func, self.list, default)
-        return List(res)
+        return List(res)  # type: ignore
     def append(self, item: T) -> 'List[T]': self.list.append(item); return self
     def insert(self, __index: int, __object: T): self.list.insert(__index, __object); return self
     def __add__(self, other: 'List[T]') -> 'List[T]': return List(self.list + list(other))  # implement coersion

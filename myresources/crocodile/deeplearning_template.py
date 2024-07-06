@@ -86,7 +86,8 @@ class Model(dl.BaseModel):
             self.compile()  # add optimizer and loss and metrics.
             self.build(sample_dataset=False)  # build the model (shape will be extracted from data supplied) if not passed.
             self.summary()  # print the model.
-            if plot: self.plot_model()  # make sure this is not called every time the model is instantiated.
+            if plot:  # make sure this is not called every time the model is instantiated.
+                dl.BaseModel.plot_model(model=self.model, model_root=dl.get_hp_save_dir(self.hp))
 
     def get_model(self):
         _ = self  # your crazy model goes here:
@@ -94,7 +95,7 @@ class Model(dl.BaseModel):
         return m
 
     def test(self):
-        report = self.evaluate(viz=False)
+        report = self.evaluate()
         import pandas as pd
         assert isinstance(report.loss_df, pd.DataFrame)
         # loss_name = self.compiler.loss.__class__.__name__ if not hasattr(self.compiler.loss, '__name__') else self.compiler.loss.__name__
@@ -109,17 +110,17 @@ def main():
     d = DataReader(hp)
     d.load_trianing_data()
     m = Model(hp, d, instantiate_model=True)
-    fig, ax = plt.subplots(ncols=2)
+    fig, _ax = plt.subplots(ncols=2)
     fig.set_size_inches(14, 10)
-    _res_before = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='Before training', ax=ax[0]), viz=True)
+    _res_before = m.evaluate(indices=np.arange(10).tolist())  # , viz_kwargs=dict(title='Before training', ax=ax[0]))
     m.fit()
-    _res_after = m.evaluate(indices=np.arange(10).tolist(), viz_kwargs=dict(title='After training', ax=ax[1]), viz=True)
+    _res_after = m.evaluate(indices=np.arange(10).tolist())  # , viz_kwargs=dict(title='After training', ax=ax[1]))
     print(m.test())
     m.save_class(weights_only=False, version="v1")
     m.save_class(weights_only=True, version="v1")
     # m.save_model()
     # m.load_weights(m.hp.save_dir)
-    m2 = Model.from_path(m.hp.save_dir)
+    m2 = Model.from_path(dl.get_hp_save_dir(m.hp))
     return m, m2
 
 
