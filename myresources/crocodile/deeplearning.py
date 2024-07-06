@@ -168,13 +168,14 @@ class DataReader:
         # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'list[Any]', Tf.RaggedTensor etc.
         super().__init__()
         self.hp = hp
-        self.split = split if split is not None else {}
+        self.split: dict[Any, Any] = split if split is not None else {}
         self.plotter = None
         self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
         # self.df_handler = df_handler
     def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
-        base = (P(path) if path is not None else get_hp_save_dir(self.hp)).joinpath(self.subpath).create()
+        hp = self.hp
+        base = (P(path) if path is not None else get_hp_save_dir(hp)).joinpath(self.subpath).create()
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError: data = self.__dict__
         Save.pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
@@ -199,28 +200,34 @@ class DataReader:
     def __repr__(self):
         print(f"DataReader Object with these keys: \n")
         S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
-        if bool(self.split):
+        split = self.split
+        if bool(split):
             print("Split-Data Table:")
-            S(self.split).print(as_config=False, title="Split Data")  # table print
+            S(split).print(as_config=False, title="Split Data")  # table print
         return f"--" * 50
 
-    def split_the_data(self, data_dict: dict[str, Any], populate_shapes: bool, split_kwargs: Optional[dict[str, Any]] = None) -> None:
+    @staticmethod
+    def split_the_data(specs: Specs, data_dict: dict[str, Any], populate_shapes: bool,
+                       shuffle: bool, random_state: int, test_size: float,
+                       split_kwargs: Optional[dict[str, Any]] = None,) -> dict[str, Any]:
         # populating data specs ip / op shapes based on arguments sent to this method.
-        strings = self.specs.get_all_names()
+        split: dict[str, Any] = {}
+
+        strings = specs.get_all_names()
         keys = list(data_dict.keys())
         if len(strings) != len(keys) or set(keys) != set(strings):
-            S(self.specs.__dict__).print(as_config=True, title="Specs Declared")
+            S(specs.__dict__).print(as_config=True, title="Specs Declared")
             # S(data_dict).print(as_config=True, title="Specs Declared")
             print(f"data_dict keys: {keys}")
             raise ValueError(f"Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
 
         if populate_shapes:
-            delcared_ip_shapes = self.specs.ip_shapes
-            delcared_op_shapes = self.specs.op_shapes
-            delcared_other_shapes = self.specs.other_shapes
-            self.specs.ip_shapes = []
-            self.specs.op_shapes = []
-            self.specs.other_shapes = []
+            delcared_ip_shapes = specs.ip_shapes
+            delcared_op_shapes = specs.op_shapes
+            delcared_other_shapes = specs.other_shapes
+            specs.ip_shapes = []
+            specs.op_shapes = []
+            specs.other_shapes = []
             for data_name, data_value in data_dict.items():
                 if type(data_value) in {pd.DataFrame, pd.Series}:
                     a_shape = data_value.iloc[0].shape
@@ -228,41 +235,43 @@ class DataReader:
                     try: item = data_value[0]
                     except IndexError as ie: raise IndexError(f"Data name: {data_name}, data value: {data_value}") from ie
                     a_shape = np.array(item).shape
-                if data_name in self.specs.ip_names: self.specs.ip_shapes.append(a_shape)
-                elif data_name in self.specs.op_names: self.specs.op_shapes.append(a_shape)
-                elif data_name in self.specs.other_names: self.specs.other_shapes.append(a_shape)
-                else: raise ValueError(f"data_name `{data_name}` is not in the specs. I don't know what to do with it.\n{self.specs=}")
+                if data_name in specs.ip_names: specs.ip_shapes.append(a_shape)
+                elif data_name in specs.op_names: specs.op_shapes.append(a_shape)
+                elif data_name in specs.other_names: specs.other_shapes.append(a_shape)
+                else: raise ValueError(f"data_name `{data_name}` is not in the specs. I don't know what to do with it.\n{specs=}")
             if len(delcared_ip_shapes) != 0 and len(delcared_op_shapes) != 0:
-                if delcared_ip_shapes != self.specs.ip_shapes or delcared_op_shapes != self.specs.op_shapes or delcared_other_shapes != self.specs.other_shapes:
+                if delcared_ip_shapes != specs.ip_shapes or delcared_op_shapes != specs.op_shapes or delcared_other_shapes != specs.other_shapes:
                     print(f"Declared ip shapes:     {delcared_ip_shapes}")
                     print(f"Declared op shapes:     {delcared_op_shapes}")
                     print(f"Declared other shapes:  {delcared_other_shapes}")
-                    print(f"Populated ip shapes:    {self.specs.ip_shapes}")
-                    print(f"Populated op shapes:    {self.specs.op_shapes}")
-                    print(f"Populated other shapes: {self.specs.other_shapes}")
+                    print(f"Populated ip shapes:    {specs.ip_shapes}")
+                    print(f"Populated op shapes:    {specs.op_shapes}")
+                    print(f"Populated other shapes: {specs.other_shapes}")
                     raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
-        from sklearn import model_selection
-        tts = model_selection.train_test_split
+        # from sklearn import model_selection
+        from sklearn.model_selection import train_test_split as tts  # type: ignore
+        # tts = model_selection.train_test_split
         args = [data_dict[item] for item in strings]
-        result = tts(*args, test_size=self.hp.test_split, shuffle=self.hp.shuffle, random_state=self.hp.seed, **split_kwargs if split_kwargs is not None else {})
-        self.split = {}  # dict(train_loader=None, test_loader=None)
-        self.split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
-        self.split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
+        result = tts(*args, test_size=test_size, shuffle=shuffle, random_state=random_state, **split_kwargs if split_kwargs is not None else {})
+        split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
+        split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
         print(f"================== Training Data Split ===========================")
-        S(self.split).print()
+        S(split).print()
         print(f"==================================================================")
+        return split
 
-    def sample_dataset(self, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
-                       use_slice: bool = False, split: Literal["train", "test"] = "test", size: Optional[int] = None) -> tuple[list[Any], list[Any], list[Any]]:
-        assert self.split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
-        keys_ip = self.specs.get_split_names(self.specs.ip_names, which_split=split)
-        keys_op = self.specs.get_split_names(self.specs.op_names, which_split=split)
-        keys_others = self.specs.get_split_names(self.specs.other_names, which_split=split)
+    @staticmethod
+    def sample_dataset(specs: Specs, split: dict[str, Any], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
+                       use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
+        assert which_split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
+        keys_ip = specs.get_split_names(specs.ip_names, which_split=which_split)
+        keys_op = specs.get_split_names(specs.op_names, which_split=which_split)
+        keys_others = specs.get_split_names(specs.other_names, which_split=which_split)
 
-        tmp = self.split[keys_ip[0]]
+        tmp = split[keys_ip[0]]
         assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
         ds_size = len(tmp)
-        select_size = size or self.hp.batch_size
+        select_size = size
         start_idx = np.random.choice(ds_size - select_size)
 
         selection: Union[list[int], slice]
@@ -276,7 +285,7 @@ class DataReader:
         y: list[Any] = []
         others: list[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
-            tmp3: Any = self.split[key]
+            tmp3: Any = split[key]
             if isinstance(tmp3, (pd.DataFrame, pd.Series)):
                 item = tmp.iloc[np.array(selection)]
             elif tmp3 is not None:
@@ -286,32 +295,30 @@ class DataReader:
             if idx == 0: x.append(item)
             elif idx == 1: y.append(item)
             else: others.append(item)
-        # x = x[0] if len(self.specs.ip_names) == 1 else x
-        # y = y[0] if len(self.specs.op_names) == 1 else y
-        # others = others[0] if len(self.specs.other_names) == 1 else others
+        # x = x[0] if len(specs.ip_names) == 1 else x
+        # y = y[0] if len(specs.op_names) == 1 else y
+        # others = others[0] if len(specs.other_names) == 1 else others
         # if len(others) == 0:
         #     if type(selection) is slice: others = np.arange(*selection.indices(10000000000000)).tolist()
         #     else: others = selection
         return x, y, others
 
-    def get_random_inputs_outputs(self, ip_shapes: Optional[list[tuple[int, ...]]] = None, op_shapes: Optional[list[tuple[int, ...]]] = None):
-        if ip_shapes is None: ip_shapes = self.specs.ip_shapes
-        if op_shapes is None: op_shapes = self.specs.op_shapes
-        dtype = self.hp.precision if hasattr(self.hp, "precision") else "float32"
-        x = [np.random.randn(self.hp.batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes]
-        y = [np.random.randn(self.hp.batch_size, * op_shape).astype(dtype) for op_shape in op_shapes]
-        # x = x[0] if len(self.specs.ip_names) == 1 else x
-        # y = y[0] if len(self.specs.op_names) == 1 else y
+    @staticmethod
+    def get_random_inputs_outputs(batch_size: int, dtype: PRECISON, ip_shapes: list[tuple[int, ...]], op_shapes: list[tuple[int, ...]]):
+        x = [np.random.randn(batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes]
+        y = [np.random.randn(batch_size, * op_shape).astype(dtype) for op_shape in op_shapes]
+        # x = x[0] if len(specs.ip_names) == 1 else x
+        # y = y[0] if len(specs.op_names) == 1 else y
         return x, y
 
     def preprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity.
     def postprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity
 
     # def standardize(self):
-    #     assert self.split is not None, "Load up the data first before you standardize it."
+    #     assert split is not None, "Load up the data first before you standardize it."
     #     self.scaler = StandardScaler()
-    #     self.split['x_train'] = self.scaler.fit_transform(self.split['x_train'])
-    #     self.split['x_test']= self.scaler.transform(self.split['x_test'])
+    #     split['x_train'] = self.scaler.fit_transform(split['x_train'])
+    #     split['x_test']= self.scaler.transform(split['x_test'])
 
     def image_viz(self, pred: 'npt.NDArray[np.float64]', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
         """
@@ -368,23 +375,24 @@ class BaseModel(ABC):
         * Must be run prior to fit method.
         * Can be run only after defining model attribute.
         """
-        match self.hp.pkg_name:
+        hp = self.hp
+        match hp.pkg_name:
             case 'tensorflow':
                 # import tensorflow as tf
                 # keras = keras
                 import keras
                 if loss is None: loss = keras.losses.MeanSquaredError()
-                if optimizer is None: optimizer = keras.optimizers.Adam(self.hp.learning_rate)
+                if optimizer is None: optimizer = keras.optimizers.Adam(hp.learning_rate)
                 if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
             case 'torch':
                 import torch as pkg  # type: ignore
                 if loss is None: loss = pkg.nn.MSELoss()
-                if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=self.hp.learning_rate)
+                if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=hp.learning_rate)
                 if metrics is None: metrics = []  # [tmp.MeanSquareError()]
         # Create a new compiler object
         self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
         # in both cases: pass the specs to the compiler if we have TF framework
-        if self.hp.pkg.__name__ == "tensorflow" and compile_model:
+        if hp.pkg.__name__ == "tensorflow" and compile_model:
             try: self.model.compile(**self.compiler.__dict__)
             except Exception as ex:
                 _ = ex
@@ -399,20 +407,22 @@ class BaseModel(ABC):
             verbose: Union[int, str] = "auto", callbacks: Optional[list[Any]] = None,
             validation_freq: int = 1,
             **kwargs: Any):
+        hp = self.hp
+        specs = self.data.specs
         assert self.data.split is not None, "Split your data before you start fitting."
-        x_train = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.ip_names, which_split="train")]
-        y_train = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.op_names, which_split="train")]
-        x_test = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.ip_names, which_split="test")]
-        y_test = [self.data.split[item] for item in self.data.specs.get_split_names(self.data.specs.op_names, which_split="test")]
+        x_train = [self.data.split[item] for item in specs.get_split_names(specs.ip_names, which_split="train")]
+        y_train = [self.data.split[item] for item in specs.get_split_names(specs.op_names, which_split="train")]
+        x_test = [self.data.split[item] for item in specs.get_split_names(specs.ip_names, which_split="test")]
+        y_test = [self.data.split[item] for item in specs.get_split_names(specs.op_names, which_split="test")]
         if weight_name is not None:
-            assert weight_name in self.data.specs.other_names, f"weight_string must be one of {self.data.specs.other_names}"
+            assert weight_name in specs.other_names, f"weight_string must be one of {specs.other_names}"
             if sample_weight is None:
-                train_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="train")[0]
+                train_weight_str = specs.get_split_names(names=[weight_name], which_split="train")[0]
                 sample_weight = self.data.split[train_weight_str]
             else:
                 print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
             if val_sample_weight is None:
-                test_weight_str = self.data.specs.get_split_names(names=[weight_name], which_split="test")[0]
+                test_weight_str = specs.get_split_names(names=[weight_name], which_split="test")[0]
                 val_sample_weight = self.data.split[test_weight_str]
             else:
                 print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
@@ -422,33 +432,35 @@ class BaseModel(ABC):
         default_settings: dict[str, Any] = dict(x=x_train[0] if len(x_train) == 1 else x_train,
                                                 y=y_train[0] if len(y_train) == 1 else y_train,
                                                 validation_data=(x_test, y_test) if val_sample_weight is None else (x_test, y_test, val_sample_weight),
-                                                batch_size=self.hp.batch_size, epochs=self.hp.epochs, shuffle=self.hp.shuffle,
+                                                batch_size=hp.batch_size, epochs=hp.epochs, shuffle=hp.shuffle,
                                                 )
         default_settings.update(kwargs)
         hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq)
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = self.plot_loss()
-            artist.fig.savefig(str(get_hp_save_dir(self.hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)))
+            artist.fig.savefig(str(get_hp_save_dir(hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)))
         return self
 
     def switch_to_sgd(self, epochs: int = 10):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
-        match self.hp.pkg_name:
+        hp = self.hp
+        match hp.pkg_name:
             case 'tensorflow':
                 import keras
-                new_optimizer = keras.optimizers.SGD(lr=self.hp.learning_rate * 0.5)
+                new_optimizer = keras.optimizers.SGD(lr=hp.learning_rate * 0.5)
             case 'torch':
                 import torch as t  # type: ignore
-                new_optimizer = t.optim.SGD(self.model.parameters(), lr=self.hp.learning_rate * 0.5)
+                new_optimizer = t.optim.SGD(self.model.parameters(), lr=hp.learning_rate * 0.5)
         self.compiler.optimizer = new_optimizer
         return self.fit(epochs=epochs)
 
     def switch_to_l1(self, epochs: int = 10):
         assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
         print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
-        match self.hp.pkg_name:
+        hp = self.hp
+        match hp.pkg_name:
             case 'tensorflow':
                 import keras
                 self.model.reset_metrics()
@@ -468,14 +480,16 @@ class BaseModel(ABC):
     def viz(self, eval_data: EvaluationData, **kwargs: Any):
         return self.data.viz(eval_data, **kwargs)
     def save_model(self, path: PLike):
-        match self.hp.pkg_name:
+        hp = self.hp
+        match hp.pkg_name:
             case 'tensorflow':
                 path_qualified = str(path) + ".keras"
                 self.model.save(path_qualified)
             case 'torch':
                 self.model.save(path)
     def save_weights(self, directory: PLike):
-        match self.hp.pkg_name:
+        hp = self.hp
+        match hp.pkg_name:
             case 'tensorflow':
                 path = P(directory).joinpath(self.model.name) + ".weights.h5"
                 self.model.save_weights(path)
@@ -501,8 +515,9 @@ class BaseModel(ABC):
             path = search_res.list[0].__str__()
         self.model.load_weights(path)  # .expect_partial()
     def summary(self):
+        hp = self.hp
         from contextlib import redirect_stdout
-        path = get_hp_save_dir(self.hp).joinpath("metadata/model/model_summary.txt").create(parents_only=True)
+        path = get_hp_save_dir(hp).joinpath("metadata/model/model_summary.txt").create(parents_only=True)
         with open(str(path), 'w', encoding='utf-8') as f:
             with redirect_stdout(f): self.model.summary()
         return self.model.summary()
@@ -542,7 +557,7 @@ class BaseModel(ABC):
                  aslice: Optional[slice] = None, indices: Optional[list[int]] = None, use_slice: bool = False, size: Optional[int] = None,
                  split: Literal["train", "test"] = "test", viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None):
         if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, others_test = self.data.sample_dataset(aslice=aslice, indices=indices, use_slice=use_slice, split=split, size=size)
+            x_test, y_test, others_test = DataReader.sample_dataset(split=self.data.split, specs=self.data.specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=split, size=size)
             if len(others_test) > 0: names_test_resolved = others_test[0]
             else: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         elif names_test is None and x_test is not None:
@@ -557,9 +572,9 @@ class BaseModel(ABC):
         y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test_resolved), legend="Prediction")
         y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test_resolved), legend="Ground Truth")
         # if loss_df is not None:
-            # if len(self.data.specs.other_names) == 1: loss_df[self.data.specs.other_names[0]] = names_test_resolved
+            # if len(specs.other_names) == 1: loss_df[specs.other_names[0]] = names_test_resolved
             # else:
-            #     for val, name in zip(names_test, self.data.specs.other_names): loss_df[name] = val
+            #     for val, name in zip(names_test, specs.other_names): loss_df[name] = val
         # loss_name = results.loss_df.columns.to_list()[0]  # first loss path
         # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
         # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test_resolved)]
@@ -595,12 +610,13 @@ class BaseModel(ABC):
         :param weights_only: self-explanatory
         :return:
         """
-        self.hp.save()  # goes into the meta path.
+        hp = self.hp
+        hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        Save.pickle(obj=self.history, path=get_hp_save_dir(self.hp) / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try: Experimental.generate_readme(get_hp_save_dir(self.hp), obj=self.__class__, desc=desc)
+        Save.pickle(obj=self.history, path=get_hp_save_dir(hp) / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
+        try: Experimental.generate_readme(get_hp_save_dir(hp), obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
-        save_dir = get_hp_save_dir(self.hp).joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
+        save_dir = get_hp_save_dir(hp).joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
         if weights_only: self.save_weights(save_dir.create())
         else:
             self.save_model(save_dir)
@@ -622,14 +638,14 @@ class BaseModel(ABC):
         specs = {'__module__': __module,
                  'model_class': self.__class__.__name__,
                  'data_class': self.data.__class__.__name__,
-                 'hp_class': self.hp.__class__.__name__,
+                 'hp_class': hp.__class__.__name__,
                  # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
                  'module_path_rh': module_path_rh,
                  'cwd_rh': P.cwd().collapseuser().as_posix(),
                  }
-        Save.json(obj=specs, path=get_hp_save_dir(self.hp).joinpath('metadata/code_specs.json').str, indent=4)
-        print(f'SAVED Model Class @ {get_hp_save_dir(self.hp).as_uri()}')
-        return get_hp_save_dir(self.hp)
+        Save.json(obj=specs, path=get_hp_save_dir(hp).joinpath('metadata/code_specs.json').str, indent=4)
+        print(f'SAVED Model Class @ {get_hp_save_dir(hp).as_uri()}')
+        return get_hp_save_dir(hp)
 
     @classmethod
     def from_class_weights(cls, path: PLike,
@@ -707,7 +723,8 @@ class BaseModel(ABC):
 
     def plot_model(self, dpi: int = 150, strict: bool = False, **kwargs: Any):  # alternative viz via tf2onnx then Netron.
         import keras
-        path = get_hp_save_dir(self.hp).joinpath("metadata/model/model_plot.png")
+        hp = self.hp
+        path = get_hp_save_dir(hp).joinpath("metadata/model/model_plot.png")
         try:
             keras.utils.plot_model(self.model, to_file=str(path), show_shapes=True, show_layer_names=True, show_layer_activations=True, show_dtype=True, expand_nested=True, dpi=dpi, **kwargs)
             print(f"Successfully plotted the model @ {path.as_uri()}")
@@ -727,18 +744,21 @@ class BaseModel(ABC):
         :param verbose:
         :return:
         """
+        specs = self.data.specs
         try:
-            keys_ip = self.data.specs.get_split_names(self.data.specs.ip_names, which_split="test")
-            keys_op = self.data.specs.get_split_names(self.data.specs.op_names, which_split="test")
+            keys_ip = specs.get_split_names(specs.ip_names, which_split="test")
+            keys_op = specs.get_split_names(specs.op_names, which_split="test")
         except TypeError as te:
             raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
         if ip is None:
             if sample_dataset:
-                ip, _, _ = self.data.sample_dataset()
+                ip, _, _ = self.data.sample_dataset(specs=specs, split=self.data.split, size=self.hp.batch_size)
             else:
-                ip, _ = self.data.get_random_inputs_outputs(ip_shapes=ip_shapes)
-        op = self.model(ip[0] if len(self.data.specs.ip_names) == 1 else ip)
+                ip, _ = DataReader.get_random_inputs_outputs(ip_shapes=ip_shapes or specs.ip_shapes,
+                                                                op_shapes=specs.op_shapes,
+                                                             batch_size=self.hp.batch_size, dtype=self.hp.precision)
+        op = self.model(ip[0] if len(specs.ip_names) == 1 else ip)
         if not isinstance(op, list): ops = [op]
         else: ops = op
         ips = ip
@@ -768,7 +788,7 @@ class Ensemble(Base):
         :param model_class: Either a class for constructing saved_models or list of saved_models already cosntructed.
           * In either case, the following methods should be implemented:
           __init__, load, load_weights, save, save_weights, predict, fit
-          Model constructor should takes everything it needs from self.hp and self.data only.
+          Model constructor should takes everything it needs from hp and self.data only.
           Otherwise, you must pass a list of already constructed saved_models.
         :param size: size of ensemble
         """
@@ -785,7 +805,7 @@ class Ensemble(Base):
             self.data = self.data_class(hp=hp_class())  # type: ignore
             print("Creating Models".center(100, "="))
             for i in tqdm(range(size)):
-                hp = self.hp_class()  # type: ignore
+                hp = hp_class()  # type: ignore
                 hp.name = str(hp.name) + f'__model__{i}'
                 datacopy: SubclassedDataReader = copy.copy(self.data)  # shallow copy
                 datacopy.hp = hp  # type: ignore
@@ -814,11 +834,13 @@ class Ensemble(Base):
 
     def fit(self, data_dict: dict[str, Any], populate_shapes: bool, shuffle_train_test: bool = True, save: bool = True, **kwargs: Any):
         self.performance = []
+        # hp = self.hp_class
+        specs = self.data.specs
         for i in range(self.size):
             print('\n\n', f" Training Model {i} ".center(100, "*"), '\n\n')
             if shuffle_train_test:
                 self.models[i].hp.seed = np.random.randint(0, 1000)
-                self.data.split_the_data(data_dict=data_dict, populate_shapes=populate_shapes)  # shuffle data (shared among models)
+                self.data.split = DataReader.split_the_data(specs=specs, data_dict=data_dict, populate_shapes=populate_shapes, shuffle=True, random_state=self.data.hp.seed, test_size=self.data.hp.test_split)
             self.models[i].fit(**kwargs)
             self.performance.append(self.models[i].evaluate(aslice=slice(0, -1), viz=False))
             if save:
@@ -867,6 +889,7 @@ class Losses:
 class HPTuning:
     def __init__(self):
         # ================== Tuning ===============
+#         kt = install_n_import("kerastuner")
         from tensorboard.plugins.hparams import api as hpt
         self.hpt = hpt
         import tensorflow as tf
@@ -897,7 +920,7 @@ class HPTuning:
     # def gen_writer(self):
     #     import tensorflow as tf
     #     with tf.summary.create_file_writer(str(self.dir)).as_default():
-    #         self.hpt.hparams_config(
+    #         hpt.hparams_config(
     #             hparams=self.params,
     #             metrics=self.metrics)
 
@@ -909,23 +932,11 @@ class HPTuning:
     #         counter += 1
     #         param_dict = dict(zip(self.params.list, combination))
     #         with self.pkg.summary.create_file_writer(str(self.dir / f"run_{counter}")).as_default():
-    #             self.hpt.hparams(param_dict)  # record the values used in this trial
+    #             hpt.hparams(param_dict)  # record the values used in this trial
     #             accuracy = self.run(param_dict)
     #             self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
 
     # def optimize(self): self.gen_writer(); self.loop()
-
-
-# class KerasOptimizer:
-#     def __init__(self, d):
-#         self.data = d
-#         self.tuner = None
-
-#     def __call__(self, ktp): pass
-
-#     def tune(self):
-#         kt = install_n_import("kerastuner")
-#         self.tuner = kt.Hyperband(self, objective='loss', max_epochs=10, factor=3, directory=P.tmp('my_dir'), project_name='intro_to_kt')
 
 
 def batcher(func_type: str = 'function'):

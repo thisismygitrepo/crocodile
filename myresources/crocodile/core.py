@@ -222,7 +222,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def filter(self, func: Callable[[T], bool], which: Callable[[int, T], Union[T, T2]] = lambda _idx, _x: _x) -> 'List[Union[T2, T]]':
         return List([which(idx, x) for idx, x in enumerate(self.list) if func(x)])
     # ======================= Modify Methods ===============================
-    def reduce(self, func: Callable[[T, T], T] = lambda x, y: x + y, default: Optional[T] = None) -> 'List[T]':
+    def reduce(self, func: Callable[[T, T], T], default: Optional[T] = None) -> 'List[T]':
         from functools import reduce
         if default is None:
             tmp = reduce(func, self.list)
@@ -398,7 +398,9 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     @staticmethod
     def concat_values(*dicts: dict[Any, Any], orient: Literal["dict", "list", "series", "split", "tight", "index"] = 'list') -> 'Struct':
         import pandas as pd
-        return Struct(pd.concat(List(dicts).apply(lambda x: Struct(x).to_dataframe()).list).to_dict(orient=orient))  # type: ignore
+        tmp = [Struct(x).to_dataframe() for x in dicts]
+        res = pd.concat(tmp).to_dict(orient=orient)
+        return Struct(res)  # type: ignore
     def plot_plt(self, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
         from crocodile.matplotlib_management import LineArtist
         artist = LineArtist(figname='Structure Plot', **kwargs)

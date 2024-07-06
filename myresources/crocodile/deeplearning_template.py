@@ -57,7 +57,7 @@ class DataReader(dl.DataReader):
         # if profile_df: self.profile_dataframe(df=self.dataset.x)
         # self.get_pandas_profile_path()
         _ = profile_df
-        self.split_the_data(data_dict=self.dataset, populate_shapes=True)
+        self.split = DataReader.split_the_data(data_dict=self.dataset, populate_shapes=True, specs=self.specs, shuffle=self.hp.shuffle, test_size=self.hp.test_split, random_state=self.hp.seed)
 
     def viz(self, eval_data: EvaluationData, ax: Optional[Axes] = None, title: str = ""):
         # _ = names
