@@ -29,7 +29,7 @@ import crocodile.deeplearning as dl
 
 from abc import ABC
 # from collections import OrderedDict
-from typing import Optional, Any, TypeVar
+from typing import Any, TypeVar, Union
 
 
 T = TypeVar('T', bound=Any)
@@ -92,24 +92,27 @@ class BaseModel:
 
     def save_model(self, save_dir: P): t.save(self.model, save_dir.joinpath("model.pth"))
     @staticmethod
-    def load_model(save_dir: P, map_location: Optional[str]):
-        model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location)
+    def load_model(save_dir: P, map_location: Union[str, Device, None]):
+        if map_location is None and t.cuda.is_available():
+            map_location = "cpu"
+        model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location)  # type: ignore
         model.eval()
         return model
 
     def save_weights(self, save_dir: P): t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
     @staticmethod
-    def load_weights(model: nn.Module, save_dir: P, map_location: Optional[str]):
-        # if map_location is None and t.cuda.is_available():
-        #     map_location = "cpu"
+    def load_weights(model: nn.Module, save_dir: P, map_location: Union[str, Device, None]):
+        if map_location is None and t.cuda.is_available():
+            map_location = "cpu"
         path = save_dir.joinpath("weights.pth")
-        model.load_state_dict(t.load(path, map_location=map_location))
+        model.load_state_dict(t.load(path, map_location=map_location))  # type: ignore
         model.eval()
         return model
 
     @staticmethod
-    def infer(model: nn.Module, xx: t.Tensor, device: Device) -> npt.NDArray[np.float32]:
+    def infer(model: nn.Module, xx: npt.NDArray, device: Device) -> npt.NDArray[np.float32]:
         model.eval()
+        # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
         xx_ = t.tensor(data=xx).to(device=device)
         with t.no_grad(): op = model(xx_)
         return op.cpu().detach().numpy()
@@ -138,8 +141,8 @@ class BaseModel:
                 train_losses.append(loss_value)
                 train_loss += loss_value * batch_length
                 total_samples += batch_length
-                if (batch_idx % 20) == 0:
-                    print(f'Accumulative loss = {train_loss}', end='\r')
+                if (batch_idx % 100) == 0:
+                    print(f'Accumulative epoch losses = {train_loss:0.2f}', end='\r')
             train_loss /= total_samples
             # writer.add_scalar('training loss', train_loss, next(epoch_c))
             test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, device=device, metrics=metrics)

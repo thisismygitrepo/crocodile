@@ -80,9 +80,9 @@ class Save:
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-        import pyaml  # type: ignore
+        import yaml
         with open(Path(path), 'w', encoding="utf-8") as file:
-            pyaml.dump(obj, file, **kwargs)
+            yaml.dump(obj, file, **kwargs)
     @staticmethod
     @save_decorator(".toml")
     def toml(obj: dict[Any, Any], path: PLike, encoding: str = 'utf-8'): return Path(path).write_text(install_n_import("toml").dumps(obj), encoding=encoding)
