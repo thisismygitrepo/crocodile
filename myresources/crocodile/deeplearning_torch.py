@@ -44,7 +44,7 @@ class TorchDataReader(dl.DataReader):
         self.batch = None
         self.test_loader = None
 
-    def define_loader(self, args: list[npt.NDArray[np.float32]], device: Device):
+    def define_loader(self, args: list[Union[npt.NDArray[np.float64], npt.NDArray[np.float32]]], device: Device):
         s = self
         tensors: list[t.Tensor] = []
         for an_arg in args:
@@ -112,7 +112,7 @@ class BaseModel:
         return model
 
     @staticmethod
-    def infer(model: nn.Module, xx: npt.NDArray, device: Device) -> npt.NDArray[np.float32]:
+    def infer(model: nn.Module, xx: Union[npt.NDArray[np.float64], npt.NDArray[np.float32]], device: Device) -> npt.NDArray[np.float32]:
         model.eval()
         # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
         xx_ = t.tensor(data=xx).to(device=device)
@@ -151,7 +151,7 @@ class BaseModel:
             # test_losses += [test_loss] * (batch_idx + 1)
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
-            print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss/total_samples:1.3f}, Test Loss = {test_losses[-1]:1.3f}')
+            print(f'Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
         print('Training Completed'.center(100, '-'))
         history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
