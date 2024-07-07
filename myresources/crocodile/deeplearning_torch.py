@@ -19,7 +19,7 @@ import torch as t
 import torch.nn as nn
 from torch.types import Device
 from torch.optim import Optimizer
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 import numpy as np
 import numpy.typing as npt
 # import pandas as pd
@@ -44,15 +44,15 @@ class TorchDataReader(dl.DataReader):
         self.batch = None
         self.test_loader = None
 
-    # def define_loader(self, ):
-    #     s = self
-    #     tensors = tuple()
-    #     for an_arg in args:
-    #         tensors += (t.tensor(an_arg, device=s.hp.device), )
-    #     tensors_dataset = t.utils.data.TensorDataset(*tensors)
-    #     loader = t.utils.data.DataLoader(tensors_dataset, batch_size=s.hp.batch_size)
-    #     batch = next(iter(loader))[0]
-    #     return loader, batch
+    def define_loader(self, args: list[npt.NDArray[np.float32]], device: Device):
+        s = self
+        tensors: list[t.Tensor] = []
+        for an_arg in args:
+            tensors.append(t.tensor(an_arg, device=device))
+        tensors_dataset = TensorDataset(*tensors)
+        loader = DataLoader(tensors_dataset, batch_size=s.hp.batch_size)
+        batch = next(iter(loader))[0]
+        return loader, batch
 
     # def to_torch_tensor(self, x):
     #     """.. note:: Data type is inferred from the input."""
@@ -97,6 +97,7 @@ class BaseModel:
             map_location = "cpu"
         model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location)  # type: ignore
         model.eval()
+        model.compile()
         return model
 
     def save_weights(self, save_dir: P): t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
@@ -107,6 +108,7 @@ class BaseModel:
         path = save_dir.joinpath("weights.pth")
         model.load_state_dict(t.load(path, map_location=map_location))  # type: ignore
         model.eval()
+        model.compile()
         return model
 
     @staticmethod
@@ -127,6 +129,7 @@ class BaseModel:
         metrics = self.metrics
         history: list[dict[str, Any]] = self.history
 
+        batch_idx: int = 0
         train_losses: list[float] = []
         test_losses: list[float] = []
         print('Training'.center(100, '-'))
@@ -138,17 +141,17 @@ class BaseModel:
                 _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch, device=device)
                 batch_length = len(batch[0])
                 loss_value = loss_tensor.item()
-                train_losses.append(loss_value)
+                # train_losses.append(loss_value)
                 train_loss += loss_value * batch_length
                 total_samples += batch_length
                 if (batch_idx % 100) == 0:
-                    print(f'Accumulative epoch losses = {train_loss:0.2f}', end='\r')
-            train_loss /= total_samples
+                    print(f'Training Loss = {train_loss/total_samples:0.2f}', end='\r')
             # writer.add_scalar('training loss', train_loss, next(epoch_c))
             test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, device=device, metrics=metrics)
-            # print(test_loss.shape)
+            # test_losses += [test_loss] * (batch_idx + 1)
+            train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
-            print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss:1.3f}, Test Loss = {test_loss[0]:1.3f}')
+            print(f'Epoch: {an_epoch:3}/{epochs}, Training Loss: {train_loss/total_samples:1.3f}, Test Loss = {test_losses[-1]:1.3f}')
         print('Training Completed'.center(100, '-'))
         history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
@@ -191,7 +194,7 @@ class BaseModel:
                 loss_value = a_metric(prediction, batch[1])
                 per_batch_losses.append(loss_value.item())
             losses.append(per_batch_losses)
-        return np.array(losses).mean(axis=0)
+        return float(np.array(losses).mean(axis=0).squeeze())
 
     @staticmethod
     def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):

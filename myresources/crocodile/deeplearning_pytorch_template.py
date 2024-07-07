@@ -12,13 +12,13 @@ import numpy as np
 import numpy.typing as npt
 
 from crocodile.file_management import P
-from crocodile.deeplearning import PRECISON
+from crocodile.deeplearning import PRECISON, get_hp_save_dir, BaseModel as BBaseModel
 from crocodile.deeplearning_torch import BaseModel
 
 from typing import Literal, TypeAlias
 from dataclasses import dataclass
 
-_ = t
+_ = t, get_hp_save_dir
 WHICH: TypeAlias = Literal["train", "test"]
 
 
@@ -88,6 +88,10 @@ def main():
     m.fit(epochs=hp.epochs, device=hp.device, train_loader=train_dataloader, test_loader=test_dataloader)
 
     save_dir = P.home().joinpath("tmp_results", "deep_learning_models", "pytorch_template").create()
+
+    artist = BBaseModel.plot_loss(history=m.history, y_label="loss")
+    artist.fig.savefig(fname=str(save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+
     m.save_model(save_dir=save_dir)
     m.save_weights(save_dir=save_dir)
     m.save_onnx(save_dir=save_dir, model=m.model, dummy_ip=x)
