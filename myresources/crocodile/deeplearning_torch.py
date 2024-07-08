@@ -25,7 +25,7 @@ import numpy.typing as npt
 # import pandas as pd
 
 from crocodile.file_management import P
-import crocodile.deeplearning as dl
+from crocodile.deeplearning import plot_loss
 
 from abc import ABC
 # from collections import OrderedDict
@@ -34,23 +34,23 @@ from typing import Any, TypeVar, Union
 
 T = TypeVar('T', bound=Any)
 Flatten = t.nn.Flatten
-_ = Dataset
+_ = Dataset, plot_loss
 
 
-class TorchDataReader(dl.DataReader):
+class TorchDataReader:
     def __init__(self, *args: Any, **kwargs: Any):
         super(TorchDataReader, self).__init__(*args, **kwargs)
         self.train_loader = None
         self.batch = None
         self.test_loader = None
 
-    def define_loader(self, args: list[Union[npt.NDArray[np.float64], npt.NDArray[np.float32]]], device: Device):
-        s = self
+    @staticmethod
+    def define_loader(batch_size: int, args: list[Union[npt.NDArray[np.float64], npt.NDArray[np.float32]]], device: Device):
         tensors: list[t.Tensor] = []
         for an_arg in args:
             tensors.append(t.tensor(an_arg, device=device))
         tensors_dataset = TensorDataset(*tensors)
-        loader = DataLoader(tensors_dataset, batch_size=s.hp.batch_size)
+        loader = DataLoader(tensors_dataset, batch_size=batch_size)
         batch = next(iter(loader))[0]
         return loader, batch
 
@@ -196,19 +196,20 @@ class BaseModel:
             losses.append(per_batch_losses)
         return float(np.array(losses).mean(axis=0).squeeze())
 
-    @staticmethod
-    def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
-        from torch import onnx
-        onnx_program = onnx.dynamo_export(model, args=dummy_ip, verbose=True)
-        save_path = save_dir.joinpath("model.onnx")
-        onnx_program.save(str(save_path))
 
-    # @staticmethod
-    # def load_onnx(save_dir: P):
-    #     save_path = save_dir.joinpath("model.onnx")
-    #     from torch import onnx
-    #     onnx_model = onnx.load(save_path)
-    #     onnx.checker.check_model(onnx_model)
+def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
+    from torch import onnx
+    onnx_program = onnx.dynamo_export(model, args=dummy_ip, verbose=True)
+    save_path = save_dir.joinpath("model.onnx")
+    onnx_program.save(str(save_path))
+
+
+def load_onnx(save_dir: P):
+    save_path = save_dir.joinpath("model.onnx")
+    # from torch import onnx
+    import onnx
+    onnx_model = onnx.load(save_path)
+    onnx.checker.check_model(onnx_model)
 
 
 # class ImagesModel(BaseModel):

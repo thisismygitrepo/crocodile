@@ -78,7 +78,7 @@ class HyperParams(Protocol):
     # ================== General ==============================
     name: str
     root: P
-    pkg_name: PACKAGE
+    # pkg_name: PACKAGE
 
     # ===================== Data ==============================
     seed: int
@@ -114,7 +114,7 @@ class HParams:
     root: P  # = P.tmp(folder="tmp_models")
     # _configured: bool = False
     # device_na: None = None
-    pkg_name: PACKAGE = 'tensorflow'
+    # pkg_name: PACKAGE = 'tensorflow'
     device_name: Device = Device.gpu0
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 
@@ -139,15 +139,15 @@ class HParams:
     def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
         data: dict[str, Any] = Read.pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
-    @property
-    def pkg(self):
-        match self.pkg_name:
-            case 'tensorflow':
-                import tensorflow as tf
-                return tf
-            case 'torch':
-                import torch as t  # type: ignore
-                return t
+    # @property
+    # def pkg(self):
+    #     match self.pkg_name:
+    #         case 'tensorflow':
+    #             import tensorflow as tf
+    #             return tf
+    #         case 'torch':
+    #             import torch as t  # type: ignore
+    #             return t
 
 
 class DataReader:
@@ -240,8 +240,7 @@ class DataReader:
                     print(f"Populated op shapes:    {specs.op_shapes}")
                     print(f"Populated other shapes: {specs.other_shapes}")
                     raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
-        # from sklearn import model_selection
-        from sklearn.model_selection import train_test_split as tts  # type: ignore
+        from sklearn.model_selection import train_test_split as tts  # pylint: disable=import-error  # type: ignore  # noqa
         # tts = model_selection.train_test_split
         args = [data_dict[item] for item in strings]
         result = tts(*args, test_size=test_size, shuffle=shuffle, random_state=random_state, **split_kwargs if split_kwargs is not None else {})
@@ -325,11 +324,11 @@ class DataReader:
     #     return None
 
 
-@dataclass
-class Compiler:
-    loss: Any
-    optimizer: Any
-    metrics: list[Any]
+# @dataclass
+# class Compiler:
+#     loss: Any
+#     optimizer: Any
+#     metrics: list[Any]
 
 
 class BaseModel(ABC):
@@ -354,43 +353,42 @@ class BaseModel(ABC):
         __module = self.__class__.__module__
         if __module.startswith('__main__'):
             print("💀 Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
-        self.compiler: Compiler
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
     def get_model(self):
         raise NotImplementedError
-    def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model: bool = True):
-        """ Updates compiler attributes. This acts like a setter.
-        .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
-                  * In case of TF, this is not the case as TF requires actual futher different
-                    compilation before changes take effect.
-        Remember:
-        * Must be run prior to fit method.
-        * Can be run only after defining model attribute.
-        """
-        hp = self.hp
-        match hp.pkg_name:
-            case 'tensorflow':
-                # import tensorflow as tf
-                # keras = keras
-                import keras
-                if loss is None: loss = keras.losses.MeanSquaredError()
-                if optimizer is None: optimizer = keras.optimizers.Adam(hp.learning_rate)
-                if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
-            case 'torch':
-                import torch as pkg  # type: ignore
-                if loss is None: loss = pkg.nn.MSELoss()
-                if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=hp.learning_rate)
-                if metrics is None: metrics = []  # [tmp.MeanSquareError()]
-        # Create a new compiler object
-        self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
-        # in both cases: pass the specs to the compiler if we have TF framework
-        if hp.pkg.__name__ == "tensorflow" and compile_model:
-            try: self.model.compile(**self.compiler.__dict__)
-            except Exception as ex:
-                _ = ex
-                S(self.compiler.__dict__).print(as_config=True, title=f"Model Compilation Specs")
-                print(f"💥 Error while compiling the model.")
-                pass
+    # def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model: bool = True):
+    #     """ Updates compiler attributes. This acts like a setter.
+    #     .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
+    #               * In case of TF, this is not the case as TF requires actual futher different
+    #                 compilation before changes take effect.
+    #     Remember:
+    #     * Must be run prior to fit method.
+    #     * Can be run only after defining model attribute.
+    #     """
+    #     hp = self.hp
+    #     match hp.pkg_name:
+    #         case 'tensorflow':
+    #             # import tensorflow as tf
+    #             # keras = keras
+    #             import keras
+    #             if loss is None: loss = keras.losses.MeanSquaredError()
+    #             if optimizer is None: optimizer = keras.optimizers.Adam(hp.learning_rate)
+    #             if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
+    #         case 'torch':
+    #             import torch as pkg  # type: ignore
+    #             if loss is None: loss = pkg.nn.MSELoss()
+    #             if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=hp.learning_rate)
+    #             if metrics is None: metrics = []  # [tmp.MeanSquareError()]
+    #     # Create a new compiler object
+    #     self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
+    #     # in both cases: pass the specs to the compiler if we have TF framework
+    #     if hp.pkg.__name__ == "tensorflow" and compile_model:
+    #         try: self.model.compile(**self.compiler.__dict__)
+    #         except Exception as ex:
+    #             _ = ex
+    #             S(self.compiler.__dict__).print(as_config=True, title=f"Model Compilation Specs")
+    #             print(f"💥 Error while compiling the model.")
+    #             pass
 
     def fit(self, viz: bool = True,
             weight_name: Optional[str] = None,
@@ -430,36 +428,26 @@ class BaseModel(ABC):
         hist = self.model.fit(**default_settings, callbacks=callbacks, sample_weight=sample_weight, verbose=verbose, validation_freq=validation_freq)
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
-            artist = BaseModel.plot_loss(self.history, y_label="loss")
+            artist = plot_loss(self.history, y_label="loss")
             artist.fig.savefig(fname=str(get_hp_save_dir(hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
         return self
 
     def switch_to_sgd(self, epochs: int = 10):
-        assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
-        print(f'Switching the optimizer to SGD. Loss is fixed to {self.compiler.loss}'.center(100, '*'))
+        print(f'Switching the optimizer to SGD. Loss is fixed.'.center(100, '*'))
         hp = self.hp
-        match hp.pkg_name:
-            case 'tensorflow':
-                import keras
-                new_optimizer = keras.optimizers.SGD(lr=hp.learning_rate * 0.5)
-            case 'torch':
-                import torch as t  # type: ignore
-                new_optimizer = t.optim.SGD(self.model.parameters(), lr=hp.learning_rate * 0.5)
-        self.compiler.optimizer = new_optimizer
+        import keras
+        new_optimizer = keras.optimizers.SGD(lr=hp.learning_rate * 0.5)
+        # import torch as t  # type: ignore
+        # new_optimizer = t.optim.SGD(self.model.parameters(), lr=hp.learning_rate * 0.5)
+        self.model.compile(optimizer=new_optimizer)
         return self.fit(epochs=epochs)
 
-    def switch_to_l1(self, epochs: int = 10):
-        assert self.compiler is not None, "Compiler is not initialized. Please initialize the compiler first."
-        print(f'Switching the loss to l1. Optimizer is fixed to {self.compiler.optimizer}'.center(100, '*'))
-        hp = self.hp
-        match hp.pkg_name:
-            case 'tensorflow':
-                import keras
-                self.model.reset_metrics()
-                new_loss = keras.losses.MeanAbsoluteError()
-            case 'torch': raise NotImplementedError
-        self.compiler.loss = new_loss
-        return self.fit(epochs=epochs)
+    def switch_to_l1(self):
+        print(f'Switching the loss to l1. Optimizer is fixed.'.center(100, '*'))
+        import keras
+        self.model.reset_metrics()
+        new_loss = keras.losses.MeanAbsoluteError()
+        self.model.compile(loss=new_loss)
 
     def __call__(self, *args: Any, **kwargs: Any):
         return self.model(*args, **kwargs)
@@ -471,31 +459,15 @@ class BaseModel(ABC):
     # def viz(self, eval_data: EvaluationData, **kwargs: Any):
     #     return self.data.viz(eval_data=eval_data, **kwargs)
     def save_model(self, path: PLike):
-        hp = self.hp
-        match hp.pkg_name:
-            case 'tensorflow':
-                path_qualified = str(path) + ".keras"
-                self.model.save(path_qualified)
-            case 'torch':
-                self.model.save(path)
+        path_qualified = str(path) + ".keras"
+        self.model.save(path_qualified)
     def save_weights(self, directory: PLike):
-        hp = self.hp
-        match hp.pkg_name:
-            case 'tensorflow':
-                path = P(directory).joinpath(self.model.name) + ".weights.h5"
-                self.model.save_weights(path)
-            case 'torch':
-                path = P(directory).joinpath(self.model.name)
-                self.model.save_weights(path)
+        path = P(directory).joinpath(self.model.name) + ".weights.h5"
+        self.model.save_weights(path)
     @staticmethod
-    def load_model(directory: PLike, pkg: PACKAGE):
-        match pkg:
-            case 'tensorflow':
-                import keras
-                return keras.models.load_model(str(directory))
-                # path to directory. file saved_model.pb is read auto.
-            case 'torch':
-                raise NotImplementedError
+    def load_model(directory: PLike):
+        import keras
+        return keras.models.load_model(str(directory))
     def load_weights(self, directory: PLike) -> None:
         # assert self.model is not None, "Model is not initialized. Please initialize the model first."
         search_res = P(directory).search('*.data*')
@@ -516,10 +488,6 @@ class BaseModel(ABC):
         for layer in self.model.layers:
             print(layer.get_config(), "\n==============================")
         return None
-    @staticmethod
-    def plot_loss(history: list[dict[str, Any]], y_label: str):
-        res = S.concat_values(*history)
-        return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
 
     # def infer(self, x: Any) -> 'npt.NDArray[np.float64]':
     #     """ This method assumes numpy input, datatype-wise and is also preprocessed.
@@ -582,7 +550,7 @@ class BaseModel(ABC):
 
     def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
         # if self.compiler is None: return None
-        metrics = [self.compiler.loss] + self.compiler.metrics
+        metrics = []
         loss_dict: dict[str, list[Any]] = dict()
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
@@ -690,7 +658,7 @@ class BaseModel(ABC):
         hp_obj = HParams.from_saved_data(path)
         data_obj = DataReader.from_saved_data(path, hp=hp_obj)
         directory = path.search('*_save_*')
-        model_obj = cls.load_model(list(directory)[0], pkg='tensorflow')
+        model_obj = cls.load_model(list(directory)[0])
         assert model_obj is not None, f"Model could not be loaded from {directory}"
         wrapper_class = cls(hp_obj, data_obj, model_obj)  # type: ignore
         return wrapper_class
@@ -847,6 +815,11 @@ class Ensemble(Base):
         print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
+
+
+def plot_loss(history: list[dict[str, Any]], y_label: str):
+    res = S.concat_values(*history)
+    return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
 
 
 class Losses:

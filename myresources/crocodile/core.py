@@ -80,7 +80,7 @@ class Save:
     @staticmethod
     @save_decorator(".yml")
     def yaml(obj: dict[Any, Any], path: PLike, **kwargs: Any):
-        import yaml
+        import yaml  # type: ignore
         with open(Path(path), 'w', encoding="utf-8") as file:
             yaml.dump(obj, file, **kwargs)
     @staticmethod
@@ -266,13 +266,14 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
             iterator = (self.list if not verbose else tqdm(self.list, desc=desc))
         else:
             iterator = (zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc))
-        if jobs:
-            from joblib import Parallel, delayed
-            if other is None: return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator))  # type: ignore
-            return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
-        if other is None:
-            return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
-        return List([func(x, y) for x, y in iterator])  # type: ignore
+        if jobs is None or jobs ==1:
+            if other is None:
+                return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
+            return List([func(x, y) for x, y in iterator])  # type: ignore
+        from joblib import Parallel, delayed
+        if other is None: return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, *args, **kwargs) for x in iterator))  # type: ignore
+        return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
+
     def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
         import pandas as pd
         df = pd.DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))

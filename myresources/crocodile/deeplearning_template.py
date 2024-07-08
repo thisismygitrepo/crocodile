@@ -83,7 +83,8 @@ class Model(dl.BaseModel):
         k.backend.set_floatx(self.hp.precision)
         if instantiate_model:
             self.model = self.get_model()
-            self.compile()  # add optimizer and loss and metrics.
+            # self.compile()  # add optimizer and loss and metrics.
+            self.model.compile(optimizer=k.optimizers.Adam(learning_rate=self.hp.learning_rate), loss='mse', metrics=['mae'])
             self.build(sample_dataset=False)  # build the model (shape will be extracted from data supplied) if not passed.
             self.summary()  # print the model.
             if plot:  # make sure this is not called every time the model is instantiated.
