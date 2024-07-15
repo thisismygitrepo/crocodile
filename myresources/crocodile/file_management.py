@@ -107,7 +107,7 @@ class Read:
             if suffix in ('eps', 'jpg', 'jpeg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svg', 'svgz', 'tif', 'tiff'):
                 import matplotlib.pyplot as pyplot
                 return pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
-            if suffix == ".parquet":
+            if suffix == "parquet":
                 import pandas as pd
                 return pd.read_parquet(path, **kwargs)
             try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
