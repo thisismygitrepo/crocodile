@@ -17,7 +17,7 @@ import enum
 import copy
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, TypeAlias, Protocol
+from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Protocol
 
 
 @dataclass
@@ -70,7 +70,6 @@ SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 
 HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
-PACKAGE: TypeAlias = Literal['tensorflow', 'torch']
 PRECISON = Literal['float64', 'float32', 'float16']
 
 
@@ -78,7 +77,6 @@ class HyperParams(Protocol):
     # ================== General ==============================
     name: str
     root: P
-    # pkg_name: PACKAGE
 
     # ===================== Data ==============================
     seed: int
@@ -112,11 +110,7 @@ class HParams:
     # ================== General ==============================
     name: str  # field(default_factory=lambda: "model-" + randstr(noun=True))
     root: P  # = P.tmp(folder="tmp_models")
-    # _configured: bool = False
-    # device_na: None = None
-    # pkg_name: PACKAGE = 'tensorflow'
-    device_name: Device = Device.gpu0
-    subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
+    device_name: Device = Device.cpu
 
     def save(self):
         # subpath = self.subpath
@@ -137,17 +131,8 @@ class HParams:
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
     def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
-        data: dict[str, Any] = Read.pickle(path=P(path) / cls.subpath / "hparams.HParams.dat.pkl", *args, **kwargs)
+        data: dict[str, Any] = Read.pickle(path=P(path) / HPARAMS_SUBPATH / "hparams.HParams.dat.pkl", *args, **kwargs)
         return cls(**data)
-    # @property
-    # def pkg(self):
-    #     match self.pkg_name:
-    #         case 'tensorflow':
-    #             import tensorflow as tf
-    #             return tf
-    #         case 'torch':
-    #             import torch as t  # type: ignore
-    #             return t
 
 
 class DataReader:
@@ -302,15 +287,11 @@ class DataReader:
         # y = y[0] if len(specs.op_names) == 1 else y
         return x, y
 
-    def preprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity.
-    def postprocess(self, *args: Any, **kwargs: Any): _ = args, kwargs, self; return args[0]  # acts like identity
-
     # def standardize(self):
     #     assert split is not None, "Load up the data first before you standardize it."
     #     self.scaler = StandardScaler()
     #     split['x_train'] = self.scaler.fit_transform(split['x_train'])
     #     split['x_test']= self.scaler.transform(split['x_test'])
-
     def image_viz(self, pred: 'npt.NDArray[np.float64]', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
         """
         Assumes numpy inputs
@@ -322,13 +303,6 @@ class DataReader:
     #     """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
     #     _ = self, eval_data, kwargs
     #     return None
-
-
-# @dataclass
-# class Compiler:
-#     loss: Any
-#     optimizer: Any
-#     metrics: list[Any]
 
 
 class BaseModel(ABC):
@@ -356,40 +330,6 @@ class BaseModel(ABC):
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
     def get_model(self):
         raise NotImplementedError
-    # def compile(self, loss: Optional[Any] = None, optimizer: Optional[Any] = None, metrics: Optional[list[Any]] = None, compile_model: bool = True):
-    #     """ Updates compiler attributes. This acts like a setter.
-    #     .. note:: * this method is as good as setting attributes of `compiler` directly in case of PyTorch.
-    #               * In case of TF, this is not the case as TF requires actual futher different
-    #                 compilation before changes take effect.
-    #     Remember:
-    #     * Must be run prior to fit method.
-    #     * Can be run only after defining model attribute.
-    #     """
-    #     hp = self.hp
-    #     match hp.pkg_name:
-    #         case 'tensorflow':
-    #             # import tensorflow as tf
-    #             # keras = keras
-    #             import keras
-    #             if loss is None: loss = keras.losses.MeanSquaredError()
-    #             if optimizer is None: optimizer = keras.optimizers.Adam(hp.learning_rate)
-    #             if metrics is None: metrics = []  # [pkg.keras.metrics.MeanSquaredError()]
-    #         case 'torch':
-    #             import torch as pkg  # type: ignore
-    #             if loss is None: loss = pkg.nn.MSELoss()
-    #             if optimizer is None: optimizer = pkg.optim.Adam(self.model.parameters(), lr=hp.learning_rate)
-    #             if metrics is None: metrics = []  # [tmp.MeanSquareError()]
-    #     # Create a new compiler object
-    #     self.compiler = Compiler(loss=loss, optimizer=optimizer, metrics=list(metrics))
-    #     # in both cases: pass the specs to the compiler if we have TF framework
-    #     if hp.pkg.__name__ == "tensorflow" and compile_model:
-    #         try: self.model.compile(**self.compiler.__dict__)
-    #         except Exception as ex:
-    #             _ = ex
-    #             S(self.compiler.__dict__).print(as_config=True, title=f"Model Compilation Specs")
-    #             print(f"💥 Error while compiling the model.")
-    #             pass
-
     def fit(self, viz: bool = True,
             weight_name: Optional[str] = None,
             val_sample_weight: Optional['npt.NDArray[np.float64]'] = None,
@@ -448,16 +388,8 @@ class BaseModel(ABC):
         self.model.reset_metrics()
         new_loss = keras.losses.MeanAbsoluteError()
         self.model.compile(loss=new_loss)
-
     def __call__(self, *args: Any, **kwargs: Any):
         return self.model(*args, **kwargs)
-    # def preprocess(self, *args: Any, **kwargs: Any):
-    #     """Converts an object to a numerical form consumable by the NN."""
-    #     return self.data.preprocess(*args, **kwargs)
-    # def postprocess(self, *args: Any, **kwargs: Any):
-    #     return self.data.postprocess(*args, **kwargs)
-    # def viz(self, eval_data: EvaluationData, **kwargs: Any):
-    #     return self.data.viz(eval_data=eval_data, **kwargs)
     def save_model(self, path: PLike):
         path_qualified = str(path) + ".keras"
         self.model.save(path_qualified)
@@ -469,7 +401,6 @@ class BaseModel(ABC):
         import keras
         return keras.models.load_model(str(directory))
     def load_weights(self, directory: PLike) -> None:
-        # assert self.model is not None, "Model is not initialized. Please initialize the model first."
         search_res = P(directory).search('*.data*')
         if len(search_res) > 0:
             path = search_res.list[0].__str__().split('.data')[0]
@@ -499,19 +430,6 @@ class BaseModel(ABC):
     #     # https://stackoverflow.com/questions/64199384/tf-keras-model-predict-results-in-memory-leak
     #     # https://github.com/tensorflow/tensorflow/issues/44711
     #     return self.model.predict(x)
-
-    # def predict(self, x: Any, **kwargs: Any):
-    #     """This method assumes preprocessed input. Returns postprocessed output. It is useful at evaluation time with preprocessed test set."""
-    #     return self.postprocess(self.infer(x), **kwargs)
-    # def deduce(self, obj: Any, viz: bool = True) -> DeductionResult:
-    #     """Assumes that contents of the object are in the form of a batch."""
-        # preprocessed = self.preprocess(obj)
-        # prediction = self.infer(preprocessed)
-        # postprocessed = self.postprocess(prediction)
-        # result = DeductionResult(input=obj, preprocessed=preprocessed, prediction=prediction, postprocessed=postprocessed)
-        # if viz: self.viz(postprocessed, **kwargs)
-        # return result
-
     def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None,
                  y_test: Optional[list['npt.NDArray[np.float64]']] = None,
                  names_test: Optional[list[str]] = None,
@@ -536,15 +454,6 @@ class BaseModel(ABC):
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
         loss_df = self.get_metrics_evaluations(y_pred, y_test)
-        # y_pred_pp = self.postprocess(y_pred, per_instance_kwargs=dict(name=names_test_resolved), legend="Prediction")
-        # y_true_pp = self.postprocess(y_test, per_instance_kwargs=dict(name=names_test_resolved), legend="Ground Truth")
-        # if loss_df is not None:
-            # if len(specs.other_names) == 1: loss_df[specs.other_names[0]] = names_test_resolved
-            # else:
-            #     for val, name in zip(names_test, specs.other_names): loss_df[name] = val
-        # loss_name = results.loss_df.columns.to_list()[0]  # first loss path
-        # loss_label = results.loss_df[loss_name].apply(lambda x: f"{loss_name} = {x}").to_list()
-        # names: list[str] = [f"{aname}. Case: {anindex}" for aname, anindex in zip(loss_label, names_test_resolved)]
         results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved], loss_df=loss_df)
         return results
 
@@ -557,9 +466,6 @@ class BaseModel(ABC):
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
             elif hasattr(a_metric, "__class__"): name = a_metric.__class__.__name__
             else: name = "unknown_loss_name"
-            # try:  # EAFP vs LBYL: both are duck-typing styles as they ask for what object can do (whether by introspection or trial) as opposed to checking its type.
-            #     path = a_metric.path  # works for subclasses Metrics
-            # except AttributeError: path = a_metric.__name__  # works for functions.
             loss_dict[name] = []
             for a_prediction, a_y_test in zip(prediction[0], groun_truth[0]):
                 if hasattr(a_metric, "reset_states"): a_metric.reset_states()
@@ -623,7 +529,7 @@ class BaseModel(ABC):
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
-            hp_obj = Read.pickle(path=path / HParams.subpath + "hparams.HParams.pkl")
+            hp_obj = Read.pickle(path=path / HPARAMS_SUBPATH + "hparams.HParams.pkl")
         if device_name: hp_obj.device_name = device_name
         if hp_obj.root != path.parent:
             hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
@@ -887,27 +793,6 @@ class HPTuning:
         _, _ = self, param_dict
         # should return a result that you want to maximize
         return _
-
-    # def gen_writer(self):
-    #     import tensorflow as tf
-    #     with tf.summary.create_file_writer(str(self.dir)).as_default():
-    #         hpt.hparams_config(
-    #             hparams=self.params,
-    #             metrics=self.metrics)
-
-    # def loop(self):
-    #     import itertools
-    #     counter = -1
-    #     tmp = self.params.list[0].domain.values
-    #     for combination in itertools.product(*[tmp]):
-    #         counter += 1
-    #         param_dict = dict(zip(self.params.list, combination))
-    #         with self.pkg.summary.create_file_writer(str(self.dir / f"run_{counter}")).as_default():
-    #             hpt.hparams(param_dict)  # record the values used in this trial
-    #             accuracy = self.run(param_dict)
-    #             self.pkg.summary.scalar(self.acc_metric, accuracy, step=1)
-
-    # def optimize(self): self.gen_writer(); self.loop()
 
 
 def batcher(func_type: str = 'function'):
