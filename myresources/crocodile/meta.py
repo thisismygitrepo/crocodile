@@ -295,7 +295,6 @@ class Terminal:
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __init__(self, host: Optional[str] = None, username: Optional[str] = None, hostname: Optional[str] = None, sshkey: Optional[str] = None, pwd: Optional[str] = None, port: int = 22, ve: Optional[str] = "ve", compress: bool = False):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        # self.tmate_sess = tmate_sess
         self.pwd = pwd
         self.ve = ve
         self.compress = compress  # Defaults: (1) use localhost if nothing provided.
@@ -363,7 +362,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.platform = platform
         self.remote_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""  # works for both cmd and pwsh
-    def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "tmate_sess", "port", "sshkey", "compress", "pwd", "ve"]}
+    def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "port", "sshkey", "compress", "pwd", "ve"]}
     def __setstate__(self, state: dict[str, Any]): SSH(**state)
     def get_remote_machine(self) -> MACHINE:
         if self._remote_machine is None:
