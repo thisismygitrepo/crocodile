@@ -4,7 +4,7 @@ File
 """
 
 
-from crocodile.core import Struct, List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
+from crocodile.core import List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime, timedelta
 import os
 import sys
@@ -16,7 +16,6 @@ OPLike: TypeAlias = Union[str, 'P', Path, None]
 PLike: TypeAlias = Union[str, 'P', Path]
 FILE_MODE: TypeAlias = Literal['r', 'w', 'x', 'a']
 SHUTIL_FORMATS: TypeAlias = Literal["zip", "tar", "gztar", "bztar", "xztar"]
-_ = Struct  # to be removed in the future
 
 
 # %% =============================== Security ================================================

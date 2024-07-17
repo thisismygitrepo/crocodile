@@ -263,9 +263,13 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         from tqdm import tqdm
         iterator: Iterable[Any]
         if other is None:
-            iterator = (self.list if not verbose else tqdm(self.list, desc=desc))
+            if not verbose: iterator = self.list
+            else: iterator = tqdm(self.list, desc=desc)
         else:
-            iterator = (zip(self.list, other) if not verbose else tqdm(zip(self.list, other), desc=desc))
+            if not verbose:
+                iterator = zip(self.list, other)
+            else:
+                iterator =  tqdm(zip(self.list, other), desc=desc)
         if jobs is None or jobs ==1:
             if other is None:
                 return List([func(x, *args, **kwargs) for x in iterator if filt(x)])
