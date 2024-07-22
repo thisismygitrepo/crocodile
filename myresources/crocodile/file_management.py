@@ -170,6 +170,10 @@ class Read:
         return runpy.run_path(str(path), init_globals=init_globals, run_name=run_name)
     @staticmethod
     def txt(path: PLike, encoding: str = 'utf-8') -> str: return P(path).read_text(encoding=encoding)
+    @staticmethod
+    def parquet(path: PLike, **kwargs: Any):
+        import pandas as pd
+        return pd.read_parquet(path, **kwargs)
 
 
 def modify_text(txt_raw: str, txt_search: str, txt_alt: Union[str, Callable[[str], str]], replace_line: bool = True, notfound_append: bool = False, prepend: bool = False, strict: bool = False):
