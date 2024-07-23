@@ -336,7 +336,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if index:
             appended_name = f'{name}_{len(self.parent.search(f"*{self.trunk}*"))}'
             return self.append(name=appended_name, index=False, verbose=verbose, suffix=suffix, **kwargs)
-        return self._return(self.parent.joinpath(self.trunk + (name or ("_" + str(timestamp()))) + (suffix or ''.join(('bruh' + self).suffixes))), operation="rename", verbose=verbose, **kwargs)
+        full_name = (name or ("_" + str(timestamp())))
+        full_suffix = suffix or ''.join(('bruh' + self).suffixes)
+        subpath = self.trunk + full_name + full_suffix
+        return self._return(self.parent.joinpath(subpath), operation="rename", verbose=verbose, **kwargs)
     def with_trunk(self, name: str, verbose: bool = True, **kwargs: Any): return self._return(self.parent.joinpath(name + "".join(self.suffixes)), operation="rename", verbose=verbose, **kwargs)  # Complementary to `with_stem` and `with_suffix`
     def with_name(self, name: str, verbose: bool = True, inplace: bool = False, overwrite: bool = False, **kwargs: Any):
         assert type(name) is str, "name must be a string."
