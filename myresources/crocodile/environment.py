@@ -85,6 +85,7 @@ class NetworkAddresses(TypedDict):
 
 
 def get_network_addresses() -> NetworkAddresses:
+    print("Getting network addresses")
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join((f"{mac}012X")[i:i + 2] for i in range(0, 12, 2))  # type: ignore
