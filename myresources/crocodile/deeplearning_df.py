@@ -104,8 +104,9 @@ class NumericalClipper:
         self.columns = list(df.columns)
         for col in self.columns:
             series = df[col]
-            self.value_min[col] = series.quantile(self.quant_min)
-            self.value_max[col] = series.quantile(self.quant_max)
+            self.value_min[col] = float(series.quantile(self.quant_min))
+            self.value_max[col] = float(series.quantile(self.quant_max))
+            # without applying float(x), quantile returns np.float64 object which can throw up the dtype at transform time.
         if verbose: self.viz()
         return self
 
