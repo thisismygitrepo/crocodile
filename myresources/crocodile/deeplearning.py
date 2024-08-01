@@ -11,7 +11,7 @@ from tqdm import tqdm
 from crocodile.matplotlib_management import ImShow
 from crocodile.core import List as L, Struct as S, Base
 from crocodile.file_management import P, Save, PLike, Read
-from crocodile.meta import Experimental
+from crocodile.meta import generate_readme
 
 import enum
 import copy
@@ -486,7 +486,7 @@ class BaseModel(ABC):
         hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
         Save.pickle(obj=self.history, path=get_hp_save_dir(hp) / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try: Experimental.generate_readme(get_hp_save_dir(hp), obj=self.__class__, desc=desc)
+        try: generate_readme(get_hp_save_dir(hp), obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = get_hp_save_dir(hp).joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
         if weights_only: self.save_weights(save_dir.create())

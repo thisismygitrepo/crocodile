@@ -9,7 +9,7 @@ import platform
 
 from crocodile.core import Struct as S
 from crocodile.file_management import P, Read
-from crocodile.meta import Experimental, Terminal
+from crocodile.meta import generate_readme, Terminal
 from crocodile.cluster.loader_runner import JobParams, FileManager, WorkloadParams, JOB_STATUS
 from crocodile.cluster.remote_machine import RemoteMachineConfig
 
@@ -101,7 +101,7 @@ else:
 print(f"job {manager.job_id} is completed.")
 
 
-Experimental.generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
+generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
 
 Job executed via tb.cluster.Machine
 remote: {params.ssh_repr}

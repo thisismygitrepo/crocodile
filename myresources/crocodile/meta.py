@@ -20,6 +20,7 @@ SHELLS: TypeAlias = Literal["default", "cmd", "powershell", "pwsh", "bash"]  # p
 CONSOLE: TypeAlias = Literal["wt", "cmd"]
 MACHINE: TypeAlias = Literal["Windows", "Linux", "Darwin"]
 T = TypeVar('T')
+PS = ParamSpec('PS')
 
 
 @dataclass
@@ -550,13 +551,6 @@ class Scheduler:
         raise ex
 
 
-# def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):
-#     try: return func()
-#     except BaseException as ex:  # or Exception
-#         if verbose: print(ex)
-#         if raise_ is not None: raise raise_
-#         if handle is not None: return handle(ex, **kwargs)
-#         return run() if run is not None else return_
 def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_code: bool = True, verbose: bool = True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
     import inspect
     text: str = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
@@ -592,9 +586,6 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         return readmepath
 
 
-PS = ParamSpec('PS')
-
-
 class RepeatUntilNoException:  # see https://github.com/jd/tenacity
     def __init__(self, retry: int = 3, sleep: float = 1.0, timeout: Optional[float] = None):
         self.retry = retry
@@ -623,42 +614,9 @@ def add(a: int, b: int):
 c = add(1, 2)
 
 
-def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
-def monkey_patch(class_inst: Any, func: Callable[[Any], Any]): setattr(class_inst.__class__, func.__name__, func)
-# def capture_locals(func: Callable[[Any], Any], scope: dict[str, Any], args: Optional[Any] = None, self: Optional[str] = None, update_scope: bool = True):
-#     res: dict[str, Any] = {}
-#     exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res)  # type: ignore
-#     _ = scope.update(res) if update_scope else None; return Struct(res)
-# def load_from_source_code(directory: str, obj: Optional[Any] = None, delete: bool = False):
-#     P(directory).search("source_code*", r=True)[0].unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
-#     sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
-#     return getattr(sourcefile, obj) if obj is not None else sourcefile
-# def extract_code(func, code: Optional[str] = None, include_args: bool = True, verbose: bool = True, copy2clipboard: bool = False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
-#     import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
-#     raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
-#     code_string = '\n'.join([aline if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") for aline in lines])  # remove return statements if there else keep line as is.
-#     title, args_header, injection_header, body_header, suffix = ((f"\n# " + f"{item} {func.__name__}".center(50, "=") + "\n") for item in ["CODE EXTRACTED FROM", "ARGS KWARGS OF", "INJECTED CODE INTO", "BODY OF", "BODY END OF"])
-#     code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix  # added later so it has more overwrite authority.
-#     _ = install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
-# def extract_arguments(func: Callable[[Any], Any], copy2clipboard: bool = False, **kwargs: Any):
-#     ak = Struct(dict((inspect := inspect).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and func_kwargs.
-#     res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(as_config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
-#     ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and func_kwargs = {}
-#     _ = install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
-# def run_cell(pointer, module=sys.modules[__name__]):
-#     for cell in P(module.__file__).read_text().split("#%%"):
-#         if pointer in cell.split('\n')[0]: break  # bingo
-#     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
-    # print(cell); install_n_import("clipboard").copy(cell); return cell
-class Experimental:
-    show_globals = staticmethod(show_globals)
-    monkey_patch = staticmethod(monkey_patch)
-    # capture_locals = staticmethod(capture_locals)
-    generate_readme = staticmethod(generate_readme)
-    # load_from_source_code = staticmethod(load_from_source_code)
-    # extract_code = staticmethod(extract_code)
-    # extract_arguments = staticmethod(extract_arguments)
-    # run_cell = staticmethod(run_cell)  # Debugging and Meta programming tools"""
+def show_globals(scope: dict[str, Any], **kwargs: Any):
+    # see print_dir
+    return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 _ = np, pd, px, plt, go
 
-from crocodile.meta import Experimental, Terminal, Log, Scheduler, SSH
+from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH
 from crocodile.meta import logging, subprocess, sys, time
 # from crocodile import run
 from crocodile.file_management import P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
@@ -23,7 +23,7 @@ from crocodile.core import str2timedelta, timestamp, randstr, validate_name, ins
 
 _ = str2timedelta, timestamp, randstr, validate_name, install_n_import
 __ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
-___ = Experimental, Terminal, Log, Scheduler, SSH
+___ = generate_readme, Terminal, Log, Scheduler, SSH
 ____ = logging, subprocess, sys, time
 
 Path = P
@@ -31,10 +31,9 @@ L = List
 S = Struct
 D = Display
 T = Terminal
-E = Experimental
 tmp = P.tmp
 
-_1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
+_1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
 
 
