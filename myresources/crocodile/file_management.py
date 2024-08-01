@@ -521,7 +521,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             raw = glob(str(slf / "**" / pattern), recursive=r) if r else glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
         if ".zip" not in slf and compressed:
             tmp = [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]
-            raw += List(tmp).reduce()  # type: ignore
+            haha = List(tmp).reduce(func=lambda x, y: x + y)
+            raw = raw + haha  # type: ignore
         processed = []
         for item in raw:
             item_ = P(item)

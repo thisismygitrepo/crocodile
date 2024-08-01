@@ -97,7 +97,10 @@ class BaseModel:
             map_location = "cpu"
         model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location)  # type: ignore
         model.eval()
-        model.compile()
+        try:
+            model.compile()
+        except Exception as e:
+            print(f"Model.compile() failed with error: {e}")
         return model
 
     def save_weights(self, save_dir: P): t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
