@@ -5,25 +5,10 @@
 
 from crocodile.file_management import P
 from crocodile.core import randstr
-# from crocodile.meta import Terminal
-
-# import pandas as pd
-
-# import plotly.graph_objects as go
-# import plotly.express as px
-# from plotly.subplots import make_subplots
 import plotly.io as pio
-# import dash_bootstrap_components as dbc
-
 import dash
-# from dash import Input, Output, State, callback_context as ctx
-# from dash import dcc
-# from dash import html
-# import dash_daq as daq
 from typing import Any, Optional
-
 from types import SimpleNamespace
-# import sys
 
 pio.renderers.default = "browser"
 
