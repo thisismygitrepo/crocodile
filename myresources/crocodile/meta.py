@@ -7,6 +7,7 @@ This is a module for handling meta operations like logging, terminal operations,
 from crocodile.core import randstr, str2timedelta, Save, install_n_import, List, Struct
 from crocodile.file_management import P, datetime, OPLike, PLike
 import time
+import datetime as dtm
 import logging
 import subprocess
 import sys
@@ -380,8 +381,13 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if self._remote_distro is None: self._remote_distro = self.run_py("print(install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
         return self._remote_distro
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
-    def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
-    def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {os.environ[name]}; export {name}")
+    def send_ssh_key(self):
+        self.copy_from_here("~/.ssh/id_rsa.pub")
+        assert self.get_remote_machine() == "Windows"
+        self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
+    def copy_env_var(self, name: str):
+        assert self.get_remote_machine() == "Linux"
+        return self.run(f"{name} = {os.environ[name]}; export {name}")
     def get_remote_repr(self, add_machine: bool = False) -> str: return f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")
     def get_local_repr(self, add_machine: bool = False) -> str:
         import getpass
@@ -400,7 +406,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         res = Response(stdin=raw[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)  # type: ignore
         if not verbose: res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False)
         else: res.print()
-        self.terminal_responses.append(res); return res
+        self.terminal_responses.append(res)
+        return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False) -> Union[Any, Response]:
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None, toolbox=True)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_remote_repr()}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
@@ -416,7 +423,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
                 return list(tmp)
             else: raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
-        if z: print(f"🗜️ ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
+        if z:
+            print(f"🗜️ ZIPPING ...")
+            source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None:
             target = P(source_obj).expanduser().absolute().collapseuser(strict=True)
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
@@ -426,7 +435,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z:
             _resp = self.run_py(f"""P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True)
-            source_obj.delete(sure=True); print("\n")
+            source_obj.delete(sure=True)
+            print("\n")
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
         if init: print(f"{'⬇️' * 5} SFTP DOWNLOADING FROM `{source}` TO `{target}`")
@@ -461,7 +471,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if z:
             target_obj = target_obj.unzip(inplace=True, content=True)
             self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
-        print("\n"); return target_obj
+        print("\n")
+        return target_obj
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
         scout = self.run_py(cmd=f"obj=SSH.scout(r'{source}', z={z}, r={r})", desc=f"Scouting source `{source}` path on remote", return_obj=True, verbose=False)
         assert isinstance(scout, Scout)
@@ -470,10 +481,15 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp: List[P] = scout.files.apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
                 return tmp.list[0]
             else: print(f"Source is a directory! either set `r=True` for recursive sending or raise `zip_first=True` flag.")
-        target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout.source_full
+        target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True)
+        if z and '.zip' not in target.suffix: target += '.zip'
+        source = scout.source_full
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
-        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
-        print("\n"); return target
+        if z:
+            target = target.unzip(inplace=True, content=True)
+            self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
+        print("\n")
+        return target
     @staticmethod
     def scout(source: PLike, z: bool = False, r: bool = False) -> Scout:
         source_full = P(source).expanduser().absolute()
@@ -513,18 +529,20 @@ class Scheduler:
         self.sess_stats = sess_stats or (lambda _sched: {})
     def __repr__(self): return f"Scheduler with {self.cycle} cycles ran so far. Last cycle was at {self.sess_start_time}."
     def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01", starting_cycle: Optional[int] = None):
-        import datetime as dtm
         if starting_cycle is not None: self.cycle = starting_cycle
         self.max_cycles, self.sess_start_time = max_cycles or self.max_cycles, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now()
-            self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
+            self.logger.info(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
             try: self.routine(self)
             except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait_sec - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
-            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
+            self.cycle += 1
+            self.logger.info(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self); return  # that's probably the only kind of exception that can rise during sleep.
+            except KeyboardInterrupt as ex:
+                self.exception_handler(ex, "sleep", self)
+                return  # that's probably the only kind of exception that can rise during sleep.
         self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
     def get_records_df(self):
         import pandas as pd

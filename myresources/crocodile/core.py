@@ -5,7 +5,6 @@ Core
 
 from pathlib import Path
 from typing import Optional, Union, Generic, TypeVar, Type, Literal, List as ListType, Any, Iterator, Callable, Iterable, Hashable, Protocol, ParamSpec, Concatenate, TypedDict
-import datetime
 
 _ = Concatenate
 __ = TypedDict
@@ -27,10 +26,13 @@ def validate_name(astring: str, replace: str = '_') -> str:
     import re
     return re.sub(r'[^-a-zA-Z0-9_.()]+', replace, str(astring))
 def timestamp(fmt: Optional[str] = None, name: Optional[str] = None) -> str:
+    import datetime
     return ((name + '_') if name is not None else '') + datetime.datetime.now().strftime(fmt or '%Y-%m-%d-%I-%M-%S-%p-%f')  # isoformat is not compatible with file naming convention, fmt here is.
-def str2timedelta(shift: str) -> datetime.timedelta:  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
+def str2timedelta(shift: str):  # Converts a human readable string like '1m' or '1d' to a timedate object. In essence, its gives a `2m` short for `pd.timedelta(minutes=2)`"""
+    import datetime
     key, val = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks", "M": "months", "y": "years"}[shift[-1]], float(shift[:-1])
-    key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val)); return datetime.timedelta(**{key: val})
+    key, val = ("days", val * 30) if key == "months" else (("weeks", val * 52) if key == "years" else (key, val))
+    return datetime.timedelta(**{key: val})
 def install_n_import(library: str, package: Optional[str] = None, fromlist: Optional[list[str]] = None):  # sometimes package name is different from import, e.g. skimage.
     try: return __import__(library, fromlist=fromlist if fromlist is not None else ())
     except (ImportError, ModuleNotFoundError):
@@ -193,7 +195,9 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def __setstate__(self, state: list[T]): self.list = state
     def __len__(self) -> int: return len(self.list)
     def __iter__(self) -> Iterator[T]: return iter(self.list)
-    def __array__(self): import numpy as np; return np.array(self.list)  # compatibility with numpy
+    def __array__(self):
+        import numpy as np
+        return np.array(self.list)  # compatibility with numpy
     # def __next__(self) -> T: return next(self.list)
     @property
     def len(self) -> int: return len(self.list)
@@ -412,7 +416,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         artist.plot_dict(self.__dict__, title=title, xlabel=xlabel, ylabel=ylabel)
         return artist
     def plot_plotly(self):
-        from crocodile.plotly_management import px
+        import plotly.express as px
         fig = px.line(self.__dict__)
         fig.show()
         return fig
