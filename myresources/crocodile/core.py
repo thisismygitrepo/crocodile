@@ -167,7 +167,7 @@ class Base(object):
         if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]): return repr_func(obj)
         return (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).__dict__)
     @staticmethod
-    def viz_composition_heirarchy(obj: Any, depth: int = 3, filt: Optional[Callable[[Any], None]] = None):
+    def viz_composition_heirarchy(obj: Any, depth: int = 3, filt: Optional[Callable[[Any], bool]] = None):
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")
         install_n_import("objgraph").show_refs([obj], max_depth=depth, filename=str(filename), filter=filt)

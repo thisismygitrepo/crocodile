@@ -95,11 +95,13 @@ class BaseModel:
     def load_model(save_dir: P, map_location: Union[str, Device, None]):
         if map_location is None and t.cuda.is_available():
             map_location = "cpu"
-        model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location)  # type: ignore
+        model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location, weights_only=True)  # type: ignore
         model.eval()
+        import traceback
         try:
             model.compile()
         except Exception as e:
+            traceback.print_exc()
             print(f"Model.compile() failed with error: {e}")
         return model
 
