@@ -604,32 +604,42 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         return readmepath
 
 
-class RepeatUntilNoException:  # see https://github.com/jd/tenacity
-    def __init__(self, retry: int = 3, sleep: float = 1.0, timeout: Optional[float] = None):
+class RepeatUntilNoException:
+    """
+    Repeat function calling if it raised an exception and/or exceeded the timeout, for a maximum of `retry` times.
+    * Alternative: `https://github.com/jd/tenacity`
+    """
+    def __init__(self, retry: int, sleep: float, timeout: Optional[float] = None, scaling: Literal["linear", "exponential"] = "exponential"):
         self.retry = retry
         self.sleep = sleep
         self.timeout = timeout
+        self.scaling: Literal["linear", "exponential"] = scaling
     def __call__(self, func: Callable[PS, T]) -> Callable[PS, T]:
         from functools import wraps
-        if self.timeout is not None: func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
+        if self.timeout is not None:
+            func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
         @wraps(wrapped=func)
         def wrapper(*args: PS.args, **kwargs: PS.kwargs):
+            t0 = time.time()
             for idx in range(self.retry):
                 try:
                     return func(*args, **kwargs)
                 except Exception as ex:
-                    sleep_time = self.sleep * (idx + 1)**2
-                    print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.""")
+                    match self.scaling:
+                        case "linear":
+                            sleep_time = self.sleep * (idx + 1)
+                        case "exponential":
+                            sleep_time = self.sleep * (idx + 1)**2
+                    print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.\nTotal wait time so far  {time.time() - t0: 0.1f} seconds""")
                     time.sleep(sleep_time)
-            raise RuntimeError(f"💥 Robust call failed after {self.retry} retries.")
+            raise RuntimeError(f"💥 Robust call failed after {self.retry} retries and total wait time of {time.time() - t0: 0.1f} seconds")
         return wrapper
 
 
-@RepeatUntilNoException()
-def add(a: int, b: int):
-    return a + b, "done"
-
-c = add(1, 2)
+# @RepeatUntilNoException(retry=3, sleep=2.2)
+# def add(a: int, b: int):
+#     return a + b, "done"
+# c = add(1, 2)
 
 
 def show_globals(scope: dict[str, Any], **kwargs: Any):
