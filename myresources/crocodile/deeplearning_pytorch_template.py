@@ -96,7 +96,7 @@ def main():
     m.save_weights(save_dir=save_dir)
     # save_onnx(save_dir=save_dir, model=m.model, dummy_ip=x)
 
-    m1 = BaseModel.load_model(save_dir=save_dir, map_location=None)
+    m1 = BaseModel.load_model(save_dir=save_dir, map_location=None, weights_only=True)
     m_init = My2LayerNN(hp=hp)
     # m_base = BaseModel(m_init, optimizer=optimizer, loss=loss, metrics=[])
     m2 = BaseModel.load_weights(model=m_init, save_dir=save_dir, map_location=None)

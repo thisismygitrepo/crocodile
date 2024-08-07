@@ -489,7 +489,8 @@ class BaseModel(ABC):
         try: generate_readme(get_hp_save_dir(hp), obj=self.__class__, desc=desc)
         except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = get_hp_save_dir(hp).joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
-        if weights_only: self.save_weights(save_dir.create())
+        if weights_only:
+            self.save_weights(save_dir.create())
         else:
             self.save_model(save_dir)
 
