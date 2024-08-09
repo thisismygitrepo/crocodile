@@ -77,6 +77,7 @@ setup(
         "matplotlib",  # viz
 
         # Accessories
+        "randomname",  # for generating random names
         "psutil",  # monitor processes.
         "joblib",  # multitasking
         "ipython",  # interactive python

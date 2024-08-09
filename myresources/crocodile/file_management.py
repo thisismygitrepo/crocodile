@@ -907,16 +907,20 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
         if fresh or self.cache is None:  # populate cache for the first time
             if not fresh and self.path is not None and self.path.exists():
                 age = datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Reading cached values from `{self.path}`. Lag = {age} ...")
-                try: self.cache = self.reader(self.path)
+                msg1 = f"⚠️ {self.name} cache: Reading cached values from `{self.path}`. Lag = {age} ..."
+                try:
+                    self.cache = self.reader(self.path)
                 except Exception as ex:
-                    if self.logger: self.logger(f"⚠️ {self.name} cache: Cache file is corrupted. {ex}")
+                    if self.logger:
+                        msg2 = f"⚠️ {self.name} cache: Cache file is corrupted. {ex}"
+                        self.logger("\n" + msg1 + "\n" + msg2)
                     self.cache = self.source_func()
                     self.save(self.cache, self.path)
                     return self.cache
                 return self(fresh=False)  # may be the cache is old ==> check that by passing it through the logic again.
             else:
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Populating fresh cache from source func. Previous cache never existed or there was an explicit fresh order.")
+                if self.logger:
+                    self.logger(f"⚠️ {self.name} cache: Populating fresh cache from source func. Previous cache never existed or there was an explicit fresh order.")
                 self.cache = self.source_func()  # fresh data.
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
@@ -927,12 +931,14 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 self.cache = None  # reset cache to prevent arriving here again.
                 return self(fresh=fresh)
             if age > self.expire:
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Updating cache from source func. Age = {age} > {self.expire} ...")
+                if self.logger:
+                    self.logger(f"⚠️ {self.name} cache: Updating cache from source func. Age = {age} > {self.expire} ...")
                 self.cache = self.source_func()
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
             else:
-                if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
+                if self.logger:
+                    self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
         return self.cache
 
     @staticmethod
