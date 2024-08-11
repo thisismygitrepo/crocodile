@@ -517,7 +517,7 @@ class BaseModel(ABC):
             'module_path_rh': module_path_rh,
             'cwd_rh': P.cwd().collapseuser().as_posix(),
                  }
-        Save.json(obj=specs, path=get_hp_save_dir(hp).joinpath('metadata/code_specs.json').str, indent=4)
+        Save.json(obj=specs, path=get_hp_save_dir(hp).joinpath('metadata/code_specs.json').to_str(), indent=4)
         print(f'SAVED Model Class @ {get_hp_save_dir(hp).as_uri()}')
         return get_hp_save_dir(hp)
 
@@ -582,7 +582,7 @@ class BaseModel(ABC):
             print(ex)
             print(f"ModuleNotFoundError: Attempting to try again after appending path with `cwd`: `{specs['cwd_rh']}`.")
             import sys
-            sys.path.append(P(specs['cwd_rh']).expanduser().absolute().str)
+            sys.path.append(P(specs['cwd_rh']).expanduser().absolute().to_str())
             try:
                 module = importlib.import_module(specs['__module__'])
             except ModuleNotFoundError as ex2:

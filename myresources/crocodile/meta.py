@@ -312,7 +312,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if isinstance(host, str):
             try:
                 import paramiko.config as pconfig
-                config = pconfig.SSHConfig.from_path(P.home().joinpath(".ssh/config").str)
+                config = pconfig.SSHConfig.from_path(P.home().joinpath(".ssh/config").to_str())
                 config_dict = config.lookup(host)
                 self.hostname = config_dict["hostname"]
                 self.username = config_dict["user"]

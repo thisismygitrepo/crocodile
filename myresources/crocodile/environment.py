@@ -156,7 +156,7 @@ class PathVar:
         dirs_ = []
         for path in dirs:
             path_rel = P(path).collapseuser(strict=False)
-            if path_rel.as_posix() in PATH or str(path_rel) in PATH or path_rel.expanduser().str in PATH or path_rel.expanduser().as_posix() in PATH: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+            if path_rel.as_posix() in PATH or str(path_rel) in PATH or path_rel.expanduser().to_str() in PATH or path_rel.expanduser().as_posix() in PATH: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
             else:
                 dirs_.append(path_rel.as_posix() if system == "Linux" else str(path_rel))
         dirs = dirs_

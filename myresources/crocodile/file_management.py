@@ -218,7 +218,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return self
     def send2trash(self, verbose: bool = True) -> 'P':
         if self.exists():
-            install_n_import(library="send2trash").send2trash(self.resolve().str)
+            install_n_import(library="send2trash").send2trash(self.resolve().to_str())
             if verbose: print(f"🗑️ TRASHED {repr(self)}")
             return self  # do not expand user symlinks.
         elif verbose:
@@ -278,7 +278,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             subprocess.Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\'')
             return self  # fails for folders. Start must be passed, but is not defined.
         elif sys.platform == 'linux':
-            subprocess.call(["xdg-open", self.expanduser().resolve().str])
+            subprocess.call(["xdg-open", self.expanduser().resolve().to_str()])
             return self  # works for files and folders alike
         else:
             subprocess.call(["open", self.expanduser().resolve().str])
@@ -303,9 +303,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             except (KeyError, IndexError):
                 f_name = validate_name(str(P(response.history[-1].url).name if len(response.history) > 0 else P(response.url).name))
         return (P.home().joinpath("Downloads") if folder is None else P(folder)).joinpath(f_name).create(parents_only=True).write_bytes(response.content)
-    def _return(self, res: 'P', operation: Literal['rename', 'delete', 'Whack'], inlieu: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
-        if inlieu:
-            self._str = str(res)  # type: ignore # pylint: disable=W0201
+    def _return(self, res: 'P', operation: Literal['rename', 'delete', 'Whack'], inplace: bool = False, overwrite: bool = False, orig: bool = False, verbose: bool = False, strict: bool = True, msg: str = "", __delayed_msg__: str = "") -> 'P':
         if inplace:
             assert self.exists(), f"`inplace` flag is only relevant if the path exists. It doesn't {self}"
             if operation == "rename":
@@ -364,7 +362,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         _ = args, kwargs
         return P(str(self))
     def __getstate__(self) -> str: return str(self)
-    def __setstate__(self, state: str): self._str = str(state)  # pylint: disable=W0201
+    # def __setstate__(self, state: str) -> None:
+    #     self._str = str(state)  # pylint: disable=W0201
     def __add__(self, other: PLike) -> 'P':
         return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
     def __radd__(self, other: PLike) -> 'P':
@@ -372,8 +371,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def __sub__(self, other: PLike) -> 'P':
         res = P(str(self).replace(str(other), ""))
         return (res[1:] if str(res[0]) in {"\\", "/"} else res) if len(res) else res  # paths starting with "/" are problematic. e.g ~ / "/path" doesn't work.
-    def rel2cwd(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), inlieu=inlieu, operation='Whack')
-    def rel2home(self, inlieu: bool = False) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), inlieu=inlieu, operation='Whack')  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
+    def rel2cwd(self, ) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.cwd())), operation='Whack')
+    def rel2home(self, ) -> 'P': return self._return(P(self.expanduser().absolute().relative_to(Path.home())), operation='Whack')  # very similat to collapseuser but without "~" being added so its consistent with rel2cwd.
     def collapseuser(self, strict: bool = True, placeholder: str = "~") -> 'P':  # opposite of `expanduser` resolve is crucial to fix Windows cases insensitivty problem.
         if strict: assert P.home() in self.expanduser().absolute().resolve(), ValueError(f"`{P.home()}` is not in the subpath of `{self}`")
         if (str(self).startswith(placeholder) or P.home().as_posix() not in self.resolve().as_posix()): return self
@@ -382,15 +381,15 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if isinstance(slici, list): return P(*[self[item] for item in slici])
         elif isinstance(slici, int): return P(self.parts[slici])
         return P(*self.parts[slici])  # must be a slice
-    def __setitem__(self, key: Union['str', int, slice], value: PLike):
-        fullparts, new = list(self.parts), list(P(value).parts)
-        if type(key) is str:
-            idx = fullparts.index(key)
-            fullparts.remove(key)
-            fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
-        elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
-        elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
-        self._str = str(P(*fullparts))  # pylint: disable=W0201  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
+    # def __setitem__(self, key: Union['str', int, slice], value: PLike):
+    #     fullparts, new = list(self.parts), list(P(value).parts)
+    #     if type(key) is str:
+    #         idx = fullparts.index(key)
+    #         fullparts.remove(key)
+    #         fullparts = fullparts[:idx] + new + fullparts[idx + 1:]
+    #     elif type(key) is int: fullparts = fullparts[:key] + new + fullparts[key + 1:]
+    #     elif type(key) is slice: fullparts = fullparts[:(0 if key.start is None else key.start)] + new + fullparts[(len(fullparts) if key.stop is None else key.stop):]
+    #     self._str = str(P(*fullparts))  # pylint: disable=W0201  # similar attributes: # self._parts # self._pparts # self._cparts # self._cached_cparts
     def split(self, at: Optional[str] = None, index: Optional[int] = None, sep: Literal[-1, 0, 1] = 1, strict: bool = True):
         if index is None and at is not None:  # at is provided  # ====================================   Splitting
             if not strict:  # behaves like split method of string
@@ -415,7 +414,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         elif self.is_absolute(): return self._type() + " '" + str(self.clickable()) + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
         elif "http" in str(self): return "🕸️ URL " + str(self.as_url_str())
         else: return "📍 Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
-    # def __str__(self): return self.as_url_str() if "http" in self else self._str
+    # def __str__(self): return self.as_url_str() if "http" in self else
+    # @property  # kept at the bottom because it confuses the linters
+    # def str(self) -> str: return str(self)  #
+    def to_str(self) -> str:
+        return str(self)
     def pistol(self):
         os.system(command=f"pistol {self}")
     def size(self, units: Literal['b', 'kb', 'mb', 'gb'] = 'mb') -> float:  # ===================================== File Specs ==========================================================================================
@@ -445,13 +448,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             elif self.is_dir(): return "📁"
             return "👻NotExist"
         return "📍Relative"
-    def clickable(self, inlieu: bool = False) -> 'P': return self._return(res=P(self.expanduser().resolve().as_uri()), inlieu=inlieu, operation='Whack')
+    def clickable(self, ) -> 'P': return self._return(res=P(self.expanduser().resolve().as_uri()), operation='Whack')
     def as_url_str(self) -> 'str': return self.as_posix().replace("https:/", "https://").replace("http:/", "http://")
     def as_url_obj(self):
         import urllib3
         tmp = urllib3.connection_from_url(str(self))
         return tmp
-    def as_unix(self, inlieu: bool = False) -> 'P': return self._return(P(str(self).replace('\\', '/').replace('//', '/')), inlieu=inlieu, operation='Whack')
+    def as_unix(self, ) -> 'P':
+        return self._return(P(str(self).replace('\\', '/').replace('//', '/')), operation='Whack')
     def as_zip_path(self):
         import zipfile
         res = self.expanduser().resolve()
@@ -491,7 +495,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if system() == "Windows" and not Terminal.is_user_admin():  # you cannot create symlink without priviliages.
             Terminal.run_as_admin(file=sys.executable, params=f" -c \"from pathlib import Path; Path(r'{self.expanduser()}').symlink_to(r'{str(target_obj)}')\"", wait=True)
         else: super(P, self.expanduser()).symlink_to(str(target_obj))
-        return self._return(target_obj, operation='Whack', inlieu=False, inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target_obj)}")
+        return self._return(target_obj, operation='Whack', inplace=False, orig=orig, verbose=verbose, msg=f"LINKED {repr(self)} ➡️ {repr(target_obj)}")
     def resolve(self, strict: bool = False):
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
@@ -580,7 +584,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if content: root_dir, base_dir = slf, "."
                 else: root_dir, base_dir = slf.split(at=str(arcname_obj[0]), sep=1)[0], str(arcname_obj)
                 path = P(Compression.compress_folder(root_dir=str(root_dir), op_path=str(path), base_dir=base_dir, fmt='zip', **kwargs))  # TODO: see if this supports mode
-        return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
+        return self._return(path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder: OPLike = None, path: OPLike = None, name: Optional[str]= None, verbose: bool = True, content: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False,
               pwd: Optional[str] = None, tmp: bool = False, pattern: Optional[str] = None, merge: bool = False) -> 'P':
         assert merge is False, f"I have not implemented this yet"
@@ -609,34 +613,34 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if not content: P(folder).joinpath(name or "").delete(sure=True, verbose=True)  # deletes a specific file / folder that has the same name as the zip file without extension.
                 else:
                     import zipfile
-                    List([x for x in zipfile.ZipFile(self.str).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(name or "", item.replace("/", "")).delete(sure=True, verbose=True))
-            result = Compression.unzip(zipfile__.str, str(folder), None if name is None else P(name).as_posix())
+                    List([x for x in zipfile.ZipFile(self.to_str()).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(name or "", item.replace("/", "")).delete(sure=True, verbose=True))
+            result = Compression.unzip(zipfile__.to_str(), str(folder), None if name is None else P(name).as_posix())
             assert isinstance(result, P)
-        return self._return(P(result), inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile__)} ==> {repr(result)}")
+        return self._return(P(result), inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile__)} ==> {repr(result)}")
     def tar(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()
-        Compression.tar(self.expanduser().resolve().str, op_path=op_path.str)
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
+        Compression.tar(self.expanduser().resolve().to_str(), op_path=op_path.to_str())
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"TARRED {repr(self)} ==>  {repr(op_path)}")
     def untar(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name.replace(".tar", "")).expanduser().resolve()
-        Compression.untar(self.expanduser().resolve().str, op_path=op_path.str)
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
+        Compression.untar(self.expanduser().resolve().to_str(), op_path=op_path.to_str())
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNTARRED {repr(self)} ==>  {repr(op_path)}")
     def gz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name + ".gz").expanduser().resolve()
-        Compression.gz(file=self.expanduser().resolve().str, op_path=op_path.str)
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
+        Compression.gz(file=self.expanduser().resolve().to_str(), op_path=op_path.to_str())
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"GZED {repr(self)} ==>  {repr(op_path)}")
     def ungz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name.replace(".gz", "")).expanduser().resolve()
-        Compression.ungz(self.expanduser().resolve().str, op_path=op_path.str)
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
+        Compression.ungz(self.expanduser().resolve().to_str(), op_path=op_path.to_str())
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNGZED {repr(self)} ==>  {repr(op_path)}")
     def xz(self, name: Optional[str]= None, folder: OPLike = None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name + ".xz").expanduser().resolve()
-        Compression.xz(self.expanduser().resolve().str, op_path=op_path.str)
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
+        Compression.xz(self.expanduser().resolve().to_str(), op_path=op_path.to_str())
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"XZED {repr(self)} ==>  {repr(op_path)}")
     def unxz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()
-        Compression.unxz(self.expanduser().resolve().str, op_path=op_path.str)
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
+        Compression.unxz(self.expanduser().resolve().to_str(), op_path=op_path.to_str())
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
 
     def tar_gz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
@@ -650,8 +654,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
 
     def unbz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()
-        Compression.unbz(self.expanduser().resolve().str, op_path=str(op_path))
-        return self._return(op_path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
+        Compression.unbz(self.expanduser().resolve().to_str(), op_path=str(op_path))
+        return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNBZED {repr(self)} ==>  {repr(op_path)}")
     def decompress(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         if "tar.gz" in self or ".tgz" in self:
             # res = self.ungz_untar(folder=folder, path=path, name=name, inplace=inplace, verbose=verbose, orig=orig)
@@ -670,7 +674,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         path = self._resolve_path(folder, name, path, slf.name + suffix)
         assert slf.is_file(), f"Cannot encrypt a directory. You might want to try `zip_n_encrypt`. {self}"
         path.write_bytes(encrypt(msg=slf.read_bytes(), key=key, pwd=pwd))
-        return self._return(path, inlieu=False, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"🔒🔑 ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
+        return self._return(path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"🔒🔑 ENCRYPTED: {repr(slf)} ==> {repr(path)}.")
     def decrypt(self, key: Optional[bytes] = None, pwd: Optional[str] = None, path: OPLike = None, folder: OPLike = None, name: Optional[str]= None, verbose: bool = True, suffix: str = ".enc", inplace: bool = False) -> 'P':
         slf = self.expanduser().resolve()
         path = self._resolve_path(folder=folder, name=name, path=path, default_name=slf.name.replace(suffix, "") if suffix in slf.name else "decrypted_" + slf.name)
@@ -796,8 +800,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         return self
-    @property  # kept at the bottom because it confuses the linters
-    def str(self) -> str: return str(self)  # or self._str
 
 
 class Compression:
