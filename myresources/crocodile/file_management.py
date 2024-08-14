@@ -92,6 +92,7 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 
 # %% =================================== File ============================================
 
+
 class Read:
     @staticmethod
     def read(path: PLike, **kwargs: Any) -> Any:
@@ -559,11 +560,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         import tempfile
         return P(tempfile.gettempdir())
     @staticmethod
-    def tmpdir(prefix: str = "") -> 'P': return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
+    def tmpdir(prefix: str = "") -> 'P':
+        return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     @staticmethod
     def tmpfile(name: Optional[str]= None, suffix: str = "", folder: OPLike = None, tstamp: bool = False, noun: bool = False) -> 'P':
-        if name is None: name_concrete = randstr(noun=noun)
-        else: name_concrete = name
+        if name is None:
+            name_concrete = randstr(noun=noun)
+        else:
+            name_concrete = name
         return P.tmp(file=name_concrete + "_" + randstr() + (("_" + str(timestamp())) if tstamp else "") + suffix, folder=folder or "tmp_files")
     @staticmethod
     def tmp(folder: OPLike = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P':
