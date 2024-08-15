@@ -47,7 +47,8 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     if noun: return install_n_import("randomname").get_name()
     import string
     import random
-    return ''.join(random.choices((string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else ""), k=length))
+    population = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else "")
+    return ''.join(random.choices(population, k=length))
 
 
 def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
@@ -399,7 +400,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                 else: raise TypeError(f"Unexpected type {type(tmp2)}")
                 if not return_str:
                     if install_n_import("tabulate"):
-                        install_n_import("rich").print(res.to_markdown())
+                        import rich
+                        rich.print(res.to_markdown())
                     else: print(res)
                     return None
                 return str(res)

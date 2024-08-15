@@ -9,16 +9,20 @@ This is `export file` where one can dictate what will be exposed with toolbox
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-_ = np, pd, px, plt, go, 
 
 from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH
 from crocodile.meta import logging, subprocess, sys, time
 from crocodile.file_management import P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
 from crocodile.core import List, Base, Struct, Save, Display
 from crocodile.core import str2timedelta, timestamp, randstr, validate_name, install_n_import
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    _ = np, pd, px, plt, go
+except ImportError:
+    pass
 
 _ = str2timedelta, timestamp, randstr, validate_name, install_n_import
 __ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime

@@ -100,9 +100,11 @@ class BaseModel:
         import traceback
         try:
             model.compile()
+            # model_opt = t.compile(model=model, mode="default")
         except Exception as e:
             traceback.print_exc()
             print(f"Model.compile() failed with error: {e}")
+            return model
         return model
 
     def save_weights(self, save_dir: P): t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
