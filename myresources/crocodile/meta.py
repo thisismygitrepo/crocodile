@@ -283,7 +283,12 @@ class Terminal:
     def replicate_session(cmd: str = ""):
         import dill
         file = P.tmpfile(suffix=".pkl")
-        script = f"""path = P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}"""
+        script = f"""
+path = P(r'{file}')
+import dill
+sess = dill.load_session(str(path))
+path.delete(sure=True, verbose=False)
+{cmd}"""
         dill.dump_session(file, main=sys.modules[__name__])
         Terminal().run_py(script=script)
     @staticmethod
