@@ -6,6 +6,7 @@
 
 from crocodile.core import install_n_import
 from crocodile.file_management import P, Read
+# from crocodile.meta import RepeatUntilNoException
 import smtplib
 import imaplib
 # from email import message
@@ -20,14 +21,19 @@ from typing import Optional, Any, Union, Literal
 """
 
 
-def get_gtihub_markdown_css(): return P(r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css').download_to_memory().text
+def get_github_markdown_css():
+    pp = r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css'
+    return P(pp).download_to_memory().text
+
+
 def md2html(body: str):
+    gh_style = P(__file__).parent.joinpath("gh_style.css").read_text()
     return f"""
 <!DOCTYPE html>
 <html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-{get_gtihub_markdown_css()}
+{gh_style}
     .markdown-body {{
         box-sizing: border-box;
         min-width: 200px;

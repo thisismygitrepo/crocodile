@@ -441,7 +441,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             case "a": tmp = self.stat().st_atime
             case "c": tmp = self.stat().st_ctime
         return datetime.fromtimestamp(tmp, **kwargs)
-    def stats(self) -> dict[str, Any]: return dict(size=self.size(), content_mod_time=self.time(which="m"), attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"), group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid)
+    def stats(self) -> dict[str, Any]:
+        return dict(size=self.size(),
+                    content_mod_time=self.time(which="m"),
+                    attr_mod_time=self.time(which="c"),
+                    last_access_time=self.time(which="a"),
+                    group_id_owner=self.stat().st_gid,
+                    user_id_owner=self.stat().st_uid
+                    )
     # ================================ String Nature management ====================================
     def _type(self):
         if self.absolute():
