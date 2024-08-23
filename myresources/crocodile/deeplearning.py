@@ -94,7 +94,7 @@ def get_hp_save_dir(hp: HyperParams):
     return (P(hp.root) / hp.name).create()
 
 
-@dataclass
+@dataclass(frozen=False, slots=True)
 class HParams:
     # ===================== Data ==============================
     seed: int

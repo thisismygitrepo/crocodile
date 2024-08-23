@@ -13,11 +13,11 @@ from crocodile.file_management import P
 from crocodile.deeplearning import EvaluationData
 from crocodile.matplotlib_management import FigureManager, Axes
 
-from dataclasses import field
+from dataclasses import field, dataclass
 from typing import Optional, Any
 
 
-@dl.dataclass
+@dataclass
 class HParams(dl.HParams):
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
     name: str = field(default_factory=lambda: "model-" + randstr(noun=True))
@@ -43,7 +43,8 @@ class DataReader(dl.DataReader):
                          other_names=["names"],
                          ip_shapes=[],
                          op_shapes=[],
-                         other_shapes=[])
+                         other_shapes=[]
+                         )
         super().__init__(hp=hp, specs=specs)
         self.hp: HParams
         self.dataset: Optional[dict[str, Any]] = None
@@ -56,7 +57,9 @@ class DataReader(dl.DataReader):
         # if profile_df: self.profile_dataframe(df=self.dataset.x)
         # self.get_pandas_profile_path()
         _ = profile_df
-        self.split = DataReader.split_the_data(data_dict=self.dataset, populate_shapes=True, specs=self.specs, shuffle=self.hp.shuffle, test_size=self.hp.test_split, random_state=self.hp.seed)
+        self.split = DataReader.split_the_data(data_dict=self.dataset, populate_shapes=True,
+                                               specs=self.specs, shuffle=self.hp.shuffle,
+                                               test_size=self.hp.test_split, random_state=self.hp.seed)
 
 
 def viz(eval_data: EvaluationData, ax: Optional[Axes], title: str):
