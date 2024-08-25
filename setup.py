@@ -87,7 +87,7 @@ setup(
         "tqdm",  # for progress bar
         "tomli",  # for TOML config files
         "pyyaml",  # for YAML config files
-        "py5json", # for JSON files
+        "pyjson5", # for JSON files
         "dill",  # extends pickle
         "cryptography",  # for encoding
         "paramiko",  # for SSH

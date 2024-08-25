@@ -120,8 +120,8 @@ class Read:
         import json
         try: mydict = json.loads(P(path).read_text(), **kwargs)
         except Exception:
-            import py5json
-            mydict = py5json.loads(P(path).read_text(), **kwargs)  # file has C-style comments.
+            import pyjson5
+            mydict = pyjson5.loads(P(path).read_text(), **kwargs)  # file has C-style comments.
         _ = r
         return mydict
     @staticmethod
