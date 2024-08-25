@@ -135,7 +135,8 @@ class DBMS:
         return result if not df else pd.DataFrame(result)
 
     def execute(self, command: str):
-        with self.eng.begin() as conn: result = conn.execute(text(command))
+        with self.eng.begin() as conn:
+            result = conn.execute(text(command))
         return result
 
     # def execute_script(self, command: str, df: bool = False):

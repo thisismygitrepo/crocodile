@@ -119,7 +119,9 @@ class Read:
     def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
         import json
         try: mydict = json.loads(P(path).read_text(), **kwargs)
-        except Exception: mydict = install_n_import("pyjson5").loads(P(path).read_text(), **kwargs)  # file has C-style comments.
+        except Exception:
+            import py5json
+            mydict = py5json.loads(P(path).read_text(), **kwargs)  # file has C-style comments.
         _ = r
         return mydict
     @staticmethod
@@ -137,7 +139,9 @@ class Read:
         res.read(filenames=[str(path)], encoding=encoding)
         return res
     @staticmethod
-    def toml(path: PLike): return install_n_import("tomli").loads(P(path).read_text())
+    def toml(path: PLike):
+        import tomli
+        return tomli.loads(P(path).read_text())
 
     @staticmethod
     def npy(path: PLike, **kwargs: Any):

@@ -767,7 +767,6 @@ class Losses:
 class HPTuning:
     def __init__(self):
         # ================== Tuning ===============
-#         kt = install_n_import("kerastuner")
         from tensorboard.plugins.hparams import api as hpt
         self.hpt = hpt
         import tensorflow as tf

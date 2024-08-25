@@ -44,7 +44,9 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     if safe:
         import secrets
         return secrets.token_urlsafe(length)  # interannly, it uses: random.SystemRandom or os.urandom which is hardware-based, not pseudo
-    if noun: return install_n_import("randomname").get_name()
+    if noun:
+        import randomname
+        return randomname.get_name()
     import string
     import random
     population = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else "")
@@ -343,9 +345,15 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def to_dataframe(self, *args: Any, **kwargs: Any):
         import pandas as pd
         return pd.DataFrame(self.__dict__, *args, **kwargs)
-    def keys(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.keys())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.keys())
-    def values(self, verbose: bool = False) -> 'List[Any]': return List(list(self.__dict__.values())) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.values())
-    def items(self, verbose: bool = False, desc: str = "") -> 'List[Any]': return List(self.__dict__.items()) if not verbose else install_n_import("tqdm").tqdm(self.__dict__.items(), desc=desc)
+    def keys(self, verbose: bool = False) -> 'List[Any]':
+        from tqdm import tqdm
+        return List(list(self.__dict__.keys()) if not verbose else tqdm(self.__dict__.keys()))
+    def values(self, verbose: bool = False) -> 'List[Any]':
+        from tqdm import tqdm
+        return List(list(self.__dict__.values()) if not verbose else tqdm(self.__dict__.values()))
+    def items(self, verbose: bool = False, desc: str = "") -> 'List[Any]':
+        from tqdm import tqdm
+        return List(self.__dict__.items() if not verbose else tqdm(self.__dict__.items(), desc=desc))
     def get(self, key: Optional[str] = None, default: Optional[Any] = None, strict: bool = False, keys: Union[None, list[str]] = None) -> 'Union[Any, List[Any]]':
         if keys is not None: return List([self.__dict__.get(key, default) if not strict else self[key] for key in keys])
         if key is not None: return (self.__dict__.get(key, default) if not strict else self[key])
@@ -385,7 +393,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
             else: print(f"Empty Struct."); return None
         else:
             if as_yaml or as_config:
-                tmp: str = install_n_import("yaml", package="pyyaml").dump(self.__dict__) if as_yaml else Display.config(self.__dict__, justify=justify, **kwargs)
+                import yaml
+                tmp: str = yaml.dump(self.__dict__) if as_yaml else Display.config(self.__dict__, justify=justify, **kwargs)
                 if return_str: return tmp
                 else:
                     from rich.syntax import Syntax
@@ -399,10 +408,10 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                     res = tmp2.drop(columns=[] if dtype else ["dtype"])
                 else: raise TypeError(f"Unexpected type {type(tmp2)}")
                 if not return_str:
-                    if install_n_import("tabulate"):
-                        import rich
-                        rich.print(res.to_markdown())
-                    else: print(res)
+                    # import tabulate
+                    import rich
+                    rich.print(res.to_markdown())
+                    # else: print(res)
                     return None
                 return str(res)
 

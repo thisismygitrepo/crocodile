@@ -1,8 +1,6 @@
 
 """Notifications Module
 """
-# import numpy as np
-# import matplotlib.pyplot as plt
 
 from crocodile.core import install_n_import
 from crocodile.file_management import P, Read
@@ -15,10 +13,6 @@ import imaplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Any, Union, Literal
-
-"""
-
-"""
 
 
 def get_github_markdown_css():
@@ -118,11 +112,14 @@ encryption = ssl
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
             config = Email.get_source_of_truth()
-            resend = install_n_import("resend")
+            _resend = install_n_import("resend")
+            import resend
             try:
                 resend.api_key = config['resend']['api_key']
                 to = config["resend"]["signup_email"]
-            except KeyError as ke: raise KeyError("You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file.") from ke
+            except KeyError as ke:
+                msggg = "You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file."
+                raise KeyError(msggg) from ke
 
             r = resend.Emails.send({
             "from": "onboarding@resend.dev",
@@ -131,6 +128,7 @@ encryption = ssl
             "html": md2html(body=body)
             })
             return r
+
         else:
             config = dict(Email.get_source_of_truth()[config_name])
             tmp = Email(config=config)
@@ -168,11 +166,15 @@ class PhoneNotification:  # security concerns: avoid using this.
             token_ = token
         pushbullet = install_n_import("pushbullet")
         self.api = pushbullet.Pushbullet(token_)
-    def send_notification(self, title: str = "Note From Python", body: str = "A notfication"): self.api.push_note(title=title, body=body)
+    def send_notification(self, title: str = "Note From Python", body: str = "A notfication"):
+        self.api.push_note(title=title, body=body)
     @staticmethod
-    def open_website(): P(r"https://www.pushbullet.com/").readit()
+    def open_website():
+        P(r"https://www.pushbullet.com/")()
     @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
-    def try_me(bulletpoint_token: str): n = PhoneNotification(bulletpoint_token); n.send_notification()
+    def try_me(bulletpoint_token: str):
+        n = PhoneNotification(bulletpoint_token)
+        n.send_notification()
 
 
 if __name__ == '__main__':

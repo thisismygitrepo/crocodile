@@ -161,7 +161,6 @@ class Response:
         return self
     def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
         if capture: self.capture()
-        install_n_import("rich")
         from rich import console
         con = console.Console()
         from rich.panel import Panel
@@ -351,7 +350,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.ssh = paramiko.SSHClient()
         self.ssh.load_system_host_keys()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
+        import rich
+        rich.inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
         try: self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
@@ -361,7 +361,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         def view_bar(slf: Any, a: Any, b: Any):
             slf.total = int(b)
             slf.update(int(a - slf.n))  # update pbar with increment
-        self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
+        from tqdm import tqdm
+        self.tqdm_wrap = type('TqdmWrap', (tqdm,), {'view_bar': view_bar})
         self._local_distro: Optional[str] = None
         self._remote_distro: Optional[str] = None
         self._remote_machine: Optional[MACHINE] = None
@@ -472,7 +473,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         print(f"RECEVING `{source}` ==> `{target_obj}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar:  # type: ignore # pylint: disable=E1129
             assert self.sftp is not None, f"Could not establish SFTP connection to {self.hostname}."
-            self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)
+            self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)  # type: ignore
         if z:
             target_obj = target_obj.unzip(inplace=True, content=True)
             self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
@@ -509,7 +510,6 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         files = source_full.search(folders=False, r=True).apply(lambda x: x.collapseuser()) if r and exists and is_dir else None
         return Scout(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):
-        install_n_import("tabulate")
         import pandas as pd
         df = pd.DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
         print("\nSummary of operations performed:")
