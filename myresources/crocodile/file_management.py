@@ -486,7 +486,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         slf = self.expanduser().absolute()
         if overwrite and slf.exists(): slf.delete(sure=True)
         res = super(P, slf).write_bytes(data)
-        if res == 0: raise RuntimeError(f"Could not save file on disk.")
+        if res == 0: raise RuntimeError("Could not save file on disk.")
         return self
     def touch(self, mode: int = 0o666, parents: bool = True, exist_ok: bool = True) -> 'P':  # pylint: disable=W0237
         if parents: self.parent.create(parents=parents)
