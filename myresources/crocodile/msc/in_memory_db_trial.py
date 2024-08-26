@@ -15,8 +15,8 @@ def generate_random_dataframe():
     num_columns = 10
     column_names: list[str] = [''.join(np.random.choice(list('abcdefghijklmnopqrstuvwxyz'), 5)) for _ in range(num_columns)]
     data = np.random.rand(num_rows, num_columns)
-    df = pd.DataFrame(data, columns=column_names)
-    return df
+    df_ = pd.DataFrame(data, columns=column_names)
+    return df_
 
 
 for i in range(10):

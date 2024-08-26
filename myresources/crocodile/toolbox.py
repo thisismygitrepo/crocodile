@@ -7,16 +7,26 @@ email: programmer@usa.com
 This is `export file` where one can dictate what will be exposed with toolbox
 """
 
-from crocodile.meta import Experimental, Terminal, Log, Scheduler, SSH
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH
 from crocodile.meta import logging, subprocess, sys, time
-# from crocodile import run
 from crocodile.file_management import P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
-from crocodile.core import List, Base, Struct, Display, Save
+from crocodile.core import List, Base, Struct, Save, Display
 from crocodile.core import str2timedelta, timestamp, randstr, validate_name, install_n_import
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    _ = np, pd, px, plt, go
+except ImportError:
+    pass
 
 _ = str2timedelta, timestamp, randstr, validate_name, install_n_import
 __ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
-___ = Experimental, Terminal, Log, Scheduler, SSH
+___ = generate_readme, Terminal, Log, Scheduler, SSH
 ____ = logging, subprocess, sys, time
 
 Path = P
@@ -24,10 +34,9 @@ L = List
 S = Struct
 D = Display
 T = Terminal
-E = Experimental
 tmp = P.tmp
 
-_1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression, Experimental
+_1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compression
 # from crocodile.core import datetime, dt, os, sys, string, random, np, copy, dill
 
 

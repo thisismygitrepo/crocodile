@@ -135,7 +135,8 @@ class DBMS:
         return result if not df else pd.DataFrame(result)
 
     def execute(self, command: str):
-        with self.eng.begin() as conn: result = conn.execute(text(command))
+        with self.eng.begin() as conn:
+            result = conn.execute(text(command))
         return result
 
     # def execute_script(self, command: str, df: bool = False):
@@ -146,7 +147,9 @@ class DBMS:
     def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
         sch = sch or self.sch or 'main'
         if table is None:
-            table = L(self.sch_tab[sch]).sample(size=1).list[0]
+            tables = self.sch_tab[sch]
+            assert len(tables) > 0, f"No tables found in schema `{sch}`"
+            table = L(tables).sample(size=1).list[0]
             print(f"Reading table `{table}` from schema `{sch}`")
         if self.con:
             res = self.con.execute(text(f'''SELECT * FROM {self._get_table_identifier(table, sch)} '''))

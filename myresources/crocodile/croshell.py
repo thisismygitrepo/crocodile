@@ -17,7 +17,6 @@ from crocodile.file_management import P
 import crocodile.core as core
 from crocodile.file_management import *  # type: ignore # noqa: F403,F401 # pylint: disable=W0401,W0614
 from crocodile.meta import *  # type: ignore # noqa: F403,F401 # pylint: disable=W0401,W0614
-from crocodile import meta
 # import crocodile.environment as env
 from crocodile.matplotlib_management import *  # noqa: F403,F401 # type: ignore # pylint: disable=W0401,W0614
 
@@ -46,9 +45,8 @@ tb.D.set_numpy_display()
 tb.D.set_pandas_display()
 D = core.Display
 L = core.List
-E = meta.Experimental
 S = core.Struct
-_ = D, L, E, S, inspect, progress, pprint, traceback, pd, np
+_ = D, L, S, inspect, progress, pprint, traceback, pd, np
 
 
 def print_logo(logo: str):

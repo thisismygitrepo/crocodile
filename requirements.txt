@@ -6,6 +6,7 @@ pandas
 matplotlib
 cycler
 rich
+tabulate
 psutil
 
 # dev
@@ -28,6 +29,7 @@ joblib  # multitasking
 # pytest  # popular alternative to builtint unittest
 ipython  # interactive python
 # jupyterlab  # for jupyter notebook
+# nbformat
 fire  # for automatic CLI interface
 tqdm  # for progress bar
 send2trash  # move to recycle bin

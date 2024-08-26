@@ -1,10 +1,13 @@
 
-"""Meta
+"""
+This is a module for handling meta operations like logging, terminal operations, SSH, etc.
+
 """
 
 from crocodile.core import randstr, str2timedelta, Save, install_n_import, List, Struct
 from crocodile.file_management import P, datetime, OPLike, PLike
 import time
+import datetime as dtm
 import logging
 import subprocess
 import sys
@@ -18,6 +21,7 @@ SHELLS: TypeAlias = Literal["default", "cmd", "powershell", "pwsh", "bash"]  # p
 CONSOLE: TypeAlias = Literal["wt", "cmd"]
 MACHINE: TypeAlias = Literal["Windows", "Linux", "Darwin"]
 T = TypeVar('T')
+PS = ParamSpec('PS')
 
 
 @dataclass
@@ -30,7 +34,8 @@ class Scout:
 
 
 class Log(logging.Logger):  #
-    def __init__(self, dialect: Literal["colorlog", "logging", "coloredlogs"] = "colorlog", name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
+    def __init__(self, dialect: Literal["colorlog", "logging", "coloredlogs"] = "colorlog",
+                 name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ",
                  s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False,
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
@@ -62,15 +67,22 @@ class Log(logging.Logger):  #
     def get_format(sep: str = ' | ', datefmt: str = "%d %H:%M:%S"):
         _ = datefmt  # TODO: add datefmt to the format string
         return f"%(asctime)s{sep}%(name)s{sep}%(module)s{sep}%(funcName)s{sep}%(levelname)s(%(levelno)s){sep}%(message)s{sep}"  # Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes logging.BASIC_FORMAT
-    def manual_degug(self, path: PLike): _ = self; sys.stdout = open(path, 'w', encoding="utf-8"); sys.stdout.close(); print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+    def manual_degug(self, path: PLike):
+        _ = self
+        sys.stdout = open(path, 'w', encoding="utf-8")
+        sys.stdout.close()
+        print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
     @staticmethod
     def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
                         'error': {'color': 'red', "faint": True, "underline": True}, 'critical': {'color': 'red', 'bold': True, "inverse": False}}  # https://coloredlogs.readthedocs.io/en/latest/api.html#available-text-styles-and-colors
         field_styles = {'asctime': {'color': 'green'}, 'hostname': {'color': 'magenta'}, 'levelname': {'color': 'black', 'bold': True}, 'path': {'color': 'blue'}, 'programname': {'color': 'cyan'}, 'username': {'color': 'yellow'}}
-        if verbose: logger = install_n_import("verboselogs").VerboseLogger(name=name); logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
+        if verbose:
+            logger = install_n_import("verboselogs").VerboseLogger(name=name)
+            logger.setLevel(l_level)  # https://github.com/xolox/python-verboselogs # verboselogs.install()  # hooks into logging module.
         else: logger = Log(name=name, dialect="logging", l_level=l_level, file=file, f_level=f_level, file_path=file_path, fmt=fmt or Log.get_format(sep), stream=stream, s_level=s_level)  # new step, not tested:
-        install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True); return logger
+        install_n_import("coloredlogs").install(logger=logger, name="lol_different_name", level=logging.NOTSET, level_styles=level_styles, field_styles=field_styles, fmt=fmt or Log.get_format(sep), isatty=True, milliseconds=True)
+        return logger
     def add_streamhandler(self, s_level: int = logging.DEBUG, fmt: Optional[Any] = None, module: Any = logging, name: str = "myStreamHandler"):
         shandler = module.StreamHandler()
         shandler.setLevel(level=s_level)
@@ -82,7 +94,8 @@ class Log(logging.Logger):  #
         filename = P.tmpfile(name=self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()
         fhandler = logging.FileHandler(filename=filename, mode=mode)
         fhandler.setFormatter(fmt=fmt)
-        fhandler.setLevel(level=f_level); fhandler.set_name(name)
+        fhandler.setLevel(level=f_level)
+        fhandler.set_name(name)
         self.addHandler(fhandler)
         self.file_path = filename.collapseuser()
         print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
@@ -143,12 +156,23 @@ class Response:
         if capture: self.capture()
         success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
         if assert_success: assert success, self.print(capture=False, desc=desc)
-        _ = print(desc) if success else self.print(capture=False, desc=desc); return self
+        if success: print(desc)
+        else: self.print(capture=False, desc=desc)
+        return self
     def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
-        _ = self.capture() if capture else None; install_n_import("rich"); from rich import console; con = console.Console(); from rich.panel import Panel; from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
-        tmp1 = Text("Input Command:\n"); tmp1.stylize("u bold blue"); tmp2 = Text("\nTerminal Response:\n"); tmp2.stylize("u bold blue")
-        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join([f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]), style="white")
-        con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black")); return self
+        if capture: self.capture()
+        from rich import console
+        con = console.Console()
+        from rich.panel import Panel
+        from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
+        tmp1 = Text("Input Command:\n")
+        tmp1.stylize("u bold blue")
+        tmp2 = Text("\nTerminal Response:\n")
+        tmp2.stylize("u bold blue")
+        list_str = [f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]
+        txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join(list_str), style="white")
+        con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black"))
+        return self
 
 
 class Terminal:
@@ -160,9 +184,13 @@ class Terminal:
         self.stderr = stderr
         self.stdin = stdin
     # def set_std_system(self): self.stdout = sys.stdout; self.stderr = sys.stderr; self.stdin = sys.stdin
-    def set_std_pipe(self): self.stdout = subprocess.PIPE; self.stderr = subprocess.PIPE; self.stdin = subprocess.PIPE
-    def set_std_null(self): self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
-    def run(self, *cmds: str, shell: Optional[SHELLS] = "default", check: bool = False, ip: Optional[str] = None):  # Runs SYSTEM commands like subprocess.run
+    def set_std_pipe(self):
+        self.stdout = subprocess.PIPE
+        self.stderr = subprocess.PIPE
+        self.stdin = subprocess.PIPE
+    def set_std_null(self):
+        self.stdout, self.stderr, self.stdin = subprocess.DEVNULL, subprocess.DEVNULL, subprocess.DEVNULL  # Equivalent to `echo 'foo' &> /dev/null`
+    def run(self, *cmds: str, shell: Optional[SHELLS] = "default", check: bool = False, ip: Optional[str] = None) -> Response:  # Runs SYSTEM commands like subprocess.run
         """Blocking operation. Thus, if you start a shell via this method, it will run in the main and won't stop until you exit manually IF stdin is set to sys.stdin, otherwise it will run and close quickly. Other combinations of stdin, stdout can lead to funny behaviour like no output but accept input or opposite.
         * This method is short for: res = subprocess.run("powershell command", capture_output=True, shell=True, text=True) and unlike os.system(cmd), subprocess.run(cmd) gives much more control over the output and input.
         * `shell=True` loads up the profile of the shell called so more specific commands can be run. Importantly, on Windows, the `start` command becomes availalbe and new windows can be launched.
@@ -220,7 +248,11 @@ class Terminal:
     def is_user_admin() -> bool:  # adopted from: https://stackoverflow.com/questions/19672352/how-to-run-script-with-elevated-privilege-on-windows"""
         if os.name == 'nt':
             try: return __import__("ctypes").windll.shell32.IsUserAnAdmin()
-            except Exception: import traceback; traceback.print_exc(); print("Admin check failed, assuming not an admin."); return False
+            except Exception:
+                import traceback
+                traceback.print_exc()
+                print("Admin check failed, assuming not an admin.")
+                return False
         else:
             return os.getuid() == 0  # Check for root on Posix
     @staticmethod
@@ -248,9 +280,16 @@ class Terminal:
         return Terminal().run_py(load_func_string + load_kwargs_string + f"\n{cmd}\n" + run_string, header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
     @staticmethod
     def replicate_session(cmd: str = ""):
-        import dill; file = file = P.tmpfile(suffix=".pkl")
-        script = f"""path = P(r'{file}')\nimport dill\nsess= dill.load_session(str(path))\npath.delete(sure=True, verbose=False)\n{cmd}"""
-        dill.dump_session(file, main=sys.modules[__name__]); Terminal().run_py(script=script)
+        import dill
+        file = P.tmpfile(suffix=".pkl")
+        script = f"""
+path = P(r'{file}')
+import dill
+sess = dill.load_session(str(path))
+path.delete(sure=True, verbose=False)
+{cmd}"""
+        dill.dump_session(file, main=sys.modules[__name__])
+        Terminal().run_py(script=script)
     @staticmethod
     def get_header(wdir: OPLike, toolbox: bool): return f"""
 # >> Code prepended
@@ -262,7 +301,6 @@ class Terminal:
 
 class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __init__(self, host: Optional[str] = None, username: Optional[str] = None, hostname: Optional[str] = None, sshkey: Optional[str] = None, pwd: Optional[str] = None, port: int = 22, ve: Optional[str] = "ve", compress: bool = False):  # https://stackoverflow.com/questions/51027192/execute-command-script-using-different-shell-in-ssh-paramiko
-        # self.tmate_sess = tmate_sess
         self.pwd = pwd
         self.ve = ve
         self.compress = compress  # Defaults: (1) use localhost if nothing provided.
@@ -278,7 +316,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         if isinstance(host, str):
             try:
                 import paramiko.config as pconfig
-                config = pconfig.SSHConfig.from_path(P.home().joinpath(".ssh/config").str)
+                config = pconfig.SSHConfig.from_path(P.home().joinpath(".ssh/config").to_str())
                 config_dict = config.lookup(host)
                 self.hostname = config_dict["hostname"]
                 self.username = config_dict["user"]
@@ -309,16 +347,22 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             raise ValueError("Either host or username and hostname must be provided.")
 
         self.sshkey = str(P(sshkey).expanduser().absolute()) if sshkey is not None else None  # no need to pass sshkey if it was configured properly already
-        self.ssh = paramiko.SSHClient(); self.ssh.load_system_host_keys(); self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        install_n_import("rich").inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
+        self.ssh = paramiko.SSHClient()
+        self.ssh.load_system_host_keys()
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        import rich
+        rich.inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
         self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
         try: self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
         except Exception as err:
             self.sftp = None
             print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
-        def view_bar(slf: Any, a: Any, b: Any): slf.total = int(b); slf.update(int(a - slf.n))  # update pbar with increment
-        self.tqdm_wrap = type('TqdmWrap', (install_n_import("tqdm").tqdm,), {'view_bar': view_bar})
+        def view_bar(slf: Any, a: Any, b: Any):
+            slf.total = int(b)
+            slf.update(int(a - slf.n))  # update pbar with increment
+        from tqdm import tqdm
+        self.tqdm_wrap = type('TqdmWrap', (tqdm,), {'view_bar': view_bar})
         self._local_distro: Optional[str] = None
         self._remote_distro: Optional[str] = None
         self._remote_machine: Optional[MACHINE] = None
@@ -326,20 +370,30 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.platform = platform
         self.remote_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.get_remote_machine() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""
         self.local_env_cmd = rf"""~/venvs/{self.ve}/Scripts/Activate.ps1""" if self.platform.system() == "Windows" else rf"""source ~/venvs/{self.ve}/bin/activate"""  # works for both cmd and pwsh
-    def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "tmate_sess", "port", "sshkey", "compress", "pwd", "ve"]}
+    def __getstate__(self): return {attr: self.__getattribute__(attr) for attr in ["username", "hostname", "host", "port", "sshkey", "compress", "pwd", "ve"]}
     def __setstate__(self, state: dict[str, Any]): SSH(**state)
     def get_remote_machine(self) -> MACHINE:
         if self._remote_machine is None:
             if (self.run("$env:OS", verbose=False, desc="Testing Remote OS Type").op == "Windows_NT" or self.run("echo %OS%", verbose=False, desc="Testing Remote OS Type Again").op == "Windows_NT"): self._remote_machine = "Windows"
             else: self._remote_machine = "Linux"
         return self._remote_machine  # echo %OS% TODO: uname on linux
-    def get_local_distro(self): self._local_distro = install_n_import("distro").name(pretty=True) if self._local_distro is None else self._local_distro; return self._local_distro
+    def get_local_distro(self) -> str:
+        if self._local_distro is None:
+            res = install_n_import("distro").name(pretty=True)
+            self._local_distro = res
+            return res
+        return self._local_distro
     def get_remote_distro(self):
         if self._remote_distro is None: self._remote_distro = self.run_py("print(install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
         return self._remote_distro
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
-    def send_ssh_key(self): self.copy_from_here("~/.ssh/id_rsa.pub"); assert self.get_remote_machine() == "Windows"; self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
-    def copy_env_var(self, name: str): assert self.get_remote_machine() == "Linux"; return self.run(f"{name} = {os.environ[name]}; export {name}")
+    def send_ssh_key(self):
+        self.copy_from_here("~/.ssh/id_rsa.pub")
+        assert self.get_remote_machine() == "Windows"
+        self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
+    def copy_env_var(self, name: str):
+        assert self.get_remote_machine() == "Linux"
+        return self.run(f"{name} = {os.environ[name]}; export {name}")
     def get_remote_repr(self, add_machine: bool = False) -> str: return f"{self.username}@{self.hostname}:{self.port}" + (f" [{self.get_remote_machine()}][{self.get_remote_distro()}]" if add_machine else "")
     def get_local_repr(self, add_machine: bool = False) -> str:
         import getpass
@@ -347,7 +401,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def __repr__(self): return f"local {self.get_local_repr(add_machine=True)} >>> SSH TO >>> remote {self.get_remote_repr(add_machine=True)}"
     def run_locally(self, command: str):
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
-        res = Response(cmd=command); res.output.returncode = os.system(command)
+        res = Response(cmd=command)
+        res.output.returncode = os.system(command)
         return res
     def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_remote_repr().replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
@@ -357,7 +412,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         res = Response(stdin=raw[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)  # type: ignore
         if not verbose: res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False)
         else: res.print()
-        self.terminal_responses.append(res); return res
+        self.terminal_responses.append(res)
+        return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False) -> Union[Any, Response]:
         assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None, toolbox=True)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_remote_repr()}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
@@ -373,7 +429,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp.apply(lambda file: self.copy_from_here(source=file, target=target))
                 return list(tmp)
             else: raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
-        if z: print(f"🗜️ ZIPPING ..."); source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
+        if z:
+            print(f"🗜️ ZIPPING ...")
+            source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None:
             target = P(source_obj).expanduser().absolute().collapseuser(strict=True)
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
@@ -383,7 +441,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z:
             _resp = self.run_py(f"""P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True)
-            source_obj.delete(sure=True); print("\n")
+            source_obj.delete(sure=True)
+            print("\n")
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
         if init: print(f"{'⬇️' * 5} SFTP DOWNLOADING FROM `{source}` TO `{target}`")
@@ -414,11 +473,12 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         print(f"RECEVING `{source}` ==> `{target_obj}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar:  # type: ignore # pylint: disable=E1129
             assert self.sftp is not None, f"Could not establish SFTP connection to {self.hostname}."
-            self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)
+            self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)  # type: ignore
         if z:
             target_obj = target_obj.unzip(inplace=True, content=True)
             self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True, verbose=False)
-        print("\n"); return target_obj
+        print("\n")
+        return target_obj
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
         scout = self.run_py(cmd=f"obj=SSH.scout(r'{source}', z={z}, r={r})", desc=f"Scouting source `{source}` path on remote", return_obj=True, verbose=False)
         assert isinstance(scout, Scout)
@@ -427,10 +487,15 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 tmp: List[P] = scout.files.apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
                 return tmp.list[0]
             else: print(f"Source is a directory! either set `r=True` for recursive sending or raise `zip_first=True` flag.")
-        target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True); target += '.zip' if z and '.zip' not in target.suffix else ''; source = scout.source_full
+        target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True)
+        if z and '.zip' not in target.suffix: target += '.zip'
+        source = scout.source_full
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.get(remotepath=source.as_posix(), localpath=target.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
-        if z: target = target.unzip(inplace=True, content=True); self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
-        print("\n"); return target
+        if z:
+            target = target.unzip(inplace=True, content=True)
+            self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
+        print("\n")
+        return target
     @staticmethod
     def scout(source: PLike, z: bool = False, r: bool = False) -> Scout:
         source_full = P(source).expanduser().absolute()
@@ -445,7 +510,6 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         files = source_full.search(folders=False, r=True).apply(lambda x: x.collapseuser()) if r and exists and is_dir else None
         return Scout(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):
-        install_n_import("tabulate")
         import pandas as pd
         df = pd.DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
         print("\nSummary of operations performed:")
@@ -456,11 +520,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
 
 
 class Scheduler:
-    def __init__(self, routine: Callable[['Scheduler'], Any], wait: str = "2m", max_cycles: int = 10000000000,
+    def __init__(self, routine: Callable[['Scheduler'], Any], wait: Union[str, int] = "2m", max_cycles: int = 10000000000,
                  exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'Scheduler'], Any]] = None,
                  logger: Optional[Log] = None, sess_stats: Optional[Callable[['Scheduler'], dict[str, Any]]] = None, records: Optional[list[list[Any]]] = None):
         self.routine = routine  # main routine to be repeated every `wait` time period
-        self.wait_sec = str2timedelta(wait).total_seconds()  # wait period between routine cycles.
+        self.wait_sec = str2timedelta(wait).total_seconds() if isinstance(wait, str) else wait  # wait period between routine cycles.
         self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
         self.exception_handler = exception_handler if exception_handler is not None else self.default_exception_handler
         self.sess_start_time = datetime.now()  # to be reset at .run
@@ -470,18 +534,20 @@ class Scheduler:
         self.sess_stats = sess_stats or (lambda _sched: {})
     def __repr__(self): return f"Scheduler with {self.cycle} cycles ran so far. Last cycle was at {self.sess_start_time}."
     def run(self, max_cycles: Optional[int] = None, until: str = "2050-01-01", starting_cycle: Optional[int] = None):
-        import datetime as dtm
         if starting_cycle is not None: self.cycle = starting_cycle
         self.max_cycles, self.sess_start_time = max_cycles or self.max_cycles, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now()
-            self.logger.warning(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time)}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
+            self.logger.info(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time).split('.', maxsplit=1)[0]}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
             try: self.routine(self)
             except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait_sec - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
-            self.cycle += 1; self.logger.warning(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
+            self.cycle += 1
+            self.logger.info(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
-            except KeyboardInterrupt as ex: self.exception_handler(ex, "sleep", self); return  # that's probably the only kind of exception that can rise during sleep.
+            except KeyboardInterrupt as ex:
+                self.exception_handler(ex, "sleep", self)
+                return  # that's probably the only kind of exception that can rise during sleep.
         self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until})")
     def get_records_df(self):
         import pandas as pd
@@ -508,13 +574,74 @@ class Scheduler:
         raise ex
 
 
-# def try_this(func, return_=None, raise_=None, run=None, handle=None, verbose=False, **kwargs):
-#     try: return func()
-#     except BaseException as ex:  # or Exception
-#         if verbose: print(ex)
-#         if raise_ is not None: raise raise_
-#         if handle is not None: return handle(ex, **kwargs)
-#         return run() if run is not None else return_
+class SchedulerV2:
+    def __init__(self, routine: Callable[['SchedulerV2'], Any],
+                 wait_ms: int,
+                 exception_handler: Optional[Callable[[Union[Exception, KeyboardInterrupt], str, 'SchedulerV2'], Any]] = None,
+                 logger: Optional[Log] = None,
+                 sess_stats: Optional[Callable[['SchedulerV2'], dict[str, Any]]] = None,
+                 records: Optional[list[list[Any]]] = None):
+        self.routine = routine  # main routine to be repeated every `wait` time period
+        self.logger = logger if logger is not None else Log(name="SchedLogger_" + randstr(noun=True))
+        self.exception_handler = exception_handler if exception_handler is not None else self.default_exception_handler
+        self.records: list[list[Any]] = records if records is not None else []
+        self.wait_ms = wait_ms  # wait period between routine cycles.
+        self.cycle: int = 0
+        self.max_cycles: int
+        self.sess_start_time: int
+        self.sess_stats = sess_stats or (lambda _sched: {})
+    def __repr__(self): return f"Scheduler with {self.cycle} cycles ran so far. Last cycle was at {self.sess_start_time}."
+    def run(self, max_cycles: Optional[int], until_ms: int):
+        if max_cycles is not None:
+            self.max_cycles = max_cycles
+        self.sess_start_time = time.time_ns() // 1_000_000
+        while (time.time_ns() // 1_000_000) < until_ms and self.cycle < self.max_cycles:
+            # 1- Time before Ops, and Opening Message
+            time1 = time.time_ns() // 1_000_000
+            self.logger.info(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(time1 - self.sess_start_time).split('.', maxsplit=1)[0]}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
+            try:
+                self.routine(self)
+            except Exception as ex:
+                self.exception_handler(ex, "routine", self)  # 2- Perform logic
+            time2 = time.time_ns() // 1_000_000
+            time_left = int(self.wait_ms - (time2 - time1))  # 4- Conclude Message
+            self.cycle += 1
+            self.logger.info(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(time2 - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_ms}ms ({time_left}s left)\n" + "-" * 100)
+            try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
+            except KeyboardInterrupt as ex:
+                self.exception_handler(ex, "sleep", self)
+                return  # that's probably the only kind of exception that can rise during sleep.
+        self.record_session_end(reason=f"Reached maximum number of cycles ({self.max_cycles})" if self.cycle >= self.max_cycles else f"Reached due stop time ({until_ms})")
+    def get_records_df(self):
+        import pandas as pd
+        return pd.DataFrame.from_records(self.records, columns=["start", "finish", "duration", "cycles", "termination reason", "logfile"] + list(self.sess_stats(self).keys()))
+    def record_session_end(self, reason: str):
+        end_time = time.time_ns() // 1_000_000
+        duration = end_time - self.sess_start_time
+        sess_stats = self.sess_stats(self)
+        self.records.append([self.sess_start_time, end_time, duration, self.cycle, reason, self.logger.file_path] + list(sess_stats.values()))
+        summ = {"start time": f"{str(self.sess_start_time)}",
+                "finish time": f"{str(end_time)}.",
+                "duration": f"{str(duration)} | wait time {self.wait_ms / 1_000: 0.1f}s",
+                "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}",
+                f"termination reason": reason, "logfile": self.logger.file_path
+                }
+        tmp = Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False)
+        assert isinstance(tmp, str)
+        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
+        df = self.get_records_df()
+        df["start"] = df["start"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
+        df["finish"] = df["finish"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
+        df["duration"] = df["duration"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
+        self.logger.critical(f"\n--> Logger history.\n" + str(df))
+        return self
+    def default_exception_handler(self, ex: Union[Exception, KeyboardInterrupt], during: str, sched: 'SchedulerV2') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
+        print(sched)
+        self.record_session_end(reason=f"during {during}, " + str(ex))
+        self.logger.exception(ex)
+        raise ex
+
+
 def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_code: bool = True, verbose: bool = True):  # Generates a readme file to contextualize any binary files by mentioning module, class, method or function used to generate the data"""
     import inspect
     text: str = "# Description\n" + desc + (separator := "\n" + "-" * 50 + "\n\n")
@@ -550,73 +677,47 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         return readmepath
 
 
-PS = ParamSpec('PS')
-
-
-class RepeatUntilNoException:  # see https://github.com/jd/tenacity
-    def __init__(self, retry: int = 3, sleep: float = 1.0, timeout: Optional[float] = None):
+class RepeatUntilNoException:
+    """
+    Repeat function calling if it raised an exception and/or exceeded the timeout, for a maximum of `retry` times.
+    * Alternative: `https://github.com/jd/tenacity`
+    """
+    def __init__(self, retry: int, sleep: float, timeout: Optional[float] = None, scaling: Literal["linear", "exponential"] = "exponential"):
         self.retry = retry
         self.sleep = sleep
         self.timeout = timeout
+        self.scaling: Literal["linear", "exponential"] = scaling
     def __call__(self, func: Callable[PS, T]) -> Callable[PS, T]:
         from functools import wraps
-        if self.timeout is not None: func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
+        if self.timeout is not None:
+            func = install_n_import("wrapt_timeout_decorator").timeout(self.timeout)(func)
         @wraps(wrapped=func)
         def wrapper(*args: PS.args, **kwargs: PS.kwargs):
+            t0 = time.time()
             for idx in range(self.retry):
                 try:
                     return func(*args, **kwargs)
                 except Exception as ex:
-                    sleep_time = self.sleep * (idx + 1)**2
-                    print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.""")
+                    match self.scaling:
+                        case "linear":
+                            sleep_time = self.sleep * (idx + 1)
+                        case "exponential":
+                            sleep_time = self.sleep * (idx + 1)**2
+                    print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.\nTotal wait time so far  {time.time() - t0: 0.1f} seconds""")
                     time.sleep(sleep_time)
-            raise RuntimeError(f"💥 Robust call failed after {self.retry} retries.")
+            raise RuntimeError(f"💥 Robust call failed after {self.retry} retries and total wait time of {time.time() - t0: 0.1f} seconds")
         return wrapper
 
 
-@RepeatUntilNoException()
-def add(a: int, b: int):
-    return a + b, "done"
+# @RepeatUntilNoException(retry=3, sleep=2.2)
+# def add(a: int, b: int):
+#     return a + b, "done"
+# c = add(1, 2)
 
-c = add(1, 2)
 
-
-def show_globals(scope: dict[str, Any], **kwargs: Any): return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
-def monkey_patch(class_inst: Any, func: Callable[[Any], Any]): setattr(class_inst.__class__, func.__name__, func)
-# def capture_locals(func: Callable[[Any], Any], scope: dict[str, Any], args: Optional[Any] = None, self: Optional[str] = None, update_scope: bool = True):
-#     res: dict[str, Any] = {}
-#     exec(extract_code(func, args=args, self=self, include_args=True, verbose=False), scope, res)  # type: ignore
-#     _ = scope.update(res) if update_scope else None; return Struct(res)
-# def load_from_source_code(directory: str, obj: Optional[Any] = None, delete: bool = False):
-#     P(directory).search("source_code*", r=True)[0].unzip(tmpdir := P.tmp() / timestamp(name="tmp_sourcecode"))
-#     sys.path.insert(0, str(tmpdir)); sourcefile = __import__(tmpdir.find("*").stem); tmpdir.delete(sure=delete, verbose=False)
-#     return getattr(sourcefile, obj) if obj is not None else sourcefile
-# def extract_code(func, code: Optional[str] = None, include_args: bool = True, verbose: bool = True, copy2clipboard: bool = False, **kwargs):  # TODO: how to handle decorated functions.  add support for lambda functions.  ==> use dill for powerfull inspection"""
-#     import inspect; import textwrap  # assumptions: first line could be @classmethod or @staticmethod. second line could be def(...). Then function body must come in subsequent lines, otherwise ignored.
-#     raw = inspect.getsourcelines(func)[0]; lines = textwrap.dedent("".join(raw[1 + (1 if raw[0].lstrip().startswith("@") else 0):])).split("\n")
-#     code_string = '\n'.join([aline if not textwrap.dedent(aline).startswith("return ") else aline.replace("return ", "return_ = ") for aline in lines])  # remove return statements if there else keep line as is.
-#     title, args_header, injection_header, body_header, suffix = ((f"\n# " + f"{item} {func.__name__}".center(50, "=") + "\n") for item in ["CODE EXTRACTED FROM", "ARGS KWARGS OF", "INJECTED CODE INTO", "BODY OF", "BODY END OF"])
-#     code_string = title + ((args_header + extract_arguments(func, **kwargs)) if include_args else '') + ((injection_header + code) if code is not None else '') + body_header + code_string + suffix  # added later so it has more overwrite authority.
-#     _ = install_n_import("clipboard").copy(code_string) if copy2clipboard else None; print(code_string) if verbose else None; return code_string  # ready to be run with exec()
-# def extract_arguments(func: Callable[[Any], Any], copy2clipboard: bool = False, **kwargs: Any):
-#     ak = Struct(dict((inspect := inspect).signature(func).parameters)).values()  # ignores self for methods automatically but also ignores args and func_kwargs.
-#     res = Struct.from_keys_values(ak.name, ak.default).update(kwargs).print(as_config=True, return_str=True, justify=0, quotes=True).replace("<class 'inspect._empty'>", "None").replace("= '", "= rf'")
-#     ak = inspect.getfullargspec(func); res = res + (f"{ak.varargs} = (,)\n" if ak.varargs else '') + (f"{ak.varkw} = " + "{}\n" if ak.varkw else '')  # add args = () and func_kwargs = {}
-#     _ = install_n_import("clipboard").copy(res) if copy2clipboard else None; return res
-# def run_cell(pointer, module=sys.modules[__name__]):
-#     for cell in P(module.__file__).read_text().split("#%%"):
-#         if pointer in cell.split('\n')[0]: break  # bingo
-#     else: raise KeyError(f"The pointer `{pointer}` was not found in the module `{module}`")
-    # print(cell); install_n_import("clipboard").copy(cell); return cell
-class Experimental:
-    show_globals = staticmethod(show_globals)
-    monkey_patch = staticmethod(monkey_patch)
-    # capture_locals = staticmethod(capture_locals)
-    generate_readme = staticmethod(generate_readme)
-    # load_from_source_code = staticmethod(load_from_source_code)
-    # extract_code = staticmethod(extract_code)
-    # extract_arguments = staticmethod(extract_arguments)
-    # run_cell = staticmethod(run_cell)  # Debugging and Meta programming tools"""
+def show_globals(scope: dict[str, Any], **kwargs: Any):
+    # see print_dir
+    return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)
 
 
 if __name__ == '__main__':

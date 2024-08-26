@@ -10,71 +10,67 @@ import platform
 import getpass
 import os
 import sys
-from typing import Union, Literal, Optional, TypedDict
 from dataclasses import dataclass
+from typing import Union, Literal, Optional, TypedDict
 
 
 system = platform.system()  # Linux or Windows
+# OS = os.environ["OS"]  # Windows_NT
 myhome = P(f"myhome/{platform.system().lower()}")
+DotFiles = P.home().joinpath("dotfiles")
 
-OS = os.getenv("OS")  # Windows_NT
 sep = ";" if system == "Windows" else ":"  # PATH separator, this is special for PATH object, not to be confused with P.sep (normal paths), usually / or \
-# env = S(dict(os.environ)).clean_view
 exe = P(sys.executable)
 
 tm = Terminal()
 
 # ============================== Common Paths ============================
 
-LocalAppData = P(tmp) if (tmp := os.getenv("LOCALAPPDATA")) else None  # C:\Users\username\AppData\Local
-AppData = P(tmp) if (tmp := os.getenv("APPDATA")) else None  # C:\Users\username\AppData\Roaming
-WindowsApps = LocalAppData.joinpath(r"Microsoft\WindowsApps") if LocalAppData else None  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
+class WindowsPaths:
+    def __init__(self) -> None:
+        self.LocalAppData = P(os.environ["LOCALAPPDATA"])  # C:\Users\username\AppData\Local
+        self.AppData = P(os.environ["APPDATA"])  # C:\Users\username\AppData\Roaming
+        self.WindowsApps = self.LocalAppData.joinpath(r"Microsoft\WindowsApps")  # this path is already in PATH. Thus, useful to add symlinks and shortcuts to apps that one would like to be in the PATH.
 
-ProgramData = P(tmp) if (tmp := os.getenv("PROGRAMDATA")) else None  # C:\ProgramData
-ProgramFiles = P(tmp) if (tmp := os.getenv("ProgramFiles")) else None  # C:\Program Files
-ProgramW6432 = P(tmp) if (tmp := os.getenv("ProgramW6432")) else None  # C:\Program Files
-ProgramFilesX86 = P(tmp) if (tmp := os.getenv("ProgramFiles(x86)")) else None  # C:\Program Files (x86)
+        self.ProgramData = P(os.environ["PROGRAMDATA"])  # C:\ProgramData
+        self.ProgramFiles = P(os.environ["ProgramFiles"])  # C:\Program Files
+        self.ProgramW6432 = P(os.environ["ProgramW6432"])  # C:\Program Files
+        self.ProgramFilesX86 = P(os.environ["ProgramFiles(x86)"])  # C:\Program Files (x86)
 
-CommonProgramFiles = P(tmp) if (tmp := os.getenv("CommonProgramFiles")) else None  # C:\Program Files\Common Files
-CommonProgramW6432 = P(tmp) if (tmp := os.getenv("CommonProgramW6432")) else None  # C:\Program Files\Common Files
-CommonProgramFilesX86 = P(tmp) if (tmp := os.getenv("CommonProgramFiles(x86)")) else None  # C:\Program Files (x86)\Common Files
+        self.CommonProgramFiles = P(os.environ["CommonProgramFiles"])  # C:\Program Files\Common Files
+        self.CommonProgramW6432 = P(os.environ["CommonProgramW6432"])  # C:\Program Files\Common Files
+        self.CommonProgramFilesX86 = P(os.environ["CommonProgramFiles(x86)"])  # C:\Program Files (x86)\Common Files
 
-Tmp = P(tmp) if (tmp := os.getenv("TMP")) else None  # C:\Users\usernrame\AppData\Local\Temp
-Temp = Tmp
+        self.Tmp = P(os.environ["TMP"])  # C:\Users\usernrame\AppData\Local\Temp
+        self.Temp = self.Tmp
 
-tmp = os.getenv("PATH")
-if isinstance(tmp, str):
-    tmp_path: L[P] = L(tmp.split(sep)).apply(P)  # type: ignore
-else:
-    tmp_path = L()
+        self.OneDriveConsumer = P(os.environ["OneDriveConsumer"])
+        self.OneDriveCommercial = P(os.environ["OneDriveCommercial"])
+        self.OneDrive = P(os.environ["OneDrive"])
+        tmp1 = self.LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe")
+        tmp2 = P(r"C:/Program Files/Microsoft OneDrive/OneDrive.exe")
+        self.OneDriveExe = tmp1 if tmp1.exists() else tmp2
+        _ = os.environ["PSModulePath"]
+
+
+tmp = os.environ["PATH"]
+tmp_path: L[P] = L(tmp.split(sep)).apply(P)  # type: ignore
 PATH = tmp_path
 
-PSPath = L(tmp.split(sep)).apply(P) if (tmp := os.getenv("PSModulePath")) else None
+PSPath = L(tmp.split(sep)).apply(P)
 
-HostName          = platform.node()  # e.g. "MY-SURFACE", os.getenv("COMPUTERNAME") only works for windows.
-UserName          = getpass.getuser()  # e.g: username, os.getenv("USERNAME") only works for windows.
-UserDomain        = os.getenv("USERDOMAIN")  # e.g. HAD OR MY-SURFACE
-UserDomainRoaming = P(tmp) if (tmp := os.getenv("USERDOMAIN_ROAMINGPROFILE")) else None  # e.g. SURFACE
-LogonServer       = os.getenv("LOGONSERVER")  # e.g. "\\MY-SURFACE"
-# UserProfile       = P(tmp) if (tmp := os.getenv("USERPROFILE")) else None  # e.g C:\Users\username
-# HomePath          = P(tmp) if (tmp := os.getenv("HOMEPATH")) else None  # e.g. C:\Users\username
-Public            = P(tmp) if (tmp := os.getenv("PUBLIC")) else None  # C:\Users\Public
+HostName          = platform.node()  # e.g. "MY-SURFACE", os.env["COMPUTERNAME") only works for windows.
+UserName          = getpass.getuser()  # e.g: username, os.env["USERNAME") only works for windows.
+# UserDomain        = os.environ["USERDOMAIN"]  # e.g. HAD OR MY-SURFACE
+# UserDomainRoaming = P(os.environ["USERDOMAIN_ROAMINGPROFILE"])  # e.g. SURFACE
+# LogonServer       = os.environ["LOGONSERVER"]  # e.g. "\\MY-SURFACE"
+# UserProfile       = P(os.env["USERPROFILE"))  # e.g C:\Users\username
+# HomePath          = P(os.env["HOMEPATH"))  # e.g. C:\Users\username
+# Public            = P(os.environ["PUBLIC"])  # C:\Users\Public
 
 WSL_FROM_WIN = P(r"\\wsl.localhost\Ubuntu-22.04\home")  # P(rf"\\wsl$\Ubuntu\home")  # see localappdata/canonical
 WIN_FROM_WSL = P(rf"/mnt/c/Users")
 
-
-OneDriveConsumer = P(tmp) if (tmp := os.getenv("OneDriveConsumer")) else None
-OneDriveCommercial = P(tmp) if (tmp := os.getenv("OneDriveCommercial")) else None
-OneDrive = P(tmp) if (tmp := os.getenv("OneDrive")) else None
-if system == "Windows" and LocalAppData is not None:
-    tmp1 = LocalAppData.joinpath("Microsoft/OneDrive/OneDrive.exe")
-    tmp2 = P(r"C:/Program Files/Microsoft OneDrive/OneDrive.exe")
-    OneDriveExe = tmp1 if tmp1.exists() else tmp2
-else: OneDriveExe = None
-
-
-DotFiles = P.home().joinpath("dotfiles")
 
 
 # ============================== Networking ==============================
@@ -89,6 +85,7 @@ class NetworkAddresses(TypedDict):
 
 
 def get_network_addresses() -> NetworkAddresses:
+    print("Getting network addresses")
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join((f"{mac}012X")[i:i + 2] for i in range(0, 12, 2))  # type: ignore
@@ -159,7 +156,7 @@ class PathVar:
         dirs_ = []
         for path in dirs:
             path_rel = P(path).collapseuser(strict=False)
-            if path_rel.as_posix() in PATH or str(path_rel) in PATH or path_rel.expanduser().str in PATH or path_rel.expanduser().as_posix() in PATH: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
+            if path_rel.as_posix() in PATH or str(path_rel) in PATH or path_rel.expanduser().to_str() in PATH or path_rel.expanduser().as_posix() in PATH: print(f"Path passed `{path}` is already in PATH, skipping the appending.")
             else:
                 dirs_.append(path_rel.as_posix() if system == "Linux" else str(path_rel))
         dirs = dirs_

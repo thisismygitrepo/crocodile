@@ -13,7 +13,7 @@ def run_on_remote():
     config = RemoteMachineConfig(
         # connection
         #        ssh_obj=SelfSSH(),  # overrides ssh_params
-        ssh_params=dict(host="thinkpad"),  # dict(host="239wsl"),
+        ssh_params=dict(host="ts"),  # dict(host="239wsl"),
         description="Description of running an expensive function",  # job_id=, base_dir="",
         # data
         copy_repo=False, update_repo=True, install_repo=False, update_essential_repos=True, data=data, transfer_method="sftp",

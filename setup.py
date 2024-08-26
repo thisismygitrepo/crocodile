@@ -1,6 +1,7 @@
 
 """
-PKG
+PKG installer
+
 """
 
 from setuptools import setup
@@ -76,11 +77,17 @@ setup(
         "matplotlib",  # viz
 
         # Accessories
+        "rich",  # for rich text
+        "tabulate",  # for pretty printing (required by rich to print tables)
+        "randomname",  # for generating random names
         "psutil",  # monitor processes.
         "joblib",  # multitasking
         "ipython",  # interactive python
         "fire",  # for automatic CLI interface
         "tqdm",  # for progress bar
+        "tomli",  # for TOML config files
+        "pyyaml",  # for YAML config files
+        "pyjson5", # for JSON files
         "dill",  # extends pickle
         "cryptography",  # for encoding
         "paramiko",  # for SSH
