@@ -3,12 +3,15 @@
 Runner
 """
 
+from rich import inspect
+from rich.console import Console
+import git
+import pandas as pd
+
 from crocodile.core import List as L, Struct as S, install_n_import
 from crocodile.file_management import P, Save, Read
 from crocodile.meta import MACHINE, Scheduler
-from rich import inspect
-from rich.console import Console
-import pandas as pd
+
 from typing import Optional, Callable, Union, Any, Literal, TypeAlias, NoReturn
 import time
 from dataclasses import dataclass, fields
@@ -117,7 +120,7 @@ class JobParams:
             func_module = func_file.stem
         else: raise TypeError(f"Passed function {func} is not a callable or a path to a python file.")
         try:
-            repo_path = P(install_n_import("git", "gitpython").Repo(func_file, search_parent_directories=True).working_dir)
+            repo_path = P(git.Repo(func_file, search_parent_directories=True).working_dir)
             func_relative_file = func_file.relative_to(repo_path)
         except Exception as e:
             print(e)

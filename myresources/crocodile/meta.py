@@ -218,7 +218,7 @@ class Terminal:
             print_code(code=script, lexer="shell", desc="Script to be executed:")
             import rich.progress as pb
             with pb.Progress(transient=True) as progress:
-                _task = progress.add_task("Running Script", total=None)
+                _task = progress.add_task(f"Running Script @ {script_file}", total=None)
                 resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         else: resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)
         return Response.from_completed_process(resp)

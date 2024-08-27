@@ -7,6 +7,7 @@ PKG installer
 from setuptools import setup
 from myresources.crocodile import __version__
 # import setuptools
+import platform
 
 
 with open("README.md", "r", encoding="utf-8") as file:
@@ -14,6 +15,39 @@ with open("README.md", "r", encoding="utf-8") as file:
 
 # get python modules:
 # P("./myresources").search("*.py", r=True).apply(lambda x: x.split(at="myresources", sep=-1)[1].as_posix().replace("/", ".")[:-3]).filter(lambda x: "__init__" not in x).list
+
+install_requires = [
+        # CORE:
+        "numpy",  # number crunching
+        "pandas",  # number crunching
+        "tabulate",  # pandas optional for pretty printing of tables
+        "matplotlib",  # viz
+
+        # Accessories
+        "rich",  # for rich text
+        "tabulate",  # for pretty printing (required by rich to print tables)
+        "randomname",  # for generating random names
+        "psutil",  # monitor processes.
+        "joblib",  # multitasking
+        "ipython",  # interactive python
+        "fire",  # for automatic CLI interface
+        "tqdm",  # for progress bar
+        "tomli",  # for TOML config files
+        "pyyaml",  # for YAML config files
+        "pyjson5", # for JSON files
+        "dill",  # extends pickle
+        "cryptography",  # for encoding
+        "paramiko",  # for SSH
+        "requests",  # interacting with web
+        "colorlog",  # for colored logging
+
+    ]
+
+
+if platform.system() == "Windows":
+    # _ = install_n_import("win32api", "pywin32")  # this is crucial for windows to pop up the concent window in case python was not run as admin.
+    install_requires.append("pywin32")
+
 
 setup(
     name='crocodile',
@@ -69,32 +103,7 @@ setup(
     long_description_content_type="text/markdown",
     package_data={'crocodile': ['art/*']},
     # include_package_data=True,
-    install_requires=[
-        # CORE:
-        "numpy",  # number crunching
-        "pandas",  # number crunching
-        "tabulate",  # pandas optional for pretty printing of tables
-        "matplotlib",  # viz
-
-        # Accessories
-        "rich",  # for rich text
-        "tabulate",  # for pretty printing (required by rich to print tables)
-        "randomname",  # for generating random names
-        "psutil",  # monitor processes.
-        "joblib",  # multitasking
-        "ipython",  # interactive python
-        "fire",  # for automatic CLI interface
-        "tqdm",  # for progress bar
-        "tomli",  # for TOML config files
-        "pyyaml",  # for YAML config files
-        "pyjson5", # for JSON files
-        "dill",  # extends pickle
-        "cryptography",  # for encoding
-        "paramiko",  # for SSH
-        "requests",  # interacting with web
-        "colorlog",  # for colored logging
-
-    ],
+    install_requires=install_requires,
 
     extras_require={
             'full': ['sqlalchemy', 'tensorflow',
