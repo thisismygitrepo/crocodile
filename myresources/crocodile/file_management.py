@@ -716,9 +716,32 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def get_env():
         import crocodile.environment as env
         return env
-    def share_on_cloud(self, timeout: int = 60_000) -> 'P':
+    def share_on_cloud(self, service: Literal['gofile', 'pixeldrain'] = "gofile", timeout: int = 60_000) -> 'P':
         import requests
-        return P(requests.put(url=f"https://transfer.sh/{self.expanduser().name}", data=self.expanduser().absolute().read_bytes(), timeout=timeout).text)
+        # return P(requests.put(url=f"https://transfer.sh/{self.expanduser().name}", data=self.expanduser().absolute().read_bytes(), timeout=timeout).text)
+        import mimetypes
+        file_path = self.expanduser().absolute()
+        file_data = file_path.read_bytes()
+        mime_type, _ = mimetypes.guess_type(file_path)
+        filename = file_path.name
+        if service == 'gofile':
+            response = requests.post(
+                url="https://store1.gofile.io/uploadFile",
+                files={"file": (filename, file_data, mime_type) },  # type: ignore
+                timeout=timeout
+            )
+            return P(response.json()['data']['downloadPage'])
+        elif service == 'pixeldrain':
+            response = requests.post(
+                url="https://pixeldrain.com/api/file",
+                files={"file": file_data},
+                timeout=timeout
+            )
+            return P(f"https://pixeldrain.com/u/{response.json()['id']}")
+
+        else:
+            raise ValueError("Unsupported service specified.")
+
     def share_on_network(self, username: Optional[str]= None, password: Optional[str] = None):
         from crocodile.meta import Terminal
         Terminal(stdout=None).run(f"sharing {self} {('--username ' + str(username)) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
