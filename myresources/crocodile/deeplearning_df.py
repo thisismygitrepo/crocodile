@@ -167,14 +167,28 @@ class DataFrameHander:
         return res
 
     @staticmethod
-    def profile_dataframe(df: pd.DataFrame, save_path: Optional[P] = None, silent: bool = False, explorative: bool = True):
+    def profile_dataframe(df: pd.DataFrame, save_path: Optional[P] = None):
         # path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report{appendix}.html").create(parents_only=True)
-        profile_report = install_n_import(library="ydata_profiling", package="ydata-profiling").ProfileReport
-        # from ydata_profiling import ProfileReport as profile_report
-        # profile_report = pandas_profiling.()
         # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
-        report = profile_report(df, title="Pandas Profiling Report", explorative=explorative, silent=silent)
-        if save_path is not None: report.to_file(save_path)
+        # report = profile_report(df, title="Pandas Profiling Report", explorative=explorative, silent=silent)
+        tmp_path = P.tmpfile(suffix=".parquet")
+        df.to_parquet(tmp_path)
+        from crocodile.core import run_in_isolated_ve
+        if save_path is None:
+            save_path = P.tmpfile(suffix=".html")
+        pyscript = f"""
+
+from ydata_profiling import ProfileReport
+import pandas as pd
+df = pd.read_parquet(r'{tmp_path}')
+report = ProfileReport(df, title="Profiling Report")
+report.to_file(r'{save_path}')
+
+"""
+        _launch_script = run_in_isolated_ve(packages=["pandas", "fastparquet", "pyarrow", "ydata-profiling"], pyscript=pyscript)
+        print(f"Profile report saved at {save_path}")
+        save_path()
+        return save_path
 
     @staticmethod
     def gui_dataframe(df: 'pd.DataFrame'): install_n_import("pandasgui").show(df)

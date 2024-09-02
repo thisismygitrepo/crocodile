@@ -51,14 +51,21 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     import random
     population = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else "")
     return ''.join(random.choices(population, k=length))
-def run_in_isolated_ve(package_name: str, pyscript: str) -> str:
+def run_in_isolated_ve(packages: list[str], pyscript: str) -> str:
     ve_name = randstr()
-    cmd = f"uv venv $HOME/venvs/tmp/{ve_name} --python 3.11; source $HOME/venvs/tmp/{ve_name}/bin/activate; uv pip install {package_name}"
+    packages_space_separated = " ".join(packages)
+    packages_space_separated = "pip setuptools " + packages_space_separated
+    ve_creation_cmd = f"uv venv $HOME/venvs/tmp/{ve_name} --python 3.11; source $HOME/venvs/tmp/{ve_name}/bin/activate; uv pip install {packages_space_separated}"
+    import time
+    t0 = time.time()
     import subprocess
-    subprocess.run(cmd, shell=True, check=True)
+    subprocess.run(ve_creation_cmd, shell=True, check=True, executable='/bin/bash')
+    t1 = time.time()
+    print(f"✅ Finished creating venv @ $HOME/venvs/tmp/{ve_name} in {t1 - t0:0.2f} seconds.")
     script_path = Path.home().joinpath("tmp_results/tmp_scripts/python").joinpath(ve_name + f"_script_{randstr()}.py")
     script_path.write_text(pyscript, encoding='utf-8')
     fire_script = f"source $HOME/venvs/tmp/{ve_name}/bin/activate; python {script_path}"
+    subprocess.run(fire_script, shell=True, check=True, executable='/bin/bash')
     return fire_script
 
 
