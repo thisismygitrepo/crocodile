@@ -51,6 +51,15 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     import random
     population = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else "")
     return ''.join(random.choices(population, k=length))
+def run_in_isolated_ve(package_name: str, pyscript: str) -> str:
+    ve_name = randstr()
+    cmd = f"uv venv $HOME/venvs/tmp/{ve_name} --python 3.11; source $HOME/venvs/tmp/{ve_name}/bin/activate; uv pip install {package_name}"
+    import subprocess
+    subprocess.run(cmd, shell=True, check=True)
+    script_path = Path.home().joinpath("tmp_results/tmp_scripts/python").joinpath(ve_name + f"_script_{randstr()}.py")
+    script_path.write_text(pyscript, encoding='utf-8')
+    fire_script = f"source $HOME/venvs/tmp/{ve_name}/bin/activate; python {script_path}"
+    return fire_script
 
 
 def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
