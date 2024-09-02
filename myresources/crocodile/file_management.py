@@ -603,8 +603,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return self._return(path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder: OPLike = None, path: OPLike = None, name: Optional[str]= None, verbose: bool = True, content: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False,
               pwd: Optional[str] = None, tmp: bool = False, pattern: Optional[str] = None, merge: bool = False) -> 'P':
-        assert merge is False, f"I have not implemented this yet"
-        assert path is None, f"I have not implemented this yet"
+        assert merge is False, "I have not implemented this yet"
+        assert path is None, "I have not implemented this yet"
         if tmp: return self.unzip(folder=P.tmp().joinpath("tmp_unzips").joinpath(randstr()), content=True).joinpath(self.stem)
         slf = zipfile__ = self.expanduser().resolve()
         if any(ztype in slf.parent for ztype in (".zip", ".7z")):  # path include a zip archive in the middle.
