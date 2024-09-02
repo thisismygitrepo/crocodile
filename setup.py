@@ -23,6 +23,10 @@ install_requires = [
         "tabulate",  # pandas optional for pretty printing of tables
         "matplotlib",  # viz
 
+        # the following is required to serialize dataframes
+        "pyarrow",
+        "fastparquet",
+
         # Accessories
         "rich",  # for rich text
         "tabulate",  # for pretty printing (required by rich to print tables)
@@ -40,7 +44,7 @@ install_requires = [
         "paramiko",  # for SSH
         "requests",  # interacting with web
         "colorlog",  # for colored logging
-
+        "sqlalchemy",  # for database
     ]
 
 
@@ -106,9 +110,12 @@ setup(
     install_requires=install_requires,
 
     extras_require={
-            'full': ['sqlalchemy', 'tensorflow',
-                    #  'torch',
-                     'scikit-learn', 'dash', 'dash_daq', 'dash_bootstrap_components',
+            'full': [
+                'tensorflow',
+                'torch',
+                "keras",
+                     'scikit-learn',
+                       # 'dash', 'dash_daq', 'dash_bootstrap_components',
                      'click',
                      'types-requests', 'types-paramiko', 'types-tqdm',
                      'setuptools', 'wheel', 'twine']
