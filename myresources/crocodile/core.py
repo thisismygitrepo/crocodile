@@ -171,7 +171,7 @@ class Base(object):
         module = inspect.getmodule(self)
         if module is not None and hasattr(module, "__file__"):
             file = Path(module.__file__)  # type: ignore
-        else: raise FileNotFoundError(f"Attempted to save code from a script running in interactive session! module should be imported instead.")
+        else: raise FileNotFoundError("Attempted to save code from a script running in interactive session! module should be imported instead.")
         _ = Path(path).expanduser().write_text(encoding='utf-8', data=file.read_text(encoding='utf-8'))
         return Path(path) if type(path) is str else path  # path could be P, better than Path
     def get_attributes(self, remove_base_attrs: bool = True, return_objects: bool = False, fields: bool = True, methods: bool = True):
@@ -198,7 +198,7 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
     def __init__(self, obj_list: Union[ListType[T], None, Iterator[T], Iterable[T]] = None) -> None:
         super().__init__()
         self.list = list(obj_list) if obj_list is not None else []
-    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else f"An Empty List []"
+    def __repr__(self): return f"List [{len(self.list)} elements]. First Item: " + f"{Display.get_repr(self.list[0], justify=0, limit=100)}" if len(self.list) > 0 else "An Empty List []"
     def print(self, sep: str = '\n', styler: Callable[[Any], str] = repr, return_str: bool = False, **kwargs: dict[str, Any]):
         res = sep.join([f"{idx:2}- {styler(item)}" for idx, item in enumerate(self.list)])
         _ = print(res) if not return_str else None; _ = kwargs
@@ -405,8 +405,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
             inspect(self, value=False, title=title, docs=False, dunder=False, sort=False)
             return None
         if not bool(self):
-            if return_str: return f"Empty Struct."
-            else: print(f"Empty Struct."); return None
+            if return_str: return "Empty Struct."
+            else: print("Empty Struct."); return None
         else:
             if as_yaml or as_config:
                 import yaml
