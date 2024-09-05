@@ -46,7 +46,7 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
     from cryptography.fernet import Fernet
     salt, iteration = None, None
     if pwd is not None:  # generate it from password
-        assert (key is None) and (type(pwd) is str), f"❌ You can either pass key or pwd, or none of them, but not both."
+        assert (key is None) and (type(pwd) is str), "❌ You can either pass key or pwd, or none of them, but not both."
         import secrets
         iteration = iteration or secrets.randbelow(exclusive_upper_bound=1_000_000)
         salt = secrets.token_bytes(nbytes=16) if salted else None
@@ -60,25 +60,25 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
                 key_resolved = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()
                 print(f"⚠️ Using key from: {P.home().joinpath('dotfiles/creds/data/encrypted_files_key.bytes')}")
             except FileNotFoundError as err:
-                print("\n" * 3, "~" * 50, f"""Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~" * 50, "\n" * 3)
+                print("\n" * 3, "~" * 50, """Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~" * 50, "\n" * 3)
                 raise FileNotFoundError(err) from err
     elif isinstance(key, (str, P, Path)): key_resolved = P(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: key_resolved = key  # key passed explicitly
-    else: raise TypeError(f"❌ Key must be either a path, bytes object or None.")
+    else: raise TypeError("❌ Key must be either a path, bytes object or None.")
     code = Fernet(key=key_resolved).encrypt(msg)
     if pwd is not None and salt is not None and iteration is not None: return base64.urlsafe_b64encode(b'%b%b%b' % (salt, iteration.to_bytes(4, 'big'), base64.urlsafe_b64decode(code)))
     return code
 def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True) -> bytes:
     import base64
     if pwd is not None:
-        assert key is None, f"❌ You can either pass key or pwd, or none of them, but not both."
+        assert key is None, "❌ You can either pass key or pwd, or none of them, but not both."
         if salted:
             decoded = base64.urlsafe_b64decode(token)
             salt, iterations, token = decoded[:16], decoded[16:20], base64.urlsafe_b64encode(decoded[20:])
             key_resolved = pwd2key(password=pwd, salt=salt, iterations=int.from_bytes(bytes=iterations, byteorder='big'))
         else: key_resolved = pwd2key(password=pwd)  # trailing `;` prevents IPython from caching the result.
     elif type(key) is bytes:
-        assert pwd is None, f"❌ You can either pass key or pwd, or none of them, but not both."
+        assert pwd is None, "❌ You can either pass key or pwd, or none of them, but not both."
         key_resolved = key  # passsed explicitly
     elif key is None: key_resolved = P.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
     elif isinstance(key, (str, P, Path)): key_resolved = P(key).read_bytes()  # passed a path to a file containing kwy
@@ -326,10 +326,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 __delayed_msg__ = f"DELETED 🗑️❌ {repr(self)}."
         if verbose and msg != "":
             try: print(msg)  # emojie print error.
-            except UnicodeEncodeError: print(f"P._return warning: UnicodeEncodeError, could not print message.")
+            except UnicodeEncodeError: print("P._return warning: UnicodeEncodeError, could not print message.")
         if verbose and __delayed_msg__ != "":
             try: print(__delayed_msg__)
-            except UnicodeEncodeError: print(f"P._return warning: UnicodeEncodeError, could not print message.")
+            except UnicodeEncodeError: print("P._return warning: UnicodeEncodeError, could not print message.")
         return self if orig else res
     # ================================ Path Object management ===========================================
     """ Distinction between Path object and the underlying file on disk that the path may refer to. Two distinct flags are used:
@@ -595,7 +595,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             arcname_obj = P(arcname or slf.name)
             if arcname_obj.name != slf.name: arcname_obj /= slf.name  # arcname has to start from somewhere and end with filename
             if slf.is_file():
-                path = Compression.zip_file(ip_path=str(slf), op_path=str(path + f".zip" if path.suffix != ".zip" else path), arcname=str(arcname_obj), mode=mode, **kwargs)
+                path = Compression.zip_file(ip_path=str(slf), op_path=str(path + ".zip" if path.suffix != ".zip" else path), arcname=str(arcname_obj), mode=mode, **kwargs)
             else:
                 if content: root_dir, base_dir = slf, "."
                 else: root_dir, base_dir = slf.split(at=str(arcname_obj[0]), sep=1)[0], str(arcname_obj)
@@ -705,7 +705,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         """:param rel2it: `folder` or `path` are relative to `self` as opposed to cwd. This is used when resolving '../dir'"""
         if path is not None:
             path = P(self.joinpath(path).resolve() if rel2it else path).expanduser().resolve()
-            assert folder is None and name is None, f"If `path` is passed, `folder` and `name` cannot be passed."
+            assert folder is None and name is None, "If `path` is passed, `folder` and `name` cannot be passed."
             assert not path.is_dir(), f"`path` passed is a directory! it must not be that. If this is meant, pass it with `folder` kwarg. `{path}`"
             return path
         name, folder = (default_name if name is None else str(name)), (self.parent if folder is None else folder)  # good for edge cases of path with single part.  # means same directory, just different name
@@ -726,11 +726,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         file_path = self.expanduser().absolute()
         file_data = file_path.read_bytes()
         mime_type, _ = mimetypes.guess_type(file_path)
-        filename = file_path.name
         if service == 'gofile':
             response = requests.post(
                 url="https://store1.gofile.io/uploadFile",
-                files={"file": (filename, file_data, mime_type) },  # type: ignore
+                files={"file": (file_path.name, file_data, mime_type) },  # type: ignore
                 timeout=timeout
             )
             return P(response.json()['data']['downloadPage'])
