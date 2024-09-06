@@ -40,7 +40,7 @@ class Log(logging.Logger):  #
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
             name = randstr(noun=True)
-            print(f"Logger name not passed. It is recommended to pass a name indicating the owner.")
+            print("Logger name not passed. It is recommended to pass a name indicating the owner.")
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
         self.file_path = file_path  # proper update to this value by self.add_filehandler()
@@ -48,7 +48,7 @@ class Log(logging.Logger):  #
             install_n_import("colorlog")
             import colorlog
             module: Any = colorlog
-            processed_fmt: Any = colorlog.ColoredFormatter(fmt or (rf"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
+            processed_fmt: Any = colorlog.ColoredFormatter(fmt or (r"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
         else:
             module = logging
             processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
@@ -62,7 +62,7 @@ class Log(logging.Logger):  #
         if which in {"stream", "all"}: self.get_shandler().setLevel(level)
         if which in {"file", "all"}: self.get_fhandler().setLevel(level)
     def __reduce_ex__(self, protocol: Any): _ = protocol; return self.__class__, tuple(self.specs.values())  # reduce_ex is enchanced reduce. It is lower than getstate and setstate. It uses init method to create an instance.
-    def __repr__(self): return "".join([f"Logger {self.name} (level {self.level}) with handlers: \n"] + [repr(h) + f"" + "\n" for h in self.handlers])
+    def __repr__(self): return "".join([f"Logger {self.name} (level {self.level}) with handlers: \n"] + [repr(h) + "\n" for h in self.handlers])
     @staticmethod
     def get_format(sep: str = ' | ', datefmt: str = "%d %H:%M:%S"):
         _ = datefmt  # TODO: add datefmt to the format string
@@ -235,7 +235,7 @@ class Terminal:
     def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
         script = (Terminal.get_header(wdir=wdir, toolbox=True) if header else "") + script + ("\nDisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts/terminal").write_text(f"""print(r'''{script}''')""" + "\n" + script)
-        print(f"Script to be executed asyncronously: ", py_script.absolute().as_uri())
+        print("Script to be executed asyncronously: ", py_script.absolute().as_uri())
         shell_script = f"""
 {f'cd {wdir}' if wdir is not None else ''}
 {'ipython' if ipython else 'python'} {'-i' if interactive else ''} {py_script}
@@ -353,7 +353,13 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         import rich
         rich.inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
-        self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
+        try:
+            self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
+        except Exception as err:
+            print(err)
+            self.pwd = getpass.getpass(f"Enter password for {self.username}@{self.hostname}: ")
+            self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
+
         try: self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
         except Exception as err:
             self.sftp = None
@@ -404,7 +410,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         res = Response(cmd=command)
         res.output.returncode = os.system(command)
         return res
-    def get_ssh_conn_str(self, cmd: str = ""): return f"ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_remote_repr().replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
+    def get_ssh_conn_str(self, cmd: str = ""): return "ssh " + (f" -i {self.sshkey}" if self.sshkey else "") + self.get_remote_repr().replace(':', ' -p ') + (f' -t {cmd} ' if cmd != '' else ' ')
     def open_console(self, cmd: str = '', new_window: bool = True, terminal: Optional[str] = None, shell: str = "pwsh"): Terminal().run_async(*(self.get_ssh_conn_str(cmd=cmd).split(" ")), new_window=new_window, terminal=terminal, shell=shell)
     def run(self, cmd: str, verbose: bool = True, desc: str = "", strict_err: bool = False, strict_returncode: bool = False, env_prefix: bool = False) -> Response:  # most central method.
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd
@@ -415,9 +421,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         self.terminal_responses.append(res)
         return res
     def run_py(self, cmd: str, desc: str = "", return_obj: bool = False, verbose: bool = True, strict_err: bool = False, strict_returncode: bool = False) -> Union[Any, Response]:
-        assert '"' not in cmd, f'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
+        assert '"' not in cmd, 'Avoid using `"` in your command. I dont know how to handle this when passing is as command to python in pwsh command.'
         if not return_obj: return self.run(cmd=f"""{self.remote_env_cmd}; python -c "{Terminal.get_header(wdir=None, toolbox=True)}{cmd}\n""" + '"', desc=desc or f"run_py on {self.get_remote_repr()}", verbose=verbose, strict_err=strict_err, strict_returncode=strict_returncode)
-        assert "obj=" in cmd, f"The command sent to run_py must have `obj=` statement if return_obj is set to True"
+        assert "obj=" in cmd, "The command sent to run_py must have `obj=` statement if return_obj is set to True"
         source_file = self.run_py(f"""{cmd}\npath = Save.pickle(obj=obj, path=P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]
         return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
@@ -430,11 +436,11 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
                 return list(tmp)
             else: raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
         if z:
-            print(f"🗜️ ZIPPING ...")
+            print("🗜️ ZIPPING ...")
             source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         if target is None:
             target = P(source_obj).expanduser().absolute().collapseuser(strict=True)
-            assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home."
+            assert target.is_relative_to("~"), "If target is not specified, source must be relative to home."
         remotepath = self.run_py(f"path=P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
@@ -459,14 +465,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if not isinstance(tmp2, P): raise RuntimeError(f"Could not zip {source} due to {tmp.err}")
             else: source = tmp2
         if target is None:
-            tmpx = self.run_py(f"print(P(r'{P(source).as_posix()}').collapseuser(strict=False).as_posix())", desc=f"Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
+            tmpx = self.run_py(f"print(P(r'{P(source).as_posix()}').collapseuser(strict=False).as_posix())", desc="Finding default target via relative source path", strict_returncode=True, strict_err=True, verbose=False).op2path()
             if isinstance(tmpx, P): target = tmpx
             else: raise RuntimeError(f"Could not resolve target path {target} due to error")
             assert target.is_relative_to("~"), f"If target is not specified, source must be relative to home.\n{target=}"
         target_obj = P(target).expanduser().absolute().create(parents_only=True)
         if z and '.zip' not in target_obj.suffix: target_obj += '.zip'
         if "~" in str(source):
-            tmp3 = self.run_py(f"print(P(r'{source}').expanduser())", desc=f"# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path()
+            tmp3 = self.run_py(f"print(P(r'{source}').expanduser())", desc="# Resolving source path address by expanding user", strict_returncode=True, strict_err=True, verbose=False).op2path()
             if isinstance(tmp3, P): source = tmp3
             else: raise RuntimeError(f"Could not resolve source path {source} due to")
         else: source = P(source)
@@ -486,7 +492,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if r:
                 tmp: List[P] = scout.files.apply(lambda file: self.receieve(source=file.as_posix(), target=P(target).joinpath(P(file).relative_to(source)) if target else None, r=False))
                 return tmp.list[0]
-            else: print(f"Source is a directory! either set `r=True` for recursive sending or raise `zip_first=True` flag.")
+            else: print("Source is a directory! either set `r=True` for recursive sending or raise `zip_first=True` flag.")
         target = P(target).expanduser().absolute().create(parents_only=True) if target else scout.source_rel2home.expanduser().absolute().create(parents_only=True)
         if z and '.zip' not in target.suffix: target += '.zip'
         source = scout.source_full
@@ -557,15 +563,21 @@ class Scheduler:
         duration = end_time - self.sess_start_time
         sess_stats = self.sess_stats(self)
         self.records.append([self.sess_start_time, end_time, duration, self.cycle, reason, self.logger.file_path] + list(sess_stats.values()))
-        summ = {"start time": f"{str(self.sess_start_time)}", "finish time": f"{str(end_time)}.", "duration": f"{str(duration)} | wait time {self.wait_sec}s", "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}", f"termination reason": reason, "logfile": self.logger.file_path}
+        summ = {
+            "start time": f"{str(self.sess_start_time)}",
+            "finish time": f"{str(end_time)}.",
+            "duration": f"{str(duration)} | wait time {self.wait_sec}s",
+            "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}",
+            "termination reason": reason, "logfile": self.logger.file_path
+                }
         tmp = Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False)
         assert isinstance(tmp, str)
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
+        self.logger.critical("\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
         df = self.get_records_df()
         df["start"] = df["start"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
         df["finish"] = df["finish"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
         df["duration"] = df["duration"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
-        self.logger.critical(f"\n--> Logger history.\n" + str(df))
+        self.logger.critical("\n--> Logger history.\n" + str(df))
         return self
     def default_exception_handler(self, ex: Union[Exception, KeyboardInterrupt], during: str, sched: 'Scheduler') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
@@ -624,16 +636,16 @@ class SchedulerV2:
                 "finish time": f"{str(end_time)}.",
                 "duration": f"{str(duration)} | wait time {self.wait_ms / 1_000: 0.1f}s",
                 "cycles ran": f"{self.cycle} | Lifetime cycles = {self.get_records_df()['cycles'].sum()}",
-                f"termination reason": reason, "logfile": self.logger.file_path
+                "termination reason": reason, "logfile": self.logger.file_path
                 }
         tmp = Struct(summ).update(sess_stats).print(as_config=True, return_str=True, quotes=False)
         assert isinstance(tmp, str)
-        self.logger.critical(f"\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
+        self.logger.critical("\n--> Scheduler has finished running a session. \n" + tmp + "\n" + "-" * 100)
         df = self.get_records_df()
         df["start"] = df["start"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
         df["finish"] = df["finish"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
         df["duration"] = df["duration"].apply(lambda x: str(x).split(".", maxsplit=1)[0])
-        self.logger.critical(f"\n--> Logger history.\n" + str(df))
+        self.logger.critical("\n--> Logger history.\n" + str(df))
         return self
     def default_exception_handler(self, ex: Union[Exception, KeyboardInterrupt], during: str, sched: 'SchedulerV2') -> None:  # user decides on handling and continue, terminate, save checkpoint, etc.  # Use signal library.
         print(sched)
@@ -659,8 +671,8 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
     if obj is not None:
         try: source_code = inspect.getsource(obj)
         except OSError: source_code = f"Could not read source code from `{obj_path}`."
-        text += (f"\n\n# Code to reproduce results\n\n```python\n" + source_code + "\n```" + separator)
-    readmepath = (path / f"README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
+        text += ("\n\n# Code to reproduce results\n\n```python\n" + source_code + "\n```" + separator)
+    readmepath = (path / "README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
     if verbose: print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}")
     if save_source_code:
         if hasattr(obj, "__code__"):
