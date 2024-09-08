@@ -279,7 +279,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=True)
             if filename.is_dir():
                 tmp_content = filename.search("*")
-                if len(tmp_content) == 1: filename = tmp_content[0]
+                if len(tmp_content) == 1:
+                    print(f"⚠️ Found only one file in the unzipped folder: {tmp_content[0]}")
+                    filename = tmp_content[0]
                 else:
                     if strict: raise ValueError(f"❌ Expected only one file in the unzipped folder, but found {len(tmp_content)} files.")
                     else: print(f"⚠️ Found {len(tmp_content)} files in the unzipped folder. Using the first one: {tmp_content[0]}")
