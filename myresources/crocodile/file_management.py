@@ -97,6 +97,7 @@ def unlock(drive: str = "D:", pwd: Optional[str] = None, auto_unlock: bool = Fal
 class Read:
     @staticmethod
     def read(path: PLike, **kwargs: Any) -> Any:
+        if Path(path).is_dir(): raise IsADirectoryError(f"Path is a directory, not a file: {path}")
         suffix = Path(path).suffix[1:]
         if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
         if suffix == "sqlite":
@@ -111,7 +112,9 @@ class Read:
             if suffix == "parquet":
                 import pandas as pd
                 return pd.read_parquet(path, **kwargs)
-            try: raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {install_n_import('magic', 'python-magic').from_file(path)}") from err
+            try:
+                guess = install_n_import('magic', 'python-magic').from_file(path)
+                raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {guess}") from err
             except ImportError as err2:
                 print(f"💥 Unknown file type. failed to recognize the suffix `{suffix}` of file {path} ")
                 raise ImportError(err) from err2
@@ -272,7 +275,17 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if verbose: print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}")
                 return default
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
-        filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=verbose) if '.zip' in str(slf) else slf
+        if '.zip' in str(slf):
+            filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=True)
+            if filename.is_dir():
+                tmp_content = filename.search("*")
+                if len(tmp_content) == 1: filename = tmp_content[0]
+                else:
+                    if strict: raise ValueError(f"❌ Expected only one file in the unzipped folder, but found {len(tmp_content)} files.")
+                    else: print(f"⚠️ Found {len(tmp_content)} files in the unzipped folder. Using the first one: {tmp_content[0]}")
+                    filename = tmp_content[0]
+        else:
+            filename = slf
         try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError as ioe: raise IOError from ioe
     def start(self, opener: Optional[str] = None):

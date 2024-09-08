@@ -55,7 +55,10 @@ def run_in_isolated_ve(packages: list[str], pyscript: str) -> str:
     ve_name = randstr()
     packages_space_separated = " ".join(packages)
     packages_space_separated = "pip setuptools " + packages_space_separated
-    ve_creation_cmd = f"uv venv $HOME/venvs/tmp/{ve_name} --python 3.11; source $HOME/venvs/tmp/{ve_name}/bin/activate; uv pip install {packages_space_separated}"
+    ve_creation_cmd = f"""
+uv venv $HOME/venvs/tmp/{ve_name} --python 3.11
+. $HOME/venvs/tmp/{ve_name}/bin/activate
+uv pip install {packages_space_separated}"""
     import time
     t0 = time.time()
     import subprocess
