@@ -193,7 +193,6 @@ class Base(object):
         import tempfile
         filename = Path(tempfile.gettempdir()).joinpath("graph_viz_" + randstr(noun=True) + ".png")
         install_n_import("objgraph").show_refs([obj], max_depth=depth, filename=str(filename), filter=filt)
-        # if __import__("sys").platform == "win32": __import__("os").startfile(str(filename.absolute()))
         return filename
 
 

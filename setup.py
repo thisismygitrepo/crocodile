@@ -45,11 +45,17 @@ install_requires = [
         "requests",  # interacting with web
         "colorlog",  # for colored logging
         "sqlalchemy",  # for database
+
+        "distro",  # for getting OS info
+        "send2trash",  # for moving files to trash
+        "py7zr",  # for 7z files
+        "gitpython",  # for git
+        "clipboard",  # for clipboard
     ]
 
 
 if platform.system() == "Windows":
-    # _ = install_n_import("win32api", "pywin32")  # this is crucial for windows to pop up the concent window in case python was not run as admin.
+    # this is crucial for windows to pop up the concent window in case python was not run as admin.
     install_requires.append("pywin32")
 
 
