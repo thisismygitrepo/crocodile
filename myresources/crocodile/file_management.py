@@ -251,18 +251,22 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return path
     def copy(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, content: bool = False, verbose: bool = True, append: Optional[str] = None, overwrite: bool = False, orig: bool = False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.
         dest = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name, rel2it=False)
-        dest, slf = dest.expanduser().resolve().create(parents_only=True), self.expanduser().resolve()
-        dest = self.append(append if append is not None else f"_copy_{randstr()}") if dest == slf else dest
-        _ = dest.delete(sure=True) if not content and overwrite and dest.exists() else None
-        if not content and not overwrite and dest.exists(): raise FileExistsError(f"Destination already exists: {repr(dest)}")
+        dest = dest.expanduser().resolve().create(parents_only=True)
+        slf = self.expanduser().resolve()
+        if dest == slf:
+            dest = self.append(append if append is not None else f"_copy_{randstr()}")
+        if not content and overwrite and dest.exists(): dest.delete(sure=True)
+        if not content and not overwrite and dest.exists(): raise FileExistsError(f"💥 Destination already exists: {repr(dest)}")
         if slf.is_file():
             import shutil
             shutil.copy(str(slf), str(dest))
             if verbose: print(f"🖨️ COPIED {repr(slf)} ==> {repr(dest)}")
         elif slf.is_dir():
             dest = dest.parent if content else dest
-            __import__("distutils.dir_util").__dict__["dir_util"].copy_tree(str(slf), str(dest))
-            if verbose: print(f"COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}")
+            # from distutils.dir_util import copy_tree
+            from shutil import copytree
+            copytree(str(slf), str(dest))
+            if verbose: print(f"🖨️ COPIED {'Content of ' if content else ''} {repr(slf)} ==> {repr(dest)}")
         else: print(f"💥 Could NOT COPY. Not a file nor a path: {repr(slf)}.")
         return dest if not orig else self
     # ======================================= File Editing / Reading ===================================
@@ -281,14 +285,15 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 tmp_content = filename.search("*")
                 if len(tmp_content) == 1:
                     print(f"⚠️ Found only one file in the unzipped folder: {tmp_content[0]}")
-                    filename = tmp_content[0]
+                    filename = tmp_content.list[0]
                 else:
                     if strict: raise ValueError(f"❌ Expected only one file in the unzipped folder, but found {len(tmp_content)} files.")
                     else: print(f"⚠️ Found {len(tmp_content)} files in the unzipped folder. Using the first one: {tmp_content[0]}")
-                    filename = tmp_content[0]
+                    filename = tmp_content.list[0]
         else:
             filename = slf
-        try: return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
+        try:
+            return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError as ioe: raise IOError from ioe
     def start(self, opener: Optional[str] = None):
         if str(self).startswith("http") or str(self).startswith("www"):
@@ -425,7 +430,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         else: raise ValueError("Either `index` or `at` can be provided. Both are not allowed simulatanesouly.")
         if sep == 0: return one, two  # neither of the portions get the sperator appended to it. # ================================  appending `at` to one of the portions
         elif sep == 1: return one, P(at) / two   # append it to right portion
-        elif sep == -1: return one / at, two  # append it to left portion.
+        elif sep == -1:
+            return one / at, two  # append it to left portion.
         else: raise ValueError(f"`sep` should take a value from the set [-1, 0, 1] but got {sep}")
     def __repr__(self):  # this is useful only for the console
         if self.is_symlink():
