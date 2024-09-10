@@ -531,7 +531,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def search(self, pattern: str = '*', r: bool = False, files: bool = True, folders: bool = True, compressed: bool = False, dotfiles: bool = False, filters: Optional[list[Callable[[Any], bool]]] = None, not_in: Optional[list[str]] = None,
                exts: Optional[list[str]] = None, win_order: bool = False) -> List['P']:
         if isinstance(not_in, list):
-            tmp = [lambda x: all([str(notin) not in str(x) for notin in not_in])]  # type: ignore
+            tmp = [lambda x: all([str(a_not_in) not in str(x) for a_not_in in not_in])]  # type: ignore
         else: tmp = []
         if isinstance(exts, list):
             tmp2 = [lambda x: any([ext in x.name for ext in exts])]  # type: ignore
