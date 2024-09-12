@@ -13,13 +13,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine, text, inspect as inspect__, Engine, Connection
 from sqlalchemy.engine import Inspector
 from sqlalchemy.sql.schema import MetaData
-from crocodile.core import Struct, Display
+from crocodile.core import Struct
 from crocodile.file_management import List as L, P, OPLike
-
-_ = create_engine, text
-
-
-Display.set_pandas_display()
 
 
 class DBMS:
@@ -38,7 +33,7 @@ class DBMS:
         # self.db = db
         self.sch = sch
         self.vws: bool = vws
-        self.schema: Optional[L[str]] = None
+        self.schema: list[str] = []
         # self.tables = None
         # self.views = None
         # self.sch_tab: Optional[Struct] = None
@@ -58,11 +53,11 @@ class DBMS:
         self.meta.reflect(bind=self.eng, schema=sch or self.sch)
         insp = inspect__(subject=self.eng)
         self.insp = insp
-        self.schema = L(obj_list=self.insp.get_schema_names())
-        print(f"Inspecting tables of schema `{self.schema.list}` {self.eng}")
-        self.sch_tab: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_table_names(schema=x)))}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
-        print(f"Inspecting views of schema `{self.schema.list}` {self.eng}")
-        self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema.list, self.schema.apply(lambda x: insp.get_view_names(schema=x)))}
+        self.schema = self.insp.get_schema_names()
+        print(f"Inspecting tables of schema `{self.schema}` {self.eng}")
+        self.sch_tab: dict[str, list[str]] = {k: v for k, v in zip(self.schema, [insp.get_table_names(schema=x) for x in self.schema])}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
+        print(f"Inspecting views of schema `{self.schema}` {self.eng}")
+        self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema, [insp.get_view_names(schema=x) for x in self.schema])}
         return self
 
     def __getstate__(self) -> dict[str, Any]:
@@ -148,7 +143,7 @@ class DBMS:
 
     # ========================== TABLES =====================================
     def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
-        sch = sch or self.sch or 'main'
+        sch = sch or self.sch or self.schema[0]
         if table is None:
             tables = self.sch_tab[sch]
             assert len(tables) > 0, f"No tables found in schema `{sch}`"
