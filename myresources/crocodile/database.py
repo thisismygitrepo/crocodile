@@ -33,7 +33,7 @@ class DBMS:
         self.ses: Optional[Session] = None
         self.insp: Optional[Inspector] = None
         self.meta: Optional[MetaData] = None
-        self.path = P(self.eng.url.database) if self.eng.url.database else None  # memory db
+        self.path: Optional[P] = P(self.eng.url.database) if self.eng.url.database else None  # memory db
 
         # self.db = db
         self.sch = sch
@@ -47,7 +47,9 @@ class DBMS:
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
         if self.path is not None:
-            print(f"Database at {self.path.as_uri()} is ready.")
+            if self.path.isfile(): path_repr = self.path.as_uri()
+            else: path_repr = self.path
+            print(f"Database at {path_repr} is ready.")
 
     def refresh(self, sch: Optional[str] = None) -> 'DBMS':  # fails if multiple schemas are there and None is specified
         self.con = self.eng.connect()
@@ -87,7 +89,7 @@ class DBMS:
         return self.meta.tables[self._get_table_identifier(table=table, sch=sch)].exported_columns.keys()
     def close(self, sleep: int = 2):
         if self.path:
-            print(f"Terminating database `{self.path.as_uri() if 'memory' not in self.path else self.path}`")
+            print(f"Terminating database `{self.path.as_uri() if self.path.is_file() and 'memory' not in self.path else self.path}`")
         if self.con: self.con.close()
         if self.ses: self.ses.close()
         self.eng.pool.dispose()
@@ -112,7 +114,8 @@ class DBMS:
             else:
                 return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
-        print(f"Linking to database at {path.as_uri()}")
+        path_repr = path.as_uri() if path.is_file() else path
+        print(f"Linking to database at {path_repr}")
         if pool_size == 0:
             res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         else:
