@@ -51,7 +51,9 @@ class Log(logging.Logger):  #
         else:
             module = logging
             processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
-        if file or file_path: self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level)
+        if file or file_path:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            self.add_filehandler(file_path=file_path, fmt=processed_fmt, f_level=f_level)
         if stream: self.add_streamhandler(s_level, fmt=processed_fmt, module=module)
         self.specs = dict(dialect=dialect, name=self.name, file=file, file_path=self.file_path, stream=bool(self.get_shandler()), fmt=fmt, sep=sep, s_level=s_level, f_level=f_level, l_level=l_level, verbose=verbose, log_colors=log_colors)  # # this way of creating relative path makes transferrable across machines.
     def get_shandler(self): return List(handler for handler in self.handlers if "StreamHandler" in str(handler))
