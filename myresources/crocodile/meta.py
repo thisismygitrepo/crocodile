@@ -98,7 +98,7 @@ class Log(logging.Logger):  #
         fhandler.setLevel(level=f_level)
         fhandler.set_name(name)
         self.addHandler(fhandler)
-        self.file_path = filename.collapseuser()
+        self.file_path = filename.collapseuser(strict=False)
         print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
     def test(self):
         List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message"))
