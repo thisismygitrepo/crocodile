@@ -121,7 +121,8 @@ class Read:
     @staticmethod
     def json(path: PLike, r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
         import json
-        try: mydict = json.loads(P(path).read_text(), **kwargs)
+        try:
+            mydict = json.loads(P(path).read_text(), **kwargs)
         except Exception:
             import pyjson5
             mydict = pyjson5.loads(P(path).read_text(), **kwargs)  # file has C-style comments.
@@ -136,7 +137,7 @@ class Read:
         return mydict
     @staticmethod
     def ini(path: PLike, encoding: Optional[str] = None):
-        if not Path(path).exists() or Path(path).is_dir(): raise FileNotFoundError(f"File not found: {path}")
+        if not Path(path).exists() or Path(path).is_dir(): raise FileNotFoundError(f"File not found or is a directory: {path}")
         import configparser
         res = configparser.ConfigParser()
         res.read(filenames=[str(path)], encoding=encoding)
@@ -145,7 +146,6 @@ class Read:
     def toml(path: PLike):
         import tomli
         return tomli.loads(P(path).read_text())
-
     @staticmethod
     def npy(path: PLike, **kwargs: Any):
         import numpy as np
@@ -764,7 +764,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
 
         else:
             raise ValueError("Unsupported service specified.")
-
     def share_on_network(self, username: Optional[str]= None, password: Optional[str] = None):
         from crocodile.meta import Terminal
         Terminal(stdout=None).run(f"sharing {self} {('--username ' + str(username)) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")

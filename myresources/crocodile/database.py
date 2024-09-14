@@ -95,7 +95,7 @@ class DBMS:
     def _get_table_identifier(self, table: str, sch: Optional[str]):
         if sch is None: sch = self.sch
         if sch is not None:
-            return f"""{sch}."{table}" """
+            return f""" "{sch}"."{table}" """
         else: return table
 
     @staticmethod
@@ -149,6 +149,7 @@ class DBMS:
             schemas = [a_sch for a_sch in self.schema if a_sch not in ["information_schema", "pg_catalog"]]
             if len(schemas) > 1 and "public" in schemas:
                 schemas.remove("public")
+            sch = schemas[0]
         if table is None:
             tables = self.sch_tab[sch]
             assert len(tables) > 0, f"No tables found in schema `{sch}`"
