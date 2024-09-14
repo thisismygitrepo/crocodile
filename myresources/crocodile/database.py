@@ -28,7 +28,9 @@ class DBMS:
         self.ses: Optional[Session] = None
         self.insp: Optional[Inspector] = None
         self.meta: Optional[MetaData] = None
-        self.path: Optional[P] = P(self.eng.url.database) if self.eng.url.database else None  # memory db
+        if self.eng.url.database and P(self.eng.url.database).exists():
+            self.path: Optional[P] = P(self.eng.url.database)
+        else: self.path = None
 
         # self.db = db
         self.sch = sch
@@ -93,7 +95,7 @@ class DBMS:
     def _get_table_identifier(self, table: str, sch: Optional[str]):
         if sch is None: sch = self.sch
         if sch is not None:
-            return f"{sch}.'{table}'"
+            return f"""{sch}."{table}" """
         else: return table
 
     @staticmethod
@@ -143,7 +145,10 @@ class DBMS:
 
     # ========================== TABLES =====================================
     def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
-        sch = sch or self.sch or self.schema[0]
+        if sch is None:
+            schemas = [a_sch for a_sch in self.schema if a_sch not in ["information_schema", "pg_catalog"]]
+            if len(schemas) > 1 and "public" in schemas:
+                schemas.remove("public")
         if table is None:
             tables = self.sch_tab[sch]
             assert len(tables) > 0, f"No tables found in schema `{sch}`"
