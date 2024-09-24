@@ -534,15 +534,18 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         try: return super(P, self).resolve(strict=strict)
         except OSError: return self
     # ======================================== Folder management =======================================
-    def search(self, pattern: str = '*', r: bool = False, files: bool = True, folders: bool = True, compressed: bool = False, dotfiles: bool = False, filters: Optional[list[Callable[[Any], bool]]] = None, not_in: Optional[list[str]] = None,
+    def search(self, pattern: str = '*', r: bool = False, files: bool = True, folders: bool = True, compressed: bool = False, dotfiles: bool = False, filters_total: Optional[list[Callable[[Any], bool]]] = None, not_in: Optional[list[str]] = None,
                exts: Optional[list[str]] = None, win_order: bool = False) -> List['P']:
         if isinstance(not_in, list):
-            tmp = [lambda x: all([str(a_not_in) not in str(x) for a_not_in in not_in])]  # type: ignore
-        else: tmp = []
+            filters_notin = [lambda x: all([str(a_not_in) not in str(x) for a_not_in in not_in])]  # type: ignore
+        else: filters_notin = []
         if isinstance(exts, list):
-            tmp2 = [lambda x: any([ext in x.name for ext in exts])]  # type: ignore
-        else: tmp2 = []
-        filters = (filters or []) + tmp + tmp2
+            filters_extension = [lambda x: any([ext in x.name for ext in exts])]  # type: ignore
+        else: filters_extension = []
+        filters_total = (filters_total or []) + filters_notin + filters_extension
+        if not files: filters_total.append(lambda x: x.is_dir())
+        if not folders: filters_total.append(lambda x: x.is_file())
+
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
             import zipfile
             import fnmatch
@@ -556,15 +559,19 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         elif dotfiles: raw = slf.glob(pattern) if not r else self.rglob(pattern)
         else:
             from glob import glob
-            raw = glob(str(slf / "**" / pattern), recursive=r) if r else glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
+            if r:
+                raw = glob(str(slf / "**" / pattern), recursive=r)
+            else:
+                raw = glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
+
         if ".zip" not in slf and compressed:
-            tmp = [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters=filters, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]
-            haha = List(tmp).reduce(func=lambda x, y: x + y)
+            filters_notin = [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters_total=filters_total, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]
+            haha = List(filters_notin).reduce(func=lambda x, y: x + y)
             raw = raw + haha  # type: ignore
         processed = []
         for item in raw:
             item_ = P(item)
-            if all([item_.is_dir() if not files else True, item_.is_file() if not folders else True] + [afilter(item_) for afilter in filters]):
+            if all([afilter(item_) for afilter in filters_total]):
                 processed.append(item_)
         if not win_order: return List(processed)
         import re

@@ -46,6 +46,7 @@ install_requires = [
         "colorlog",  # for colored logging
         "sqlalchemy",  # for database
 
+        "bcrypt",  # for hashing
         "distro",  # for getting OS info
         "send2trash",  # for moving files to trash
         "py7zr",  # for 7z files
