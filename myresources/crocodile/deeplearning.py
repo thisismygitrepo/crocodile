@@ -175,13 +175,13 @@ class DataReader:
         return res
     def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
     def __repr__(self):
-        print(f"DataReader Object with these keys: \n")
+        print("DataReader Object with these keys: \n")
         S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
         split = self.split
         if bool(split):
             print("Split-Data Table:")
             S(split).print(as_config=False, title="Split Data")  # table print
-        return f"--" * 50
+        return "--" * 50
 
     @staticmethod
     def split_the_data(specs: Specs, data_dict: dict[str, Any], populate_shapes: bool,
@@ -196,7 +196,7 @@ class DataReader:
             S(specs.__dict__).print(as_config=True, title="Specs Declared")
             # S(data_dict).print(as_config=True, title="Specs Declared")
             print(f"data_dict keys: {keys}")
-            raise ValueError(f"Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
+            raise ValueError("Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
 
         if populate_shapes:
             delcared_ip_shapes = specs.ip_shapes
@@ -224,22 +224,22 @@ class DataReader:
                     print(f"Populated ip shapes:    {specs.ip_shapes}")
                     print(f"Populated op shapes:    {specs.op_shapes}")
                     print(f"Populated other shapes: {specs.other_shapes}")
-                    raise ValueError(f"Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
+                    raise ValueError("Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
         from sklearn.model_selection import train_test_split as tts  # pylint: disable=import-error  # type: ignore  # noqa
         # tts = model_selection.train_test_split
         args = [data_dict[item] for item in strings]
         result = tts(*args, test_size=test_size, shuffle=shuffle, random_state=random_state, **split_kwargs if split_kwargs is not None else {})
         split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
         split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
-        print(f"================== Training Data Split ===========================")
+        print("================== Training Data Split ===========================")
         S(split).print()
-        print(f"==================================================================")
+        print("==================================================================")
         return split
 
     @staticmethod
     def sample_dataset(specs: Specs, split: dict[str, Any], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
                        use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
-        assert which_split is not None, f"No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
+        assert which_split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = specs.get_split_names(specs.ip_names, which_split=which_split)
         keys_op = specs.get_split_names(specs.op_names, which_split=which_split)
         keys_others = specs.get_split_names(specs.other_names, which_split=which_split)
@@ -350,12 +350,12 @@ class BaseModel(ABC):
                 train_weight_str = specs.get_split_names(names=[weight_name], which_split="train")[0]
                 sample_weight = split[train_weight_str]
             else:
-                print(f"⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
+                print("⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
             if val_sample_weight is None:
                 test_weight_str = specs.get_split_names(names=[weight_name], which_split="test")[0]
                 val_sample_weight = split[test_weight_str]
             else:
-                print(f"⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
+                print("⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
 
         x_test = x_test[0] if len(x_test) == 1 else x_test
         y_test = y_test[0] if len(y_test) == 1 else y_test
@@ -369,11 +369,11 @@ class BaseModel(ABC):
         self.history.append(copy.deepcopy(hist.history))  # it is paramount to copy, cause source can change.
         if viz:
             artist = plot_loss(self.history, y_label="loss")
-            artist.fig.savefig(fname=str(get_hp_save_dir(hp).joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+            artist.fig.savefig(fname=str(get_hp_save_dir(hp).joinpath("metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
         return self
 
     def switch_to_sgd(self, epochs: int = 10):
-        print(f'Switching the optimizer to SGD. Loss is fixed.'.center(100, '*'))
+        print('Switching the optimizer to SGD. Loss is fixed.'.center(100, '*'))
         hp = self.hp
         import keras
         new_optimizer = keras.optimizers.SGD(lr=hp.learning_rate * 0.5)
@@ -383,7 +383,7 @@ class BaseModel(ABC):
         return self.fit(epochs=epochs)
 
     def switch_to_l1(self):
-        print(f'Switching the loss to l1. Optimizer is fixed.'.center(100, '*'))
+        print('Switching the loss to l1. Optimizer is fixed.'.center(100, '*'))
         import keras
         self.model.reset_metrics()
         new_loss = keras.losses.MeanAbsoluteError()
@@ -622,7 +622,7 @@ class BaseModel(ABC):
             keys_ip = specs.get_split_names(specs.ip_names, which_split="test")
             keys_op = specs.get_split_names(specs.op_names, which_split="test")
         except TypeError as te:
-            raise ValueError(f"Failed to load up sample data. Make sure that data has been loaded up properly.") from te
+            raise ValueError("Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
         if ip is None:
             if sample_dataset:
@@ -641,7 +641,7 @@ class BaseModel(ABC):
             print("\n")
             print("Build Test".center(50, '-'))
             S.from_keys_values(keys_ip, L(ips).apply(lambda x: x.shape)).print(as_config=True, title="Input shapes:")
-            S.from_keys_values(keys_op, L(ops).apply(lambda x: x.shape)).print(as_config=True, title=f"Output shape:")
+            S.from_keys_values(keys_op, L(ops).apply(lambda x: x.shape)).print(as_config=True, title="Output shape:")
             print("\n\nStats on output data for random normal input:")
             try:
                 res = []
@@ -719,7 +719,7 @@ class Ensemble(Base):
             if save:
                 self.models[i].save_class()
                 Save.pickle(obj=self.performance, path=get_hp_save_dir(self.models[i].hp) / "performance.pkl")
-        print("\n\n", f" Finished fitting the ensemble ".center(100, ">"), "\n")
+        print("\n\n", " Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
 
