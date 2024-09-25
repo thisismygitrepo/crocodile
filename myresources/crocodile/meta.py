@@ -355,11 +355,19 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         rich.inspect(Struct(host=self.host, hostname=self.hostname, username=self.username, password="***", port=self.port, key_filename=self.sshkey, ve=self.ve), value=False, title="SSHing To", docs=False, sort=False)
         sock = paramiko.ProxyCommand(self.proxycommand) if self.proxycommand is not None else None
         try:
-            self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
-        except Exception as err:
-            print(err)
+            if pwd is None:
+                allow_agent = True
+                look_for_keys = True
+            else:
+                allow_agent = False
+                look_for_keys = False
+            self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock,
+                             allow_agent=allow_agent, look_for_keys=look_for_keys)  # type: ignore
+        except Exception as _err:
+            rich.console.Console().print_exception()
             self.pwd = getpass.getpass(f"Enter password for {self.username}@{self.hostname}: ")
-            self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock)  # type: ignore
+            self.ssh.connect(hostname=self.hostname, username=self.username, password=self.pwd, port=self.port, key_filename=self.sshkey, compress=self.compress, sock=sock,
+                             allow_agent=False,look_for_keys=False)  # type: ignore
 
         try: self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
         except Exception as err:
