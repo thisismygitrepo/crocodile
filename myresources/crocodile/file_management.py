@@ -156,7 +156,6 @@ class Read:
     def csv(path: PLike, **kwargs: Any):
         import pandas as pd
         return pd.read_csv(path, **kwargs)
-
     @staticmethod
     def pickle(path: PLike, **kwargs: Any):
         import pickle
@@ -166,7 +165,6 @@ class Read:
             raise ex
     @staticmethod
     def pkl(path: PLike, **kwargs: Any): return Read.pickle(path, **kwargs)
-
     @staticmethod
     def dill(path: PLike, **kwargs: Any) -> Any:
         """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
@@ -273,8 +271,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     def readit(self, reader: Optional[Callable[[PLike], Any]] = None, strict: bool = True, default: Optional[Any] = None, verbose: bool = False, **kwargs: Any) -> 'Any':
         slf = self.expanduser().resolve()
         if not slf.exists():
-            if strict:
-                raise FileNotFoundError(f"`{slf}` is no where to be found!")
+            if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else:
                 if verbose: print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}")
                 return default
@@ -290,8 +287,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                     if strict: raise ValueError(f"❌ Expected only one file in the unzipped folder, but found {len(tmp_content)} files.")
                     else: print(f"⚠️ Found {len(tmp_content)} files in the unzipped folder. Using the first one: {tmp_content[0]}")
                     filename = tmp_content.list[0]
-        else:
-            filename = slf
+        else: filename = slf
         try:
             return Read.read(filename, **kwargs) if reader is None else reader(str(filename), **kwargs)
         except IOError as ioe: raise IOError from ioe
@@ -388,8 +384,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         _ = args, kwargs
         return P(str(self))
     def __getstate__(self) -> str: return str(self)
-    # def __setstate__(self, state: str) -> None:
-    #     self._str = str(state)  # pylint: disable=W0201
     def __add__(self, other: PLike) -> 'P':
         return self.parent.joinpath(self.name + str(other))  # used append and prepend if the addition wanted to be before suffix.
     def __radd__(self, other: PLike) -> 'P':
@@ -441,13 +435,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         elif self.is_absolute(): return self._type() + " '" + str(self.clickable()) + "'" + (" | " + self.time(which="c").isoformat()[:-7].replace("T", "  ") if self.exists() else "") + (f" | {self.size()} Mb" if self.is_file() else "")
         elif "http" in str(self): return "🕸️ URL " + str(self.as_url_str())
         else: return "📍 Relative " + "'" + str(self) + "'"  # not much can be said about a relative path.
-    # def __str__(self): return self.as_url_str() if "http" in self else
-    # @property  # kept at the bottom because it confuses the linters
-    # def str(self) -> str: return str(self)  #
-    def to_str(self) -> str:
-        return str(self)
-    def pistol(self):
-        os.system(command=f"pistol {self}")
+    def to_str(self) -> str: return str(self)
+    def pistol(self): os.system(command=f"pistol {self}")
     def size(self, units: Literal['b', 'kb', 'mb', 'gb'] = 'mb') -> float:  # ===================================== File Specs ==========================================================================================
         total_size = self.stat().st_size if self.is_file() else sum([item.stat().st_size for item in self.rglob("*") if item.is_file()])
         tmp: int
@@ -468,12 +457,9 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             case "c": tmp = self.stat().st_ctime
         return datetime.fromtimestamp(tmp, **kwargs)
     def stats(self) -> dict[str, Any]:
-        return dict(size=self.size(),
-                    content_mod_time=self.time(which="m"),
-                    attr_mod_time=self.time(which="c"),
-                    last_access_time=self.time(which="a"),
-                    group_id_owner=self.stat().st_gid,
-                    user_id_owner=self.stat().st_uid
+        return dict(size=self.size(), content_mod_time=self.time(which="m"),
+                    attr_mod_time=self.time(which="c"), last_access_time=self.time(which="a"),
+                    group_id_owner=self.stat().st_gid, user_id_owner=self.stat().st_uid
                     )
     # ================================ String Nature management ====================================
     def _type(self):
@@ -545,7 +531,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         filters_total = (filters_total or []) + filters_notin + filters_extension
         if not files: filters_total.append(lambda x: x.is_dir())
         if not folders: filters_total.append(lambda x: x.is_file())
-
         if ".zip" in (slf := self.expanduser().resolve()) and compressed:  # the root (self) is itself a zip archive (as opposed to some search results are zip archives)
             import zipfile
             import fnmatch
@@ -563,7 +548,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 raw = glob(str(slf / "**" / pattern), recursive=r)
             else:
                 raw = glob(str(slf.joinpath(pattern)))  # glob ignroes dot and hidden files
-
         if ".zip" not in slf and compressed:
             filters_notin = [P(comp_file).search(pattern=pattern, r=r, files=files, folders=folders, compressed=True, dotfiles=dotfiles, filters_total=filters_total, not_in=not_in, win_order=win_order) for comp_file in self.search("*.zip", r=r)]
             haha = List(filters_notin).reduce(func=lambda x, y: x + y)
@@ -577,7 +561,6 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         import re
         processed.sort(key=lambda x: [int(k) if k.isdigit() else k for k in re.split('([0-9]+)', string=x.stem)])
         return List(processed)
-
     def tree(self, *args: Any, **kwargs: Any):
         from crocodile.msc.odds import tree
         return tree(self, *args, **kwargs)
@@ -604,10 +587,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return P.tmp(folder=rf"tmp_dirs/{prefix + ('_' if prefix != '' else '') + randstr()}")
     @staticmethod
     def tmpfile(name: Optional[str]= None, suffix: str = "", folder: OPLike = None, tstamp: bool = False, noun: bool = False) -> 'P':
-        if name is None:
-            name_concrete = randstr(noun=noun)
-        else:
-            name_concrete = name
+        name_concrete = name or randstr(noun=noun)
         return P.tmp(file=name_concrete + "_" + randstr() + (("_" + str(timestamp())) if tstamp else "") + suffix, folder=folder or "tmp_files")
     @staticmethod
     def tmp(folder: OPLike = None, file: Optional[str] = None, root: str = "~/tmp_results") -> 'P':
@@ -685,17 +665,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         op_path = self._resolve_path(folder, name, path, self.name.replace(".xz", "")).expanduser().resolve()
         Compression.unxz(self.expanduser().resolve().to_str(), op_path=op_path.to_str())
         return self._return(op_path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNXZED {repr(self)} ==>  {repr(op_path)}")
-
     def tar_gz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         return self.tar(inplace=inplace).gz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
     def tar_xz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         return self.tar(inplace=inplace).xz(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-
     # def ungz_untar(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
     #     return self.ungz(name=f"tmp_{randstr()}.tar", inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)  # this works for .tgz suffix as well as .tar.gz
     # def unxz_untar(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
     #     return self.unxz(inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)
-
     def unbz(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder=folder, name=name, path=path, default_name=self.name.replace(".bz", "").replace(".tbz", ".tar")).expanduser().resolve()
         Compression.unbz(self.expanduser().resolve().to_str(), op_path=str(op_path))
@@ -755,20 +732,11 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         file_data = file_path.read_bytes()
         mime_type, _ = mimetypes.guess_type(file_path)
         if service == 'gofile':
-            response = requests.post(
-                url="https://store1.gofile.io/uploadFile",
-                files={"file": (file_path.name, file_data, mime_type) },  # type: ignore
-                timeout=timeout
-            )
+            response = requests.post(url="https://store1.gofile.io/uploadFile", files={"file": (file_path.name, file_data, mime_type) }, timeout=timeout)
             return P(response.json()['data']['downloadPage'])
         elif service == 'pixeldrain':
-            response = requests.post(
-                url="https://pixeldrain.com/api/file",
-                files={"file": file_data},
-                timeout=timeout
-            )
+            response = requests.post(url="https://pixeldrain.com/api/file", files={"file": file_data}, timeout=timeout)
             return P(f"https://pixeldrain.com/u/{response.json()['id']}")
-
         else:
             raise ValueError("Unsupported service specified.")
     def share_on_network(self, username: Optional[str]= None, password: Optional[str] = None):
@@ -849,7 +817,10 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         from crocodile.meta import Terminal
         if verbose: print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`")
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
-        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
+        success = res.is_successful(strict_err=False, strict_returcode=True)
+        if not success:
+            res.print(capture=False, desc="Cloud Storage Operation")
+            return None
         if decrypt: localpath = localpath.decrypt(key=key, pwd=pwd, inplace=True)
         if unzip: localpath = localpath.unzip(inplace=True, verbose=True, overwrite=overwrite, content=True, merge=merge)
         return localpath
@@ -865,9 +836,12 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         rclone_cmd += f" --progress --transfers={transfers} --verbose"
         rclone_cmd += (" --delete-during" if delete else "")
         from crocodile.meta import Terminal
-        _ = print(rclone_cmd) if verbose else None
+        if verbose : print(rclone_cmd)
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
-        assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
+        success = res.is_successful(strict_err=False, strict_returcode=True)
+        if not success:
+            res.print(capture=False, desc="Cloud Storage Operation")
+            return None
         return self
 
 
@@ -941,8 +915,6 @@ class Compression:
 
 T = TypeVar('T')
 T2 = TypeVar('T2')
-
-
 class PrintFunc(Protocol):
     def __call__(self, *args: str) -> Union[NoReturn, None]: ...
 
@@ -1011,7 +983,6 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 if self.logger:
                     self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
         return self.cache
-
     @staticmethod
     def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
                     #  saver: Callable[[T2, PLike], Any] = Save.pickle,
@@ -1036,22 +1007,18 @@ class CacheV2(Generic[T]):
         self.logger = logger
         self.expire = expire  # in milliseconds
         self.name = name if isinstance(name, str) else str(self.source_func)
-
     @property
     def age(self):
         if self.path is None:
             return time.time_ns() // 1_000_000 - self.time_produced
         return time.time_ns() // 1_000_000 - int(self.path.stat().st_mtime * 1000)
-
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         self.path = P.home() / self.path if self.path is not None else self.path
-
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state["path"] = self.path.relative_to(P.home()) if self.path is not None else state["path"]
         return state
-
     def __call__(self, fresh: bool = False) -> T:
         if fresh or self.cache is None:
             if not fresh and self.path is not None and self.path.exists():
@@ -1093,7 +1060,6 @@ class CacheV2(Generic[T]):
                 if self.logger:
                     self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age} ms.")
         return self.cache
-
     @staticmethod
     def as_decorator(expire: int = 60000, logger: Optional[PrintFunc] = None, path: OPLike = None,
                      name: Optional[str] = None):
@@ -1101,30 +1067,6 @@ class CacheV2(Generic[T]):
             res = CacheV2(source_func=source_func, expire=expire, logger=logger, path=path, name=name)
             return res
         return decorator
-
-# add: Cache[int]
-# def save_int(a: int, path: PLike): Save.pickle(a, path)
-def read_int(path: PLike) -> int:
-    return Read.pickle(path)
-
-
-@Cache.as_decorator()
-def add():
-    a, b = 2, "2"
-    return a + int(b), 2
-
-
-def add2():
-    a, b = 2, "2"
-    return a + int(b)
-
-
-def func():
-
-    res = add()
-    add3 = Cache(source_func=add2)
-    res2 = add3()
-    return res, res2
 
 
 if __name__ == '__main__':

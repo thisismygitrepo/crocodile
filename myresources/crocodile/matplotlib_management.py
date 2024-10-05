@@ -95,7 +95,7 @@ class PDF(GenericSave):  # For pdf, you just need any stream [update, clear, acc
     def _save(self, a_fig: Figure, a_name: str, bbox_inches: str = 'tight', pad_inches: float = 0.3, **kwargs: Any):
         _ = a_name
         self.pp.savefig(a_fig, bbox_inches=bbox_inches, pad_inches=pad_inches, **kwargs)
-    def finish(self): print(f"Saving results ..."); self.pp.close(); print(f"SAVED PDF @", P(self.fname).absolute().as_uri()); return self
+    def finish(self): print("Saving results ..."); self.pp.close(); print("SAVED PDF @", P(self.fname).absolute().as_uri()); return self
 class PNG(GenericSave):
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -103,7 +103,7 @@ class PNG(GenericSave):
     def _save(self, afigure: Figure, aname: str, dpi: int = 150, **kwargs: Any):
         fname = self.save_dir.joinpath(validate_name(aname)).create(parents_only=True)
         afigure.savefig(str(fname), bbox_inches='tight', pad_inches=0.3, dpi=dpi, **kwargs)
-    def finish(self): print(f"SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
+    def finish(self): print("SAVED PNGs @", P(self.fname).absolute().as_uri()); return self
 
 # class GIF(GenericSave):  # NOT RECOMMENDED, used GIFFileBased instead.
 #     """This class uses ArtistAnimation: works on lines and images list attached to figure axes and Doesn't work on axes, unless you add large number of them. As such, titles are not incorporated etc (limitation).
@@ -159,7 +159,7 @@ class GIFFileBased(GenericSave):
     def finish(self):
         print('Saving results ...')
         self.writer.finish()
-        print(f"SAVED GIF @", P(self.fname).absolute().as_uri())
+        print("SAVED GIF @", P(self.fname).absolute().as_uri())
         return self
 class GIFPipeBased(GIFFileBased):
     def __init__(self): super().__init__(_type='GIFPipeBased')
@@ -341,7 +341,7 @@ class FigureManager:
                 if fig is not None:
                     if self.message_obj: self.message_obj.remove()
                     self.message_obj = fig.text(*self.info_loc, self.message, fontsize=8)
-                else: print(f"Cant update info text, figure is not defined yet.")
+                else: print("Cant update info text, figure is not defined yet.")
                 break
         if event.key != 'q': event.canvas.figure.canvas.draw()  # for smooth quit without throwing errors  # don't update if you want to quit.
     def toggle_annotate(self, event: Any):

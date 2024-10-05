@@ -672,7 +672,7 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         text += f"# Source code file generated me was located here: \n`{obj_path.collapseuser().as_posix()}`\n" + separator
         try:
             repo = install_n_import(library="git", package="gitpython").Repo(obj_path.parent, search_parent_directories=True)
-            text += f"# Last Commit\n{repo.git.execute('git log -1')}{separator}# Remote Repo\n{repo.git.execute('git remote -v')}{separator}"
+            text += f"# Last Commit\n{repo.git.execute(['git', 'log', '-1'])}{separator}# Remote Repo\n{repo.git.execute(['git', 'remote', '-v'])}{separator}"
             try: tmppp = obj_path.relative_to(repo.working_dir).as_posix()
             except Exception: tmppp = ""  # type: ignore
             text += f"# link to files: \n{repo.remote().url.replace('.git', '')}/tree/{repo.active_branch.commit.hexsha}/{tmppp}{separator}"

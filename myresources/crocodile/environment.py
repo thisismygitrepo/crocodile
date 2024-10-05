@@ -69,7 +69,7 @@ UserName          = getpass.getuser()  # e.g: username, os.env["USERNAME") only 
 # Public            = P(os.environ["PUBLIC"])  # C:\Users\Public
 
 WSL_FROM_WIN = P(r"\\wsl.localhost\Ubuntu-22.04\home")  # P(rf"\\wsl$\Ubuntu\home")  # see localappdata/canonical
-WIN_FROM_WSL = P(rf"/mnt/c/Users")
+WIN_FROM_WSL = P(r"/mnt/c/Users")
 
 
 
@@ -94,7 +94,7 @@ def get_network_addresses() -> NetworkAddresses:
     import socket
     try: local_ip_v4 = socket.gethostbyname(socket.gethostname() + ".local")  # without .local, in linux machines, '/etc/hosts' file content, you have an IP address mapping with '127.0.1.1' to your hostname
     except Exception:
-        print(f"Warning: Could not get local_ip_v4. This is probably because you are running a WSL instance")  # TODO find a way to get the local_ip_v4 in WSL
+        print("Warning: Could not get local_ip_v4. This is probably because you are running a WSL instance")  # TODO find a way to get the local_ip_v4 in WSL
         local_ip_v4 = socket.gethostbyname(socket.gethostname())
     # _addresses: TypeAlias = Literal['subnet_mask', 'mac_address', 'local_ip_v4', 'default_gateway', 'public_ip_v4']
     res = NetworkAddresses(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=P('https://api.ipify.org').download_to_memory().text)
@@ -206,7 +206,7 @@ class PathVar:
     @staticmethod
     def load_fresh_path():
         if system == "Windows":
-            result = fr'[System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'
+            result = r'[System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'
             return result  # if run is False else tm.run(result, shell="powershell")
         else: raise NotImplementedError
 

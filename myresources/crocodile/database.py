@@ -22,7 +22,7 @@ class DBMS:
     * Always use sqlalchemy API and avoid sql-dielect specific language.
     * Engine is provided externally. It is the end-user's business to make this engine.
     """
-    def __init__(self, engine: Engine, sch: Optional[str] = None, vws: bool = False, inspect: bool = True):
+    def __init__(self, engine: Engine, sch: Optional[str] = None, vws: bool = False):
         self.eng: Engine = engine
         self.con: Optional[Connection] = None
         self.ses: Optional[Session] = None
@@ -40,7 +40,7 @@ class DBMS:
         # self.views = None
         # self.sch_tab: Optional[Struct] = None
         # self.sch_vws: Optional[Struct] = None
-        if inspect: self.refresh()
+        # if inspect: self.refresh()
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
         if self.path is not None:
