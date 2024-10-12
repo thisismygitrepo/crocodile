@@ -11,6 +11,7 @@ import pandas as pd
 
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine, text, inspect as inspect__, Engine, Connection
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.engine import Inspector
 from sqlalchemy.sql.schema import MetaData
 from crocodile.core import Struct
@@ -36,6 +37,9 @@ class DBMS:
         self.sch = sch
         self.vws: bool = vws
         self.schema: list[str] = []
+
+        self.sch_tab: dict[str, list[str]]
+        self.sch_vws: dict[str, list[str]]
         # self.tables = None
         # self.views = None
         # self.sch_tab: Optional[Struct] = None
@@ -57,9 +61,9 @@ class DBMS:
         self.insp = insp
         self.schema = self.insp.get_schema_names()
         print(f"Inspecting tables of schema `{self.schema}` {self.eng}")
-        self.sch_tab: dict[str, list[str]] = {k: v for k, v in zip(self.schema, [insp.get_table_names(schema=x) for x in self.schema])}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
+        self.sch_tab = {k: v for k, v in zip(self.schema, [insp.get_table_names(schema=x) for x in self.schema])}  # dict(zip(self.schema, self.schema.apply(lambda x: self.insp.get_table_names(schema=x))))  #
         print(f"Inspecting views of schema `{self.schema}` {self.eng}")
-        self.sch_vws: dict[str, list[str]] = {k: v for k, v in zip(self.schema, [insp.get_view_names(schema=x) for x in self.schema])}
+        self.sch_vws = {k: v for k, v in zip(self.schema, [insp.get_view_names(schema=x) for x in self.schema])}
         return self
 
     def __getstate__(self) -> dict[str, Any]:
@@ -80,6 +84,7 @@ class DBMS:
     @classmethod
     def from_local_db(cls, path: OPLike = None, echo: bool = False, share_across_threads: bool = False, pool_size: int = 5, **kwargs: Any):
         return cls(engine=cls.make_sql_engine(path=path, echo=echo, share_across_threads=share_across_threads, pool_size=pool_size, **kwargs))
+
     def __repr__(self): return f"DataBase @ {self.eng}"
     def get_columns(self, table: str, sch: Optional[str] = None):
         assert self.meta is not None
@@ -119,6 +124,26 @@ class DBMS:
             res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
 
+    @staticmethod
+    def make_sql_async_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
+        """Establish lazy initialization with database"""
+        from sqlalchemy.pool import StaticPool, NullPool
+        _ = NullPool
+        if str(path) == "memory":
+            print("Linking to in-memory database.")
+            if share_across_threads:
+                # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
+                return create_async_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
+            else:
+                return create_async_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
+        path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
+        path_repr = path.as_uri() if path.is_file() else path
+        print(f"Linking to database at {path_repr}")
+        if pool_size == 0:
+            res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+        else:
+            res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+        return res
     # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
         with self.eng.connect() as conn:
