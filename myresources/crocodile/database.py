@@ -208,5 +208,36 @@ class DBMS:
         print("\n" * 3)
 
 
+DB_TMP_PATH = P.tmp().joinpath("tmp_dbs/results/data.sqlite")
+
+
+def to_db(table: str, idx: int, idx_max: int, data: Any):
+    import pickle
+    db = DBMS.from_local_db(DB_TMP_PATH)
+    time_now = time.time_ns()
+    data_blob = pickle.dumps(data)
+    create_table = f"""CREATE TABLE IF NOT EXISTS "{table}" (time INT PRIMARY KEY, idx INT, idx_max INT, data BLOB)"""
+    insert_row = f"""INSERT INTO "{table}" (time, idx, idx_max, data) VALUES (:time, :idx, :idx_max, :data)"""
+    with db.eng.connect() as conn:
+        conn.execute(text(create_table))
+        conn.execute(
+            text(insert_row),
+            {'time': time_now, 'idx': idx, 'idx_max': idx_max, 'data': data_blob}
+        )
+        conn.commit()
+    db.close()
+
+
+def from_db(table: str):
+    import pickle
+    db = DBMS.from_local_db(DB_TMP_PATH)
+    with db.eng.connect() as conn:
+        res = conn.execute(text(f"""SELECT * FROM "{table}" """))
+        records = res.fetchall()
+        df = pd.DataFrame(records, columns=['time', 'idx', 'idx_max', 'data'])
+        df['data'] = df['data'].apply(pickle.loads)
+        return df
+
+
 if __name__ == '__main__':
     pass
