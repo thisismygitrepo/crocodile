@@ -1,4 +1,3 @@
-
 """
 https://docs.sqlalchemy.org/en/14/tutorial/index.html#a-note-on-the-future
 
@@ -125,7 +124,7 @@ class DBMS:
         return res
 
     @staticmethod
-    def make_sql_async_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
+    def make_sql_async_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = "aiosqlite", pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
         """Establish lazy initialization with database"""
         from sqlalchemy.pool import StaticPool, NullPool
         _ = NullPool
@@ -133,7 +132,7 @@ class DBMS:
             print("Linking to in-memory database.")
             if share_across_threads:
                 # see: https://docs.sqlalchemy.org/en/14/dialects/sqlite.html#using-a-memory-database-in-multiple-threads
-                return create_async_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
+                return create_async_engine(url=f"{dialect}+{driver}://", echo=echo, future=True, poolclass=StaticPool, connect_args={"mode": "memory", "cache": "shared"})
             else:
                 return create_async_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
@@ -144,6 +143,7 @@ class DBMS:
         else:
             res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
+
     # ==================== QUERIES =====================================
     def execute_as_you_go(self, *commands: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
         with self.eng.connect() as conn:
