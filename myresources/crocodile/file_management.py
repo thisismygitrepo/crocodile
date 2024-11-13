@@ -924,7 +924,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
     def __init__(self, source_func: Callable[[], T],
                  expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
                  saver: Callable[[T, PLike], Any] = Save.pickle, reader: Callable[[PLike], T] = Read.pickle, name: Optional[str] = None) -> None:
-        self.cache: Optional[T] = None  # fridge content
+        self.cache: T
         self.source_func = source_func  # function which when called returns a fresh object to be frozen.
         self.path: Optional[P] = P(path) if path else None  # if path is passed, it will function as disk-based flavour.
         self.time_produced = datetime.now()  # if path is None else
@@ -947,7 +947,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
         state["path"] = self.path.rel2home() if self.path is not None else state["path"]
         return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh: bool = False) -> T:
-        if fresh or self.cache is None:  # populate cache for the first time
+        if fresh or not hasattr(self, "cache"):  # populate cache for the first time
             if not fresh and self.path is not None and self.path.exists():
                 age = datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
                 msg1 = f"⚠️ {self.name} cache: Reading cached values from `{self.path}`. Lag = {age} ..."
@@ -968,11 +968,9 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
         else:  # cache exists
-            try:
-                age = self.age
-            except AttributeError:  # path doesn't exist (may be deleted)
-                self.cache = None  # reset cache to prevent arriving here again.
-                return self(fresh=fresh)
+            try: age = self.age
+            except AttributeError:  # path doesn't exist (may be deleted) ==> need to repopulate cache form source_func.
+                return self(fresh=True)
             if age > self.expire:
                 if self.logger:
                     self.logger(f"⚠️ {self.name} cache: Updating cache from source func. Age = {age} > {self.expire} ...")
@@ -980,8 +978,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 if self.path is None: self.time_produced = datetime.now()
                 else: self.save(self.cache, self.path)
             else:
-                if self.logger:
-                    self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
+                if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
         return self.cache
     @staticmethod
     def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
