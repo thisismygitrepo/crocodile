@@ -239,5 +239,50 @@ def from_db(table: str):
         return df
 
 
+def get_table_specs(engine: Engine, table_name: str) -> pd.DataFrame:
+    inspector = inspect__(engine)
+    # Collect table information
+    columns_info = [{
+        'name': col['name'],
+        'type': str(col['type']),
+        'nullable': col['nullable'],
+        'default': col['default'],
+        'autoincrement': col.get('autoincrement'),
+        'category': 'column'
+    } for col in inspector.get_columns(table_name)]
+    # Primary keys
+    pk_info = [{
+        'name': pk,
+        'type': None,
+        'nullable': False,
+        'default': None,
+        'autoincrement': None,
+        'category': 'primary_key'
+    } for pk in inspector.get_pk_constraint(table_name)['constrained_columns']]
+    # Foreign keys
+    fk_info = [{
+        'name': fk['constrained_columns'][0],
+        'type': f"FK -> {fk['referred_table']}.{fk['referred_columns'][0]}",
+        'nullable': None,
+        'default': None,
+        'autoincrement': None,
+        'category': 'foreign_key'
+    } for fk in inspector.get_foreign_keys(table_name)]
+    # Indexe
+    index_info = [{
+        'name': idx['name'],
+        'type': f"Index on {', '.join(idx['column_names'])}",
+        'nullable': None,
+        'default': None,
+        'autoincrement': None,
+        'category': 'index',
+        'unique': idx['unique']
+    } for idx in inspector.get_indexes(table_name)]
+    # Combine all information
+    all_info = columns_info + pk_info + fk_info + index_info
+    # Convert to DataFrame
+    df = pd.DataFrame(all_info)
+    return df
+
 if __name__ == '__main__':
     pass

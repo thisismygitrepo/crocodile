@@ -160,8 +160,8 @@ class Read:
     def pickle(path: PLike, **kwargs: Any):
         import pickle
         try: return pickle.loads(P(path).read_bytes(), **kwargs)
-        except Exception as ex:
-            print(f"💥 Failed to load pickle file {path} with error: {ex}")
+        except BaseException as ex:
+            print(f"💥 Failed to load pickle file `{path}` with error:\n{ex}")
             raise ex
     @staticmethod
     def pkl(path: PLike, **kwargs: Any): return Read.pickle(path, **kwargs)
