@@ -1,5 +1,6 @@
 from yt_dlp import YoutubeDL
 import sys
+from pathlib import Path
 
 def time_to_seconds(time_str: str) -> int:
     """Convert time string (HH:MM:SS or MM:SS) to seconds"""
@@ -39,30 +40,29 @@ def time_to_seconds(time_str: str) -> int:
 
 
 def download_clip(url: str, start_time: str, end_time: str, output_filename: str):
-    try:
-        start_seconds: int = time_to_seconds(start_time)
-        duration: int = time_to_seconds(end_time) - start_seconds
-        ydl_opts: dict = {
-            'format': 'best[ext=mp4]/best',
-            'outtmpl': output_filename,
-            'external_downloader': 'ffmpeg',
-            'external_downloader_args': [
-                '-ss', str(start_seconds),
-                '-t', str(duration)
-            ]
-        }
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        print(f"Successfully downloaded clip to {output_filename}")
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        sys.exit(1)
+    start_seconds: int = time_to_seconds(start_time)
+    duration: int = time_to_seconds(end_time) - start_seconds
+    base_path = Path.home() / "Downloads" / "parts"
+    base_path.mkdir(parents=True, exist_ok=True)
+    ydl_opts: dict = {
+        'format': 'best[ext=mp4]/best',
+        'outtmpl': str(base_path / output_filename),
+        'external_downloader': 'ffmpeg',
+        'external_downloader_args': [
+            '-ss', str(start_seconds),
+            '-t', str(duration)
+        ]
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+    print(f"Successfully downloaded clip to {output_filename}")
+
 
 
 if __name__ == "__main__":
     # Example usage
-    url: str = "https://www.youtube.com/watch?v=uqS9aiPnKrs"
-    start_time: str = "3:26"
-    end_time: str = "3:46"
-    output_filename: str = "clip2.mp4"
+    url: str = "https://www.youtube.com/watch?v"
+    start_time: str = "1:25:51"
+    end_time: str = "1:28:17"
+    output_filename: str = "clip5.mp4"
     download_clip(url, start_time, end_time, output_filename)
