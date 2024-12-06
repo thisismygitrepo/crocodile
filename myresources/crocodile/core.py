@@ -21,6 +21,7 @@ T3 = TypeVar('T3')
 PLike = Union[str, Path]
 PS = ParamSpec('PS')
 
+
 # ============================== Accessories ============================================
 def validate_name(astring: str, replace: str = '_') -> str:
     import re
@@ -51,6 +52,7 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     import random
     population = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else "")
     return ''.join(random.choices(population, k=length))
+
 def run_in_isolated_ve(packages: list[str], pyscript: str) -> str:
     ve_name = randstr()
     packages_space_separated = " ".join(packages)
@@ -98,7 +100,7 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
 class Save:
     @staticmethod
     @save_decorator(".json")
-    def json(obj: Any, path: PLike, indent: Union[str, int, None] = None, encoding: str = 'utf-8', **kwargs: Any):
+    def json(obj: Any, path: PLike, indent: Union[str, int, None] = 4, encoding: str = 'utf-8', **kwargs: Any):
         import json as jsonlib
         return Path(path).write_text(jsonlib.dumps(obj, indent=indent, default=lambda x: x.__dict__, **kwargs), encoding=encoding)
     @staticmethod
@@ -140,6 +142,10 @@ class Save:
         import dill
         data = dill.dumps(obj=obj, **kwargs)
         return Path(path).write_bytes(data=data)
+    # @staticmethod
+    # def h5(obj: Any, path: PLike, **kwargs: Any):
+    #     import h5py
+    #     with h5py
 
 
 # ====================================== Object Management ====================================
@@ -329,7 +335,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     # def recursive_struct(mydict: dict[Any, Any]) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
     # @staticmethod
     # def recursive_dict(struct) -> 'Struct': _ = [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
-    def save_json(self, path: Optional[PLike] = None, indent: Optional[str] = None): return Save.json(obj=self.__dict__, path=path, indent=indent)
+    # def save_json(self, path: Optional[PLike] = None, indent: Optional[str] = None): return Save.json(obj=self.__dict__, path=path, indent=indent)
     @staticmethod
     def from_keys_values(k: Iterable[str], v: Iterable[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
     @staticmethod
@@ -348,7 +354,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def __getattr__(self, item: str) -> 'Struct':
         try: return self.__dict__[item]
         except KeyError as ke: raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from ke  # this works better with the linter. replacing Key error with Attribute error makes class work nicely with hasattr() by returning False.
-    clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
+    # clean_view = property(lambda self: type("TempClass", (object,), self.__dict__))
     def __repr__(self, limit: int = 150): return "Struct: " + Display.get_repr(self.keys().list.__repr__(), limit=limit, justify=0)
     def __getitem__(self, item: str): return self.__dict__[item]  # thus, gives both dot notation and string access to elements.
     def __setitem__(self, key: str, value: Any): self.__dict__[key] = value
@@ -432,7 +438,6 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                     # else: print(res)
                     return None
                 return str(res)
-
     @staticmethod
     def concat_values(*dicts: dict[Any, Any], orient: Literal["dict", "list", "series", "split", "tight", "index"] = 'list') -> 'Struct':
         import pandas as pd
@@ -468,9 +473,11 @@ class Display:
         import numpy as np
         np.set_printoptions(precision=precision, suppress=suppress, linewidth=linewidth, floatmode=floatmode, formatter={'float_kind':'{:0.2f}'.format}, **kwargs)
     @staticmethod
-    def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False): return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
+    def config(mydict: dict[Any, Any], sep: str = "\n", justify: int = 15, quotes: bool = False):
+        return sep.join([f"{key:>{justify}} = {repr(val) if quotes else val}" for key, val in mydict.items()])
     @staticmethod
-    def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str: return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
+    def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str:
+        return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
     @staticmethod
     def eng():
         import pandas as pd
