@@ -791,8 +791,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if verbose: print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`")
         res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell").capture()
         _ = [item.delete(sure=True) for item in to_del]
-        if verbose: print(f"{'⬆️'*5} UPLOAD COMPLETED.")
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
+        if verbose: print(f"{'⬆️'*5} UPLOAD COMPLETED.")
         if share:
             if verbose: print("🔗 SHARING FILE")
             res = Terminal().run(f"""rclone link '{cloud}:{rp.as_posix()}'""", shell="powershell").capture()
