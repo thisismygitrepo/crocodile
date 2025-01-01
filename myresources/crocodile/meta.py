@@ -724,7 +724,7 @@ class RepeatUntilNoException:
                             sleep_time = self.sleep * (idx + 1)
                         case "exponential":
                             sleep_time = self.sleep * (idx + 1)**2
-                    print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.\nTotal wait time so far  {time.time() - t0: 0.1f} seconds""")
+                    print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.\nTotal wait time so far {time.time() - t0: 0.1f} seconds""")
                     time.sleep(sleep_time)
             raise RuntimeError(f"💥 Robust call failed after {self.retry} retries and total wait time of {time.time() - t0: 0.1f} seconds")
         return wrapper
