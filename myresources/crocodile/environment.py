@@ -102,7 +102,15 @@ def get_network_addresses() -> NetworkAddresses:
     finally:
         s.close()
     # _addresses: TypeAlias = Literal['subnet_mask', 'mac_address', 'local_ip_v4', 'default_gateway', 'public_ip_v4']
-    res = NetworkAddresses(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=P('https://api.ipify.org').download_to_memory().text)
+
+    try:
+        public_ip_v4 = P('https://api.ipify.org').download_to_memory(timeout=1.0).text
+    except Exception:
+        try:
+            public_ip_v4 = P('https://ipinfo.io/ip').download_to_memory(timeout=1.0).text
+        except Exception:
+            public_ip_v4 = P("https://ifconfig.me/ip").download_to_memory(timeout=1.0).text
+    res = NetworkAddresses(subnet_mask=None, mac_address=mac_address, local_ip_v4=local_ip_v4, default_gateway=None, public_ip_v4=public_ip_v4)
     return res
 
 
