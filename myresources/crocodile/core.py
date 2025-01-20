@@ -120,9 +120,10 @@ class Save:
         conf = configparser.ConfigParser()
         conf.read_dict(obj)
         with open(path, 'w', encoding="utf-8") as configfile: conf.write(configfile, **kwargs)
-    @staticmethod
-    @save_decorator(".csv")
-    def csv(obj: Any, path: PLike): return obj.to_frame('dtypes').reset_index().to_csv(str(path) + ".dtypes")
+    # @staticmethod
+    # @save_decorator(".csv")
+    # def csv(obj: Any, path: PLike):
+    #     return obj.to_frame('dtypes').reset_index().to_csv(str(path) + ".dtypes")
     @staticmethod
     @save_decorator(".npy")
     def npy(obj: Any, path: PLike, **kwargs: Any):

@@ -112,6 +112,9 @@ class Read:
             if suffix == "parquet":
                 import pandas as pd
                 return pd.read_parquet(path, **kwargs)
+            elif suffix == "csv":
+                import pandas as pd
+                return pd.read_csv(path, **kwargs)
             try:
                 guess = install_n_import('magic', 'python-magic').from_file(path)
                 raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {guess}") from err
@@ -152,10 +155,6 @@ class Read:
         data = np.load(str(path), allow_pickle=True, **kwargs)
         # data = data.item() if data.dtype == np.object else data
         return data
-    @staticmethod
-    def csv(path: PLike, **kwargs: Any):
-        import pandas as pd
-        return pd.read_csv(path, **kwargs)
     @staticmethod
     def pickle(path: PLike, **kwargs: Any):
         import pickle
