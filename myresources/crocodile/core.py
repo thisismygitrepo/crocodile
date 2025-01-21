@@ -53,6 +53,7 @@ def randstr(length: int = 10, lower: bool = True, upper: bool = True, digits: bo
     population = (string.ascii_lowercase if lower else "") + (string.ascii_uppercase if upper else "") + (string.digits if digits else "") + (string.punctuation if punctuation else "")
     return ''.join(random.choices(population, k=length))
 
+
 def run_in_isolated_ve(packages: list[str], pyscript: str) -> str:
     ve_name = randstr()
     packages_space_separated = " ".join(packages)
@@ -98,6 +99,10 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
 
 
 class Save:
+    @staticmethod
+    @save_decorator(".parquet")
+    def parquet(obj: Any, path: PLike):
+        obj.to_parquet(path, index=False)
     @staticmethod
     @save_decorator(".json")
     def json(obj: Any, path: PLike, indent: Union[str, int, None] = 4, encoding: str = 'utf-8', **kwargs: Any):
