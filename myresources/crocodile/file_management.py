@@ -931,6 +931,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
         self.logger = logger
         self.expire = str2timedelta(expire) if isinstance(expire, str) else expire
         self.name = name if isinstance(name, str) else str(self.source_func)
+        self.last_call_is_fresh = False
     @property
     def age(self):
         """Throws AttributeError if called before cache is populated and path doesn't exists"""
@@ -945,6 +946,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
         state["path"] = self.path.rel2home() if self.path is not None else state["path"]
         return state  # With this implementation, instances can be pickled and loaded up in different machine and still works.
     def __call__(self, fresh: bool = False) -> T:
+        self.last_call_is_fresh = False
         if fresh or not hasattr(self, "cache"):  # populate cache for the first time
             if not fresh and self.path is not None and self.path.exists():
                 age = datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)
@@ -956,15 +958,20 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                         msg2 = f"⚠️ {self.name} cache: Cache file is corrupted. {ex}"
                         self.logger("\n" + msg1 + "\n" + msg2)
                     self.cache = self.source_func()
-                    self.save(self.cache, self.path)
+                    self.last_call_is_fresh = True
+                    self.time_produced = datetime.now()
+                    if self.path is not None: self.save(self.cache, self.path)
                     return self.cache
                 return self(fresh=False)  # may be the cache is old ==> check that by passing it through the logic again.
             else:
                 if self.logger:
-                    self.logger(f"⚠️ {self.name} cache: Populating fresh cache from source func. Previous cache never existed or there was an explicit fresh order.")
+                    # Previous cache never existed or there was an explicit fresh order.
+                    why = "There was an explicit fresh order." if fresh else "Previous cache never existed or is corrupted."
+                    self.logger(f"⚠️ {self.name} cache: Populating fresh cache from source func. {why}")
                 self.cache = self.source_func()  # fresh data.
-                if self.path is None: self.time_produced = datetime.now()
-                else: self.save(self.cache, self.path)
+                self.last_call_is_fresh = True
+                self.time_produced = datetime.now()
+                if self.path is not None: self.save(self.cache, self.path)
         else:  # cache exists
             try: age = self.age
             except AttributeError:  # path doesn't exist (may be deleted) ==> need to repopulate cache form source_func.
@@ -973,8 +980,9 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                 if self.logger:
                     self.logger(f"⚠️ {self.name} cache: Updating cache from source func. Age = {age} > {self.expire} ...")
                 self.cache = self.source_func()
-                if self.path is None: self.time_produced = datetime.now()
-                else: self.save(self.cache, self.path)
+                self.last_call_is_fresh = True
+                self.time_produced = datetime.now()
+                if self.path is not None: self.save(self.cache, self.path)
             else:
                 if self.logger: self.logger(f"⚠️ {self.name} cache: Using cached values. Lag = {age}.")
         return self.cache

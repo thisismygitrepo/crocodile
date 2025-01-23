@@ -75,7 +75,7 @@ uv pip install {packages_space_separated}"""
     return fire_script
 
 
-def save_decorator(ext: str = ""):  # apply default paths, add extension to path, print the saved file path
+def save_decorator(ext: str):  # apply default paths, add extension to path, print the saved file path
     def decorator(func: Callable[..., Any]):
         def wrapper(obj: Any, path: Union[str, Path, None] = None, verbose: bool = True, add_suffix: bool = False, desc: str = "", class_name: str = "",
                     **kwargs: Any):
@@ -91,7 +91,7 @@ def save_decorator(ext: str = ""):  # apply default paths, add extension to path
             path.parent.mkdir(parents=True, exist_ok=True)
             func(path=path, obj=obj, **kwargs)
             if verbose:
-                try: print(f"💽 SAVED {desc or path.name} {obj.__class__.__name__}: {Display.f(repr(obj), justify=0, limit=50)}  @ `{path.absolute().as_uri()}`. Size = {path.stat().st_size / 1024**2:0.2f} MB")  # |  Directory: `{path.parent.absolute().as_uri()}`
+                try: print(f"💽 SAVED {desc or path.name} {obj.__class__.__name__}: {Display.f(repr(obj), justify=0, limit=75)}\n💽 SAVED {path.stat().st_size / 1024**2:0.2f} MB @ `{path.absolute().as_uri()}`.")  # |  Directory: `{path.parent.absolute().as_uri()}`
                 except UnicodeEncodeError as err: print(f"crocodile.core: Warning: UnicodeEncodeError: {err}")
             return path
         return wrapper
@@ -116,7 +116,8 @@ class Save:
             yaml.dump(obj, file, **kwargs)
     @staticmethod
     @save_decorator(".toml")
-    def toml(obj: dict[Any, Any], path: PLike, encoding: str = 'utf-8'): return Path(path).write_text(install_n_import("toml").dumps(obj), encoding=encoding)
+    def toml(obj: dict[Any, Any], path: PLike, encoding: str = 'utf-8'):
+        return Path(path).write_text(install_n_import("toml").dumps(obj), encoding=encoding)
     @staticmethod
     @save_decorator(".ini")
     def ini(obj: dict[Any, Any], path: PLike, **kwargs: Any):
