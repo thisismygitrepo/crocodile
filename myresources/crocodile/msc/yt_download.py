@@ -82,8 +82,9 @@ def merge_videos():
 
 if __name__ == "__main__":
     # Example usage
-    url: str = "https://www.youtube.com/watch?v"
-    start_time: str = "1:25:51"
-    end_time: str = "1:28:17"
-    output_filename: str = "clip5.mp4"
-    download_clip(url, start_time, end_time, output_filename)
+    # url: str = "https://www.youtube.com/watch?v"
+    # start_time: str = "1:25:51"
+    # end_time: str = "1:28:17"
+    # output_filename: str = "clip5.mp4"
+    # download_clip(url, start_time, end_time, output_filename)
+    pass

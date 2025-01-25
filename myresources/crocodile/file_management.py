@@ -5,6 +5,7 @@ File
 
 
 from crocodile.core import List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
+# from myresources.crocodile.core import List, timestamp, randstr, validate_name, str2timedelta, Save, Path, install_n_import
 from datetime import datetime, timedelta
 import time
 import os

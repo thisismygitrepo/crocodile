@@ -338,11 +338,6 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
         final_dict.update(kwargs)  # type ignore
         super(Struct, self).__init__()
         self.__dict__ = final_dict  # type: ignore
-    # @staticmethod
-    # def recursive_struct(mydict: dict[Any, Any]) -> 'Struct': struct = Struct(mydict); [struct.__setitem__(key, Struct.recursive_struct(val) if type(val) is dict else val) for key, val in struct.items()]; return struct
-    # @staticmethod
-    # def recursive_dict(struct) -> 'Struct': _ = [struct.__dict__.__setitem__(key, Struct.recursive_dict(val) if type(val) is Struct else val) for key, val in struct.__dict__.items()]; return struct.__dict__
-    # def save_json(self, path: Optional[PLike] = None, indent: Optional[str] = None): return Save.json(obj=self.__dict__, path=path, indent=indent)
     @staticmethod
     def from_keys_values(k: Iterable[str], v: Iterable[Any]) -> 'Struct': return Struct(dict(zip(k, v)))
     @staticmethod
