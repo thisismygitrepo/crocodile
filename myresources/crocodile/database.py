@@ -47,8 +47,10 @@ class DBMS:
         # self.ip_formatter: Optional[Any] = None
         # self.db_specs: Optional[Any] = None
         if self.path is not None:
-            if self.path.is_file(): path_repr = self.path.as_uri()
-            else: path_repr = self.path
+            if self.path.is_file():
+                path_repr = self.path.as_uri()
+            else:
+                path_repr = self.path
             print(f"Database at {path_repr} is ready.")
 
     def refresh(self, sch: Optional[str] = None) -> 'DBMS':  # fails if multiple schemas are there and None is specified
