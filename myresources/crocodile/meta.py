@@ -553,12 +553,12 @@ class Scheduler:
         self.max_cycles, self.sess_start_time = max_cycles or self.max_cycles, datetime.now()
         while datetime.now() < datetime.fromisoformat(until) and self.cycle < self.max_cycles:  # 1- Time before Ops, and Opening Message
             time1 = datetime.now()
-            self.logger.info(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(datetime.now() - self.sess_start_time).split('.', maxsplit=1)[0]}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
+            self.logger.info(f"🚦Cycle {str(self.cycle).zfill(6)}. Total Run⏳ = {str(datetime.now() - self.sess_start_time).split('.', maxsplit=1)[0]}. UTC🕜 {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
             try: self.routine(self)
             except Exception as ex: self.exception_handler(ex, "routine", self)  # 2- Perform logic
             time_left = int(self.wait_sec - (datetime.now() - time1).total_seconds())  # 4- Conclude Message
             self.cycle += 1
-            self.logger.info(f"Finishing Cycle {str(self.cycle - 1).zfill(5)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
+            self.logger.info(f"🏁Cycle {str(self.cycle - 1).zfill(6)} in {str(datetime.now() - time1).split('.', maxsplit=1)[0]}. Sleeping for {self.wait_sec}s ({time_left}s left)\n" + "-" * 100)
             try: time.sleep(time_left if time_left > 0 else 0.1)  # # 5- Sleep. consider replacing by Asyncio.sleep
             except KeyboardInterrupt as ex:
                 self.exception_handler(ex, "sleep", self)
@@ -619,7 +619,7 @@ class SchedulerV2:
         while (time.time_ns() // 1_000_000) < until_ms and self.cycle < self.max_cycles:
             # 1- Time before Ops, and Opening Message
             time1 = time.time_ns() // 1_000_000
-            self.logger.info(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(time1 - self.sess_start_time).split('.', maxsplit=1)[0]}. UTC {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
+            self.logger.info(f"Starting Cycle {str(self.cycle).zfill(5)}. Total Run Time = {str(time1 - self.sess_start_time).split('.', maxsplit=1)[0]}. UTC🕜 {datetime.now(tz=dtm.UTC).strftime('%d %H:%M:%S')}")
             try:
                 self.routine(self)
             except Exception as ex:
