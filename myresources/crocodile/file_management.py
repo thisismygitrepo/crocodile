@@ -996,6 +996,19 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
             res = Cache(source_func=source_func, expire=expire, logger=logger, path=path, name=name, reader=reader, saver=saver)
             return res
         return decorator
+    def from_cloud(self, cloud: str, rel2home: bool = True, root: Optional[str] = None):
+        assert self.path is not None
+        exists = self.path.exists()
+        exists_but_old = exists and ((datetime.now() - datetime.fromtimestamp(self.path.stat().st_mtime)) > self.expire)
+        if not exists or exists_but_old:
+            returned_path = self.path.from_cloud(cloud=cloud, rel2home=rel2home, root=root)
+            if returned_path is None and not exists:
+                raise FileNotFoundError(f"Failed to get @ {self.path}. Build the cache first with signed api.")
+            elif returned_path is None and exists and self.logger is not None:
+                self.logger(f"Failed to get fresh data from cloud. Using old cache @ {self.path}.")
+        else:
+            pass  # maybe we don't need to fetch it from cloud, if its too hot
+        return self.reader(self.path)
 
 
 class CacheV2(Generic[T]):
