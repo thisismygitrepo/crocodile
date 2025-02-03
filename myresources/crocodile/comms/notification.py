@@ -154,7 +154,8 @@ encryption = ssl
         else:
             body_arg = f'"{body}"'
         cmd = f"""m365 outlook mail send --verbose --saveToSentItems --importance normal --bodyContentType {body_content_type} --bodyContents {body_arg} --subject "{subject}" --to {to_str} {attachments_str}"""
-        Terminal().run(cmd, shell="powershell")
+        response = Terminal().run(cmd, shell="powershell")
+        response.print(desc="Email sending response")
 
 
 class PhoneNotification:  # security concerns: avoid using this.
