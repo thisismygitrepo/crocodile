@@ -153,26 +153,28 @@ class DataFrameHandler:
         enc = DataFrameHandler(
             scaler=StandardScaler(),
             imputer=SimpleImputer(),
-            encoder_onehot=OneHotEncoder(),
+            encoder_categorical=OneHotEncoder(),
             encoder_ordinal=OrdinalEncoder(),
             clipper_categorical=CategoricalClipper(),
             clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98),
             cols_ordinal = [],
-            cols_onehot = ['DischargeDisposition', 'pathwayReduced'],
-            col_numerical = ["LOSgenmedLeg", "LOSelse", "FirstLegHourOfDay", "GenMed2ElseLosRatio", "FirstLegHourOfDay"],
+            cols_categorical = ['DischargeDisposition', 'pathwayReduced'],
+            cols_numerical = ["LOSgenmedLeg", "LOSelse", "FirstLegHourOfDay", "GenMed2ElseLosRatio", "FirstLegHourOfDay"],
         )
         enc.fit(df_pathways.copy())
         ```
         """
         self.clipper_categorical: CategoricalClipper = clipper_categorical
-
-        self.encoder_onehot: OneHotEncoder = encoder_categorical
-        self.cols_categorical: list[str] = cols_categorical
-        self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
-        self.cols_ordinal: list[str] = cols_ordinal
+        self.clipper_numerical: NumericalClipper = clipper_numerical
+        # ordinal data doesn't need to be clipped, because there is no concept of "Other" in ordinal data and there is no cost to having a large number of categories.
 
         self.cols_numerical: list[str] = cols_numerical
-        self.clipper_numerical: NumericalClipper = clipper_numerical
+        self.cols_categorical: list[str] = cols_categorical
+        self.cols_ordinal: list[str] = cols_ordinal
+
+        self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
+        self.encoder_onehot: OneHotEncoder = encoder_categorical
+
         self.imputer: SimpleImputer = imputer
         self.scaler: Union[RobustScaler, StandardScaler] = scaler
 
@@ -217,13 +219,13 @@ report.to_file(r'{save_path}')
     @staticmethod
     def gui_dataframe(df: 'pd.DataFrame'): install_n_import("pandasgui").show(df)
 
-    def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
+    def encode(self, df: pd.DataFrame) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
         df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
         tmp = self.encoder_onehot.transform(df[self.cols_categorical])
         df = df.drop(columns=self.cols_categorical)  # consider inplace=True but make sure it doesn't raise copy warning
         df.loc[:, self.encoder_onehot.get_feature_names_out()] = tmp  # type: ignore
-        df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy().astype(precision)
+        df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy()
         return df
 
     def impute_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -239,16 +241,19 @@ report.to_file(r'{save_path}')
         return df
 
     def fit(self, df: 'pd.DataFrame', verbose: bool = True):
-        self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_categorical], verbose=verbose)
-        self.encoder_onehot.fit(df[self.cols_categorical])
-        self.encoder_ordinal.fit(df[self.cols_ordinal])
+        sub_df = df.loc[:, self.cols_categorical]
+        self.clipper_categorical.fit(df=sub_df, verbose=verbose)
+        df_prime = self.clipper_categorical.transform(sub_df)
+        self.encoder_onehot.fit(df_prime[self.cols_categorical])
+        self.encoder_ordinal.fit(df_prime[self.cols_ordinal])
+
         self.clipper_numerical.fit(df.loc[:, self.cols_numerical], verbose=verbose)
         self.imputer.fit(df[self.cols_numerical])
         self.scaler.fit(df[self.cols_ordinal + self.cols_numerical])
 
-    def clip_encode_impute_scale(self, df: 'pd.DataFrame', precision: str) -> 'pd.DataFrame':
+    def clip_encode_impute_scale(self, df: 'pd.DataFrame') -> 'pd.DataFrame':
         df = self.clipper_categorical.transform(df)
-        df = self.encode(df, precision=precision)
+        df = self.encode(df)
         df = self.clipper_numerical.transform(df)
         df = self.impute_standardize(df=df)
         return df
@@ -272,7 +277,7 @@ def try_dfh():
     dfh = DataFrameHandler(scaler=RobustScaler(), imputer=SimpleImputer(), cols_ordinal=['A'], cols_categorical=['B'], cols_numerical=['C'], encoder_categorical=OneHotEncoder(), encoder_ordinal=OrdinalEncoder(),
                           clipper_categorical=CategoricalClipper(), clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98))
     dfh.fit(df)
-    df = dfh.clip_encode_impute_scale(df, precision='float32')
+    df = dfh.clip_encode_impute_scale(df)
 
 
 if __name__ == "__main__":
