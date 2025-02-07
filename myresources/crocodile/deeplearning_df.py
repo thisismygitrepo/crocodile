@@ -223,6 +223,10 @@ report.to_file(r'{save_path}')
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
         df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
         tmp = self.encoder_onehot.transform(df[self.cols_categorical])
+        if isinstance(tmp, np.ndarray):
+            pass
+        else:
+            tmp = tmp.todense()
         df = df.drop(columns=self.cols_categorical)  # consider inplace=True but make sure it doesn't raise copy warning
         df.loc[:, self.encoder_onehot.get_feature_names_out()] = tmp  # type: ignore
         df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy()
