@@ -110,10 +110,10 @@ class NumericalClipper:
 
     def viz(self) -> None:
         print("\n")
-        print(f"Clipping Columns".center(100, '-'))
+        print("Clipping Columns".center(100, '-'))
         print(pd.DataFrame([self.value_min, self.value_max], index=["min", "max"]).T)
         print(f"\nQuantiles used for clipping: \n- min: {self.quant_min}\n- max: {self.quant_max}")
-        print(f"-" * 100)
+        print("-" * 100)
         print("\n")
 
     def transform(self, df: pd.DataFrame):
@@ -133,8 +133,11 @@ class NumericalClipper:
 
 
 class DataFrameHandler:
-    def __init__(self, scaler: Union[RobustScaler, StandardScaler], imputer: SimpleImputer, cols_ordinal: list[str], cols_categorical: list[str], cols_numerical: list[str],
-                 encoder_onehot: OneHotEncoder,
+    def __init__(self, scaler: Union[RobustScaler, StandardScaler], imputer: SimpleImputer,
+                 cols_ordinal: list[str],
+                 cols_categorical: list[str],
+                 cols_numerical: list[str],
+                 encoder_categorical: OneHotEncoder,
                  encoder_ordinal: OrdinalEncoder,
                  clipper_categorical: CategoricalClipper,
                  clipper_numerical: NumericalClipper
@@ -163,7 +166,7 @@ class DataFrameHandler:
         """
         self.clipper_categorical: CategoricalClipper = clipper_categorical
 
-        self.encoder_onehot: OneHotEncoder = encoder_onehot
+        self.encoder_onehot: OneHotEncoder = encoder_categorical
         self.cols_categorical: list[str] = cols_categorical
         self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
         self.cols_ordinal: list[str] = cols_ordinal
@@ -266,7 +269,7 @@ def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
 
 def try_dfh():
     df = pd.DataFrame(np.random.randn(100, 3), columns=list('ABC'))
-    dfh = DataFrameHandler(scaler=RobustScaler(), imputer=SimpleImputer(), cols_ordinal=['A'], cols_categorical=['B'], cols_numerical=['C'], encoder_onehot=OneHotEncoder(), encoder_ordinal=OrdinalEncoder(),
+    dfh = DataFrameHandler(scaler=RobustScaler(), imputer=SimpleImputer(), cols_ordinal=['A'], cols_categorical=['B'], cols_numerical=['C'], encoder_categorical=OneHotEncoder(), encoder_ordinal=OrdinalEncoder(),
                           clipper_categorical=CategoricalClipper(), clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98))
     dfh.fit(df)
     df = dfh.clip_encode_impute_scale(df, precision='float32')
