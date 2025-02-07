@@ -243,7 +243,7 @@ report.to_file(r'{save_path}')
     def fit(self, df: 'pd.DataFrame', verbose: bool = True):
         sub_df = df.loc[:, self.cols_categorical]
         self.clipper_categorical.fit(df=sub_df, verbose=verbose)
-        df_prime = self.clipper_categorical.transform(sub_df)
+        df_prime = self.clipper_categorical.transform(sub_df)  # because at transform time, the clipping will be applied first and will mutate the data. We don't want to surprise the encoder with new values (e.g. `OtherClipper`)
         self.encoder_onehot.fit(df_prime[self.cols_categorical])
         self.encoder_ordinal.fit(df_prime[self.cols_ordinal])
 
