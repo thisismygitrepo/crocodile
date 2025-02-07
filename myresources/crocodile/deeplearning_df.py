@@ -133,7 +133,7 @@ class NumericalClipper:
 
 
 class DataFrameHandler:
-    def __init__(self, scaler: Union[RobustScaler, StandardScaler], imputer: SimpleImputer, cols_ordinal: list[str], cols_onehot: list[str], cols_numerical: list[str],
+    def __init__(self, scaler: Union[RobustScaler, StandardScaler], imputer: SimpleImputer, cols_ordinal: list[str], cols_categorical: list[str], cols_numerical: list[str],
                  encoder_onehot: OneHotEncoder,
                  encoder_ordinal: OrdinalEncoder,
                  clipper_categorical: CategoricalClipper,
@@ -143,25 +143,28 @@ class DataFrameHandler:
         Use like this:
         ```python
         from crocodile.deeplearning_df import CategoricalClipper, NumericalClipper, DataFrameHandler
-        from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, SimpleImputer, StandardScaler
+        from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+        from sklearn.impute import SimpleImputer  # type: ignore
+
         # Encode categorical variables
         enc = DataFrameHandler(
             scaler=StandardScaler(),
             imputer=SimpleImputer(),
             encoder_onehot=OneHotEncoder(),
-            encoder_ordinal=OrdinalEndoder(),
+            encoder_ordinal=OrdinalEncoder(),
             clipper_categorical=CategoricalClipper(),
             clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98),
             cols_ordinal = [],
-            cols_categorical = ['DischargeDisposition', 'pathwayReduced'],
-            col_numerical = [],
+            cols_onehot = ['DischargeDisposition', 'pathwayReduced'],
+            col_numerical = ["LOSgenmedLeg", "LOSelse", "FirstLegHourOfDay", "GenMed2ElseLosRatio", "FirstLegHourOfDay"],
         )
+        enc.fit(df_pathways.copy())
         ```
         """
         self.clipper_categorical: CategoricalClipper = clipper_categorical
 
         self.encoder_onehot: OneHotEncoder = encoder_onehot
-        self.cols_onehot: list[str] = cols_onehot
+        self.cols_categorical: list[str] = cols_categorical
         self.encoder_ordinal: OrdinalEncoder = encoder_ordinal
         self.cols_ordinal: list[str] = cols_ordinal
 
@@ -214,8 +217,8 @@ report.to_file(r'{save_path}')
     def encode(self, df: pd.DataFrame, precision: str) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
         df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
-        tmp = self.encoder_onehot.transform(df[self.cols_onehot])
-        df = df.drop(columns=self.cols_onehot)  # consider inplace=True but make sure it doesn't raise copy warning
+        tmp = self.encoder_onehot.transform(df[self.cols_categorical])
+        df = df.drop(columns=self.cols_categorical)  # consider inplace=True but make sure it doesn't raise copy warning
         df.loc[:, self.encoder_onehot.get_feature_names_out()] = tmp  # type: ignore
         df.loc[:, self.cols_numerical] = df.loc[:, self.cols_numerical].to_numpy().astype(precision)
         return df
@@ -233,8 +236,8 @@ report.to_file(r'{save_path}')
         return df
 
     def fit(self, df: 'pd.DataFrame', verbose: bool = True):
-        self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_onehot], verbose=verbose)
-        self.encoder_onehot.fit(df[self.cols_onehot])
+        self.clipper_categorical.fit(df=df.loc[:, self.cols_ordinal + self.cols_categorical], verbose=verbose)
+        self.encoder_onehot.fit(df[self.cols_categorical])
         self.encoder_ordinal.fit(df[self.cols_ordinal])
         self.clipper_numerical.fit(df.loc[:, self.cols_numerical], verbose=verbose)
         self.imputer.fit(df[self.cols_numerical])
@@ -263,7 +266,7 @@ def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
 
 def try_dfh():
     df = pd.DataFrame(np.random.randn(100, 3), columns=list('ABC'))
-    dfh = DataFrameHandler(scaler=RobustScaler(), imputer=SimpleImputer(), cols_ordinal=['A'], cols_onehot=['B'], cols_numerical=['C'], encoder_onehot=OneHotEncoder(), encoder_ordinal=OrdinalEncoder(),
+    dfh = DataFrameHandler(scaler=RobustScaler(), imputer=SimpleImputer(), cols_ordinal=['A'], cols_categorical=['B'], cols_numerical=['C'], encoder_onehot=OneHotEncoder(), encoder_ordinal=OrdinalEncoder(),
                           clipper_categorical=CategoricalClipper(), clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98))
     dfh.fit(df)
     df = dfh.clip_encode_impute_scale(df, precision='float32')
