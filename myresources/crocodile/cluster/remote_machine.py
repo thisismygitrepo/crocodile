@@ -1,4 +1,3 @@
-
 """RM
 """
 
@@ -152,7 +151,7 @@ class RemoteMachine:
         return self
 
     def submit(self) -> None:
-        console.rule(title="Submitting job")
+        console.rule(title="🚀 Submitting job")
         if type(self.ssh) is SelfSSH: pass
         else:
             from crocodile.cluster.data_transfer import Submission  # import here to avoid circular import.
@@ -163,7 +162,7 @@ class RemoteMachine:
         self.submitted = True  # before sending `self` to the remote.
 
     def generate_scripts(self):
-        console.rule(f"Generating scripts for job `{self.file_manager.job_id}` @ Machine `{self.__repr__()}`")
+        console.rule(f"📝 Generating scripts for job `{self.file_manager.job_id}` @ Machine `{self.__repr__()}`")
         self.job_params.ssh_repr = repr(self.ssh)
         self.job_params.ssh_repr_remote = self.ssh.get_remote_repr()
         self.job_params.description = self.config.description

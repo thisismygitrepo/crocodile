@@ -1,4 +1,3 @@
-
 """DS
 """
 
@@ -11,7 +10,7 @@ class Submission:
     """Sends repo, data, root_dir and write execution command."""
     @staticmethod
     def transfer_sh(rm: RemoteMachine) -> None:
-        print("Using transfer.sh to send data to remote machine.")
+        print("🚀 Using transfer.sh to send data to remote machine.")
         cloud_download_py_script = "\n"
         # downloading repo, this takes place prior to pyscript (otherwise, its tool late as the library is loaded at the top of the pyscript already)
         if rm.config.copy_repo:

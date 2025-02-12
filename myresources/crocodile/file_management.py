@@ -795,7 +795,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if share:
             if verbose: print("🔗 SHARING FILE")
             res = Terminal().run(f"""rclone link '{cloud}:{rp.as_posix()}'""", shell="powershell").capture()
-            tmp = res.op2path(strict_err=True, strict_returncode=True)
+            tmp = res.op2path(strict_err=False, strict_returncode=False)
             if tmp is None:
                 res.print()
                 raise RuntimeError(f"💥 Could not get link for {self}.")

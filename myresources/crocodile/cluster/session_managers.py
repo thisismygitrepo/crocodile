@@ -18,7 +18,7 @@ class Zellij:
         try:
             return L(Terminal().run("zellij ls --no-formatting").op.split("\n")).filter(lambda x: "(current)" in x).list[0].split(" [Created")[0]
         except IndexError as ie:
-            print(f"""Fails if there is no zellij session running, fails if there is no (current) suffix against the session name.""")
+            print("""Fails if there is no zellij session running, fails if there is no (current) suffix against the session name.""")
             raise ie
     @staticmethod
     def get_new_session_command(sess_name: str) -> str: return f"zellij attach {sess_name} -c "  # -c means create if not exists.
