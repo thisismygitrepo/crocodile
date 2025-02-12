@@ -1,4 +1,3 @@
-
 """
 Distributed Computing
 """
@@ -103,7 +102,7 @@ class Cluster:
     def load(job_id: str, base: Optional[str] = None) -> 'Cluster': return Cluster.get_cluster_path(job_id=job_id, base=base).joinpath("cluster.Cluster.pkl").readit()
     @staticmethod
     def get_cluster_path(job_id: str, base: Union[str, P, None] = None):
-        if base is None: base_obj = P.home().joinpath(rf"tmp_results/remote_machines")
+        if base is None: base_obj = P.home().joinpath("tmp_results/remote_machines")
         else: base_obj = P(base)
         return base_obj.joinpath(f"job_id__{job_id}")
     def __init__(self,
@@ -151,10 +150,10 @@ class Cluster:
         self.machines_per_tab: int = 1
         self.window_number: int = 2
 
-    def __repr__(self): return f"Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
+    def __repr__(self): return "Cluster with following machines:\n" + "\n".join([repr(item) for item in (self.machines if self.machines else self.sshz)])
     def print_func_kwargs(self):
         print("\n" * 2)
-        console.rule(title=f"kwargs of functions to be run on machines")
+        console.rule(title="kwargs of functions to be run on machines")
         for an_ssh, a_kwarg in zip(self.sshz, self.workload_params):
             S(a_kwarg.__dict__).print(as_config=True, title=an_ssh.get_remote_repr())
     def print_commands(self, launch_method: LAUNCH_METHOD):
@@ -263,7 +262,7 @@ class Cluster:
             _ = idx
             if a_m.results_path is None:
                 print(f"Results are not ready for machine {a_m}.")
-                print(f"Try to run `.check_job_status()` to check if the job is done and obtain results path.")
+                print("Try to run `.check_job_status()` to check if the job is done and obtain results path.")
                 continue
             # results_folder = P(a_m.results_path).expanduser()
             if a_m.results_downloaded is False:

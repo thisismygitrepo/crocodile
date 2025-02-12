@@ -30,7 +30,7 @@ console = Console()
 class RemoteMachineConfig:
     # conn
     job_id: str = field(default_factory=lambda: randstr(noun=True))
-    base_dir: str = f"~/tmp_results/remote_machines/jobs"
+    base_dir: str = "~/tmp_results/remote_machines/jobs"
     description: str = ""
     ssh_params: dict[str, Union[str, int]] = field(default_factory=lambda: {})
     ssh_obj: Union[SSH, SelfSSH, None] = None
@@ -64,7 +64,7 @@ class RemoteMachineConfig:
     max_simulataneous_jobs: int = 1
     workload_params: Optional[WorkloadParams] = None
     def __post_init__(self) -> None:
-        if self.interactive and self.lock_resources: print(f"RemoteMachineConfig Warning: If interactive is ON along with lock_resources, the job might never end.")
+        if self.interactive and self.lock_resources: print("RemoteMachineConfig Warning: If interactive is ON along with lock_resources, the job might never end. ⚠️")
         if self.transfer_method == "cloud": assert self.cloud_name is not None, "Cloud name is not provided. 🤷‍♂️"
         if self.notify_upon_completion and self.to_email is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
@@ -127,7 +127,7 @@ class RemoteMachine:
         if isinstance(ssh, SelfSSH):
             pid_path = self.file_manager.execution_log_dir.expanduser().joinpath("pid.txt")
             while True:
-                print(f"🫷 Waiting for Python process to start and declare its pid @ `{pid_path}` as dictated in python script ... ")
+                print(f"🧑‍💻 Waiting for Python process to start and declare its pid @ `{pid_path}` as dictated in python script ... ")
                 time.sleep(3)
                 try:
                     pid = int(pid_path.read_text())
@@ -254,7 +254,7 @@ deactivate
         if not end_time_file.exists():
             start_time_file = base.joinpath("start_time.txt")
             if not start_time_file.exists():
-                print(f"Job {self.config.job_id} is still in the queue. 🤯")
+                print(f"Job {self.config.job_id} is still in the queue. 😯")
             else:
                 start_time = start_time_file.read_text()
                 txt = f"Machine {self.ssh.get_remote_repr(add_machine=True)} has not yet finished job `{self.config.job_id}`. 😟"
@@ -271,7 +271,7 @@ deactivate
 📁 results_folder_path: {results_folder} """)
             try:
                 inspect(base.joinpath("execution_times.Struct.pkl").readit(), value=False, title="Execution Times", docs=False, sort=False)
-            except Exception as err: print(f"Could not read execution times files. 🤷‍, here is the error:\n {err}️")
+            except Exception as err: print(f"Could not read execution times files. 🤷‍♂️, here is the error:\n {err}️")
             print("\n")
 
             self.results_path = P(results_folder)
@@ -302,7 +302,7 @@ deactivate
         if reset_cloud: cm.reset_cloud()
         cm.claim_lock()  # before adding any new jobs, make sure the global jobs folder is mirrored locally.
         from copy import deepcopy
-        self.config.base_dir = CloudManager.base_path.joinpath(f"jobs").collapseuser().as_posix()
+        self.config.base_dir = CloudManager.base_path.joinpath("jobs").collapseuser().as_posix()
         self.file_manager.base_dir = P(self.config.base_dir).collapseuser()
         wl = WorkloadParams().split_to_jobs(jobs=split)
         rms: list[RemoteMachine] = []
