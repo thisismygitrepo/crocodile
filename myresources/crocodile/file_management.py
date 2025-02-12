@@ -799,6 +799,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             if tmp is None:
                 res.print()
                 raise RuntimeError(f"💥 Could not get link for {self}.")
+            else:
+                res.print_if_unsuccessful(desc="Cloud Storage Operation", strict_err=True, strict_returncode=True)
             return tmp
         return self
     def from_cloud(self, cloud: str, remotepath: OPLike = None, decrypt: bool = False, unzip: bool = False,  # type: ignore  # pylint: disable=W0621

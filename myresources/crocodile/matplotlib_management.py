@@ -28,12 +28,6 @@ import platform
 from typing import Any, Optional, Literal, TypeAlias, Callable, Type, Union
 
 
-"""TODO: add implementation https://github.com/gustavovelascoh/plot_update
-"""
-
-# plt.style.use('dark_background')
-
-
 STREAM: TypeAlias = Literal['clear', 'accumulate', 'update']  # Streaming (Refresh mechanism): * Clear the axis. (slowest, but easy on memory) * accumulate, using visibility to hide previous axes. (Fastest but memory intensive)  * The artist has an update method. (best)
 ARTIST: TypeAlias = Literal['internal', 'external']  # How is the data visualized? You need artist. The artist can either be internal, as in ImShow or passed externally (especially non image data)
 PARSER: TypeAlias = Literal['internal', 'external']  # Data parsing: internal for loop to go through all the dataset passed. # Allows manual control over parsing. external for loop. It should have add method. # Manual control only takes place after the external loop is over.

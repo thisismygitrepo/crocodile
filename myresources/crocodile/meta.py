@@ -153,8 +153,7 @@ class Response:
             if val is not None and val.readable():
                 self.output.__dict__[key] = val.read().decode().rstrip()
         return self
-    def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", capture: bool = True, strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
-        if capture: self.capture()
+    def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
         success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
         if assert_success: assert success, self.print(capture=False, desc=desc)
         if success: print(desc)
@@ -425,7 +424,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         cmd = (self.remote_env_cmd + "; " + cmd) if env_prefix else cmd
         raw = self.ssh.exec_command(cmd)
         res = Response(stdin=raw[0], stdout=raw[1], stderr=raw[2], cmd=cmd, desc=desc)  # type: ignore
-        if not verbose: res.print_if_unsuccessful(capture=True, desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False)
+        if not verbose: res.capture().print_if_unsuccessful(desc=desc, strict_err=strict_err, strict_returncode=strict_returncode, assert_success=False)
         else: res.print()
         self.terminal_responses.append(res)
         return res
