@@ -71,6 +71,7 @@ uv pip install {packages_space_separated}"""
     script_path = Path.home().joinpath("tmp_results/tmp_scripts/python").joinpath(ve_name + f"_script_{randstr()}.py")
     script_path.write_text(pyscript, encoding='utf-8')
     fire_script = f"source $HOME/venvs/tmp/{ve_name}/bin/activate; python {script_path}"
+    print(f"🔥 Running the script in the ve `{ve_name}`".center(75, "="))
     subprocess.run(fire_script, shell=True, check=True, executable='/bin/bash')
     return fire_script
 

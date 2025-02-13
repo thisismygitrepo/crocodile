@@ -145,11 +145,11 @@ class DataFrameHandler:
         """
         Use like this:
         ```python
+
         from crocodile.deeplearning_df import CategoricalClipper, NumericalClipper, DataFrameHandler
         from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
         from sklearn.impute import SimpleImputer  # type: ignore
 
-        # Encode categorical variables
         enc = DataFrameHandler(
             scaler=StandardScaler(),
             imputer=SimpleImputer(),
@@ -158,10 +158,14 @@ class DataFrameHandler:
             clipper_categorical=CategoricalClipper(),
             clipper_numerical=NumericalClipper(quant_min=0.02, quant_max=0.98),
             cols_ordinal = [],
-            cols_categorical = ['DischargeDisposition', 'pathwayReduced'],
-            cols_numerical = ["LOSgenmedLeg", "LOSelse", "FirstLegHourOfDay", "GenMed2ElseLosRatio", "FirstLegHourOfDay"],
+            cols_categorical = ['DischargeDisposition', 'pathwayReduced', 'FirstLegDayOfWeek'],
+            cols_numerical = ["LOSgenmedLeg", "LOSelse", "FirstLegHourOfDay", "GenMed2ElseLosRatio"],
         )
-        enc.fit(df_pathways.copy())
+        df = df_pathways.sample(10_000)
+        enc.fit(df)
+        df = enc.clip_encode_impute_scale(df)
+        data = df[enc.cols_encoded]  # in case df had more columns than declared.
+
         ```
         """
         self.clipper_categorical: CategoricalClipper = clipper_categorical
@@ -247,9 +251,11 @@ report.to_file(r'{save_path}')
     def fit(self, df: 'pd.DataFrame', verbose: bool = True):
         sub_df = df.loc[:, self.cols_categorical]
         self.clipper_categorical.fit(df=sub_df, verbose=verbose)
-        df_prime = self.clipper_categorical.transform(sub_df)  # because at transform time, the clipping will be applied first and will mutate the data. We don't want to surprise the encoder with new values (e.g. `OtherClipper`)
-        self.encoder_onehot.fit(df_prime[self.cols_categorical])
-        self.encoder_ordinal.fit(df_prime[self.cols_ordinal])
+        df_clipped = self.clipper_categorical.transform(sub_df)
+        # because at transform time, the clipping will be applied first and will mutate the data. We don't want to surprise the encoder with new values (e.g. `OtherClipper`)
+        self.encoder_onehot.fit(df_clipped[self.cols_categorical])
+
+        self.encoder_ordinal.fit(df[self.cols_ordinal])
 
         self.clipper_numerical.fit(df.loc[:, self.cols_numerical], verbose=verbose)
         self.imputer.fit(df[self.cols_numerical])
