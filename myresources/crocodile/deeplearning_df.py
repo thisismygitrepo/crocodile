@@ -196,33 +196,6 @@ class DataFrameHandler:
                 res[att] = getattr(self, att)
         return res
 
-    @staticmethod
-    def profile_dataframe(df: pd.DataFrame, save_path: Optional[P] = None):
-        # path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report{appendix}.html").create(parents_only=True)
-        # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
-        # report = profile_report(df, title="Pandas Profiling Report", explorative=explorative, silent=silent)
-        tmp_path = P.tmpfile(suffix=".parquet")
-        df.to_parquet(tmp_path)
-        from crocodile.core import run_in_isolated_ve
-        if save_path is None:
-            save_path = P.tmpfile(suffix=".html")
-        pyscript = f"""
-
-from ydata_profiling import ProfileReport
-import pandas as pd
-df = pd.read_parquet(r'{tmp_path}')
-report = ProfileReport(df, title="Profiling Report")
-report.to_file(r'{save_path}')
-
-"""
-        _launch_script = run_in_isolated_ve(packages=["pandas", "fastparquet", "pyarrow", "ydata-profiling"], pyscript=pyscript)
-        print(f"Profile report saved at {save_path}")
-        save_path()
-        return save_path
-
-    @staticmethod
-    def gui_dataframe(df: 'pd.DataFrame'): install_n_import("pandasgui").show(df)
-
     def encode(self, df: pd.DataFrame) -> pd.DataFrame:
         """Converts the dataframe to numerical format. Missing values are encoded as `pd.NA`, otherwise, encoders will fail to handle them."""
         df.loc[:, self.cols_ordinal] = self.encoder_ordinal.transform(df[self.cols_ordinal])
@@ -267,6 +240,30 @@ report.to_file(r'{save_path}')
         df = self.clipper_numerical.transform(df)
         df = self.impute_standardize(df=df)
         return df
+
+
+def profile_dataframe(df: pd.DataFrame, save_path: Optional[P] = None):
+    # path = data.hp.save_dir.joinpath(data.subpath, f"pandas_profile_report{appendix}.html").create(parents_only=True)
+    # from import ProfileReport  # also try pandasgui  # import statement is kept inside the function due to collission with matplotlib
+    # report = profile_report(df, title="Pandas Profiling Report", explorative=explorative, silent=silent)
+    tmp_path = P.tmpfile(suffix=".parquet")
+    df.to_parquet(tmp_path)
+    from crocodile.core import run_in_isolated_ve
+    if save_path is None:
+        save_path = P.tmpfile(suffix=".html")
+    pyscript = f"""
+
+from ydata_profiling import ProfileReport
+import pandas as pd
+df = pd.read_parquet(r'{tmp_path}')
+report = ProfileReport(df, title="Profiling Report")
+report.to_file(r'{save_path}')
+
+"""
+    _launch_script = run_in_isolated_ve(packages=["pandas", "fastparquet", "pyarrow", "ydata-profiling"], pyscript=pyscript)
+    print(f"Profile report saved at {save_path}")
+    save_path()
+    return save_path
 
 
 def check_for_nan(ip: 'npt.NDArray[Any]') -> int:
