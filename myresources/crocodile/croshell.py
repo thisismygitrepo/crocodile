@@ -24,6 +24,13 @@ import numpy as np
 import pandas as pd
 import platform
 
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    _ = px, go
+except ImportError:
+    print("Plotly is not installed")
+
 
 def print_header():
     console = Console()
