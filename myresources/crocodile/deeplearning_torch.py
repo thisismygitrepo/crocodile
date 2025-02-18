@@ -1,4 +1,3 @@
-
 """
 For model.compile()
 # Debian
@@ -77,17 +76,17 @@ class BaseModel:
         tot = 0
         for name, layer in model.named_children():
             params = sum(p.numel() for p in layer.parameters())
-            print(f'Layer {name}. # Parameters = ', params)
+            print(f'🔍 Layer {name}. # Parameters = ', params)
             tot += params
-        print(f"Total = {tot}")
-        print("-" * 20)
+        print(f"📊 Total = {tot}")
+        print("➖" * 20)
 
     @staticmethod
     def summary(model: nn.Module, detailed: bool = False):
-        print(' Summary '.center(50, '='))
+        print(' 📋 Summary '.center(50, '='))
         if detailed: BaseModel.check_childern_details(model)
         else:
-            print('Number of weights in the NN = ', sum(p.numel() for p in model.parameters()))
+            print('💫 Number of weights in the NN = ', sum(p.numel() for p in model.parameters()))
             print(''.center(57, '='))
 
     def save_model(self, save_dir: P) -> None:
@@ -141,7 +140,7 @@ class BaseModel:
         batch_idx: int = 0
         train_losses: list[float] = []
         test_losses: list[float] = []
-        print('Training'.center(100, '-'))
+        print('🚀 Training'.center(100, '-'))
         for an_epoch in range(epochs):
             train_loss = 0.0
             total_samples = 0
@@ -150,18 +149,15 @@ class BaseModel:
                 _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch, device=device)
                 batch_length = len(batch[0])
                 loss_value = loss_tensor.item()
-                # train_losses.append(loss_value)
                 train_loss += loss_value * batch_length
                 total_samples += batch_length
                 if (batch_idx % 100) == 0:
-                    print(f'Training Loss = {train_loss/total_samples:0.2f}', end='\r')
-            # writer.add_scalar('training loss', train_loss, next(epoch_c))
+                    print(f'⚡ Training Loss = {train_loss/total_samples:0.2f}', end='\r')
             test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, device=device, metrics=metrics)
-            # test_losses += [test_loss] * (batch_idx + 1)
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
-            print(f'Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
-        print('Training Completed'.center(100, '-'))
+            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
+        print('✨ Training Completed'.center(100, '-'))
         history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
 
@@ -175,8 +171,8 @@ class BaseModel:
         try:
             loss_val = loss_func(output, y)
         except:
-            print(f'Output shape = {output.shape}, Y shape = {y.shape}')
-            print('Output dtype = ', output.dtype, 'Y dtype = ', y.dtype)
+            print(f'❌ Output shape = {output.shape}, Y shape = {y.shape}')
+            print('❌ Output dtype = ', output.dtype, 'Y dtype = ', y.dtype)
             raise
         loss_val.backward()
         optimizer.step()
