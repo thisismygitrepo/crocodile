@@ -37,9 +37,7 @@ class Specs:
 class EvaluationData:
     x: list[Any]
     y_pred: list[Any]
-    # y_pred_pp: Any
     y_true: list[Any]
-    # y_true_pp: list[Any]
     names: list[str]
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
@@ -218,12 +216,9 @@ class DataReader:
                 else: raise ValueError(f"data_name `{data_name}` is not in the specs. I don't know what to do with it.\n{specs=}")
             if len(delcared_ip_shapes) != 0 and len(delcared_op_shapes) != 0:
                 if delcared_ip_shapes != specs.ip_shapes or delcared_op_shapes != specs.op_shapes or delcared_other_shapes != specs.other_shapes:
-                    print(f"Declared ip shapes:     {delcared_ip_shapes}")
-                    print(f"Declared op shapes:     {delcared_op_shapes}")
-                    print(f"Declared other shapes:  {delcared_other_shapes}")
-                    print(f"Populated ip shapes:    {specs.ip_shapes}")
-                    print(f"Populated op shapes:    {specs.op_shapes}")
-                    print(f"Populated other shapes: {specs.other_shapes}")
+                    print(f"Declared ip VS populated input shapes:     {delcared_ip_shapes} ?= {specs.ip_shapes}")
+                    print(f"Declared op shapes VS populated output shapes:     {delcared_op_shapes} ?= {specs.op_shapes}")
+                    print(f"Declared other shapes VS populated other shapes:     {delcared_other_shapes} ?= {specs.other_shapes}")
                     raise ValueError("Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
         from sklearn.model_selection import train_test_split as tts  # pylint: disable=import-error  # type: ignore  # noqa
         # tts = model_selection.train_test_split
@@ -237,9 +232,9 @@ class DataReader:
         return split
 
     @staticmethod
-    def sample_dataset(specs: Specs, split: dict[str, Any], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
+    def sample_dataset(specs: Specs, split: Optional[dict[str, Any]], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
                        use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
-        assert which_split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
+        assert split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = specs.get_split_names(specs.ip_names, which_split=which_split)
         keys_op = specs.get_split_names(specs.op_names, which_split=which_split)
         keys_others = specs.get_split_names(specs.other_names, which_split=which_split)
@@ -257,8 +252,8 @@ class DataReader:
         else:
             tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
             selection = tmp2
-        x: list[Any] = []
-        y: list[Any] = []
+        inputs: list[Any] = []
+        outputs: list[Any] = []
         others: list[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp3: Any = split[key]
@@ -268,8 +263,8 @@ class DataReader:
                 item = tmp3[selection]
             elif tmp3 is None: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
             else: raise ValueError(f"Split key `{key}` is of unknown data type `{type(tmp3)}`.")
-            if idx == 0: x.append(item)
-            elif idx == 1: y.append(item)
+            if idx == 0: inputs.append(item)
+            elif idx == 1: outputs.append(item)
             else: others.append(item)
         # x = x[0] if len(specs.ip_names) == 1 else x
         # y = y[0] if len(specs.op_names) == 1 else y
@@ -277,7 +272,7 @@ class DataReader:
         # if len(others) == 0:
         #     if type(selection) is slice: others = np.arange(*selection.indices(10000000000000)).tolist()
         #     else: others = selection
-        return x, y, others
+        return inputs, outputs, others
 
     @staticmethod
     def get_random_inputs_outputs(batch_size: int, dtype: PRECISON, ip_shapes: list[tuple[int, ...]], op_shapes: list[tuple[int, ...]]):
@@ -626,7 +621,7 @@ class BaseModel(ABC):
 
         if ip is None:
             if sample_dataset:
-                ip, _, _ = self.data.sample_dataset(specs=specs, split=self.data.split, size=self.hp.batch_size)
+                ip, _, _ = DataReader.sample_dataset(specs=specs, split=self.data.split, size=self.hp.batch_size)
             else:
                 ip, _ = DataReader.get_random_inputs_outputs(ip_shapes=ip_shapes or specs.ip_shapes,
                                                                 op_shapes=specs.op_shapes,

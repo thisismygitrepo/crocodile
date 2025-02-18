@@ -90,7 +90,10 @@ class BaseModel:
             print('Number of weights in the NN = ', sum(p.numel() for p in model.parameters()))
             print(''.center(57, '='))
 
-    def save_model(self, save_dir: P): t.save(self.model, save_dir.joinpath("model.pth"))
+    def save_model(self, save_dir: P) -> None:
+        t.save(self.model, save_dir.joinpath("model.pth"))
+    def save_weights(self, save_dir: P) -> None:
+        t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
     @staticmethod
     def load_model(save_dir: P, map_location: Union[str, Device, None], weights_only: bool):
         if map_location is None and t.cuda.is_available():
@@ -107,7 +110,6 @@ class BaseModel:
             return model
         return model
 
-    def save_weights(self, save_dir: P): t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
     @staticmethod
     def load_weights(model: nn.Module, save_dir: P, map_location: Union[str, Device, None]):
         if map_location is None and t.cuda.is_available():
