@@ -24,11 +24,11 @@ import numpy.typing as npt
 # import pandas as pd
 
 from crocodile.file_management import P
-from crocodile.deeplearning import plot_loss
+from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL
 
 from abc import ABC
 # from collections import OrderedDict
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar, Union, Optional
 
 
 T = TypeVar('T', bound=Any)
@@ -70,6 +70,39 @@ class BaseModel:
         self.optimizer = optimizer
         self.metrics = metrics
         self.history: list[dict[str, Any]] = []
+
+    @staticmethod
+    def evaluate(
+        data: DataReader,
+        model: Any,
+
+                #  x_test: list['npt.NDArray[np.float64]'],
+                #  y_test: list['npt.NDArray[np.float64]'],
+                #  y_pred_raw: Union['npt.NDArray[np.float64]', list['npt.NDArray[np.float64]']],
+                 names_test: Optional[list[str]] = None,
+                 ) -> EvaluationData:
+
+        aslice: Optional[slice] = None  # slice(0, -1, 1)
+        indices: Optional[list[int]] = None
+        use_slice: bool = False
+        specs = data.specs
+        split = data.split
+        x_test, y_test, _others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices,
+                                                                use_slice=use_slice, which_split="test", size=data.hp.batch_size)
+        with t.no_grad():
+            y_pred_raw = model([t.Tensor(item) for item in x_test])
+        names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
+
+        if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
+        else: names_test_resolved = names_test
+
+        if not isinstance(y_pred_raw, list) and not isinstance(y_pred_raw, tuple):  # if a single tensor is returned
+            y_pred = (y_pred_raw, )
+        else: y_pred = y_pred_raw
+
+        results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved],
+                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(y_pred, y_test))
+        return results
 
     @staticmethod
     def check_childern_details(model: nn.Module):
@@ -152,7 +185,7 @@ class BaseModel:
                 train_loss += loss_value * batch_length
                 total_samples += batch_length
                 if (batch_idx % 100) == 0:
-                    print(f'⚡ Training Loss = {train_loss/total_samples:0.2f}', end='\r')
+                    print(f'⚡ Training Loss = {train_loss/total_samples:0.2f}, Batch {batch_idx}/{len(train_loader)}', end='\r')
             test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, device=device, metrics=metrics)
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)

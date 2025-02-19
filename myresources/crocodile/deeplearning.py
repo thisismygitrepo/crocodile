@@ -17,7 +17,7 @@ import enum
 import copy
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Protocol
+from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Protocol, Iterable
 
 
 @dataclass
@@ -35,9 +35,9 @@ class Specs:
 
 @dataclass
 class EvaluationData:
-    x: list[Any]
-    y_pred: list[Any]
-    y_true: list[Any]
+    x: Iterable[Any]
+    y_pred: Iterable[Any]
+    y_true: Iterable[Any]
     names: list[str]
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
@@ -140,7 +140,7 @@ class DataReader:
     def __init__(self, hp: HyperParams,  # type: ignore
                  specs: Optional[Specs] = None,
                  split: Optional[dict[str, Any]] = None) -> None:
-        # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'list[Any]', Tf.RaggedTensor etc.
+        # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'Iterable[Any]', Tf.RaggedTensor etc.
         super().__init__()
         self.hp = hp
         self.split: dict[Any, Any] = split if split is not None else {}
@@ -233,7 +233,7 @@ class DataReader:
 
     @staticmethod
     def sample_dataset(specs: Specs, split: Optional[dict[str, Any]], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
-                       use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
+                       use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[Iterable[Any], Iterable[Any], Iterable[Any]]:
         assert split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = specs.get_split_names(specs.ip_names, which_split=which_split)
         keys_op = specs.get_split_names(specs.op_names, which_split=which_split)
@@ -252,9 +252,9 @@ class DataReader:
         else:
             tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
             selection = tmp2
-        inputs: list[Any] = []
-        outputs: list[Any] = []
-        others: list[Any] = []
+        inputs: Iterable[Any] = []
+        outputs: Iterable[Any] = []
+        others: Iterable[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp3: Any = split[key]
             if isinstance(tmp3, (pd.DataFrame, pd.Series)):
@@ -329,7 +329,7 @@ class BaseModel(ABC):
             weight_name: Optional[str] = None,
             val_sample_weight: Optional['npt.NDArray[np.float64]'] = None,
             sample_weight: Optional['npt.NDArray[np.float64]'] = None,
-            verbose: Union[int, str] = "auto", callbacks: Optional[list[Any]] = None,
+            verbose: Union[int, str] = "auto", callbacks: Optional[Iterable[Any]] = None,
             validation_freq: int = 1,
             **kwargs: Any):
         hp = self.hp
@@ -425,37 +425,40 @@ class BaseModel(ABC):
     #     # https://stackoverflow.com/questions/64199384/tf-keras-model-predict-results-in-memory-leak
     #     # https://github.com/tensorflow/tensorflow/issues/44711
     #     return self.model.predict(x)
-    def evaluate(self, x_test: Optional[list['npt.NDArray[np.float64]']] = None,
-                 y_test: Optional[list['npt.NDArray[np.float64]']] = None,
+    @staticmethod
+    def evaluate(
+        data: DataReader,
+        model: Any,
+
+                #  x_test: list['npt.NDArray[np.float64]'],
+                #  y_test: list['npt.NDArray[np.float64]'],
+                #  y_pred_raw: Union['npt.NDArray[np.float64]', list['npt.NDArray[np.float64]']],
                  names_test: Optional[list[str]] = None,
-                 aslice: Optional[slice] = None, indices: Optional[list[int]] = None,
-                 use_slice: bool = False, size: Optional[int] = None,
-                 which_split: Literal["train", "test"] = "test",
-                #  viz: bool = True, viz_kwargs: Optional[dict[str, Any]] = None,
                  ) -> EvaluationData:
-        specs = self.data.specs
-        split = self.data.split
-        size = size or self.hp.batch_size
-        if x_test is None and y_test is None and names_test is None:
-            x_test, y_test, others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices, use_slice=use_slice, which_split=which_split, size=size)
-            if len(others_test) > 0: names_test_resolved = others_test[0]
-            else: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
-        elif names_test is None and x_test is not None:
-            names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
-        else: raise ValueError(f"Either provide x_test and y_test or none of them. Got x_test={x_test} and y_test={y_test}")
-        # ==========================================================================
-        y_pred_raw = self.model.predict(x_test)
+
+        aslice: Optional[slice] = slice(0, -1, 1)
+        indices: Optional[list[int]] = None
+        use_slice: bool = False
+        specs = data.specs
+        split = data.split
+        x_test, y_test, _others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices,
+                                                                use_slice=use_slice, which_split="test", size=data.hp.batch_size)
+        y_pred_raw = model(x_test)
+        names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
+
+        if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
+        else: names_test_resolved = names_test
         if not isinstance(y_pred_raw, list): y_pred = [y_pred_raw]
         else: y_pred = y_pred_raw
         assert isinstance(y_test, list)
-        loss_df = self.get_metrics_evaluations(y_pred, y_test)
-        results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved], loss_df=loss_df)
+        results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved],
+                                 loss_df=BaseModel.get_metrics_evaluations(y_pred, y_test))
         return results
 
-    def get_metrics_evaluations(self, prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
-        # if self.compiler is None: return None
+    @staticmethod
+    def get_metrics_evaluations(prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
         metrics = []
-        loss_dict: dict[str, list[Any]] = dict()
+        loss_dict: dict[str, Iterable[Any]] = dict()
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
@@ -678,7 +681,7 @@ class Ensemble(Base):
                 datacopy: SubclassedDataReader = copy.copy(self.data)  # shallow copy
                 datacopy.hp = hp  # type: ignore
                 self.models.append(model_class(hp, datacopy))
-        self.performance: list[Any] = []
+        self.performance: Iterable[Any] = []
 
     @classmethod
     def from_saved_models(cls, parent_dir: PLike, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
@@ -710,7 +713,8 @@ class Ensemble(Base):
                 self.models[i].hp.seed = np.random.randint(0, 1000)
                 self.data.split = DataReader.split_the_data(specs=specs, data_dict=data_dict, populate_shapes=populate_shapes, shuffle=True, random_state=self.data.hp.seed, test_size=self.data.hp.test_split)
             self.models[i].fit(**kwargs)
-            self.performance.append(self.models[i].evaluate(aslice=slice(0, -1)))
+
+            self.performance.append(BaseModel.evaluate(model=self.models[i], data=self.data))
             if save:
                 self.models[i].save_class()
                 Save.pickle(obj=self.performance, path=get_hp_save_dir(self.models[i].hp) / "performance.pkl")
