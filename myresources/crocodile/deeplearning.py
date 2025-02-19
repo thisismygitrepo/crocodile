@@ -35,9 +35,9 @@ class Specs:
 
 @dataclass
 class EvaluationData:
-    x: Iterable[Any]
-    y_pred: Iterable[Any]
-    y_true: Iterable[Any]
+    x: list[Any]
+    y_pred: list[Any]
+    y_true: list[Any]
     names: list[str]
     loss_df: Optional['pd.DataFrame']
     def __repr__(self) -> str:
@@ -233,7 +233,7 @@ class DataReader:
 
     @staticmethod
     def sample_dataset(specs: Specs, split: Optional[dict[str, Any]], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
-                       use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[Iterable[Any], Iterable[Any], Iterable[Any]]:
+                       use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
         assert split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
         keys_ip = specs.get_split_names(specs.ip_names, which_split=which_split)
         keys_op = specs.get_split_names(specs.op_names, which_split=which_split)
@@ -252,9 +252,9 @@ class DataReader:
         else:
             tmp2: list[int] = np.random.choice(ds_size, size=select_size, replace=False).astype(int).tolist()
             selection = tmp2
-        inputs: Iterable[Any] = []
-        outputs: Iterable[Any] = []
-        others: Iterable[Any] = []
+        inputs: list[Any] = []
+        outputs: list[Any] = []
+        others: list[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp3: Any = split[key]
             if isinstance(tmp3, (pd.DataFrame, pd.Series)):
@@ -441,8 +441,10 @@ class BaseModel(ABC):
         use_slice: bool = False
         specs = data.specs
         split = data.split
-        x_test, y_test, _others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices,
-                                                                use_slice=use_slice, which_split="test", size=data.hp.batch_size)
+        x_test, y_test, _others_test = DataReader.sample_dataset(
+            split=split, specs=specs, aslice=aslice, indices=indices,
+            use_slice=use_slice, which_split="test", size=data.hp.batch_size
+            )
         y_pred_raw = model(x_test)
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
 
@@ -457,8 +459,8 @@ class BaseModel(ABC):
 
     @staticmethod
     def get_metrics_evaluations(prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
-        metrics = []
-        loss_dict: dict[str, Iterable[Any]] = dict()
+        metrics: list[Any] = []
+        loss_dict: dict[str, list[Any]] = dict()
         for a_metric in metrics:
             if hasattr(a_metric, "name"): name = a_metric.name
             elif hasattr(a_metric, "__name__"): name = a_metric.__name__
@@ -763,35 +765,35 @@ class Losses:
         return MeanMaxError
 
 
-class HPTuning:
-    def __init__(self):
-        # ================== Tuning ===============
-        from tensorboard.plugins.hparams import api as hpt
-        self.hpt = hpt
-        import tensorflow as tf
-        self.pkg = tf
-        self.dir = None
-        self.params = L()
-        self.acc_metric = None
-        self.metrics = None
+# class HPTuning:
+#     def __init__(self):
+#         # ================== Tuning ===============
+#         from tensorboard.plugins.hparams import api as hpt
+#         self.hpt = hpt
+#         import tensorflow as tf
+#         self.pkg = tf
+#         self.dir = None
+#         self.params = L()
+#         self.acc_metric = None
+#         self.metrics = None
 
-    @staticmethod
-    def help() -> None:
-        """Steps of use: subclass this and do the following:
-        * Set directory attribute.
-        * set params
-        * set accuracy metric
-        * generate writer.
-        * implement run method.
-        * run loop method.
-        * in the command line, run `tensorboard --logdir <self.dir>`
-        """
-        pass
+#     @staticmethod
+#     def help() -> None:
+#         """Steps of use: subclass this and do the following:
+#         * Set directory attribute.
+#         * set params
+#         * set accuracy metric
+#         * generate writer.
+#         * implement run method.
+#         * run loop method.
+#         * in the command line, run `tensorboard --logdir <self.dir>`
+#         """
+#         pass
 
-    def run(self, param_dict: dict[str, Any]):
-        _, _ = self, param_dict
-        # should return a result that you want to maximize
-        return _
+#     def run(self, param_dict: dict[str, Any]):
+#         _, _ = self, param_dict
+#         # should return a result that you want to maximize
+#         return _
 
 
 def batcher(func_type: str = 'function'):

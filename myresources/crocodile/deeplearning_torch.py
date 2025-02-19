@@ -75,20 +75,20 @@ class BaseModel:
     def evaluate(
         data: DataReader,
         model: Any,
-
-                #  x_test: list['npt.NDArray[np.float64]'],
-                #  y_test: list['npt.NDArray[np.float64]'],
-                #  y_pred_raw: Union['npt.NDArray[np.float64]', list['npt.NDArray[np.float64]']],
-                 names_test: Optional[list[str]] = None,
-                 ) -> EvaluationData:
+        #  x_test: list['npt.NDArray[np.float64]'],
+        #  y_test: list['npt.NDArray[np.float64]'],
+        #  y_pred_raw: Union['npt.NDArray[np.float64]', list['npt.NDArray[np.float64]']],
+        names_test: Optional[list[str]] = None,
+        ) -> EvaluationData:
 
         aslice: Optional[slice] = None  # slice(0, -1, 1)
         indices: Optional[list[int]] = None
         use_slice: bool = False
         specs = data.specs
         split = data.split
-        x_test, y_test, _others_test = DataReader.sample_dataset(split=split, specs=specs, aslice=aslice, indices=indices,
-                                                                use_slice=use_slice, which_split="test", size=data.hp.batch_size)
+        x_test, y_test, _others_test = DataReader.sample_dataset(
+                                    split=split, specs=specs, aslice=aslice, indices=indices,
+                                    use_slice=use_slice, which_split="test", size=data.hp.batch_size)
         with t.no_grad():
             y_pred_raw = model([t.Tensor(item) for item in x_test])
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
@@ -96,12 +96,18 @@ class BaseModel:
         if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: names_test_resolved = names_test
 
-        if not isinstance(y_pred_raw, list) and not isinstance(y_pred_raw, tuple):  # if a single tensor is returned
-            y_pred = (y_pred_raw, )
-        else: y_pred = y_pred_raw
+        if isinstance(y_pred_raw, t.Tensor):
+            y_pred = (y_pred_raw.numpy(), )
+        elif isinstance(y_pred_raw, list):
+            y_pred = [item.numpy() for item in y_pred_raw]  # type: ignore
+        elif isinstance(y_pred_raw, tuple):
+            y_pred = [item.numpy() for item in y_pred_raw]  # type: ignore
+        else:
+            raise ValueError(f"y_pred_raw is of type {type(y_pred_raw)}")
 
         results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved],
-                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(y_pred, y_test))
+                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(y_pred, y_test)
+                                 )
         return results
 
     @staticmethod
@@ -153,14 +159,19 @@ class BaseModel:
         return model
 
     @staticmethod
-    def infer(model: nn.Module, xx: Union[npt.NDArray[np.float64], npt.NDArray[np.float32]], device: Device) -> npt.NDArray[np.float32]:
+    def infer(model: nn.Module, xx: Union[tuple[npt.NDArray[np.float64], ...],
+                                          tuple[npt.NDArray[np.float32]], ...],
+                                          device: Device) -> tuple[npt.NDArray[np.float32]]:
         model.eval()
         # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
         xx_ = t.tensor(data=xx).to(device=device)
         with t.no_grad(): op = model(xx_)
-        return op.cpu().detach().numpy()
+        return tuple(an_op.cpu().detach().numpy() for an_op in op)
 
-    def fit(self, epochs: int, train_loader: DataLoader[T], test_loader: DataLoader[T], device: Device):
+    def fit(self, epochs: int,
+            train_loader: DataLoader[T],
+            test_loader: DataLoader[T],
+            device: Device):
         """
         Standard training loop for Pytorch models. It is assumed that the model is already on the correct device.
         """
@@ -179,7 +190,7 @@ class BaseModel:
             total_samples = 0
             model.train()  # Double checking
             for batch_idx, batch in enumerate(train_loader):
-                _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch, device=device)
+                _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch)
                 batch_length = len(batch[0])
                 loss_value = loss_tensor.item()
                 train_loss += loss_value * batch_length
@@ -195,28 +206,36 @@ class BaseModel:
         return train_losses, test_losses
 
     @staticmethod
-    def train_step(model: nn.Module, loss_func: nn.Module, optimizer: Optimizer, batch: tuple[t.Tensor, t.Tensor, t.Tensor], device: Device):
+    def train_step(model: nn.Module, loss_func: nn.Module, optimizer: Optimizer,
+                   batch: tuple[tuple[t.Tensor,  ...], tuple[t.Tensor,  ...], tuple[t.Tensor,  ...]],
+                   ):
         x, y, _name = batch
-        x = x.to(device)
-        y = y.to(device)
         optimizer.zero_grad()  # clear the gradients of all optimized variables
         output = model.forward(x)
         try:
             loss_val = loss_func(output, y)
-        except:
-            print(f'❌ Output shape = {output.shape}, Y shape = {y.shape}')
-            print('❌ Output dtype = ', output.dtype, 'Y dtype = ', y.dtype)
-            raise
+        except Exception as e:
+            # print(f'❌ Output shape = {output.shape}, Y shape = {y.shape}')
+            for idx, (an_output, an_y) in enumerate(zip(output, y)):
+                if an_output.shape != an_y.shape:
+                    print(f'❌ Output shape = {an_output.shape}, Y shape = {an_y.shape}')
+                    raise ValueError(f"Shapes of output and y do not match at index {idx}") from e
+            # print('❌ Output dtype = ', output.dtype, 'Y dtype = ', y.dtype)
+            for idx, (an_output, an_y) in enumerate(zip(output, y)):
+                if an_output.dtype != an_y.dtype:
+                    print(f'❌ Output dtype = {an_output.dtype}, Y dtype = {an_y.dtype}')
+                    raise ValueError(f"Data types of output and y do not match at index {idx}") from e
+            raise e
         loss_val.backward()
         optimizer.step()
         return output, loss_val
 
     @staticmethod
-    def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor], device: Device):
+    def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor]):
         with t.no_grad():
             x, y, _name = batch
-            x = x.to(device)
-            y = y.to(device)
+            # x = [an_x.to(device) for an_x in x]
+            # y = [an_y.to(device) for an_y in y]
             op = model(x)
             loss_val = loss_func(op, y)
             return op, loss_val
@@ -226,7 +245,7 @@ class BaseModel:
         model.eval()
         losses: list[list[float]] = []
         for _idx, batch in enumerate(loader):
-            prediction, loss_value = BaseModel.test_step(model=model, loss_func=loss_func, batch=batch, device=device)
+            prediction, loss_value = BaseModel.test_step(model=model, loss_func=loss_func, batch=batch)
             per_batch_losses: list[float] = [loss_value.item()]
             for a_metric in metrics:
                 loss_value = a_metric(prediction, batch[1])
