@@ -6,8 +6,9 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
-from crocodile.matplotlib_management import ImShow
+from crocodile.matplotlib_management import ImShow, FigureManager, Axes
 from crocodile.core import List as L, Struct as S, Base
 from crocodile.file_management import P, Save, PLike, Read
 from crocodile.meta import generate_readme
@@ -198,9 +199,6 @@ class DataReader:
             delcared_ip_shapes = specs.ip_shapes
             delcared_op_shapes = specs.op_shapes
             delcared_other_shapes = specs.other_shapes
-            specs.ip_shapes = {}
-            specs.op_shapes = {}
-            specs.other_shapes = {}
             for data_name, data_value in data_dict.items():
                 if type(data_value) in {pd.DataFrame, pd.Series}:
                     a_shape = data_value.iloc[0].shape
@@ -727,6 +725,22 @@ class Ensemble(Base):
 def plot_loss(history: list[dict[str, Any]], y_label: str):
     res = S.concat_values(*history)
     return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
+
+def viz(eval_data: EvaluationData, ax: Optional[Axes], title: str):
+    if ax is None:
+        fig, axis = plt.subplots(figsize=(14, 10))
+    else:
+        fig = ax.get_figure()
+        axis = ax
+    x = np.arange(len(eval_data.y_true[0]))
+    axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
+    axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
+    axis.legend()
+    axis.set_title(title or 'Predicted vs True')
+    FigureManager.grid(axis)
+    plt.show(block=False)
+    plt.pause(0.5)  # pause a bit so that the figure is displayed.
+    return fig
 
 
 class Losses:

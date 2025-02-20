@@ -10,15 +10,16 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import numpy.typing as npt
+import matplotlib.pyplot as plt
 
 from crocodile.file_management import P
-from crocodile.deeplearning import PRECISON, get_hp_save_dir, plot_loss
+from crocodile.deeplearning import PRECISON, get_hp_save_dir, plot_loss, BaseModel as TF_BASE_MODEL
 from crocodile.deeplearning_torch import BaseModel
 
 from typing import Literal, TypeAlias
 from dataclasses import dataclass
 
-_ = get_hp_save_dir
+_ = get_hp_save_dir, TF_BASE_MODEL, plt
 WHICH: TypeAlias = Literal["train", "test"]
 
 
@@ -94,6 +95,11 @@ def main():
     _ = loss_example, test_dataloader
 
     m = BaseModel(model=model, optimizer=optimizer, loss=loss, metrics=[])
+
+    # fig, _ax = plt.subplots(ncols=2)
+    # fig.set_size_inches(14, 10)
+    # _res_before = TF_BASE_MODEL.evaluate(model=m, data=data, names_test=np.arange(10).tolist())
+
     m.fit(epochs=hp.epochs, device=device, train_loader=train_dataloader, test_loader=test_dataloader)
     save_dir = P.home().joinpath("tmp_results", "deep_learning_models", "pytorch_template").create()
     artist = plot_loss(history=m.history, y_label="loss")

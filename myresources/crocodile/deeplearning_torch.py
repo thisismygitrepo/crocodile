@@ -241,7 +241,7 @@ class BaseModel:
             return op, loss_val
 
     @staticmethod
-    def test(model: nn.Module, loss_func: nn.Module, loader: DataLoader[T], device: Device, metrics: list[nn.Module]):
+    def test(model: nn.Module, loss_func: nn.Module, loader: DataLoader[T], metrics: list[nn.Module]):
         model.eval()
         losses: list[list[float]] = []
         for _idx, batch in enumerate(loader):

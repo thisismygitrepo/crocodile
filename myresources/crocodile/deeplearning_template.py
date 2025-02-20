@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 import crocodile.deeplearning as dl
 from crocodile.core import randstr
 from crocodile.file_management import P
-from crocodile.deeplearning import EvaluationData
-from crocodile.matplotlib_management import FigureManager, Axes
+from crocodile.deeplearning import viz
 
 from dataclasses import field, dataclass
 from typing import Optional, Any
@@ -22,7 +21,6 @@ class HParams(dl.HParams):
     subpath: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
     name: str = field(default_factory=lambda: "model-" + randstr(noun=True))
     root: P = P.tmp(folder="tmp_models")
-    # device_name: Device=Device.gpu0
     # ===================== Data ==============================
     seed: int = 234
     shuffle: bool = True
@@ -48,33 +46,13 @@ class DataReader(dl.DataReader):
         self.dataset: Optional[dict[str, Any]] = None
         if load_trianing_data: self.load_trianing_data()  # make sure that DataReader can be instantiated cheaply without loading data.
 
-    def load_trianing_data(self, profile_df: bool = False):
+    def load_trianing_data(self):
         self.dataset = dict(x=np.random.randn(1000, 10).astype(self.hp.precision),
                             y=np.random.randn(1000, 1).astype(self.hp.precision),
                             names=np.arange(start=0, stop=1000))
-        # if profile_df: self.profile_dataframe(df=self.dataset.x)
-        # self.get_pandas_profile_path()
-        _ = profile_df
         self.split = DataReader.split_the_data(data_dict=self.dataset, populate_shapes=True,
                                                specs=self.specs, shuffle=self.hp.shuffle,
                                                test_size=self.hp.test_split, random_state=self.hp.seed)
-
-
-def viz(eval_data: EvaluationData, ax: Optional[Axes], title: str):
-    if ax is None:
-        fig, axis = plt.subplots(figsize=(14, 10))
-    else:
-        fig = ax.get_figure()
-        axis = ax
-    x = np.arange(len(eval_data.y_true[0]))
-    axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
-    axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
-    axis.legend()
-    axis.set_title(title or 'Predicted vs True')
-    FigureManager.grid(axis)
-    plt.show(block=False)
-    plt.pause(0.5)  # pause a bit so that the figure is displayed.
-    return fig
 
 
 class Model(dl.BaseModel):
@@ -114,7 +92,7 @@ def main():
     fig, _ax = plt.subplots(ncols=2)
     fig.set_size_inches(14, 10)
     _res_before = Model.evaluate(model=m, data=d, names_test=np.arange(10).tolist())
-    viz(eval_data=_res_before, ax=_ax[0], title='Before training')
+    dl.viz(eval_data=_res_before, ax=_ax[0], title='Before training')
     m.fit()
     _res_after = Model.evaluate(model=m, data=d, names_test=np.arange(10).tolist())
     print(m.test())
