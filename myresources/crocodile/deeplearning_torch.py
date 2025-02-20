@@ -160,7 +160,7 @@ class BaseModel:
 
     @staticmethod
     def infer(model: nn.Module, xx: Union[tuple[npt.NDArray[np.float64], ...],
-                                          tuple[npt.NDArray[np.float32]], ...],
+                                          tuple[npt.NDArray[np.float32], ...]],
                                           device: Device) -> tuple[npt.NDArray[np.float32]]:
         model.eval()
         # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
