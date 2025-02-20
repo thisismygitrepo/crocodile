@@ -1,4 +1,3 @@
-
 """
 dl
 """
@@ -22,13 +21,11 @@ from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Proto
 
 @dataclass
 class Specs:
-    ip_names: list[str]  # e.g.: ["x1", "x2"]
-    op_names: list[str]  # e.g.: ["y1", "y2"]
-    other_names: list[str] = field(default_factory=list)  # e.g.: indices or names
-    ip_shapes: list[tuple[int, ...]] = field(default_factory=list)
-    op_shapes: list[tuple[int, ...]] = field(default_factory=list)
-    other_shapes: list[tuple[int, ...]] = field(default_factory=list)
-    def get_all_names(self): return self.ip_names + self.op_names + self.other_names
+    ip_shapes: dict[str, tuple[int, ...]]  # e.g.: {"x1": (10, 2), "x2": (10,)}
+    op_shapes: dict[str, tuple[int, ...]]  # e.g.: {"y1": (5,), "y2": (3, 3)}
+    other_shapes: dict[str, tuple[int, ...]] = field(default_factory=dict)  # e.g.: {"index": (1,)}
+    def get_all_names(self) -> list[str]:
+        return list(self.ip_shapes.keys()) + list(self.op_shapes.keys()) + list(self.other_shapes.keys())
     def get_split_names(self, names: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
         return [item + f"_{which_split}" for item in names]
 
@@ -145,7 +142,7 @@ class DataReader:
         self.hp = hp
         self.split: dict[Any, Any] = split if split is not None else {}
         self.plotter = None
-        self.specs: Specs = Specs(ip_shapes=[], op_shapes=[], other_shapes=[], ip_names=[], op_names=[], other_names=[]) if specs is None else specs
+        self.specs: Specs = Specs(ip_shapes={}, op_shapes={}, other_shapes={}) if specs is None else specs
         # self.df_handler = df_handler
     def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
@@ -200,9 +197,9 @@ class DataReader:
             delcared_ip_shapes = specs.ip_shapes
             delcared_op_shapes = specs.op_shapes
             delcared_other_shapes = specs.other_shapes
-            specs.ip_shapes = []
-            specs.op_shapes = []
-            specs.other_shapes = []
+            specs.ip_shapes = {}
+            specs.op_shapes = {}
+            specs.other_shapes = {}
             for data_name, data_value in data_dict.items():
                 if type(data_value) in {pd.DataFrame, pd.Series}:
                     a_shape = data_value.iloc[0].shape
@@ -210,9 +207,9 @@ class DataReader:
                     try: item = data_value[0]
                     except IndexError as ie: raise IndexError(f"Data name: {data_name}, data value: {data_value}") from ie
                     a_shape = np.array(item).shape
-                if data_name in specs.ip_names: specs.ip_shapes.append(a_shape)
-                elif data_name in specs.op_names: specs.op_shapes.append(a_shape)
-                elif data_name in specs.other_names: specs.other_shapes.append(a_shape)
+                if data_name in specs.ip_shapes: specs.ip_shapes[data_name] = a_shape
+                elif data_name in specs.op_shapes: specs.op_shapes[data_name] = a_shape
+                elif data_name in specs.other_shapes: specs.other_shapes[data_name] = a_shape
                 else: raise ValueError(f"data_name `{data_name}` is not in the specs. I don't know what to do with it.\n{specs=}")
             if len(delcared_ip_shapes) != 0 and len(delcared_op_shapes) != 0:
                 if delcared_ip_shapes != specs.ip_shapes or delcared_op_shapes != specs.op_shapes or delcared_other_shapes != specs.other_shapes:
@@ -235,9 +232,9 @@ class DataReader:
     def sample_dataset(specs: Specs, split: Optional[dict[str, Any]], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
                        use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
         assert split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
-        keys_ip = specs.get_split_names(specs.ip_names, which_split=which_split)
-        keys_op = specs.get_split_names(specs.op_names, which_split=which_split)
-        keys_others = specs.get_split_names(specs.other_names, which_split=which_split)
+        keys_ip = specs.get_split_names(list(specs.ip_shapes.keys()), which_split=which_split)
+        keys_op = specs.get_split_names(list(specs.op_shapes.keys()), which_split=which_split)
+        keys_others = specs.get_split_names(list(specs.other_shapes.keys()), which_split=which_split)
 
         tmp = split[keys_ip[0]]
         assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
@@ -275,9 +272,9 @@ class DataReader:
         return inputs, outputs, others
 
     @staticmethod
-    def get_random_inputs_outputs(batch_size: int, dtype: PRECISON, ip_shapes: list[tuple[int, ...]], op_shapes: list[tuple[int, ...]]):
-        x = [np.random.randn(batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes]
-        y = [np.random.randn(batch_size, * op_shape).astype(dtype) for op_shape in op_shapes]
+    def get_random_inputs_outputs(batch_size: int, dtype: PRECISON, ip_shapes: dict[str, tuple[int, ...]], op_shapes: dict[str, tuple[int, ...]]):
+        x = [np.random.randn(batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes.values()]
+        y = [np.random.randn(batch_size, * op_shape).astype(dtype) for op_shape in op_shapes.values()]
         # x = x[0] if len(specs.ip_names) == 1 else x
         # y = y[0] if len(specs.op_names) == 1 else y
         return x, y
@@ -335,12 +332,12 @@ class BaseModel(ABC):
         hp = self.hp
         specs = self.data.specs
         split = self.data.split
-        x_train = [split[item] for item in specs.get_split_names(names=specs.ip_names, which_split="train")]
-        y_train = [split[item] for item in specs.get_split_names(names=specs.op_names, which_split="train")]
-        x_test = [split[item] for item in specs.get_split_names(names=specs.ip_names, which_split="test")]
-        y_test = [split[item] for item in specs.get_split_names(names=specs.op_names, which_split="test")]
+        x_train = [split[item] for item in specs.get_split_names(names=list(specs.ip_shapes.keys()), which_split="train")]
+        y_train = [split[item] for item in specs.get_split_names(names=list(specs.op_shapes.keys()), which_split="train")]
+        x_test = [split[item] for item in specs.get_split_names(names=list(specs.ip_shapes.keys()), which_split="test")]
+        y_test = [split[item] for item in specs.get_split_names(names=list(specs.op_shapes.keys()), which_split="test")]
         if weight_name is not None:
-            assert weight_name in specs.other_names, f"weight_string must be one of {specs.other_names}"
+            assert weight_name in specs.other_shapes, f"weight_string must be one of {specs.other_shapes}"
             if sample_weight is None:
                 train_weight_str = specs.get_split_names(names=[weight_name], which_split="train")[0]
                 sample_weight = split[train_weight_str]
@@ -619,8 +616,8 @@ class BaseModel(ABC):
         """
         specs = self.data.specs
         try:
-            keys_ip = specs.get_split_names(specs.ip_names, which_split="test")
-            keys_op = specs.get_split_names(specs.op_names, which_split="test")
+            keys_ip = specs.get_split_names(list(specs.ip_shapes.keys()), which_split="test")
+            keys_op = specs.get_split_names(list(specs.op_shapes.keys()), which_split="test")
         except TypeError as te:
             raise ValueError("Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
@@ -631,7 +628,7 @@ class BaseModel(ABC):
                 ip, _ = DataReader.get_random_inputs_outputs(ip_shapes=ip_shapes or specs.ip_shapes,
                                                                 op_shapes=specs.op_shapes,
                                                              batch_size=self.hp.batch_size, dtype=self.hp.precision)
-        op = self.model(ip[0] if len(specs.ip_names) == 1 else ip)
+        op = self.model(ip[0] if len(specs.ip_shapes) == 1 else ip)
         if not isinstance(op, list): ops = [op]
         else: ops = op
         ips = ip

@@ -38,13 +38,11 @@ class HParams(dl.HParams):
 
 class DataReader(dl.DataReader):
     def __init__(self, hp: HParams, load_trianing_data: bool = False) -> None:
-        specs = dl.Specs(ip_names=['x'],
-                         op_names=["y"],
-                         other_names=["names"],
-                         ip_shapes=[],
-                         op_shapes=[],
-                         other_shapes=[]
-                         )
+        specs = dl.Specs(
+            ip_shapes={'x': (10,)},
+            op_shapes={'y': (1,)},
+            other_shapes={'names': (1,)}
+        )
         super().__init__(hp=hp, specs=specs)
         self.hp: HParams
         self.dataset: Optional[dict[str, Any]] = None
@@ -98,7 +96,7 @@ class Model(dl.BaseModel):
         return m
 
     def test(self):
-        report = self.evaluate()
+        report = Model.evaluate(model=self.model, data=self.data, names_test=np.arange(10).tolist())
         import pandas as pd
         assert isinstance(report.loss_df, pd.DataFrame)
         # loss_name = self.compiler.loss.__class__.__name__ if not hasattr(self.compiler.loss, '__name__') else self.compiler.loss.__name__
@@ -115,10 +113,10 @@ def main():
     m = Model(hp, d, instantiate_model=True)
     fig, _ax = plt.subplots(ncols=2)
     fig.set_size_inches(14, 10)
-    _res_before = m.evaluate(indices=np.arange(10).tolist())
+    _res_before = Model.evaluate(model=m, data=d, names_test=np.arange(10).tolist())
     viz(eval_data=_res_before, ax=_ax[0], title='Before training')
     m.fit()
-    _res_after = m.evaluate(indices=np.arange(10).tolist())
+    _res_after = Model.evaluate(model=m, data=d, names_test=np.arange(10).tolist())
     print(m.test())
     viz(eval_data=_res_after, ax=_ax[1], title='After training')
 

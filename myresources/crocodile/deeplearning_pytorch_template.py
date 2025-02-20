@@ -47,8 +47,8 @@ class DataReader(Dataset[float]):
         self.names: npt.NDArray[np.int32] = np.arange(start=0, stop=length, dtype=np.int32)
     def __len__(self):
         return len(self.x)
-    def __getitem__(self, idx: int):
-        return self.x[idx], self.y[idx], self.names[idx]
+    def __getitem__(self, idx: int) -> tuple[tuple[t.Tensor], tuple[t.Tensor], tuple[t.Tensor]]:
+        return (self.x[idx], ), (self.y[idx], ), (self.names[idx],)
 
 
 class My2LayerNN(nn.Module):
@@ -57,10 +57,10 @@ class My2LayerNN(nn.Module):
         self.fc1 = nn.Linear(in_features=hp.in_features, out_features=64)
         self.fc2 = nn.Linear(in_features=64, out_features=1)
 
-    def forward(self, x: t.Tensor) -> t.Tensor:
-        x = t.relu(self.fc1(x))
+    def forward(self, x: tuple[t.Tensor]) -> tuple[t.Tensor]:
+        x = t.relu(self.fc1(x[0]))
         x = self.fc2(x)
-        return x
+        return (x, )
 
 
 def main():
@@ -68,7 +68,7 @@ def main():
     ds_train = DataReader(hp=hp, which="train")
     ds_test = DataReader(hp=hp, which="test")
     train_dataloader = DataLoader(ds_train, batch_size=hp.batch_size, shuffle=hp.shuffle)
-    test_dataloader = DataLoader(ds_test, batch_size=hp.batch_size, shuffle=False)
+    test_dataloader = DataLoader(ds_test, batch_size=hp.batch_size, shuffle=hp.shuffle)
 
     train_item = next(iter(train_dataloader))
     x = train_item[0].to(hp.device)
@@ -90,7 +90,7 @@ def main():
     save_dir = P.home().joinpath("tmp_results", "deep_learning_models", "pytorch_template").create()
 
     artist = plot_loss(history=m.history, y_label="loss")
-    artist.fig.savefig(fname=str(save_dir.joinpath(f"metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+    artist.fig.savefig(fname=str(save_dir.joinpath("metadata/training/loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
 
     m.save_model(save_dir=save_dir)
     m.save_weights(save_dir=save_dir)

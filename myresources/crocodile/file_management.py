@@ -276,8 +276,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                 if verbose: print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}")
                 return default
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
-        if '.zip' in str(slf):
-            filename = slf.unzip(folder=slf.tmp(folder="tmp_unzipped"), verbose=True)
+        if '.tar.gz' in str(slf) or '.tgz' in str(slf) or '.gz' in str(slf) or '.tar.bz' in str(slf) or 'tbz' in str(slf) or 'tar.xz' in str(slf) or '.zip' in str(slf):
+            filename = slf.decompress(folder=slf.tmp(folder="tmp_unzipped"), verbose=True)
             if filename.is_dir():
                 tmp_content = filename.search("*")
                 if len(tmp_content) == 1:
@@ -680,6 +680,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if "tar.gz" in self or ".tgz" in self:
             # res = self.ungz_untar(folder=folder, path=path, name=name, inplace=inplace, verbose=verbose, orig=orig)
             return self.ungz(name=f"tmp_{randstr()}.tar", inplace=inplace).untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)  # this works for .tgz suffix as well as .tar.gz
+        elif ".gz" in self: res = self.ungz(folder=folder, path=path, name=name, inplace=inplace, verbose=verbose, orig=orig)
         elif "tar.bz" in self or "tbz" in self:
             res = self.unbz(name=f"tmp_{randstr()}.tar", inplace=inplace)
             return res.untar(folder=folder, name=name, path=path, inplace=True, orig=orig, verbose=verbose)

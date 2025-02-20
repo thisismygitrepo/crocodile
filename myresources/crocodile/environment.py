@@ -88,21 +88,17 @@ def get_network_addresses() -> NetworkAddresses:
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join((f"{mac}012X")[i:i + 2] for i in range(0, 12, 2))  # type: ignore
-    # elif hex_format: return hex(mac)
-    # else: return mac
+
+
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Doesn't need to be reachable
         s.connect(('8.8.8.8', 1))
         local_ip_v4 = s.getsockname()[0]
     except Exception:
         local_ip_v4 = socket.gethostbyname(socket.gethostname())
-        # local_ip_v4 = '127.0.0.1'
     finally:
         s.close()
-    # _addresses: TypeAlias = Literal['subnet_mask', 'mac_address', 'local_ip_v4', 'default_gateway', 'public_ip_v4']
-
     try:
         public_ip_v4 = P('https://api.ipify.org').download_to_memory(timeout=1.0).text
     except Exception:
