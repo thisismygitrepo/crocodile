@@ -179,9 +179,10 @@ class DataReader:
         return "--" * 50
 
     @staticmethod
-    def split_the_data(specs: Specs, data_dict: dict[str, Any], populate_shapes: bool,
+    def split_the_data(specs: Specs,
+                       data_dict: dict[str, Any], populate_shapes: bool,
                        shuffle: bool, random_state: int, test_size: float,
-                       split_kwargs: Optional[dict[str, Any]] = None,) -> dict[str, Any]:
+                       split_kwargs: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         # populating data specs ip / op shapes based on arguments sent to this method.
         split: dict[str, Any] = {}
 
@@ -272,7 +273,9 @@ class DataReader:
         return inputs, outputs, others
 
     @staticmethod
-    def get_random_inputs_outputs(batch_size: int, dtype: PRECISON, ip_shapes: dict[str, tuple[int, ...]], op_shapes: dict[str, tuple[int, ...]]):
+    def get_random_inputs_outputs(batch_size: int, dtype: PRECISON,
+                                  ip_shapes: dict[str, tuple[int, ...]],
+                                  op_shapes: dict[str, tuple[int, ...]]):
         x = [np.random.randn(batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes.values()]
         y = [np.random.randn(batch_size, * op_shape).astype(dtype) for op_shape in op_shapes.values()]
         # x = x[0] if len(specs.ip_names) == 1 else x
@@ -548,7 +551,6 @@ class BaseModel(ABC):
 
         save_dir_weights = list(path.search('*_save_*'))[0]
         model_obj.load_weights(directory=save_dir_weights)
-        # TODO: add argument to this function to choose which version to load.
         history_path = path / "metadata/training/history.pkl"
         if history_path.exists(): history: list[dict[str, Any]] = Read.pickle(path=history_path)
         else: history = []
@@ -603,7 +605,7 @@ class BaseModel(ABC):
             else: print(f"Failed to plot the model. Error: {ex}")
         return path
 
-    def build(self, sample_dataset: bool = False, ip_shapes: Optional[list[tuple[int, ...]]] = None, ip: Optional[list['npt.NDArray[np.float64]']] = None, verbose: bool = True):
+    def build(self, sample_dataset: bool = False, ip_shapes: Optional[dict[str, [tuple[int, ...]]]] = None, ip: Optional[list['npt.NDArray[np.float64]']] = None, verbose: bool = True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.
