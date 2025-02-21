@@ -24,7 +24,7 @@ import numpy.typing as npt
 # import pandas as pd
 
 from crocodile.file_management import P
-from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL
+from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, SpecsLike
 
 from abc import ABC
 # from collections import OrderedDict
@@ -73,22 +73,21 @@ class BaseModel:
 
     @staticmethod
     def evaluate(
-        data: DataReader,
         model: Any,
         #  x_test: list['npt.NDArray[np.float64]'],
         #  y_test: list['npt.NDArray[np.float64]'],
         #  y_pred_raw: Union['npt.NDArray[np.float64]', list['npt.NDArray[np.float64]']],
-        names_test: Optional[list[str]] = None,
+        specs: SpecsLike,
+        split: dict[str, Any],
+        names_test: Optional[list[str]] = None, batch_size: int = 32
         ) -> EvaluationData:
 
         aslice: Optional[slice] = None  # slice(0, -1, 1)
         indices: Optional[list[int]] = None
         use_slice: bool = False
-        specs = data.specs
-        split = data.split
         x_test, y_test, _others_test = DataReader.sample_dataset(
                                     split=split, specs=specs, aslice=aslice, indices=indices,
-                                    use_slice=use_slice, which_split="test", size=data.hp.batch_size)
+                                    use_slice=use_slice, which_split="test", size=batch_size)
         with t.no_grad():
             y_pred_raw = model([t.Tensor(item) for item in x_test])
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
@@ -134,6 +133,7 @@ class BaseModel:
         t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
     @staticmethod
     def load_model(save_dir: P, map_location: Union[str, Device, None], weights_only: bool):
+        print(f"Loading model from {save_dir} to Device `{map_location}`")
         if map_location is None and t.cuda.is_available():
             map_location = "cpu"
         model: nn.Module = t.load(save_dir.joinpath("model.pth"), map_location=map_location, weights_only=weights_only)  # type: ignore
@@ -197,7 +197,7 @@ class BaseModel:
                 total_samples += batch_length
                 if (batch_idx % 100) == 0:
                     print(f'⚡ Training Loss = {train_loss/total_samples:0.2f}, Batch {batch_idx}/{len(train_loader)}', end='\r')
-            test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, device=device, metrics=metrics)
+            test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, metrics=metrics)
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
             print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')

@@ -20,14 +20,23 @@ from dataclasses import dataclass, field
 from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Protocol, Iterable
 
 
+class SpecsLike(Protocol):
+    """Protocol defining the required attributes for specs-like objects"""
+    ip_shapes: dict[str, tuple[int, ...]]
+    op_shapes: dict[str, tuple[int, ...]]
+    other_shapes: dict[str, tuple[int, ...]]
+
+
 @dataclass
 class Specs:
     ip_shapes: dict[str, tuple[int, ...]]  # e.g.: {"x1": (10, 2), "x2": (10,)}
     op_shapes: dict[str, tuple[int, ...]]  # e.g.: {"y1": (5,), "y2": (3, 3)}
     other_shapes: dict[str, tuple[int, ...]] = field(default_factory=dict)  # e.g.: {"index": (1,)}
-    def get_all_names(self) -> list[str]:
-        return list(self.ip_shapes.keys()) + list(self.op_shapes.keys()) + list(self.other_shapes.keys())
-    def get_split_names(self, names: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
+    @staticmethod
+    def get_all_names(slf: SpecsLike) -> list[str]:
+        return list(slf.ip_shapes.keys()) + list(slf.op_shapes.keys()) + list(slf.other_shapes.keys())
+    @staticmethod
+    def get_split_names(names: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
         return [item + f"_{which_split}" for item in names]
 
 
@@ -136,14 +145,15 @@ class DataReader:
     """This class holds the dataset for training and testing.
     """
     def __init__(self, hp: HyperParams,  # type: ignore
-                 specs: Optional[Specs] = None,
-                 split: Optional[dict[str, Any]] = None) -> None:
+                 specs: SpecsLike,
+                 split: Optional[dict[str, Any]] = None
+                 ) -> None:
         # split could be Union[None, 'npt.NDArray[np.float64]', 'pd.DataFrame', 'pd.Series', 'Iterable[Any]', Tf.RaggedTensor etc.
         super().__init__()
         self.hp = hp
         self.split: dict[Any, Any] = split if split is not None else {}
         self.plotter = None
-        self.specs: Specs = Specs(ip_shapes={}, op_shapes={}, other_shapes={}) if specs is None else specs
+        self.specs: SpecsLike = specs
         # self.df_handler = df_handler
     def save(self, path: Optional[str] = None, **kwargs: Any) -> None:
         _ = kwargs
@@ -180,14 +190,14 @@ class DataReader:
         return "--" * 50
 
     @staticmethod
-    def split_the_data(specs: Specs,
+    def split_the_data(specs: SpecsLike,
                        data_dict: dict[str, Any], populate_shapes: bool,
                        shuffle: bool, random_state: int, test_size: float,
                        split_kwargs: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         # populating data specs ip / op shapes based on arguments sent to this method.
         split: dict[str, Any] = {}
 
-        strings = specs.get_all_names()
+        strings = Specs.get_all_names(specs)
         keys = list(data_dict.keys())
         if len(strings) != len(keys) or set(keys) != set(strings):
             S(specs.__dict__).print(as_config=True, title="Specs Declared")
@@ -228,12 +238,12 @@ class DataReader:
         return split
 
     @staticmethod
-    def sample_dataset(specs: Specs, split: Optional[dict[str, Any]], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
+    def sample_dataset(specs: SpecsLike, split: Optional[dict[str, Any]], size: int, aslice: Optional['slice'] = None, indices: Optional[list[int]] = None,
                        use_slice: bool = False, which_split: Literal["train", "test"] = "test") -> tuple[list[Any], list[Any], list[Any]]:
         assert split is not None, "No dataset is loaded to DataReader, .split attribute is empty. Consider using `.load_training_data()` method."
-        keys_ip = specs.get_split_names(list(specs.ip_shapes.keys()), which_split=which_split)
-        keys_op = specs.get_split_names(list(specs.op_shapes.keys()), which_split=which_split)
-        keys_others = specs.get_split_names(list(specs.other_shapes.keys()), which_split=which_split)
+        keys_ip = Specs.get_split_names(list(specs.ip_shapes.keys()), which_split=which_split)
+        keys_op = Specs.get_split_names(list(specs.op_shapes.keys()), which_split=which_split)
+        keys_others = Specs.get_split_names(list(specs.other_shapes.keys()), which_split=which_split)
 
         tmp = split[keys_ip[0]]
         assert tmp is not None, f"Split key {keys_ip[0]} is None. Make sure that the data is loaded."
