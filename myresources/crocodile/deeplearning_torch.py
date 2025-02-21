@@ -263,8 +263,8 @@ def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
 
 def load_onnx(save_dir: P):
     save_path = save_dir.joinpath("model.onnx")
-    # from torch import onnx
-    import onnx
+    from torch import onnx
+    # import onnx
     onnx_model = onnx.load(save_path)
     onnx.checker.check_model(onnx_model)
 

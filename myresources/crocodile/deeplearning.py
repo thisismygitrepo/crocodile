@@ -726,7 +726,8 @@ def plot_loss(history: list[dict[str, Any]], y_label: str):
     res = S.concat_values(*history)
     return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
 
-def viz(eval_data: EvaluationData, ax: Optional[Axes], title: str):
+
+def visualize(eval_data: EvaluationData, ax: Optional[Axes], title: str):
     if ax is None:
         fig, axis = plt.subplots(figsize=(14, 10))
     else:
