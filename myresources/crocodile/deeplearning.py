@@ -81,7 +81,7 @@ SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 PRECISON = Literal['float64', 'float32', 'float16']
-def precision2torch_dtype(precision: PRECISON) -> Any:
+def precision2torch_dtype(precision: PRECISON) -> 't.dtype':
     import torch as t  # type: ignore
     match precision:
         case 'float64': return t.float64
@@ -880,4 +880,5 @@ def _load_class(file_path: str):
 
 
 if __name__ == '__main__':
+    import torch as t
     pass
