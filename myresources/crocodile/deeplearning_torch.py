@@ -159,10 +159,10 @@ class BaseModel:
         return model
 
     @staticmethod
-    def infer(model: nn.Module, xx: tuple[npt.NDArray[np.float64] | npt.NDArray[np.float32], ...],
+    def infer(model: nn.Module, xx: tuple[npt.NDArray[np.float64 | np.float32], ...],
                                           device: Device,
                                           data_precision: Optional[str]
-                                          ) -> tuple[npt.NDArray[np.float32] | npt.NDArray[np.float64], ...]:
+                                          ) -> tuple[npt.NDArray[np.float32 | np.float64], ...]:
         model.eval()
         # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
         # xx_ = t.tensor(data=xx).to(device=device)

@@ -81,6 +81,13 @@ SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
 
 HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 PRECISON = Literal['float64', 'float32', 'float16']
+def precision2torch_dtype(precision: PRECISON) -> Any:
+    import torch as t  # type: ignore
+    match precision:
+        case 'float64': return t.float64
+        case 'float32': return t.float32
+        case 'float16': return t.float16
+        case _: raise ValueError(f"Unknown precision: {precision}")
 
 
 class HyperParams(Protocol):
