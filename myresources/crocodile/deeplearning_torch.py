@@ -44,7 +44,7 @@ class TorchDataReader:
         self.test_loader = None
 
     @staticmethod
-    def define_loader(batch_size: int, args: list[Union[npt.NDArray[np.float64], npt.NDArray[np.float32]]], device: Device):
+    def define_loader(batch_size: int, args: tuple[npt.NDArray[np.float64 | np.float32]], device: Device):
         tensors: list[t.Tensor] = []
         for an_arg in args:
             tensors.append(t.tensor(an_arg, device=device))
@@ -159,19 +159,29 @@ class BaseModel:
         return model
 
     @staticmethod
-    def infer(model: nn.Module, xx: Union[tuple[npt.NDArray[np.float64], ...],
-                                          tuple[npt.NDArray[np.float32], ...]],
-                                          device: Device) -> tuple[npt.NDArray[np.float32]]:
+    def infer(model: nn.Module, xx: tuple[npt.NDArray[np.float64] | npt.NDArray[np.float32], ...],
+                                          device: Device,
+                                          data_precision: Optional[str]
+                                          ) -> tuple[npt.NDArray[np.float32] | npt.NDArray[np.float64], ...]:
         model.eval()
         # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
-        xx_ = t.tensor(data=xx).to(device=device)
+        # xx_ = t.tensor(data=xx).to(device=device)
+        if data_precision is None:
+            xx_ = tuple(t.tensor(data=an_x).to(device=device) for an_x in xx)
+        else:
+            if data_precision == 'float32':
+                xx_ = tuple(t.tensor(data=an_x, dtype=t.float32).to(device=device) for an_x in xx)
+            elif data_precision == 'float64':
+                xx_ = tuple(t.tensor(data=an_x, dtype=t.float64).to(device=device) for an_x in xx)
+            else:
+                raise ValueError(f"Data precision {data_precision} not supported.")
         with t.no_grad(): op = model(xx_)
         return tuple(an_op.cpu().detach().numpy() for an_op in op)
 
     def fit(self, epochs: int,
             train_loader: DataLoader[T],
             test_loader: DataLoader[T],
-            device: Device):
+            ):
         """
         Standard training loop for Pytorch models. It is assumed that the model is already on the correct device.
         """
@@ -261,12 +271,12 @@ def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
     onnx_program.save(str(save_path))
 
 
-def load_onnx(save_dir: P):
-    save_path = save_dir.joinpath("model.onnx")
-    from torch import onnx
-    # import onnx
-    onnx_model = onnx.load(save_path)
-    onnx.checker.check_model(onnx_model)
+# def load_onnx(save_dir: P):
+#     save_path = save_dir.joinpath("model.onnx")
+#     from torch import onnx
+#     # import onnx
+#     onnx_model = onnx.load(save_path)
+#     onnx.checker.check_model(onnx_model)
 
 
 # class ImagesModel(BaseModel):

@@ -38,6 +38,11 @@ class Specs:
     @staticmethod
     def get_split_names(names: list[str], which_split: Literal["train", "test"] = "train") -> list[str]:
         return [item + f"_{which_split}" for item in names]
+    @staticmethod
+    def pretty_print(slf: SpecsLike) -> None:
+        S(slf.ip_shapes).print(as_config=True, title="Input Shapes")
+        S(slf.op_shapes).print(as_config=True, title="Output Shapes")
+        S(slf.other_shapes).print(as_config=True, title="Other Shapes")
 
 
 @dataclass
