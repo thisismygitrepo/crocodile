@@ -625,7 +625,8 @@ class BaseModel(ABC):
             else: print(f"Failed to plot the model. Error: {ex}")
         return path
 
-    def build(self, sample_dataset: bool = False, ip_shapes: Optional[dict[str, [tuple[int, ...]]]] = None, ip: Optional[list['npt.NDArray[np.float64]']] = None, verbose: bool = True):
+    def build(self, sample_dataset: bool = False, ip_shapes: Optional[dict[str, tuple[int, ...]]] = None,
+              ip: Optional[list['npt.NDArray[np.float64]']] = None, verbose: bool = True):
         """ Building has two main uses.
         * Useful to baptize the model, especially when its layers are built lazily. Although this will eventually happen as the first batch goes in. This is a must before showing the summary of the model.
         * Doing sanity check about shapes when designing model.

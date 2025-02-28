@@ -1,3 +1,4 @@
+
 """
 For model.compile()
 # Debian
@@ -21,13 +22,11 @@ from torch.optim import Optimizer
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 import numpy as np
 import numpy.typing as npt
-# import pandas as pd
 
 from crocodile.file_management import P
 from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, SpecsLike
 
 from abc import ABC
-# from collections import OrderedDict
 from typing import Any, TypeVar, Union, Optional
 
 
@@ -42,7 +41,6 @@ class TorchDataReader:
         self.train_loader = None
         self.batch = None
         self.test_loader = None
-
     @staticmethod
     def define_loader(batch_size: int, args: tuple[npt.NDArray[np.float64 | np.float32]], device: Device):
         tensors: list[t.Tensor] = []
@@ -52,15 +50,6 @@ class TorchDataReader:
         loader = DataLoader(tensors_dataset, batch_size=batch_size)
         batch = next(iter(loader))[0]
         return loader, batch
-
-    # def to_torch_tensor(self, x):
-    #     """.. note:: Data type is inferred from the input."""
-    #     return t.tensor(x).to(self.hp.device)
-
-    # @staticmethod
-    # def to_numpy(x):
-    #     if type(x) is not np.ndarray: return x.cpu().detach().numpy()
-    #     else: return x
 
 
 class BaseModel:
@@ -74,9 +63,6 @@ class BaseModel:
     @staticmethod
     def evaluate(
         model: Any,
-        #  x_test: list['npt.NDArray[np.float64]'],
-        #  y_test: list['npt.NDArray[np.float64]'],
-        #  y_pred_raw: Union['npt.NDArray[np.float64]', list['npt.NDArray[np.float64]']],
         specs: SpecsLike,
         split: dict[str, Any],
         names_test: Optional[list[str]] = None, batch_size: int = 32
@@ -164,8 +150,6 @@ class BaseModel:
                                           data_precision: Optional[str]
                                           ) -> tuple[npt.NDArray[np.float32 | np.float64], ...]:
         model.eval()
-        # sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True)
-        # xx_ = t.tensor(data=xx).to(device=device)
         if data_precision is None:
             xx_ = tuple(t.tensor(data=an_x).to(device=device) for an_x in xx)
         else:
@@ -225,12 +209,10 @@ class BaseModel:
         try:
             loss_val = loss_func(output, y)
         except Exception as e:
-            # print(f'❌ Output shape = {output.shape}, Y shape = {y.shape}')
             for idx, (an_output, an_y) in enumerate(zip(output, y)):
                 if an_output.shape != an_y.shape:
                     print(f'❌ Output shape = {an_output.shape}, Y shape = {an_y.shape}')
                     raise ValueError(f"Shapes of output and y do not match at index {idx}") from e
-            # print('❌ Output dtype = ', output.dtype, 'Y dtype = ', y.dtype)
             for idx, (an_output, an_y) in enumerate(zip(output, y)):
                 if an_output.dtype != an_y.dtype:
                     print(f'❌ Output dtype = {an_output.dtype}, Y dtype = {an_y.dtype}')
@@ -244,8 +226,6 @@ class BaseModel:
     def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor]):
         with t.no_grad():
             x, y, _name = batch
-            # x = [an_x.to(device) for an_x in x]
-            # y = [an_y.to(device) for an_y in y]
             op = model(x)
             loss_val = loss_func(op, y)
             return op, loss_val
@@ -269,14 +249,12 @@ def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
     onnx_program = onnx.dynamo_export(model, args=dummy_ip, verbose=True)
     save_path = save_dir.joinpath("model.onnx")
     onnx_program.save(str(save_path))
-
-
-# def load_onnx(save_dir: P):
-#     save_path = save_dir.joinpath("model.onnx")
-#     from torch import onnx
-#     # import onnx
-#     onnx_model = onnx.load(save_path)
-#     onnx.checker.check_model(onnx_model)
+def load_onnx(save_dir: P):
+    save_path = save_dir.joinpath("model.onnx")
+    from torch import onnx
+    # import onnx
+    onnx_model = onnx.load(save_path)
+    onnx.checker.check_model(onnx_model)
 
 
 # class ImagesModel(BaseModel):
@@ -307,30 +285,6 @@ def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
     # def make_channel_first(images: t.Tensor):
     #     return images.transpose((0, 3, 1, 2)) if len(images.shape) == 4 else images.transpose((2, 0, 1))
 
-
-# def check_shapes(module, ip):
-#     """Used to check sizes after each layer in a Pytorch model. Use the function to mimic every call in the forwatd
-#     method of a Pytorch model.
-
-#     :param module: a module used in a single step of forward method of a model
-#     :param ip: a random tensor of appropriate input size for module
-#     :return: output tensor, and prints sizes along the pipeline
-#     """
-#     print(getattr(module, '_get_name')().center(50, '-'))
-#     op = 'Input shape'
-#     print(f'{0:2}- {op:20s}, {ip.shape}')
-#     named_childern = list(module.named_children())
-#     if len(named_childern) == 0:  # a single layer, rather than nn.Module subclass
-#         named_childern = list(module.named_modules())
-#     for idx, (a_name, a_layer) in enumerate(named_childern):
-#         if idx == 0:
-#             with t.no_grad(): op = a_layer(ip)
-#         else:
-#             with t.no_grad(): op = a_layer(op)
-#         print(f'{idx + 1:2}- {a_name:20s}, {op.shape}')
-#     print("Stats on output data for random normal input:")
-#     print(pd.DataFrame(TorchDataReader.to_numpy(op).flatten()).describe())
-#     return op
 
 
 class Accuracy(object):
