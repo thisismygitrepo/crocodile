@@ -91,7 +91,7 @@ class BaseModel:
             raise ValueError(f"y_pred_raw is of type {type(y_pred_raw)}")
 
         results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved],
-                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(y_pred, y_test)
+                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(prediction=y_pred, groun_truth=y_test)
                                  )
         return results
 
@@ -112,6 +112,18 @@ class BaseModel:
         else:
             print('💫 Number of weights in the NN = ', sum(p.numel() for p in model.parameters()))
             print(''.center(57, '='))
+    @staticmethod
+    def check_output_stats(model: nn.Module, data_loader: DataLoader):
+        import pandas as pd
+        with t.no_grad():
+            for batch in data_loader:
+                inputs, _ops, _other = batch
+                predictions = model(inputs)
+                results = [a_red.cpu().numpy() for a_red in predictions]
+                a_df = pd.DataFrame(np.array(results).flatten()).describe()
+                print("Stats of the output:")
+                print(a_df)
+                break
 
     def save_model(self, save_dir: P) -> None:
         t.save(self.model, save_dir.joinpath("model.pth"))
