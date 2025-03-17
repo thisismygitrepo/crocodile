@@ -1,4 +1,3 @@
-
 """
 This is a module for handling meta operations like logging, terminal operations, SSH, etc.
 
@@ -40,7 +39,8 @@ class Log(logging.Logger):  #
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
             name = randstr(noun=True)
-            print("Logger name not passed. It is recommended to pass a name indicating the owner.")
+            print(f"""🔔 Logger name not provided.
+   Please provide a descriptive name for proper identification!""")
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
         self.file_path = file_path  # proper update to this value by self.add_filehandler()
@@ -72,7 +72,8 @@ class Log(logging.Logger):  #
         _ = self
         sys.stdout = open(path, 'w', encoding="utf-8")
         sys.stdout.close()
-        print(f"Finished ... have a look @ \n {path}")  # all print statements will write to this file.
+        print(f"""✅ Debug operation completed.
+   Output debug file located at: {path}""")
     @staticmethod
     def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
@@ -90,7 +91,8 @@ class Log(logging.Logger):  #
         shandler.setFormatter(fmt=fmt)
         shandler.set_name(name)
         self.addHandler(shandler)
-        print(f"    Level {s_level} stream handler for Logger `{self.name}` is created.")
+        print(f"""✅ [STREAM HANDLER] Created for Logger: {self.name}
+   Handler Level: {s_level}""")
     def add_filehandler(self, file_path: OPLike = None, fmt: Optional[Any] = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
         filename = P.tmpfile(name=self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()
         fhandler = logging.FileHandler(filename=filename, mode=mode)
@@ -99,7 +101,8 @@ class Log(logging.Logger):  #
         fhandler.set_name(name)
         self.addHandler(fhandler)
         self.file_path = filename.collapseuser(strict=False)
-        print(f"    Level {f_level} file handler for Logger `{self.name}` is created @ " + P(filename).clickable())
+        print(f"""📁 [FILE HANDLER] Created for Logger: {self.name}
+   Level: {f_level} at location: {P(filename).clickable()}""")
     def test(self):
         List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message"))
         for level in range(0, 60, 5): self.log(msg=f"This is a message of level {level}", level=level)
@@ -230,11 +233,14 @@ class Terminal:
         new_window_cmd = "start" if new_window is True else ""  # start is alias for Start-Process which launches a new window.  adding `start` to the begining of the command results in launching a new console that will not inherit from the console python was launched from e.g. conda
         extra, my_list = ("-Command" if shell in {"powershell", "pwsh"} and len(cmds) else ""), list(cmds)
         if self.machine == "Windows": my_list = [new_window_cmd, terminal, shell, extra] + my_list  # having a list is equivalent to: start "ipython -i file.py". Thus, arguments of ipython go to ipython, not start.
+        print(f"""🚀 [ASYNC EXECUTION] About to run command: {my_list}""")
         print("Meta.Terminal.run_async: Subprocess command: ", my_list := [item for item in my_list if item != ""])
         return subprocess.Popen(my_list, stdin=subprocess.PIPE, shell=True)  # stdout=self.stdout, stderr=self.stderr, stdin=self.stdin. # returns Popen object, not so useful for communcation with an opened terminal
     def run_py(self, script: str, wdir: OPLike = None, interactive: bool = True, ipython: bool = True, shell: Optional[str] = None, terminal: str = "", new_window: bool = True, header: bool = True):  # async run, since sync run is meaningless.
         script = (Terminal.get_header(wdir=wdir, toolbox=True) if header else "") + script + ("\nDisplayData.set_pandas_auto_width()\n" if terminal in {"wt", "powershell", "pwsh"} else "")
         py_script = P.tmpfile(name="tmp_python_script", suffix=".py", folder="tmp_scripts/terminal").write_text(f"""print(r'''{script}''')""" + "\n" + script)
+        print(f"""🚀 [ASYNC PYTHON SCRIPT] Script URI:
+   {py_script.absolute().as_uri()}""")
         print("Script to be executed asyncronously: ", py_script.absolute().as_uri())
         shell_script = f"""
 {f'cd {wdir}' if wdir is not None else ''}
@@ -371,7 +377,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         try: self.sftp: Optional[paramiko.SFTPClient] = self.ssh.open_sftp()
         except Exception as err:
             self.sftp = None
-            print(f"WARNING: could not open SFTP connection to {hostname}. No data transfer is possible. Erorr faced: `{err}`")
+            print(f"""⚠️  WARNING: Failed to open SFTP connection to {hostname}.
+   Error Details: {err}
+   Data transfer may be affected!""")
         def view_bar(slf: Any, a: Any, b: Any):
             slf.total = int(b)
             slf.update(int(a - slf.n))  # update pbar with increment
@@ -414,6 +422,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         return f"{getpass.getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_local_repr(add_machine=True)} >>> SSH TO >>> remote {self.get_remote_repr(add_machine=True)}"
     def run_locally(self, command: str):
+        print(f"""💻 [LOCAL EXECUTION] Running command on node: {self.platform.node()}
+Command:
+{command}""")
         print(f"Executing Locally @ {self.platform.node()}:\n{command}")
         res = Response(cmd=command)
         res.output.returncode = os.system(command)
@@ -435,11 +446,14 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         source_file = self.run_py(f"""{cmd}\npath = Save.pickle(obj=obj, path=P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]
         return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
+        if init:
+            print(f"""⬆️⬆️⬆️⬆️⬆️  [SFTP UPLOAD] Initiating file upload from: {source} to: {target}""")
         if init: print(f"{'⬆️' * 5} SFTP UPLOADING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         source_obj = P(source).expanduser().absolute()
         if target is None:
             target = P(source_obj).expanduser().absolute().collapseuser(strict=True)
             assert target.is_relative_to("~"), "If target is not specified, source must be relative to home."
+            if z: target += ".zip"
         if not z and source_obj.is_dir():
             if r is False: raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
             source_list: List[P] = source_obj.search("*", folders=False, r=True)
@@ -451,6 +465,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         remotepath = self.run_py(f"path=P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
+        print(f"""📤 [UPLOAD] Sending file:
+   {repr(P(source_obj))}  ==>  Remote Path: {remotepath.as_posix()}""")
         print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z:
@@ -459,6 +475,10 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             print("\n")
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
+        if init:
+            print(f"""⬇️⬇️⬇️⬇️⬇️ 
+[SFTP DOWNLOAD] Initiating download from: {source}
+                to: {target}""")
         if init: print(f"{'⬇️' * 5} SFTP DOWNLOADING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(P(r'{source}').expanduser().absolute().is_dir())", desc=f"Check if source `{source}` is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             if r is False: raise RuntimeError(f"source `{source}` is a directory! either set r=True for recursive sending or raise zip_first flag.")
@@ -483,6 +503,8 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
             if isinstance(tmp3, P): source = tmp3
             else: raise RuntimeError(f"Could not resolve source path {source} due to")
         else: source = P(source)
+        print(f"""📥 [DOWNLOAD] Receiving:
+   {source}  ==>  Local Path: {target_obj}""")
         print(f"RECEVING `{source}` ==> `{target_obj}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar:  # type: ignore # pylint: disable=E1129
             assert self.sftp is not None, f"Could not establish SFTP connection to {self.hostname}."
@@ -680,7 +702,9 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         except OSError: source_code = f"Could not read source code from `{obj_path}`."
         text += ("\n\n# Code to reproduce results\n\n```python\n" + source_code + "\n```" + separator)
     readmepath = (path / "README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
-    if verbose: print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}")
+    if verbose:
+        print(f"""📄 [README INFO] Saved: {readmepath.name}
+Location: {readmepath.absolute().as_uri()}""")
     if save_source_code:
         if hasattr(obj, "__code__"):
             save_path = obj.__code__.co_filename
@@ -692,6 +716,7 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
             print(f"Could not find source code for {obj}.")
             return readmepath
         P(save_path).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False)
+        print(f"""📂 [SOURCE CODE] Saved source code archive at: {readmepath.with_name("source_code.zip").absolute().as_uri()}""")
         print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
         return readmepath
 
@@ -722,6 +747,10 @@ class RepeatUntilNoException:
                             sleep_time = self.sleep * (idx + 1)
                         case "exponential":
                             sleep_time = self.sleep * (idx + 1)**2
+                    print(f"""💥 [RETRY] Function {func.__name__} call failed with error:
+{ex}
+Retry count: {idx}/{self.retry}. Sleeping for {sleep_time} seconds.
+Total elapsed time: {time.time() - t0:0.1f} seconds.""")
                     print(f"""💥 Robust call of `{func}` failed with ```{ex}```.\nretrying {idx}/{self.retry} more times after sleeping for {sleep_time} seconds.\nTotal wait time so far {time.time() - t0: 0.1f} seconds.""")
                     time.sleep(sleep_time)
             raise RuntimeError(f"💥 Robust call failed after {self.retry} retries and total wait time of {time.time() - t0: 0.1f} seconds.\n{func=}\n{args=}\n{kwargs=}")
