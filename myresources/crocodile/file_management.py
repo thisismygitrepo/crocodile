@@ -103,7 +103,9 @@ class Read:
         if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
         if suffix == "sqlite":
             from crocodile.database import DBMS
-            return DBMS.from_local_db(path=path).refresh()
+            res = DBMS.from_local_db(path=path)
+            print(res.describe_db())
+            return res
         try: return getattr(Read, suffix)(str(path), **kwargs)
         except AttributeError as err:
             if "type object 'Read' has no attribute" not in str(err): raise AttributeError(err) from err
