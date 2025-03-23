@@ -192,6 +192,22 @@ class DBMS:
         for mydict in mydicts: cmd += f"""({tuple(mydict)}), """
         self.execute_begin_once(cmd)
 
+    def describe_db(self):
+        self.refresh()
+        assert self.meta is not None
+        res_all = []
+        assert self.ses is not None
+        for tbl in self.meta.sorted_tables:
+            table = tbl.name
+            if self.sch is not None:
+                table = f"{self.sch}.{table}"
+            print(f"Table: {table}")
+            count = self.ses.query(tbl).count()
+            res = dict(table=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6,
+                       columns=len(tbl.exported_columns), schema=self.sch)
+            res_all.append(res)
+        return pd.DataFrame(res_all)
+
     def describe_table(self, table: str, sch: Optional[str] = None, dtype: bool = True) -> None:
         print(table.center(100, "="))
         self.refresh()
@@ -199,7 +215,7 @@ class DBMS:
         tbl = self.meta.tables[table]
         assert self.ses is not None
         count = self.ses.query(tbl).count()
-        res = Struct(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6)
+        res = Struct(dict(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6))
         res.print(dtype=False, as_config=True, title="TABLE DETAILS")
         dat = self.read_table(table=table, sch=sch, size=2)
         cols = self.get_columns(table, sch=sch)
