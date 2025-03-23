@@ -140,7 +140,6 @@ class HParams:
         try: data: dict[str, Any] = self.__getstate__()
         except AttributeError:
             data = self.__dict__
-
         Save.pickle(path=save_dir.joinpath(subpath, "hparams.HParams.dat.pkl"), obj=data)
         Save.pickle(path=save_dir.joinpath(subpath, "hparams.HParams.pkl"), obj=self)
 

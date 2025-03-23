@@ -47,7 +47,7 @@ class Log(logging.Logger):  #
         if dialect == "colorlog":
             import colorlog
             module: Any = colorlog
-            processed_fmt: Any = colorlog.ColoredFormatter(fmt or (r"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'thin_red', 'CRITICAL': 'fg_bold_red,bg_black', })  # see here for format: https://pypi.org/project/colorlog/
+            processed_fmt: Any = colorlog.ColoredFormatter(fmt or (r"%(log_color)s" + Log.get_format(sep)), datefmt="%d %H:%M:%S", log_colors=log_colors or {'DEBUG': 'bold_cyan', 'INFO': 'green', 'WARNING': 'yellow', 'ERROR': 'fg_bold_red,bg_black', 'CRITICAL': 'thin_red', })  # see here for format: https://pypi.org/project/colorlog/
         else:
             module = logging
             processed_fmt = logging.Formatter(fmt or Log.get_format(sep))
@@ -680,7 +680,7 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
         except OSError: source_code = f"Could not read source code from `{obj_path}`."
         text += ("\n\n# Code to reproduce results\n\n```python\n" + source_code + "\n```" + separator)
     readmepath = (path / "README.md" if path.is_dir() else (path.with_name(path.trunk + "_README.md") if path.is_file() else path)).write_text(text, encoding="utf-8")
-    if verbose: print(f"SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}")
+    if verbose: print(f"💽 SAVED {readmepath.name} @ {readmepath.absolute().as_uri()}")
     if save_source_code:
         if hasattr(obj, "__code__"):
             save_path = obj.__code__.co_filename
@@ -692,7 +692,7 @@ def generate_readme(path: PLike, obj: Any = None, desc: str = '', save_source_co
             print(f"Could not find source code for {obj}.")
             return readmepath
         P(save_path).zip(path=readmepath.with_name(P(readmepath).trunk + "_source_code.zip"), verbose=False)
-        print("SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
+        print("💽 SAVED source code @ " + readmepath.with_name("source_code.zip").absolute().as_uri())
         return readmepath
 
 

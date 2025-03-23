@@ -181,6 +181,7 @@ class BaseModel:
         """
         Standard training loop for Pytorch models. It is assumed that the model is already on the correct device.
         """
+
         model = self.model
         loss_func = self.loss
         optimizer = self.optimizer
