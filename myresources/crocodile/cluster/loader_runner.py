@@ -7,7 +7,7 @@ from rich.console import Console
 import pandas as pd
 
 from crocodile.core import List as L, Struct as S, randstr
-from crocodile.file_management import Read
+from crocodile.file_management_helpers.file4 import Read
 from crocodile.meta import SSH
 from crocodile.cluster.self_ssh import SelfSSH
 

@@ -3,7 +3,7 @@ from typing import Optional, Union, Generic, TypeVar, Literal, List as ListType,
 
 from crocodile.core_modules.core_1 import Save, randstr, install_n_import
 from crocodile.core_modules.core_4 import Display
-from crocodile.core_modules.core_3 import Struct
+
 
 
 _Slice = TypeVar('_Slice', bound='Slicable')
@@ -58,10 +58,13 @@ class Base(object):
         attrs: List[Any] = List(dir(self)).filter(lambda x: '__' not in x and not x.startswith('_')).remove(values=remove_vals)
         attrs = attrs.filter(lambda x: (inspect.ismethod(getattr(self, x)) if not fields else True) and ((not inspect.ismethod(getattr(self, x))) if not methods else True))  # logic (questionable): anything that is not a method is a field
         return List([getattr(self, x) for x in attrs]) if return_objects else List(attrs)
-    def print(self, dtype: bool = False, attrs: bool = False, **kwargs: Any): return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
+    def print(self, dtype: bool = False, attrs: bool = False, **kwargs: Any):
+        from crocodile.core_modules.core_3 import Struct
+        return Struct(self.__dict__).update(attrs=self.get_attributes() if attrs else None).print(dtype=dtype, **kwargs)
     @staticmethod
     def get_state(obj: Any, repr_func: Callable[[Any], dict[str, Any]] = lambda x: x, exclude: Optional[list[str]] = None) -> dict[str, Any]:
         if not any([hasattr(obj, "__getstate__"), hasattr(obj, "__dict__")]): return repr_func(obj)
+        from crocodile.core_modules.core_3 import Struct
         return (tmp if type(tmp := obj.__getstate__() if hasattr(obj, "__getstate__") else obj.__dict__) is not dict else Struct(tmp).filter(lambda k, v: k not in (exclude or [])).apply2values(lambda k, v: Base.get_state(v, exclude=exclude, repr_func=repr_func)).__dict__)
     @staticmethod
     def viz_composition_heirarchy(obj: Any, depth: int = 3, filt: Optional[Callable[[Any], bool]] = None):

@@ -1,14 +1,9 @@
 
 from pathlib import Path
-from typing import Optional, Union, TypeVar, Type, Literal, Any, Callable, Iterable, Hashable, Protocol, ParamSpec
+from typing import Optional, Union, TypeVar, Type, Literal, Any, Callable, Iterable, Hashable, ParamSpec
 
 from crocodile.core_modules.core_2 import Base, List
 from crocodile.core_modules.core_4 import Display
-
-
-_Slice = TypeVar('_Slice', bound='Slicable')
-class Slicable(Protocol):
-    def __getitem__(self: _Slice, i: slice) -> _Slice: ...
 
 
 T = TypeVar('T')
