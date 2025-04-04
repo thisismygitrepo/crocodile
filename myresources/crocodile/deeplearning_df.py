@@ -10,7 +10,8 @@ import numpy.typing as npt
 from sklearn.preprocessing import StandardScaler, RobustScaler  # type: ignore
 from sklearn.impute import SimpleImputer  # type: ignore
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder  # type: ignore
-from crocodile.file_management import P, install_n_import
+from crocodile.file_management import P
+# from crocodile.core_modules.core_1 import install_n_import
 from typing import Optional, Any, Union
 
 
@@ -33,7 +34,7 @@ This is in contrast to behaviour of sklearn's OrdinalEncoder and OneHotEncoder, 
     def fit(self, df: pd.DataFrame, verbose: bool = True) -> 'CategoricalClipper':
         if verbose:
             print("\n")
-            print(f"Fitting Categorical Clipper".center(100, '-'))
+            print("Fitting Categorical Clipper".center(100, '-'))
 
         self.columns = list(df.columns)
         for col in self.columns:

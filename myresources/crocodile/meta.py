@@ -4,9 +4,10 @@ This is a module for handling meta operations like logging, terminal operations,
 """
 
 from crocodile.core import randstr, str2timedelta, Save, install_n_import, List, Struct
-from crocodile.file_management import P, datetime, OPLike, PLike
+from crocodile.file_management import P, OPLike, PLike
 import time
 import datetime as dtm
+from datetime import datetime
 import logging
 import subprocess
 import sys

@@ -4,7 +4,7 @@
 
 from crocodile.core import List, timestamp, randstr, validate_name, install_n_import
 from crocodile.file_management_helpers.file1 import encrypt, decrypt, modify_text
-from crocodile.file_management_helpers.file4 import Compression, Read
+from crocodile.file_management_helpers.file2 import Compression
 from crocodile.file_management_helpers.file5 import Read
 from pathlib import Path
 from datetime import datetime

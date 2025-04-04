@@ -2,7 +2,9 @@
 """Odds
 """
 
-from crocodile.file_management import P, install_n_import
+from crocodile.file_management import P
+from crocodile.core_modules.core_1 import install_n_import
+
 from crocodile.core import List
 # from crocodile.meta import Scheduler, Log
 # import time
@@ -11,7 +13,7 @@ from typing import Optional, Any, Callable, TypeVar, Generic
 
 def share(path: P):
     import requests
-    response = requests.post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False, description="its a file, init?", ), files={'file': path.read_bytes()})
+    response = requests.post(url=r'https://file.io', data=dict(name=path.name, expires="2022-08-01", title="a descriptivefile title", maxDownloads=1, autoDelete=True, private=False, description="its a file, init?", ), files={'file': path.read_bytes()}, timeout=10)
     return response.json()['link'] if ['link'] in response.json() else response.json()
 
 def edit_video(path: P, t_start: float = 0.0, t_end: Optional[float] = None, speed: float = 1.0, suffix: Optional[str] = None, rotate: float = 0.0, volume: float = 1.0, fps: float = 25.0):
