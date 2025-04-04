@@ -38,10 +38,10 @@ class Read:
     def json(path: 'PLike', r: bool = False, **kwargs: Any) -> Any:  # return could be list or dict etc
         import json
         try:
-            mydict = json.loads(P(path).read_text(), **kwargs)
+            mydict = json.loads(Path(path).read_text(encoding='utf-8'), **kwargs)
         except Exception:
             import pyjson5
-            mydict = pyjson5.loads(Path(path).read_text(), **kwargs)  # file has C-style comments.
+            mydict = pyjson5.loads(Path(path).read_text(encoding='utf-8'), **kwargs)  # file has C-style comments.
         _ = r
         return mydict
     @staticmethod

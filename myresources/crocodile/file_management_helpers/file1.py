@@ -29,6 +29,9 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
     import base64
     from cryptography.fernet import Fernet
     salt, iteration = None, None
+    if __debug__:
+        from crocodile.file_management_helpers.file3 import P
+        _ = P
     if pwd is not None:  # generate it from password
         assert (key is None) and (type(pwd) is str), "❌ You can either pass key or pwd, or none of them, but not both."
         import secrets
@@ -46,7 +49,7 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
             except FileNotFoundError as err:
                 print("\n" * 3, "~" * 50, """Consider Loading up your dotfiles or pass `gen_key=True` to make and save one.""", "~" * 50, "\n" * 3)
                 raise FileNotFoundError(err) from err
-    elif isinstance(key, (str, P, Path)): key_resolved = P(key).read_bytes()  # a path to a key file was passed, read it:
+    elif isinstance(key, (str, P, Path)): key_resolved = Path(key).read_bytes()  # a path to a key file was passed, read it:
     elif type(key) is bytes: key_resolved = key  # key passed explicitly
     else: raise TypeError("❌ Key must be either a path, bytes object or None.")
     code = Fernet(key=key_resolved).encrypt(msg)
@@ -54,6 +57,9 @@ def encrypt(msg: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, 
     return code
 def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None, salted: bool = True) -> bytes:
     import base64
+    if __debug__:
+        from crocodile.file_management_helpers.file3 import P
+        _ = P
     if pwd is not None:
         assert key is None, "❌ You can either pass key or pwd, or none of them, but not both."
         if salted:
@@ -65,7 +71,7 @@ def decrypt(token: bytes, key: Optional[bytes] = None, pwd: Optional[str] = None
         assert pwd is None, "❌ You can either pass key or pwd, or none of them, but not both."
         key_resolved = key  # passsed explicitly
     elif key is None: key_resolved = Path.home().joinpath("dotfiles/creds/data/encrypted_files_key.bytes").read_bytes()  # read from file
-    elif isinstance(key, (str, P, Path)): key_resolved = P(key).read_bytes()  # passed a path to a file containing kwy
+    elif isinstance(key, (str, P, Path)): key_resolved = Path(key).read_bytes()  # passed a path to a file containing kwy
     else: raise TypeError(f"❌ Key must be either str, P, Path, bytes or None. Recieved: {type(key)}")
     from cryptography.fernet import Fernet
     return Fernet(key=key_resolved).decrypt(token)
