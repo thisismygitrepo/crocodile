@@ -6,7 +6,7 @@ Notify User Upon Completion
 from crocodile.comms.notification import Email
 from crocodile.core import Struct as S
 from crocodile.file_management import P
-from crocodile.cluster.remote_machine import FileManager
+from crocodile.cluster.file_manager import FileManager
 from crocodile.cluster.loader_runner import EmailParams
 
 

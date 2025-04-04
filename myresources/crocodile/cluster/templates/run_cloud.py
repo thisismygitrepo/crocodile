@@ -2,7 +2,9 @@
 """Run with sane defaults for a remote machine.
 """
 
-from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig, CloudManager, WorkloadParams
+from crocodile.cluster.remote_machine import RemoteMachine, RemoteMachineConfig
+from crocodile.cluster.cloud_manager import CloudManager
+from crocodile.cluster.loader_runner import WorkloadParams
 from crocodile.cluster.self_ssh import SelfSSH
 from crocodile.file_management import Read
 from machineconfig.utils.utils import DEFAULTS_PATH

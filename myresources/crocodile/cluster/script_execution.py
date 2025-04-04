@@ -10,8 +10,10 @@ import platform
 from crocodile.core import Struct as S
 from crocodile.file_management import P, Read
 from crocodile.meta import generate_readme, Terminal
-from crocodile.cluster.loader_runner import JobParams, FileManager, WorkloadParams, JOB_STATUS
+from crocodile.cluster.loader_runner import WorkloadParams, JOB_STATUS
 from crocodile.cluster.remote_machine import RemoteMachineConfig
+from crocodile.cluster.file_manager import FileManager
+from crocodile.cluster.job_params import JobParams
 
 from importlib.machinery import SourceFileLoader
 from rich.console import Console

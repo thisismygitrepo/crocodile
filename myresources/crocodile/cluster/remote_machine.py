@@ -2,17 +2,19 @@
 """
 
 from typing import Optional, Any, Union, Callable
-from dataclasses import dataclass, field
 import time
 import platform
 import getpass
 
 from crocodile.core import randstr, Struct as S
-from crocodile.file_management import P, Save, Read
+from crocodile.file_management import P, Save
 from crocodile.meta import SSH
 from crocodile.cluster.session_managers import Zellij, WindowsTerminal
 from crocodile.cluster.self_ssh import SelfSSH
-from crocodile.cluster.loader_runner import JobParams, EmailParams, WorkloadParams, FileManager, TRANSFER_METHOD, LAUNCH_METHOD, JOB_STATUS, CloudManager, LogEntry
+from crocodile.cluster.loader_runner import EmailParams, WorkloadParams, LAUNCH_METHOD, JOB_STATUS, LogEntry, RemoteMachineConfig
+from crocodile.cluster.file_manager import FileManager
+from crocodile.cluster.cloud_manager import CloudManager
+from crocodile.cluster.job_params import JobParams
 import crocodile.cluster as cluster
 
 from rich.panel import Panel
@@ -24,60 +26,6 @@ import pandas as pd
 
 
 console = Console()
-
-
-@dataclass
-class RemoteMachineConfig:
-    # conn
-    job_id: str = field(default_factory=lambda: randstr(noun=True))
-    base_dir: str = "~/tmp_results/remote_machines/jobs"
-    description: str = ""
-    ssh_params: dict[str, Union[str, int]] = field(default_factory=lambda: {})
-    ssh_obj: Union[SSH, SelfSSH, None] = None
-
-    # data
-    copy_repo: bool = False
-    update_repo: bool = False
-    install_repo: bool = False
-    update_essential_repos: bool = True
-    data: Optional[list[Any]] = None
-    transfer_method: TRANSFER_METHOD = "sftp"
-    cloud_name: Optional[str] = None
-
-    # remote machine behaviour
-    allowed_remotes: Optional[list[str]] = None
-    open_console: bool = True
-    notify_upon_completion: bool = False
-    to_email: Optional[str] = None
-    email_config_name: Optional[str] = None
-
-    # execution behaviour
-    launch_method: LAUNCH_METHOD = "remotely"
-    kill_on_completion: bool = False
-    ipython: bool = False
-    interactive: bool = False
-    pdb: bool = False
-    pudb: bool = False
-    wrap_in_try_except: bool = False
-    parallelize: bool = False
-    lock_resources: bool = True
-    max_simulataneous_jobs: int = 1
-    workload_params: Optional[WorkloadParams] = None
-    def __post_init__(self) -> None:
-        if self.interactive and self.lock_resources: print("RemoteMachineConfig Warning: If interactive is ON along with lock_resources, the job might never end. ⚠️")
-        if self.transfer_method == "cloud": assert self.cloud_name is not None, "Cloud name is not provided. 🤷‍♂️"
-        if self.notify_upon_completion and self.to_email is None:
-            from machineconfig.utils.utils import DEFAULTS_PATH
-            try:
-                section = Read.ini(DEFAULTS_PATH)['general']
-                self.to_email = section['to_email']
-            except (FileNotFoundError, KeyError, IndexError) as err: raise ValueError(f"Email address is not provided. 🤷‍♂️ & default could not be read @ `{DEFAULTS_PATH}`") from err
-        if self.notify_upon_completion and self.email_config_name is None:
-            from machineconfig.utils.utils import DEFAULTS_PATH
-            try:
-                section = Read.ini(DEFAULTS_PATH)['general']
-                self.email_config_name = section['email_config_name']
-            except (FileNotFoundError, KeyError, IndexError) as err: raise ValueError(f"Email config name is not provided. 🤷‍♂️ & default could not be read @ `{DEFAULTS_PATH}`") from err
 
 
 class RemoteMachine:

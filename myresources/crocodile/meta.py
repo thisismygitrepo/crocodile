@@ -754,12 +754,6 @@ Total elapsed time: {time.time() - t0:0.1f} seconds.""")
         return wrapper
 
 
-# @RepeatUntilNoException(retry=3, sleep=2.2)
-# def add(a: int, b: int):
-#     return a + b, "done"
-# c = add(1, 2)
-
-
 def show_globals(scope: dict[str, Any], **kwargs: Any):
     # see print_dir
     return Struct(scope).filter(lambda k, v: "__" not in k and not k.startswith("_") and k not in {"In", "Out", "get_ipython", "quit", "exit", "sys"}).print(**kwargs)

@@ -34,7 +34,7 @@ class Submission:
     @staticmethod
     def cloud(rm: RemoteMachine) -> None:
         cloud = rm.config.cloud_name
-        assert cloud is not None, f"Cloud name is not specified in the config file. Please specify it in the config file."
+        assert cloud is not None, "Cloud name is not specified in the config file. Please specify it in the config file."
         if rm.config.copy_repo: P(rm.job_params.repo_path_rh).to_cloud(cloud=cloud, rel2home=True, zip=True, encrypt=True)
         for x in rm.data: x.to_cloud(cloud=cloud, rel2home=True)
         downloads = '\n'.join([f"cloud_copy {cloud}: '{a_path.collapseuser().as_posix()} -r" for a_path in rm.data])

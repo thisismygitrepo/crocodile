@@ -43,6 +43,7 @@ class MachineSpecs:
     @staticmethod
     def get_this_machine_specs():
         cpu, ram = psutil.cpu_count(), psutil.virtual_memory().total / 2 ** 30
+        assert cpu is not None
         return MachineSpecs(cpu=cpu, ram=ram, product=cpu * ram, cpu_norm=cpu, ram_norm=ram, product_norm=cpu * ram)
 
 
