@@ -9,8 +9,9 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from crocodile.matplotlib_management import ImShow, FigureManager, Axes
-from crocodile.core import List as L, Struct as S, Base
-from crocodile.file_management import P, Save, PLike, Read
+from crocodile.core import List as L, Struct as S, Base, Save
+from crocodile.file_management import P, PLike, Read
+
 from crocodile.meta import generate_readme
 
 import enum
