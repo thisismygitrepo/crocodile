@@ -192,7 +192,7 @@ class Cluster:
         plt = install_n_import("plotext")
         names = L(self.sshz).apply(lambda x: x.get_remote_repr(add_machine=True)).list
 
-        plt.simple_multiple_bar(names, [[machine_specs.cpu for machine_specs in self.machines_specs], [machine_specs.ram for machine_specs in self.machines_specs]], title=f"Resources per machine", labels=["#cpu threads", "memory size"])
+        plt.simple_multiple_bar(names, [[machine_specs.cpu for machine_specs in self.machines_specs], [machine_specs.ram for machine_specs in self.machines_specs]], title="Resources per machine", labels=["#cpu threads", "memory size"])
         plt.show()
         print("")
         plt.simple_bar(names, self.machine_load_calc.load_ratios, width=100, title=f"Load distribution for machines using criterion `{self.machine_load_calc.load_criterion}`")

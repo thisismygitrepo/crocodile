@@ -84,7 +84,9 @@ def save_decorator(ext: str):  # apply default paths, add extension to path, pri
             path.parent.mkdir(parents=True, exist_ok=True)
             func(path=path, obj=obj, **kwargs)
             if verbose:
-                try: print(f"💽 SAVED {desc or path.name} {obj.__class__.__name__}: {Display.f(repr(obj), justify=0, limit=75)}\n💽 SAVED {path.stat().st_size / 1024**2:0.2f} MB @ `{path.absolute().as_uri()}`.")  # |  Directory: `{path.parent.absolute().as_uri()}`
+                def f(str_: str, limit: int = 10000000000, justify: int = 50, direc: str = "<") -> str:
+                    return f"{(str_[:limit - 4] + '... ' if len(str_) > limit else str_):{direc}{justify}}"
+                try: print(f"💽 SAVED {desc or path.name} {obj.__class__.__name__}: {f(repr(obj), justify=0, limit=75)}\n💽 SAVED {path.stat().st_size / 1024**2:0.2f} MB @ `{path.absolute().as_uri()}`.")  # |  Directory: `{path.parent.absolute().as_uri()}`
                 except UnicodeEncodeError as err: print(f"crocodile.core: Warning: UnicodeEncodeError: {err}")
             return path
         return wrapper

@@ -39,7 +39,7 @@ class Log(logging.Logger):  #
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
             name = randstr(noun=True)
-            print(f"""🔔 Logger name not provided.
+            print("""🔔 Logger name not provided.
    Please provide a descriptive name for proper identification!""")
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
         print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
