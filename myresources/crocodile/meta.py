@@ -22,6 +22,10 @@ from crocodile.meta_helpers.meta2 import (
 # Import from meta_helpers.meta3
 from crocodile.meta_helpers.meta3 import SSH
 
+from crocodile.meta_helpers.meta4 import (
+    Scheduler
+) 
+
 # Import from meta_helpers.meta5
 from crocodile.meta_helpers.meta5 import (
     generate_readme,
@@ -45,6 +49,9 @@ __all__ = [
     
     # From meta3
     'SSH',
+
+    # From meta4
+    'Scheduler',
     
     # From meta5
     'generate_readme',

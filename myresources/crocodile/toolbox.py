@@ -12,7 +12,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH
-from crocodile.meta import logging, subprocess, sys, time
+import logging
+import subprocess
+import sys
+import time
 from crocodile.file_management import P, Read, Compression, Cache, encrypt, decrypt, modify_text
 from crocodile.core import List, Base, Struct, Save, Display
 from crocodile.core import str2timedelta, timestamp, randstr, validate_name, install_n_import
