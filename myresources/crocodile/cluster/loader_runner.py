@@ -45,6 +45,7 @@ class WorkloadParams:
         min_end = series[min_idx_end]
         return min_start, min_end
     def print(self): S(self.__dict__).print(as_config=True, title="Job Workload")
+    def print(self): S(self.__dict__).print(as_config=True, title="Job Workload")
     def viz(self):
         print(f"This machine will execute ({(self.idx_end - self.idx_start) / self.idx_max * 100:.2f}%) of total job workload.")
         print(f"This share of workload will be split among {self.jobs} of threads on this machine.")
