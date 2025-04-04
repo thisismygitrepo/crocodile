@@ -50,7 +50,7 @@ class WorkloadParams:
         min_start = series[min_idx_start]
         min_end = series[min_idx_end]
         return min_start, min_end
-    def print(self): S(self.__dict__).print(as_config=True, title=f"Job Workload")
+    def print(self): S(self.__dict__).print(as_config=True, title="Job Workload")
     def viz(self):
         print(f"This machine will execute ({(self.idx_end - self.idx_start) / self.idx_max * 100:.2f}%) of total job workload.")
         print(f"This share of workload will be split among {self.jobs} of threads on this machine.")
@@ -171,7 +171,7 @@ res = None  # in case the file did not define it.
 # --------------------------------- END OF SCRIPT AS IS
 """
 
-        if workload_params is not None and parallelize is False: base += f"""
+        if workload_params is not None and parallelize is False: base += """
 res = func(workload_params=workload_params, **func_kwargs)
 """
         elif workload_params is not None and parallelize is True: base += f"""
@@ -183,7 +183,7 @@ for idx, x in enumerate(kwargs_workload):
 print("\\n" * 2)
 res = L(workload_params).apply(lambda a_workload_params: func(workload_params=a_workload_params, **func_kwargs), jobs={workload_params.jobs})
 """
-        else: base += f"""
+        else: base += """
 res = func(**func_kwargs)
 """
 
@@ -216,11 +216,11 @@ class EmailParams:
 
 
 class FileManager:
-    running_path          = P(f"~/tmp_results/remote_machines/file_manager/running_jobs.pkl")
-    queue_path            = P(f"~/tmp_results/remote_machines/file_manager/queued_jobs.pkl")
-    history_path          = P(f"~/tmp_results/remote_machines/file_manager/history_jobs.pkl")
-    shell_script_path_log = P(f"~/tmp_results/remote_machines/file_manager/last_cluster_script.txt")
-    default_base          = P(f"~/tmp_results/remote_machines/jobs")
+    running_path          = P("~/tmp_results/remote_machines/file_manager/running_jobs.pkl")
+    queue_path            = P("~/tmp_results/remote_machines/file_manager/queued_jobs.pkl")
+    history_path          = P("~/tmp_results/remote_machines/file_manager/history_jobs.pkl")
+    shell_script_path_log = P("~/tmp_results/remote_machines/file_manager/last_cluster_script.txt")
+    default_base          = P("~/tmp_results/remote_machines/jobs")
     @staticmethod
     def from_pickle(path: Union[str, P]):
         fm = FileManager(job_id='1', remote_machine_type='Windows', lock_resources=True, max_simulataneous_jobs=1, base=None)
@@ -246,21 +246,21 @@ class FileManager:
         status = 'queued'
         self.job_root = self.base_dir.joinpath(f"{status}/{self.job_id}")
     @property
-    def py_script_path(self): return self.job_root.joinpath(f"python/cluster_wrap.py")
+    def py_script_path(self): return self.job_root.joinpath("python/cluster_wrap.py")
     @property
-    def cloud_download_py_script_path(self): return self.job_root.joinpath(f"python/download_data.py")
+    def cloud_download_py_script_path(self): return self.job_root.joinpath("python/download_data.py")
     @property
-    def shell_script_path(self): return self.job_root.joinpath(f"shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
+    def shell_script_path(self): return self.job_root.joinpath("shell/cluster_script" + {"Windows": ".ps1", "Linux": ".sh"}[self.remote_machine_type])
     @property
-    def kwargs_path(self): return self.job_root.joinpath(f"data/func_kwargs.pkl")
+    def kwargs_path(self): return self.job_root.joinpath("data/func_kwargs.pkl")
     @property
-    def file_manager_path(self): return self.job_root.joinpath(f"data/file_manager.pkl")
+    def file_manager_path(self): return self.job_root.joinpath("data/file_manager.pkl")
     @property
-    def remote_machine_path(self): return self.job_root.joinpath(f"data/remote_machine.Machine.pkl")
+    def remote_machine_path(self): return self.job_root.joinpath("data/remote_machine.Machine.pkl")
     @property
-    def remote_machine_config_path(self): return self.job_root.joinpath(f"data/remote_machine_config.pkl")
+    def remote_machine_config_path(self): return self.job_root.joinpath("data/remote_machine_config.pkl")
     @property
-    def execution_log_dir(self): return self.job_root.joinpath(f"logs")
+    def execution_log_dir(self): return self.job_root.joinpath("logs")
     def get_fire_command(self, launch_method: LAUNCH_METHOD):
         _ = launch_method
         script_path = self.shell_script_path.expanduser()
@@ -311,7 +311,7 @@ class FileManager:
         try:
             queue_file: list[JobStatus] = self.queue_path.expanduser().readit()
         except FileNotFoundError:
-            print(f"Queue file was deleted by the locking job, creating an empty one and saving it.")
+            print("Queue file was deleted by the locking job, creating an empty one and saving it.")
             queue_file = []
             Save.pickle(obj=queue_file, path=self.queue_path.expanduser())
         job_ids = [job.job_id for job in queue_file]
@@ -336,7 +336,7 @@ echo "Unlocked resources"
 
             try: running_file: list[JobStatus] = self.running_path.expanduser().readit()
             except FileNotFoundError:
-                print(f"Running file was deleted by the locking job, making one.")
+                print("Running file was deleted by the locking job, making one.")
                 running_file = []
                 Save.pickle(obj=running_file, path=self.running_path.expanduser())
 
@@ -358,7 +358,7 @@ echo "Unlocked resources"
 
             # --------------- Clearning up running_file from dead processes -----------------
             found_dead_process = False
-            assert len(running_file) > 0, f"Running file is empty. This should not happen. There should be a break before this point."
+            assert len(running_file) > 0, "Running file is empty. This should not happen. There should be a break before this point."
 
             for running_job in running_file:
                 try: proc = psutil.Process(pid=running_job.pid)
@@ -382,8 +382,8 @@ echo "Unlocked resources"
             running_job = running_file[0]  # arbitrary job in the running file.
             assert running_job.start_time is not None, f"Running job {running_job} has no start time. This should not happen."
 
-            this_specs = {f"Submission time": this_job.submission_time, f"Time now": pd.Timestamp.now(),
-                          f"Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - this_job.submission_time,
+            this_specs = {"Submission time": this_job.submission_time, "Time now": pd.Timestamp.now(),
+                          "Time spent waiting in the queue so far 🛌": pd.Timestamp.now() - this_job.submission_time,
                           f"Time consumed by locking job so far (job_id = {running_job.job_id}) so far ⏰": pd.Timestamp.now() - running_job.start_time}
             S(this_specs).print(as_config=True, title=f"This Job `{this_job.job_id}` Details")
             console.rule(title=f"Resources are locked by another job `{running_job.job_id}`. Sleeping for {sleep_time_mins} minutes. 😴", style="bold red", characters="-")
@@ -399,7 +399,7 @@ echo "Unlocked resources"
         except FileNotFoundError as fne: raise FileNotFoundError(f"Queue file {queue_path} does not exist. This method should not be called in the first place.") from fne
 
         if job_status in queue_file: queue_file.remove(job_status)
-        print(f"Removed current job from waiting queue and added it to the running queue. Saving both files.")
+        print("Removed current job from waiting queue and added it to the running queue. Saving both files.")
         Save.pickle(obj=queue_file, path=queue_path)
 
         running_path = self.running_path.expanduser()
@@ -456,7 +456,7 @@ class LogEntry:
 
 
 class CloudManager:
-    base_path = P(f"~/tmp_results/remote_machines/cloud")
+    base_path = P("~/tmp_results/remote_machines/cloud")
     server_interval_sec: int = 60 * 5
     num_claim_checks: int = 3
     inter_check_interval_sec: int = 15
@@ -464,7 +464,7 @@ class CloudManager:
         if reset_local:
             print("☠️ Resetting local cloud cache ☠️. Locally created / completed jobs not yet synced will not make it to the cloud.")
             P(self.base_path).expanduser().delete(sure=True)
-        self.status_root: P = self.base_path.expanduser().joinpath(f"workers", f"{getpass.getuser()}@{platform.node()}").create()
+        self.status_root: P = self.base_path.expanduser().joinpath("workers", f"{getpass.getuser()}@{platform.node()}").create()
         self.max_jobs: int = max_jobs
         if cloud is None:
             from machineconfig.utils.utils import DEFAULTS_PATH
@@ -498,13 +498,13 @@ class CloudManager:
     # =================== CLOUD MONITORING ===================
     def fetch_cloud_live(self):
         remote = CloudManager.base_path
-        localpath = P.tmp().joinpath(f"tmp_dirs/cloud_manager_live").create()
+        localpath = P.tmp().joinpath("tmp_dirs/cloud_manager_live").create()
         alternative_base = localpath.delete(sure=True).from_cloud(cloud=self.cloud, remotepath=remote.get_remote_path(root="myhome", rel2home=True), verbose=False)
         return alternative_base
     @staticmethod
     def prepare_servers_report(cloud_root: P):
         from crocodile.cluster.remote_machine import RemoteMachine
-        workers_root = cloud_root.joinpath(f"workers").search("*")
+        workers_root = cloud_root.joinpath("workers").search("*")
         res: dict[str, list[RemoteMachine]] = {}
         times: dict[str, pd.Timedelta] = {}
         for a_worker in workers_root:
@@ -527,7 +527,7 @@ class CloudManager:
             log_path = alternative_base.joinpath("logs.pkl")
             if log_path.exists(): log: dict[JOB_STATUS, 'pd.DataFrame'] = Read.pickle(path=log_path)
             else:
-                print(f"Log file doesn't exist! 🫤 must be that cloud is getting purged or something 🤔 ")
+                print("Log file doesn't exist! 🫤 must be that cloud is getting purged or something 🤔 ")
                 log = {}
             for item_name, item_df in log.items():
                 console.rule(f"{item_name} DataFrame (Latest {'10' if len(item_df) > 10 else len(item_df)} / {len(item_df)})")
@@ -548,14 +548,14 @@ class CloudManager:
             print("👷 Workers:")
             servers_report = self.prepare_servers_report(cloud_root=alternative_base)
             pprint(servers_report.to_markdown())
-        sched = Scheduler(routine=routine, wait=f"5m")
+        sched = Scheduler(routine=routine, wait="5m")
         sched.run()
 
     # ================== CLEARNING METHODS ===================
     def clean_interrupted_jobs_mess(self, return_to_queue: bool = True):
         """Clean jobs that failed but in logs show running by looking at the pid.
         If you want to do the same for remote machines, you will need to do it manually using `rerun_jobs`"""
-        assert len(self.running_jobs) == 0, f"method should never be called while there are running jobs. This can only be called at the beginning of the run."
+        assert len(self.running_jobs) == 0, "method should never be called while there are running jobs. This can only be called at the beginning of the run."
         from crocodile.cluster.remote_machine import RemoteMachine
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         log = self.read_log()
@@ -592,7 +592,7 @@ class CloudManager:
         self.write_log(log=log)
     def clean_failed_jobs_mess(self):
         """If you want to do it for remote machine, use `rerun_jobs` (manual selection)"""
-        print(f"⚠️ Cleaning failed jobs mess for this machine ⚠️")
+        print("⚠️ Cleaning failed jobs mess for this machine ⚠️")
         from crocodile.cluster.remote_machine import RemoteMachine
         log = self.read_log()
         for _idx, row in log["failed"].iterrows():
@@ -675,7 +675,7 @@ class CloudManager:
                 self.write_log(log=log)
                 # self.running_jobs.remove(a_rm)
                 jobs_ids_to_be_removed_from_running.append(a_rm.config.job_id)
-            elif status == "queued": raise RuntimeError(f"I thought I'm working strictly with running jobs, and I encountered unexpected a job with `queued` status.")
+            elif status == "queued": raise RuntimeError("I thought I'm working strictly with running jobs, and I encountered unexpected a job with `queued` status.")
             else: raise ValueError(f"I receieved a status that I don't know how to handle `{status}`")
         self.running_jobs = [a_rm for a_rm in self.running_jobs if a_rm.config.job_id not in jobs_ids_to_be_removed_from_running]
         Save.pickle(obj=self.running_jobs, path=self.status_root.joinpath("running_jobs.pkl"), verbose=False)
@@ -688,7 +688,7 @@ class CloudManager:
         from crocodile.cluster.remote_machine import RemoteMachine
         log = self.read_log()  # ask for the log file.
         if len(log["queued"]) == 0:
-            print(f"No queued jobs found.")
+            print("No queued jobs found.")
             return None
         idx: int = 0
         while len(self.running_jobs) < self.max_jobs:
@@ -732,13 +732,13 @@ class CloudManager:
         Note: If the parameters of the class are messed with, there is no gaurantee of zero collision by this method.
         It takes at least inter_check_interval_sec * num_claims_check to claim the lock.
         """
-        if first_call: print(f"Claiming lock 🔒 ...")
+        if first_call: print("Claiming lock 🔒 ...")
         this_machine = f"{getpass.getuser()}@{platform.node()}"
         path = CloudManager.base_path.expanduser().create()
         try:
             lock_path = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         except AssertionError as _ae:
-            print(f"Lock doesn't exist on remote, uploading for the first time.")
+            print("Lock doesn't exist on remote, uploading for the first time.")
             path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
             return self.claim_lock(first_call=False)
 
@@ -754,9 +754,9 @@ class CloudManager:
             time.sleep(wait)
             return self.claim_lock(first_call=False)
 
-        if locking_machine == this_machine: print(f"Lock already claimed by this machine. 🤭")
+        if locking_machine == this_machine: print("Lock already claimed by this machine. 🤭")
         elif locking_machine == "": print("No claims on lock, claiming it ... 🙂")
-        else: raise ValueError(f"Unexpected value of lock_data at this point of code.")
+        else: raise ValueError("Unexpected value of lock_data at this point of code.")
 
         path.joinpath("lock.txt").write_text(this_machine).to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         counter: int = 1
@@ -772,19 +772,19 @@ class CloudManager:
             print(f"‼️ Claim laid, waiting for 10 seconds and checking if this is challenged: #{counter}-{self.num_claim_checks} ❓")
             time.sleep(10)
         CloudManager.base_path.expanduser().sync_to_cloud(cloud=self.cloud, rel2home=True, verbose=False, sync_down=True)
-        print(f"✅ Lock Claimed 🔒")
+        print("✅ Lock Claimed 🔒")
         self.lock_claimed = True
 
     def release_lock(self):
         if not self.lock_claimed:
-            print(f"⚠️ Lock is not claimed, nothing to release.")
+            print("⚠️ Lock is not claimed, nothing to release.")
             return
-        print(f"Releasing Lock")
+        print("Releasing Lock")
         path = CloudManager.base_path.expanduser().create()
         try:
             lock_path = path.joinpath("lock.txt").from_cloud(cloud=self.cloud, rel2home=True, verbose=False)
         except AssertionError as _ae:
-            print(f"Lock doesn't exist on remote, uploading for the first time.")
+            print("Lock doesn't exist on remote, uploading for the first time.")
             path.joinpath("lock.txt").write_text("").to_cloud(cloud=self.cloud, rel2home=True, verbose=False)
             self.lock_claimed = False
             return NoReturn
