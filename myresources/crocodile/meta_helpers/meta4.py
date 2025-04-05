@@ -133,4 +133,3 @@ class SchedulerV2:
         self.record_session_end(reason=f"during {during}, " + str(ex))
         self.logger.exception(ex)
         raise ex
-
