@@ -177,7 +177,7 @@ Command:
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
         if init:
-            print(f"""⬇️⬇️⬇️⬇️⬇️ 
+            print(f"""⬇️⬇️⬇️⬇️⬇️
 [SFTP DOWNLOAD] Initiating download from: {source}
                 to: {target}""")
         if init: print(f"{'⬇️' * 5} SFTP DOWNLOADING FROM `{source}` TO `{target}`")

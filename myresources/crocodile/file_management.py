@@ -30,16 +30,16 @@ __all__ = [
 
     # From file1 - Security functions
     'obscure', 'unobscure', 'hashpwd', 'pwd2key', 'encrypt', 'decrypt', 'unlock', 'modify_text',
-    
+
     # From file2 - Compression utilities
     'Compression', 'FILE_MODE', 'SHUTIL_FORMATS',
-    
+
     # From file3 - Cache classes
     'Cache', 'CacheV2', 'PrintFunc',
-    
+
     # From file4 - Path utilities
     'P', 'PLike', 'OPLike',
-    
+
     # From file5 - Other utilities
     'Read',
 ]

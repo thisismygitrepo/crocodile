@@ -12,7 +12,7 @@ def time_to_seconds(time_str: str) -> int:
 # def download_clip_(url: str, start_time: str, end_time: str, output_filename: str) -> None:
 #     """
 #     Download a specific portion of a YouTube video.
-    
+
 #     Args:
 #         url (str): YouTube video URL
 #         start_time (str): Start time in format HH:MM:SS
@@ -65,11 +65,11 @@ def merge_videos():
     # Load video clips
     clip1 = VideoFileClip(f"{home}/clip.mp4")
     clip2 = VideoFileClip(f"{home}/clip2.mp4")
-    
+
     # Reduce volume of first clip by half
     clip1 = clip1.volumex(0.5)
     clip2 = clip2.volumex(2.0)
-    
+
     # Concatenate clips
     final_clip = concatenate_videoclips([clip1, clip2])
     # Write output

@@ -4,7 +4,7 @@
 
 import os
 import random
-# 
+#
 import textwrap
 import subprocess
 from crocodile.core import install_n_import, randstr

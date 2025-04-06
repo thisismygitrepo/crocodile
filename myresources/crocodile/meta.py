@@ -7,7 +7,7 @@ This is a module for handling meta operations like logging, terminal operations,
 from crocodile.meta_helpers.meta1 import (
     Scout,
     Log,
-    STD, 
+    STD,
     Response
 )
 
@@ -24,7 +24,7 @@ from crocodile.meta_helpers.meta3 import SSH
 
 from crocodile.meta_helpers.meta4 import (
     Scheduler
-) 
+)
 
 # Import from meta_helpers.meta5
 from crocodile.meta_helpers.meta5 import (
@@ -40,19 +40,19 @@ __all__ = [
     'Log',
     'STD',
     'Response',
-    
+
     # From meta2
     'Terminal',
     'SHELLS',
     'CONSOLE',
     'MACHINE',
-    
+
     # From meta3
     'SSH',
 
     # From meta4
     'Scheduler',
-    
+
     # From meta5
     'generate_readme',
     'RepeatUntilNoException',

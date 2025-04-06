@@ -23,7 +23,7 @@ With this cluster management tool, old laptops and desktops are endowed second l
 * 📁 Binary data is `sftp`'d automatically to each remote.
 * 💽💻💿 Specs of each resource is inspected and workload is distributed accordingly on the cluster.
 * 📨📩 Email Notifications. Get **optionally** notified about start and finish of your submitted jobs.
-* 🔒🔑 Resources locking. A Job can *optionally* hold the resources to itself and other submitted jobs will have to wait. 
+* 🔒🔑 Resources locking. A Job can *optionally* hold the resources to itself and other submitted jobs will have to wait.
   * 🙋‍♂️🙋‍♀ ️This feature enable sending aribtrary number of jobs in one go and never worry about overwhelming the remote. Then you come later and get all results.
 * Zellij session with reasonable layout is fired automatically on each remote.
 
@@ -62,7 +62,7 @@ This package extends many native Python classes to equip you with an uneasy-to-t
         * create a symlink to it from `~/toy`
         * resolve the symbolic link
         * calculate the checksum of the file
- 
+
 ```python
 P.tmpfile().write_text("lol").copy().move("..", rel2it=True).collapseuser().zip().delete(sure=True).touch().parent.search("*", folders=False)[0].share_on_cloud()().download().encrypt(pwd="haha").symlink_from("~/toy").resolve().checksum()
 ```
@@ -85,7 +85,7 @@ path = P("dataset/type1/meta/images/file3.ext")
 
  * Additionally, the package provides many other new classes, e.g. `Read` and `Save`. Together with `P`, they provide comprehensive support for file management. Life cannot get easier with those. Every class inherits attributes that allow saving and loading in one line.
 
-   
+
 Furthermore, those classes are inextricably connected. For example, globbing a path `P` object returns a `List` object. You can move back and forth between `List` and `Struct` and `DataFrame` with one method, and so on.
 
 * Deep Learning Modules.
