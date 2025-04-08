@@ -1,5 +1,3 @@
-
-
 """Crocodile Shell
 """
 
@@ -29,23 +27,26 @@ try:
     import plotly.graph_objects as go
     _ = px, go
 except ImportError:
-    print("Plotly is not installed")
+    print("⚠️  IMPORT ERROR: Plotly is not installed ⚠️")
 
 
 def print_header():
     console = Console()
     pretty.install()
 
-    _header = f"Python {platform.python_version()} in VE `{os.getenv('VIRTUAL_ENV')}` On {platform.system()}."
+    _header = f"🐍 Python {platform.python_version()} in VE `{os.getenv('VIRTUAL_ENV')}` On {platform.system()} 🐍"
     _header = Text(_header)
     _header.stylize("bold blue")
     console.rule(_header, style="bold red", align="center")
 
     # link to tutorial or github
-    _ = Text(f"Crocodile Shell {crocodile.__version__}")
+    _ = Text(f"✨ Crocodile Shell {crocodile.__version__} ✨")
     _.stylize("#05f8fc on #293536")
     console.print(_)
-    print("Made with 🐍 | Built with ❤️")
+    
+    print("\n" + "=" * 60)
+    print("🐊 Made with 🐍 | Built with ❤️  | Powered by Crocodile 🐊")
+    print("=" * 60 + "\n")
 
 
 tb.D.set_numpy_display()
@@ -66,7 +67,9 @@ def print_logo(logo: str):
             if random.choice([True, True, False]): font_box_color(logo)
             else: character_color(logo)
         else:
-            print(f"Missing ascii art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
+            print("\n" + "🚫 " + "-" * 70 + " 🚫")
+            print(f"🔍 Missing ASCII art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
+            print("🚫 " + "-" * 70 + " 🚫\n")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
     else:
@@ -90,10 +93,12 @@ def print_logo(logo: str):
             if _dynamic_art: character_or_box_color(logo)
             else: print(P(__file__).parent.joinpath("art").search().sample(size=1).list[0].read_text())
         else:
-            print(f"Missing ascii art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
+            print("\n" + "🚫 " + "-" * 70 + " 🚫")
+            print(f"🔍 Missing ASCII art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
+            print("🚫 " + "-" * 70 + " 🚫\n")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
-    print("\n")
+    print("\n" + "•" * 50 + "\n")
 
 
 if __name__ == "__main__":

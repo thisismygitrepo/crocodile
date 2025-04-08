@@ -28,10 +28,14 @@ class Log(logging.Logger):  #
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
             name = randstr(noun=True)
-            print("""🔔 Logger name not provided.
-   Please provide a descriptive name for proper identification!""")
+            print(f"""
+╔═════════════════════════ 📢 LOGGER WARNING 📢 ═════════════════════════╗
+║ 🔔 Logger name not provided.                                            ║
+║ ℹ️  Please provide a descriptive name for proper identification!        ║
+╚═══════════════════════════════════════════════════════════════════════╝
+""")
         super().__init__(name, level=l_level)  # logs everything, finer level of control is given to its handlers
-        print(f"Logger `{name}` from `{dialect}` is instantiated with level {l_level}.")
+        print(f"🔧 Logger `{name}` from `{dialect}` initialized with level {l_level} 🔧")
         self.file_path = file_path  # proper update to this value by self.add_filehandler()
         if dialect == "colorlog":
             import colorlog
@@ -61,8 +65,11 @@ class Log(logging.Logger):  #
         _ = self
         sys.stdout = open(path, 'w', encoding="utf-8")
         sys.stdout.close()
-        print(f"""✅ Debug operation completed.
-   Output debug file located at: {path}""")
+        print(f"""
+✅ ═════════════════ DEBUG OPERATION COMPLETED ═════════════════
+📝 Output debug file located at: {path}
+══════════════════════════════════════════════════════════════
+""")
     @staticmethod
     def get_coloredlogs(name: Optional[str] = None, file: bool = False, file_path: OPLike = None, stream: bool = True, fmt: Optional[str] = None, sep: str = " | ", s_level: int = logging.DEBUG, f_level: int = logging.DEBUG, l_level: int = logging.DEBUG, verbose: bool = False):
         level_styles = {'spam': {'color': 'green', 'faint': True}, 'debug': {'color': 'white'}, 'verbose': {'color': 'blue'}, 'info': {'color': "green"}, 'notice': {'color': 'magenta'}, 'warning': {'color': 'yellow'}, 'success': {'color': 'green', 'bold': True},
@@ -80,8 +87,12 @@ class Log(logging.Logger):  #
         shandler.setFormatter(fmt=fmt)
         shandler.set_name(name)
         self.addHandler(shandler)
-        print(f"""✅ [STREAM HANDLER] Created for Logger: {self.name}
-   Handler Level: {s_level}""")
+        print(f"""
+✅ ═════════════════ STREAM HANDLER CREATED ═════════════════
+📊 Logger: {self.name}
+🔢 Handler Level: {s_level}
+═══════════════════════════════════════════════════════════
+""")
     def add_filehandler(self, file_path: OPLike = None, fmt: Optional[Any] = None, f_level: int = logging.DEBUG, mode: str = "a", name: str = "myFileHandler"):
         filename = P.tmpfile(name=self.name, suffix=".log", folder="tmp_loggers") if file_path is None else P(file_path).expanduser()
         fhandler = logging.FileHandler(filename=filename, mode=mode)
@@ -90,13 +101,18 @@ class Log(logging.Logger):  #
         fhandler.set_name(name)
         self.addHandler(fhandler)
         self.file_path = filename.collapseuser(strict=False)
-        print(f"""📁 [FILE HANDLER] Created for Logger: {self.name}
-   Level: {f_level} at location: {P(filename).clickable()}""")
+        print(f"""
+📁 ═════════════════ FILE HANDLER CREATED ═════════════════
+📊 Logger: {self.name}
+🔢 Level: {f_level} 
+📋 Location: {P(filename).clickable()}
+═══════════════════════════════════════════════════════════
+""")
     def test(self):
         List([self.debug, self.info, self.warning, self.error, self.critical]).apply(lambda func: func(f"this is a {func.__name__} message"))
         for level in range(0, 60, 5): self.log(msg=f"This is a message of level {level}", level=level)
     def get_history(self, lines: int = 200, to_html: bool = False):
-        assert isinstance(self.file_path, P), f"Logger `{self.name}` does not have a file handler. Thus, no history is available."
+        assert isinstance(self.file_path, P), f"❌ Logger `{self.name}` does not have a file handler. Thus, no history is available."
         logs = "\n".join(self.file_path.expanduser().absolute().read_text().split("\n")[-lines:])
         return install_n_import("ansi2html").Ansi2HTMLConverter().convert(logs) if to_html else logs
 
@@ -148,8 +164,10 @@ class Response:
     def print_if_unsuccessful(self, desc: str = "TERMINAL CMD", strict_err: bool = False, strict_returncode: bool = False, assert_success: bool = False):
         success = self.is_successful(strict_err=strict_err, strict_returcode=strict_returncode)
         if assert_success: assert success, self.print(capture=False, desc=desc)
-        if success: print(desc)
-        else: self.print(capture=False, desc=desc)
+        if success: 
+            print(f"✅ {desc} completed successfully")
+        else: 
+            self.print(capture=False, desc=desc)
         return self
     def print(self, desc: str = "TERMINAL CMD", capture: bool = True):
         if capture: self.capture()
@@ -157,11 +175,11 @@ class Response:
         con = console.Console()
         from rich.panel import Panel
         from rich.text import Text  # from rich.syntax import Syntax; syntax = Syntax(my_code, "python", theme="monokai", line_numbers=True)
-        tmp1 = Text("Input Command:\n")
+        tmp1 = Text("📥 Input Command:\n")
         tmp1.stylize("u bold blue")
-        tmp2 = Text("\nTerminal Response:\n")
+        tmp2 = Text("\n📤 Terminal Response:\n")
         tmp2.stylize("u bold blue")
-        list_str = [f"{f' {idx} - {key} '}".center(40, "-") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]
+        list_str = [f"{f' {idx} - {key} '}".center(40, "═") + f"\n{val}" for idx, (key, val) in enumerate(self.output.__dict__.items())]
         txt = tmp1 + Text(str(self.input), style="white") + tmp2 + Text("\n".join(list_str), style="white")
-        con.print(Panel(txt, title=self.desc, subtitle=desc, width=150, style="bold cyan on black"))
+        con.print(Panel(txt, title=f"🖥️  {self.desc}", subtitle=f"📋 {desc}", width=150, style="bold cyan on black"))
         return self

@@ -1,4 +1,3 @@
-
 """
 Job Execution Script
 """
@@ -30,7 +29,7 @@ _ = SourceFileLoader, WorkloadParams
 
 params = JobParams.from_empty()
 
-print("\n" * 2)
+print("\n" + "═" * 80 + "\n")
 manager: FileManager = FileManager.from_pickle(params.file_manager_path)
 manager.secure_resources()
 pid: int = os.getpid()
@@ -50,22 +49,31 @@ func_kwargs = Read.pickle(path=manager.kwargs_path.expanduser())
 
 # ######################### EXECUTION ####################################
 
-print("\n" * 2)
-console.rule(title="PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
-print("\n" * 2)
-console.print(f"Executing {P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_r} : {params.func_name}", style="bold blue")
-if isinstance(func_kwargs, dict): S(func_kwargs).print(title="kwargs", as_config=True)
-else: inspect(func_kwargs, value=False, title=f"kwargs from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
-print("\n" * 2)
+print("\n" + "═" * 80 + "\n")
+console.rule(title="🚀 PYTHON EXECUTION SCRIPT - STARTING 🚀", style="bold red", characters="═")
+print("\n" + "═" * 80 + "\n")
+
+console.print(f"""
+📂 Executing File: {P(rf'{params.repo_path_rh}').expanduser().collapseuser().as_posix()}/{params.file_path_r}
+🔧 Function: {params.func_name}
+⏰ Time: {time_at_execution_start_local}
+""", style="bold blue")
+
+if isinstance(func_kwargs, dict): 
+    S(func_kwargs).print(title="📋 Function Arguments", as_config=True)
+else: 
+    inspect(func_kwargs, value=False, title=f"📋 Function Arguments from `{manager.kwargs_path.collapseuser().as_posix()}`", docs=False, sort=False)
+
+print("\n" + "•" * 60 + "\n")
 
 res = ""
 func = ""
 
 # execution_line
 
-print("\n" * 2)
-console.rule(title="FINISHED PYTHON EXECUTION SCRIPT", characters="-", style="bold red")
-print("\n" * 2)
+print("\n" + "•" * 60 + "\n")
+console.rule(title="✅ FINISHED PYTHON EXECUTION SCRIPT ✅", characters="═", style="bold green")
+print("\n" + "═" * 80 + "\n")
 
 # ######################### END OF EXECUTION #############################
 
@@ -74,7 +82,12 @@ if type(res) is P or (type(res) is str and P(res).expanduser().exists()):
     res_folder = P(res).expanduser()
 else:
     res_folder = P.tmp(folder=rf"tmp_dirs/{manager.job_id}").create()
-    console.print(Panel(f"WARNING: The executed function did not return a path to a results directory. Execution metadata will be saved separately in {res_folder.collapseuser().as_posix()}."))
+    console.print(Panel(f"""
+⚠️  WARNING ⚠️
+The executed function did not return a path to a results directory.
+Execution metadata will be saved separately in:
+{res_folder.collapseuser().as_posix()}
+""", title="📁 Result Directory Warning", border_style="yellow"))
     print("\n\n")
     # try:
         # Save.pickle(obj=res, path=res_folder.joinpath("result.pkl"))
@@ -97,10 +110,24 @@ exec_times.save(path=manager.execution_log_dir.expanduser().joinpath("execution_
 if params.error_message == "":
     job_status = "completed"
     manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
+    print(f"""
+✅ ═════════════════════ JOB COMPLETED SUCCESSFULLY ═════════════════════
+🔖 Job ID: {manager.job_id}
+⏱️  Total execution time: {delta}
+📂 Results located at: {res_folder.collapseuser().as_posix()}
+══════════════════════════════════════════════════════════════════════
+""")
 else:
     job_status = "failed"
     manager.execution_log_dir.expanduser().joinpath("status.txt").write_text(job_status)
-print(f"job {manager.job_id} is completed.")
+    print(f"""
+❌ ═════════════════════ JOB EXECUTION FAILED ═════════════════════
+🔖 Job ID: {manager.job_id}
+⏱️  Total execution time: {delta}
+🔍 Error message: {params.error_message}
+📂 Results located at: {res_folder.collapseuser().as_posix()}
+═════════════════════════════════════════════════════════════════
+""")
 
 
 generate_readme(path=manager.job_root.expanduser().joinpath("execution_log.md"), obj=func, desc=f'''
@@ -125,12 +152,12 @@ kwargs_path @ `{manager.kwargs_path.collapseuser()}`
 # manager.root_dir.expanduser().copy(folder=res_folder, overwrite=True)
 
 # print to execution console:
-exec_times.print(title="Execution Times", as_config=True)
-print("\n" * 1)
+exec_times.print(title="⏱️ Execution Times", as_config=True)
+print("\n" + "─" * 60 + "\n")
 ssh_repr_remote = params.ssh_repr_remote or f"{getpass.getuser()}@{platform.node()}"  # os.getlogin() can throw an error in non-login shells.
 console.print(Panel(Text(f'''
 ftprx {ssh_repr_remote} {res_folder.collapseuser()} -r
-''', style="bold blue on white"), title="Pull results with this line:", border_style="bold red"))
+''', style="bold blue on white"), title="📥 Pull results with this line:", border_style="bold red"))
 
 
 if params.session_name != "":
@@ -155,16 +182,28 @@ if rm_conf.kill_on_completion:
         from crocodile.cluster.session_managers import Zellij  # type: ignore  # pylint: disable=C0412
         current_session = Zellij.get_current_zellij_session()
         # Zellij.close_tab(sess_name=params.session_name, tab_name=params.tab_name)
-        print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
+        print(f"""
+🔄 ════════════════ SESSION MANAGEMENT ════════════════
+🛑 Killing session `{params.session_name}` on `{params.ssh_repr}`
+════════════════════════════════════════════════════════
+""")
         Terminal().run(f"zellij --session {current_session} go-to-tab-name '{params.tab_name}'; sleep 2; zellij --session {current_session} action close-tab").print()  # i.e. current tab
     elif platform.system() == "Windows":
-        print(f"Killing session `{params.session_name}` on `{params.ssh_repr}`")
+        print(f"""
+🔄 ════════════════ SESSION MANAGEMENT ════════════════
+🛑 Killing session `{params.session_name}` on `{params.ssh_repr}`
+════════════════════════════════════════════════════════
+""")
         from machineconfig.utils.procs import ProcessManager
         pm = ProcessManager()
         pm.kill(commands=[params.session_name])
-    else: raise NotImplementedError(f"kill_on_completion is not implemented for platform `{platform.system()}`")
+    else: raise NotImplementedError(f"❌ kill_on_completion is not implemented for platform `{platform.system()}`")
 else:
-    print(f"Keeping the tab `{params.tab_name}` on `{params.ssh_repr}`")
+    print(f"""
+🔄 ════════════════ SESSION MANAGEMENT ════════════════
+✅ Keeping the tab `{params.tab_name}` on `{params.ssh_repr}`
+════════════════════════════════════════════════════════
+""")
 
 
-console.rule(title="END OF PYTHON EXECUTION SCRIPT", style="bold red", characters="-")
+console.rule(title="🏁 END OF PYTHON EXECUTION SCRIPT 🏁", style="bold green", characters="═")
