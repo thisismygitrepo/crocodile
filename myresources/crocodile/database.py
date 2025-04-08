@@ -13,8 +13,8 @@ from sqlalchemy import create_engine, text, inspect as inspect__, Engine, Connec
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.engine import Inspector
 from sqlalchemy.sql.schema import MetaData
-from crocodile.core import Struct
-from crocodile.file_management import List as L, P, OPLike
+from crocodile.core import Struct, List as L
+from crocodile.file_management import P, OPLike
 
 
 class DBMS:
