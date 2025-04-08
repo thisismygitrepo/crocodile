@@ -40,13 +40,9 @@ def print_header():
     console.rule(_header, style="bold red", align="center")
 
     # link to tutorial or github
-    _ = Text(f"✨ Crocodile Shell {crocodile.__version__} ✨")
+    _ = Text(f"✨ 🐊 Crocodile Shell {crocodile.__version__} ✨" + " Made with 🐍 | Built with ❤️")
     _.stylize("#05f8fc on #293536")
     console.print(_)
-    
-    print("\n" + "=" * 60)
-    print("🐊 Made with 🐍 | Built with ❤️  | Powered by Crocodile 🐊")
-    print("=" * 60 + "\n")
 
 
 tb.D.set_numpy_display()
