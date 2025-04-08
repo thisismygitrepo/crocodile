@@ -13,7 +13,7 @@ from typing import Optional, Any, Callable
 def expensive_function(workload_params: WorkloadParams, sim_dict: Optional[dict[str, Any]] = None) -> P:
     import time
     from rich.progress import track
-    print(f"Hello, I am one thread of an expensive function, and I just started running ...")
+    print("Hello, I am one thread of an expensive function, and I just started running ...")
     print(f"Oh, I recieved this parameter: {sim_dict=} & {workload_params=} ")
     execution_time_in_seconds = 60 * 1
     steps = 100
@@ -22,8 +22,8 @@ def expensive_function(workload_params: WorkloadParams, sim_dict: Optional[dict[
     print(f"I'm done, I crunched numbers from {workload_params.idx_start} to {workload_params.idx_end}.")
     _ = workload_params.idx_max
 
-    save_dir = P.tmp().joinpath(f"tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
-    Save.pickle(obj={'a': 1}, path=save_dir.joinpath(f"trial_func_result.pkl"))
+    save_dir = P.tmp().joinpath("tmp_dirs/expensive_function_single_thread").joinpath(workload_params.save_suffix, f"thread_{workload_params.idx_start}_{workload_params.idx_end}").create()
+    Save.pickle(obj={'a': 1}, path=save_dir.joinpath("trial_func_result.pkl"))
     return save_dir
 
 

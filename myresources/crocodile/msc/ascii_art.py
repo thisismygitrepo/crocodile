@@ -93,7 +93,7 @@ def get_art(comment: Optional[str] = None, artlib: Optional[BOX_OR_CHAR] = None,
     if verbose:
         print(f'Using style: {style} from {artlib}', '\n' * 3)
         print(f'{cmd=}')
-        print(f'Results:\n', res)
+        print('Results:\n', res)
     return res
 
 

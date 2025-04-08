@@ -22,7 +22,7 @@ def main() -> RemoteMachineConfig:
     from machineconfig.scripts.python.cloud_mount import get_rclone_config
     cloud_names = get_rclone_config().sections()
     #     job_id=, base_dir="",
-    parser.add_argument('Description', help=f'The file you want to process', default=f"Description of running func on remotes")
+    parser.add_argument('Description', help='The file you want to process', default="Description of running func on remotes")
 
     # # execution behaviour
     # wrap_in_try_except=True

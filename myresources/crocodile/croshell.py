@@ -40,7 +40,7 @@ def print_header():
     console.rule(_header, style="bold red", align="center")
 
     # link to tutorial or github
-    _ = Text(f"✨ 🐊 Crocodile Shell {crocodile.__version__} ✨" + " Made with 🐍 | Built with ❤️")
+    _ = Text(f"✨ 🐊 Crocodile Shell {crocodile.__version__} ✨" + " Made with 🐍 | Built with ❤️\n")
     _.stylize("#05f8fc on #293536")
     console.print(_)
 
@@ -64,7 +64,7 @@ def print_logo(logo: str):
             else: character_color(logo)
         else:
             print("\n" + "🚫 " + "-" * 70 + " 🚫")
-            print(f"🔍 Missing ASCII art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
+            print("🔍 Missing ASCII art dependencies. Install with: iwr bit.ly/cfgasciiartwindows | iex")
             print("🚫 " + "-" * 70 + " 🚫\n")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
@@ -90,11 +90,10 @@ def print_logo(logo: str):
             else: print(P(__file__).parent.joinpath("art").search().sample(size=1).list[0].read_text())
         else:
             print("\n" + "🚫 " + "-" * 70 + " 🚫")
-            print(f"🔍 Missing ASCII art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
+            print("🔍 Missing ASCII art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
             print("🚫 " + "-" * 70 + " 🚫\n")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
-    print("\n" + "•" * 50 + "\n")
 
 
 if __name__ == "__main__":

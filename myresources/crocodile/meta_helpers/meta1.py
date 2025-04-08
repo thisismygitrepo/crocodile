@@ -28,7 +28,7 @@ class Log(logging.Logger):  #
                  log_colors: Optional[dict[str, str]] = None):
         if name is None:
             name = randstr(noun=True)
-            print(f"""
+            print("""
 ╔═════════════════════════ 📢 LOGGER WARNING 📢 ═════════════════════════╗
 ║ 🔔 Logger name not provided.                                            ║
 ║ ℹ️  Please provide a descriptive name for proper identification!        ║

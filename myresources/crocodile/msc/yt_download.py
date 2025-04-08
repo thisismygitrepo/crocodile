@@ -1,5 +1,4 @@
 from yt_dlp import YoutubeDL
-import sys
 from pathlib import Path
 
 def time_to_seconds(time_str: str) -> int:
