@@ -1,7 +1,3 @@
-"""
-https://docs.sqlalchemy.org/en/14/tutorial/index.html#a-note-on-the-future
-
-"""
 
 import time
 from typing import Optional, Any, Callable
@@ -18,10 +14,6 @@ from crocodile.file_management import P, OPLike
 
 
 class DBMS:
-    """Implementation Philosophy:
-    * Always use sqlalchemy API and avoid sql-dielect specific language.
-    * Engine is provided externally. It is the end-user's business to make this engine.
-    """
     def __init__(self, engine: Engine, sch: Optional[str] = None, vws: bool = False):
         self.eng: Engine = engine
         self.con: Optional[Connection] = None

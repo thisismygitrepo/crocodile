@@ -23,7 +23,7 @@ class Compression:
             jungle_zip.write(filename=str(ip_path), arcname=str(arcname) if arcname is not None else None, compress_type=zipfile.ZIP_DEFLATED, **kwargs)
         return Path(op_path)
     @staticmethod
-    def unzip(ip_path: str, op_path: str, fname: Optional[str]= None, password: Optional[bytes] = None, memory: bool = False, **kwargs: Any):
+    def unzip(ip_path: str, op_path: str, fname: Optional[str]= None, password: Optional[bytes] = None, memory: bool = False, **kwargs: Any) -> Path | dict[str, bytes] | bytes:
         import zipfile
         with zipfile.ZipFile(str(ip_path), 'r') as zipObj:
             if memory:

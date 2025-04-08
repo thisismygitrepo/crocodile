@@ -456,7 +456,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
                     import zipfile
                     List([x for x in zipfile.ZipFile(self.to_str()).namelist() if "/" not in x or (len(x.split('/')) == 2 and x.endswith("/"))]).apply(lambda item: P(folder).joinpath(name or "", item.replace("/", "")).delete(sure=True, verbose=True))
             result = Compression.unzip(zipfile__.to_str(), str(folder), None if name is None else P(name).as_posix())
-            assert isinstance(result, P)
+            assert isinstance(result, Path)
         return self._return(P(result), inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"UNZIPPED {repr(zipfile__)} ==> {repr(result)}")
     def tar(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, inplace: bool = False, orig: bool = False, verbose: bool = True) -> 'P':
         op_path = self._resolve_path(folder, name, path, self.name + ".tar").expanduser().resolve()
