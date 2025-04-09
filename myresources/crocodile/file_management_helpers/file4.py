@@ -412,20 +412,20 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
     # ====================================== Compression & Encryption ===========================================
     def zip(self, path: OPLike = None, folder: OPLike = None, name: Optional[str]= None, arcname: Optional[str] = None, inplace: bool = False, verbose: bool = True,
             content: bool = False, orig: bool = False, use_7z: bool = False, pwd: Optional[str] = None, mode: FILE_MODE = 'w', **kwargs: Any) -> 'P':
-        path, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
+        path_resolved, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         if use_7z:  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
-            path = path + '.7z' if not path.suffix == '.7z' else path
-            with install_n_import("py7zr").SevenZipFile(file=path, mode=mode, password=pwd) as archive: archive.writeall(path=str(slf), arcname=None)
+            path_resolved = path_resolved + '.7z' if not path_resolved.suffix == '.7z' else path_resolved
+            with install_n_import("py7zr").SevenZipFile(file=path_resolved, mode=mode, password=pwd) as archive: archive.writeall(path=str(slf), arcname=None)
         else:
             arcname_obj = P(arcname or slf.name)
             if arcname_obj.name != slf.name: arcname_obj /= slf.name  # arcname has to start from somewhere and end with filename
             if slf.is_file():
-                path = Compression.zip_file(ip_path=str(slf), op_path=str(path + ".zip" if path.suffix != ".zip" else path), arcname=str(arcname_obj), mode=mode, **kwargs)
+                path_resolved = Compression.zip_file(ip_path=str(slf), op_path=str(path_resolved + ".zip" if path_resolved.suffix != ".zip" else path_resolved), arcname=str(arcname_obj), mode=mode, **kwargs)
             else:
                 if content: root_dir, base_dir = slf, "."
                 else: root_dir, base_dir = slf.split(at=str(arcname_obj[0]), sep=1)[0], str(arcname_obj)
-                path = P(Compression.compress_folder(root_dir=str(root_dir), op_path=str(path), base_dir=base_dir, fmt='zip', **kwargs))  # TODO: see if this supports mode
-        return self._return(path, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
+                path_resolved = P(Compression.compress_folder(root_dir=str(root_dir), op_path=str(path_resolved), base_dir=base_dir, fmt='zip', **kwargs))  # TODO: see if this supports mode
+        return self._return(path_resolved, inplace=inplace, operation="delete", orig=orig, verbose=verbose, msg=f"ZIPPED {repr(slf)} ==>  {repr(path)}")
     def unzip(self, folder: OPLike = None, path: OPLike = None, name: Optional[str]= None, verbose: bool = True, content: bool = False, inplace: bool = False, overwrite: bool = False, orig: bool = False,
               pwd: Optional[str] = None, tmp: bool = False, pattern: Optional[str] = None, merge: bool = False) -> 'P':
         assert merge is False, "I have not implemented this yet"
