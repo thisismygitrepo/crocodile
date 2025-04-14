@@ -1,0 +1,124 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crocodile"
+version = "14.3"  # Version directly defined here instead of using dynamic
+description = "Deep Learning Framework & Workload Management For On-premise Personal Machines."
+readme = "README.md"
+authors = [
+    {name = "Alex Al-Saffar", email = "programmer@usa.com"}
+]
+license = {text = "Apache 2.0"}
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # CORE
+    "numpy",
+    "pandas",
+    "tabulate",
+    "matplotlib",
+    
+    # Dataframe serialization
+    "pyarrow",
+    "fastparquet",
+    
+    # Accessories
+    "rich",
+    "tabulate",
+    "randomname",
+    "psutil",
+    "joblib",
+    "ipython",
+    "fire",
+    "tqdm",
+    "tomli",
+    "pyyaml",
+    "pyjson5",
+    "dill",
+    "cryptography",
+    "paramiko",
+    "requests",
+    "colorlog",
+    "sqlalchemy",
+    "bcrypt",
+    "distro",
+    "send2trash",
+    "py7zr",
+    "gitpython",
+    "clipboard",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/thisismygitrepo/crocodile"
+"Bug Tracker" = "https://github.com/thisismygitrepo/crocodile/issues"
+"Documentation" = "https://crocodile.readthedocs.io/en/latest/"
+"Source Code" = "https://github.com/thisismygitrepo/crocodile"
+"PyPI" = "https://pypi.org/project/crocodile"
+
+[project.optional-dependencies]
+full = [
+    "tensorflow",
+    "torch",
+    "keras",
+    "scikit-learn",
+    "click",
+    "types-requests",
+    "types-paramiko",
+    "types-tqdm",
+    "setuptools",
+    "wheel", 
+    "twine"
+]
+
+[tool.setuptools]
+package-dir = {"" = "myresources"}
+py-modules = [
+    "crocodile.core",
+    "crocodile.croshell",
+    "crocodile.database",
+    "crocodile.deeplearning",
+    "crocodile.deeplearning_template",
+    "crocodile.deeplearning_df",
+    "crocodile.deeplearning_torch",
+    "crocodile.environment",
+    "crocodile.file_management",
+    "crocodile.matplotlib_management",
+    "crocodile.meta",
+    "crocodile.plotly_management",
+    "crocodile.run",
+    "crocodile.toolbox",
+    "crocodile.cluster.data_transfer",
+    "crocodile.cluster.distribute",
+    "crocodile.cluster.meta_handling",
+    "crocodile.cluster.remote_machine",
+    "crocodile.cluster.script_execution",
+    "crocodile.cluster.script_notify_upon_completion",
+    "crocodile.cluster.trial_file",
+    "crocodile.comms.helper_funcs",
+    "crocodile.comms.notification",
+    "crocodile.comms.onedrive",
+    "crocodile.msc.ascii_art",
+    "crocodile.msc.dl_template",
+    "crocodile.msc.numerical",
+    "crocodile.msc.odds"
+]
+
+[tool.setuptools.packages.find]
+where = ["myresources"]
+include = ["crocodile*"]
+
+[tool.setuptools.package-data]
+"crocodile" = ["art/*"]
+
+# Additional metadata
+[tool.crocodile]
+release_date = "2025-04-17"
+release_notes = """
+Minor changes
+"""

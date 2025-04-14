@@ -130,6 +130,6 @@ setup(
 
 )
 
-with open("./myresources/crocodile/art/happy_croco", "r", encoding="utf-8") as file:
-    croco = file.read()  # search ascii art or characters art.
-print(croco)
+# with open("./myresources/crocodile/art/happy_croco", "r", encoding="utf-8") as file:
+#     croco = file.read()  # search ascii art or characters art.
+# print(croco)

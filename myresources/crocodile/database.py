@@ -189,11 +189,11 @@ class DBMS:
         assert self.meta is not None
         res_all = []
         assert self.ses is not None
-        for tbl in self.meta.sorted_tables:
+        from tqdm import tqdm
+        for tbl in tqdm(self.meta.sorted_tables, desc="Inspecting tables", unit="table"):
             table = tbl.name
             if self.sch is not None:
                 table = f"{self.sch}.{table}"
-            print(f"Table: {table}")
             count = self.ses.query(tbl).count()
             res = dict(table=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6,
                        columns=len(tbl.exported_columns), schema=self.sch)
