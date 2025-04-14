@@ -47,11 +47,11 @@ def print_header():
     console.print(_)
 
 
-tb.D.set_numpy_display()
-tb.D.set_pandas_display()
 D = core.Display
 L = core.List
 S = core.Struct
+D.set_numpy_display()
+D.set_pandas_display()
 _ = D, L, S, inspect, progress, pprint, traceback, pd, np
 
 
