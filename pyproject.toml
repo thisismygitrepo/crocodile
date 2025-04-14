@@ -71,9 +71,6 @@ full = [
     "types-requests",
     "types-paramiko",
     "types-tqdm",
-    "setuptools",
-    "wheel", 
-    "twine"
 ]
 
 [tool.setuptools]
