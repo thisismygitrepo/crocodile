@@ -9,7 +9,6 @@ from rich.text import Text
 from rich.console import Console
 
 import crocodile.toolbox as tb
-import crocodile
 from crocodile.core import *  # type: ignore # pylint: disable=W0401,W0614 # noqa: F403,F401
 from crocodile.file_management import P
 import crocodile.core as core
@@ -40,7 +39,10 @@ def print_header():
     console.rule(_header, style="bold red", align="center")
 
     # link to tutorial or github
-    _ = Text(f"✨ 🐊 Crocodile Shell {crocodile.__version__} ✨" + " Made with 🐍 | Built with ❤️\n")
+    # import crocodile
+    # version = crocodile.__version__
+    version = ""
+    _ = Text(f"✨ 🐊 Crocodile Shell {version} ✨" + " Made with 🐍 | Built with ❤️\n")
     _.stylize("#05f8fc on #293536")
     console.print(_)
 
