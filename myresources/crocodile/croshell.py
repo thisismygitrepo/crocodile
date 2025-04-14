@@ -52,7 +52,7 @@ L = core.List
 S = core.Struct
 D.set_numpy_display()
 D.set_pandas_display()
-_ = D, L, S, inspect, progress, pprint, traceback, pd, np
+_ = D, L, S, inspect, progress, pprint, traceback, pd, np, tb
 
 
 def print_logo(logo: str):
