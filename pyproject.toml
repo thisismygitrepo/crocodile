@@ -23,6 +23,7 @@ dependencies = [
     "pandas",
     "tabulate",
     "matplotlib",
+    "plotly",
     
     # Dataframe serialization
     "pyarrow",
