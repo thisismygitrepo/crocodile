@@ -32,6 +32,14 @@ from crocodile.core_modules.core_4 import (
     Display
 )
 
+
+def func(a: int, b: int) -> int:
+    """
+    A simple function that adds two integers.
+    """
+    return a + b
+
+
 # Define public API
 __all__ = [
     # From core_1
