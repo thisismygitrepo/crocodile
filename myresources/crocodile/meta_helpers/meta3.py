@@ -148,8 +148,6 @@ Command:
         source_file = self.run_py(f"""{cmd}\npath = Save.pickle(obj=obj, path=P.tmpfile(suffix='.pkl'))\nprint(path)""", desc=desc, verbose=verbose, strict_err=True, strict_returncode=True).op.split('\n')[-1]
         return self.copy_to_here(source=source_file, target=P.tmpfile(suffix='.pkl')).readit()
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
-        if init:
-            print(f"""⬆️⬆️⬆️⬆️⬆️  [SFTP UPLOAD] Initiating file upload from: {source} to: {target}""")
         if init: print(f"{'⬆️' * 5} [SFTP UPLOAD] FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         source_obj = P(source).expanduser().absolute()
         if target is None:
@@ -172,7 +170,6 @@ Command:
         remotepath = self.run_py(f"path=P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
         print(f"""📤 [SFTP UPLOAD] Sending file: {repr(P(source_obj))}  ==>  Remote Path: {remotepath.as_posix()}""")
-        print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z:
             _resp = self.run_py(f"""P(r'{remotepath.as_posix()}').expanduser().unzip(content=False, inplace=True, overwrite={overwrite})""", desc=f"UNZIPPING {remotepath.as_posix()}", verbose=False, strict_err=True, strict_returncode=True)
@@ -180,10 +177,6 @@ Command:
             print("\n")
         return source_obj
     def copy_to_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, init: bool = True) -> P:
-        if init:
-            print(f"""⬇️⬇️⬇️⬇️⬇️
-[SFTP DOWNLOAD] Initiating download from: {source}
-                to: {target}""")
         if init: print(f"{'⬇️' * 5} SFTP DOWNLOADING FROM `{source}` TO `{target}`")
         if not z and self.run_py(f"print(P(r'{source}').expanduser().absolute().is_dir())", desc=f"Check if source `{source}` is a dir", verbose=False, strict_returncode=True, strict_err=True).op.split("\n")[-1] == 'True':
             if r is False: raise RuntimeError(f"source `{source}` is a directory! either set r=True for recursive sending or raise zip_first flag.")
@@ -208,9 +201,7 @@ Command:
             if isinstance(tmp3, P): source = tmp3
             else: raise RuntimeError(f"Could not resolve source path {source} due to")
         else: source = P(source)
-        print(f"""📥 [DOWNLOAD] Receiving:
-   {source}  ==>  Local Path: {target_obj}""")
-        print(f"RECEVING `{source}` ==> `{target_obj}`")
+        print(f"""📥 [DOWNLOAD] Receiving: {source}  ==>  Local Path: {target_obj}""")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar:  # type: ignore # pylint: disable=E1129
             assert self.sftp is not None, f"Could not establish SFTP connection to {self.hostname}."
             self.sftp.get(remotepath=source.as_posix(), localpath=str(target_obj), callback=pbar.view_bar)  # type: ignore
