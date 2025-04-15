@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH
+from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH, scout
 import logging
 import subprocess
 import sys
@@ -31,7 +31,7 @@ except ImportError:
 
 _ = str2timedelta, timestamp, randstr, validate_name, install_n_import
 __ = P, Read, Compression, Cache, encrypt, decrypt, modify_text, datetime
-___ = generate_readme, Terminal, Log, Scheduler, SSH
+___ = generate_readme, Terminal, Log, Scheduler, SSH, scout
 ____ = logging, subprocess, sys, time
 
 Path = P

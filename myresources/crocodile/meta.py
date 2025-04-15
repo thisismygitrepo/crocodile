@@ -6,12 +6,13 @@ This is a module for handling meta operations like logging, terminal operations,
 # Import from meta_helpers.meta1
 from crocodile.meta_helpers.meta1 import (
     Scout,
+    scout,
     Log,
-    STD,
-    Response
+    STD
 )
 
 # Import from meta_helpers.meta2
+from crocodile.meta_helpers.meta11 import Response
 from crocodile.meta_helpers.meta2 import (
     Terminal,
     SHELLS,
@@ -37,6 +38,7 @@ from crocodile.meta_helpers.meta5 import (
 __all__ = [
     # From meta1
     'Scout',
+    'scout',
     'Log',
     'STD',
     'Response',

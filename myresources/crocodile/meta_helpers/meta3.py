@@ -2,7 +2,8 @@ from crocodile.core import install_n_import, List, Struct
 from crocodile.file_management import P, OPLike, PLike
 import os
 from typing import Union, Any, Optional
-from crocodile.meta_helpers.meta1 import Response, Scout
+from crocodile.meta_helpers.meta1 import Scout, scout
+from crocodile.meta_helpers.meta11 import Response
 from crocodile.meta_helpers.meta2 import MACHINE, Terminal
 
 
@@ -159,7 +160,7 @@ Command:
             if r is False: raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
             source_list: List[P] = source_obj.search("*", folders=False, r=True)
             remote_root = self.run_py(f"path=P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.create())", desc=f"Creating Target directory `{P(target).as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
-            _ = [self.copy_from_here(source=item, target=P(remote_root).joinpath(item.name)) for item in source_list]
+            _ = [self.copy_from_here(source=item, target=P(remote_root).joinpath(item.relative_to(source_obj))) for item in source_list]
             return list(source_list)
         if z:
             print("🗜️ ZIPPING ...")
@@ -216,7 +217,7 @@ Command:
         print("\n")
         return target_obj
     def receieve(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False) -> P:
-        scout = self.run_py(cmd=f"obj=SSH.scout(r'{source}', z={z}, r={r})", desc=f"Scouting source `{source}` path on remote", return_obj=True, verbose=False)
+        scout = self.run_py(cmd=f"obj=scout(r'{source}', z={z}, r={r})", desc=f"Scouting source `{source}` path on remote", return_obj=True, verbose=False)
         assert isinstance(scout, Scout)
         if not z and scout.is_dir and scout.files is not None:
             if r:
@@ -232,19 +233,6 @@ Command:
             self.run_py(f"P(r'{source.as_posix()}').delete(sure=True)", desc="Cleaning temp zip files @ remote.", strict_returncode=True, strict_err=True)
         print("\n")
         return target
-    @staticmethod
-    def scout(source: PLike, z: bool = False, r: bool = False) -> Scout:
-        source_full = P(source).expanduser().absolute()
-        source_rel2home = source_full.collapseuser()
-        exists = source_full.exists()
-        is_dir = source_full.is_dir() if exists else False
-        if z and exists:
-            try: source_full = source_full.zip()
-            except Exception as ex:
-                raise Exception(f"Could not zip {source_full} due to {ex}") from ex  # type: ignore # pylint: disable=W0719
-            source_rel2home = source_full.zip()
-        files = source_full.search(folders=False, r=True).apply(lambda x: x.collapseuser()) if r and exists and is_dir else None
-        return Scout(source_full=source_full, source_rel2home=source_rel2home, exists=exists, is_dir=is_dir, files=files)
     def print_summary(self):
         import pandas as pd
         df = pd.DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
