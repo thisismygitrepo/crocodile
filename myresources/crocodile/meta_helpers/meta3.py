@@ -80,8 +80,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         except Exception as err:
             self.sftp = None
             print(f"""⚠️  WARNING: Failed to open SFTP connection to {hostname}.
-   Error Details: {err}
-   Data transfer may be affected!""")
+   Error Details: {err}\nData transfer may be affected!""")
         def view_bar(slf: Any, a: Any, b: Any):
             slf.total = int(b)
             slf.update(int(a - slf.n))  # update pbar with increment
@@ -124,10 +123,7 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         return f"{getpass.getuser()}@{self.platform.node()}" + (f" [{self.platform.system()}][{self.get_local_distro()}]" if add_machine else "")
     def __repr__(self): return f"local {self.get_local_repr(add_machine=True)} >>> SSH TO >>> remote {self.get_remote_repr(add_machine=True)}"
     def run_locally(self, command: str):
-        print(f"""💻 [LOCAL EXECUTION] Running command on node: {self.platform.node()}
-Command:
-{command}""")
-        print(f"Executing Locally @ {self.platform.node()}:\n{command}")
+        print(f"""💻 [LOCAL EXECUTION] Running command on node: {self.platform.node()} Command: {command}""")
         res = Response(cmd=command)
         res.output.returncode = os.system(command)
         return res
@@ -150,6 +146,7 @@ Command:
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
         if init: print(f"{'⬆️' * 5} [SFTP UPLOAD] FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         source_obj = P(source).expanduser().absolute()
+        if not source_obj.exists(): raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` does not exist!")
         if target is None:
             target = P(source_obj).expanduser().absolute().collapseuser(strict=True)
             assert target.is_relative_to("~"), "If target is not specified, source must be relative to home."
@@ -161,7 +158,6 @@ Command:
             source_list.print()
             for item in source_list:
                 a__target = P(remote_root).joinpath(item.relative_to(source_obj))
-                print(a__target)
                 self.copy_from_here(source=item, target=a__target)
             return list(source_list)
         if z:
