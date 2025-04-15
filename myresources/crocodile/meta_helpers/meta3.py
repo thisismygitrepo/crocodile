@@ -150,7 +150,7 @@ Command:
     def copy_from_here(self, source: PLike, target: OPLike = None, z: bool = False, r: bool = False, overwrite: bool = False, init: bool = True) -> Union[P, list[P]]:
         if init:
             print(f"""⬆️⬆️⬆️⬆️⬆️  [SFTP UPLOAD] Initiating file upload from: {source} to: {target}""")
-        if init: print(f"{'⬆️' * 5} SFTP UPLOADING FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
+        if init: print(f"{'⬆️' * 5} [SFTP UPLOAD] FROM `{source}` TO `{target}`")  # TODO: using return_obj do all tests required in one go.
         source_obj = P(source).expanduser().absolute()
         if target is None:
             target = P(source_obj).expanduser().absolute().collapseuser(strict=True)
@@ -158,17 +158,20 @@ Command:
             if z: target += ".zip"
         if not z and source_obj.is_dir():
             if r is False: raise RuntimeError(f"Meta.SSH Error: source `{source_obj}` is a directory! either set `r=True` for recursive sending or raise `z=True` flag to zip it first.")
-            source_list: List[P] = source_obj.search("*", folders=False, r=True)
+            source_list: List[P] = source_obj.search("*", folders=False, files=True, r=True)
             remote_root = self.run_py(f"path=P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.create())", desc=f"Creating Target directory `{P(target).as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
-            _ = [self.copy_from_here(source=item, target=P(remote_root).joinpath(item.relative_to(source_obj))) for item in source_list]
+            source_list.print()
+            for item in source_list:
+                a__target = P(remote_root).joinpath(item.relative_to(source_obj))
+                print(a__target)
+                self.copy_from_here(source=item, target=a__target)
             return list(source_list)
         if z:
             print("🗜️ ZIPPING ...")
             source_obj = P(source_obj).expanduser().zip(content=True)  # .append(f"_{randstr()}", inplace=True)  # eventually, unzip will raise content flag, so this name doesn't matter.
         remotepath = self.run_py(f"path=P(r'{P(target).as_posix()}').expanduser()\n{'path.delete(sure=True)' if overwrite else ''}\nprint(path.parent.create())", desc=f"Creating Target directory `{P(target).parent.as_posix()}` @ {self.get_remote_repr()}", verbose=False).op or ''
         remotepath = P(remotepath.split("\n")[-1]).joinpath(P(target).name)
-        print(f"""📤 [UPLOAD] Sending file:
-   {repr(P(source_obj))}  ==>  Remote Path: {remotepath.as_posix()}""")
+        print(f"""📤 [SFTP UPLOAD] Sending file: {repr(P(source_obj))}  ==>  Remote Path: {remotepath.as_posix()}""")
         print(f"SENDING `{repr(P(source_obj))}` ==> `{remotepath.as_posix()}`")
         with self.tqdm_wrap(ascii=True, unit='b', unit_scale=True) as pbar: self.sftp.put(localpath=P(source_obj).expanduser(), remotepath=remotepath.as_posix(), callback=pbar.view_bar)  # type: ignore # pylint: disable=E1129
         if z:
