@@ -22,9 +22,9 @@ project = 'crocodile'
 copyright = '2020, Alex Al-Saffar'
 author = 'Alex Al-Saffar'
 
-from crocodile import __version__
-version = __version__  # simple X.Y.Z
-release = __version__  # full anem with alpha beta rc etc tags.
+# from crocodile import __version__
+# version = __version__  # simple X.Y.Z
+# release = __version__  # full anem with alpha beta rc etc tags.
 
 # -- General configuration ---------------------------------------------------
 

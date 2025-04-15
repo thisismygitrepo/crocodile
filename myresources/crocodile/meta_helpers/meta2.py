@@ -53,9 +53,16 @@ class Terminal:
                 full_command = f"{start_cmd} {script_file}"  # full_command = [start_cmd, str(script_file)]
         else: full_command = f"{shell} {script_file}"  # full_command = [shell, str(tmp_file)]
         if verbose:
-            from machineconfig.utils.utils import print_code
-            print_code(code=script, lexer="shell", desc="Script to be executed:")
+            desc="Script to be executed:"
+            if platform.system() == "Windows": lexer = "powershell"
+            elif platform.system() == "Linux": lexer = "sh"
+            else: raise NotImplementedError(f"Platform {platform.system()} not supported for lexer {lexer}")
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.syntax import Syntax
             import rich.progress as pb
+            console = Console()
+            console.print(Panel(Syntax(code=script, lexer=lexer), title=f"📄 {desc}"), style="bold red")
             with pb.Progress(transient=True) as progress:
                 _task = progress.add_task(f"Running Script @ {script_file}", total=None)
                 resp = subprocess.run(full_command, stderr=self.stderr, stdin=self.stdin, stdout=self.stdout, text=True, shell=True, check=False)

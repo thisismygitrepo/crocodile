@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=70", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,11 +10,10 @@ readme = "README.md"
 authors = [
     {name = "Alex Al-Saffar", email = "programmer@usa.com"}
 ]
-license = {text = "Apache 2.0"}
 requires-python = ">=3.10"
+license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -89,15 +88,7 @@ py-modules = [
     "crocodile.matplotlib_management",
     "crocodile.meta",
     "crocodile.plotly_management",
-    "crocodile.run",
     "crocodile.toolbox",
-    "crocodile.cluster.data_transfer",
-    "crocodile.cluster.distribute",
-    "crocodile.cluster.meta_handling",
-    "crocodile.cluster.remote_machine",
-    "crocodile.cluster.script_execution",
-    "crocodile.cluster.script_notify_upon_completion",
-    "crocodile.cluster.trial_file",
     "crocodile.comms.helper_funcs",
     "crocodile.comms.notification",
     "crocodile.comms.onedrive",
