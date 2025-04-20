@@ -69,6 +69,11 @@ full = [
     "types-requests>=2.32.0.20250328",
     "types-tqdm>=4.67.0.20250404",
 ]
+docs = [
+    "sphinx>=8.2.3",
+    "sphinx-rtd-theme>=1.2.0",
+    "sphinx-autodoc-typehints>=1.23.0"
+]
 
 [tool.setuptools]
 package-dir = {"" = "myresources"}
