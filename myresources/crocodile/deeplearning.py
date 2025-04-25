@@ -94,7 +94,7 @@ def precision2torch_dtype(precision: PRECISON) -> 't.dtype':
 class HyperParams(Protocol):
     # ================== General ==============================
     name: str
-    root: P
+    root: str
 
     # ===================== Data ==============================
     seed: int
@@ -109,7 +109,7 @@ class HyperParams(Protocol):
 
 
 def get_hp_save_dir(hp: HyperParams):
-    return (P(hp.root) / hp.name).create()
+    return (P(hp.root).expanduser() / hp.name).create()
 
 
 @dataclass(frozen=False, slots=True)
@@ -546,14 +546,14 @@ class BaseModel(ABC):
                            hparam_class: Optional[Type[SubclassedHParams]] = None,
                            data_class: Optional[Type[SubclassedDataReader]] = None,
                            device_name: Optional[Device] = None, verbose: bool = True):
-        path = P(path)
+        path = P(path).expanduser()
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
             hp_obj = Read.pickle(path=path / HPARAMS_SUBPATH + "hparams.HParams.pkl")
         if device_name: hp_obj.device_name = device_name
-        if hp_obj.root != path.parent:
-            hp_obj.root, hp_obj.name = path.parent, path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
+        if str(hp_obj.root) != path.parent:
+            hp_obj.root, hp_obj.name = str(path.parent), path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
 
         if data_class is not None: d_obj: SubclassedDataReader = data_class.from_saved_data(path, hp=hp_obj)
         else:

@@ -61,7 +61,7 @@ dependencies = [
 full = [
     # "tensorflow",
     # "keras",
-    "tensorflow>=2.19.0",
+    # "tensorflow>=2.19.0",
     "scikit-learn>=1.6.1",
     "click>=8.1.8",
     "torch>=2.6.0",
