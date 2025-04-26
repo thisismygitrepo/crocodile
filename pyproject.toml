@@ -113,3 +113,10 @@ release_date = "2025-04-17"
 release_notes = """
 Minor changes
 """
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "onnx>=1.17.0",
+    "onnxruntime>=1.21.1",
+]
