@@ -171,7 +171,7 @@ class BaseModel:
                 xx_ = tuple(t.tensor(data=an_x, dtype=t.float64).to(device=device) for an_x in xx)
             else:
                 raise ValueError(f"Data precision {data_precision} not supported.")
-        with t.no_grad(): op = model(xx_)
+        with t.no_grad(): op = model(*xx_)
         return tuple(an_op.cpu().detach().numpy() for an_op in op)
 
     def fit(self, epochs: int,
@@ -218,7 +218,7 @@ class BaseModel:
                    ):
         x, y, _name = batch
         optimizer.zero_grad()  # clear the gradients of all optimized variables
-        output = model.forward(x)
+        output = model.forward(*x)
         try:
             loss_val = loss_func(output, y)
         except Exception as e:
@@ -239,7 +239,7 @@ class BaseModel:
     def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor]):
         with t.no_grad():
             x, y, _name = batch
-            op = model(x)
+            op = model(*x)
             loss_val = loss_func(op, y)
             return op, loss_val
 

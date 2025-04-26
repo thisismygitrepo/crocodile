@@ -208,7 +208,6 @@ class DataReader:
                        split_kwargs: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         # populating data specs ip / op shapes based on arguments sent to this method.
         split: dict[str, Any] = {}
-
         strings = Specs.get_all_names(specs)
         keys = list(data_dict.keys())
         if len(strings) != len(keys) or set(keys) != set(strings):
@@ -216,7 +215,6 @@ class DataReader:
             # S(data_dict).print(as_config=True, title="Specs Declared")
             print(f"data_dict keys: {keys}")
             raise ValueError("Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
-
         if populate_shapes:
             delcared_ip_shapes = specs.ip_shapes
             delcared_op_shapes = specs.op_shapes
@@ -465,7 +463,7 @@ class BaseModel(ABC):
             split=split, specs=specs, aslice=aslice, indices=indices,
             use_slice=use_slice, which_split="test", size=data.hp.batch_size
             )
-        y_pred_raw = model(x_test)
+        y_pred_raw = model(*x_test)
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
 
         if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
