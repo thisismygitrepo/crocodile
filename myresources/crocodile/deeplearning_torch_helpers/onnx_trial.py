@@ -58,7 +58,7 @@ class PredictionModel(nn.Module):
         x = self.gelu(x)
         x = self.linear3(x)
 
-        return x
+        return x, x * 2
 
 
 def save_model_to_onnx(model: Any, sample_input: Any, file_path: str):
@@ -71,11 +71,12 @@ def save_model_to_onnx(model: Any, sample_input: Any, file_path: str):
         # opset_version=23,                     # ONNX version to use
         do_constant_folding=True,             # Optimization: fold constants
         input_names=['signals', 'context'],   # Names for inputs
-        output_names=['output'],              # Name for outputs
+        output_names=['output1', 'output2'],  # Names for outputs
         dynamic_axes={                        # Specify dynamic axes
             'signals': {0: 'batch_size'},
             'context': {0: 'batch_size'},
-            'output': {0: 'batch_size'}
+            'output1': {0: 'batch_size'},
+            'output2': {0: 'batch_size'}
         }
     )
     print(f"Model exported to {file_path}")
@@ -95,15 +96,17 @@ def load_onnx_model_and_infer(onnx_path: Any, signals: Any, context: Any):
     # Run inference
     outputs = session.run(None, input_feed=onnx_inputs)
 
-    return outputs[0]
+    return outputs
 
 
 def compare_torch_and_onnx(torch_outputs: Any, onnx_outputs: Any):
-    """Compare outputs from PyTorch and ONNX models"""
-    diff = np.abs(torch_outputs - onnx_outputs).max()
-    print(f"Maximum absolute difference between PyTorch and ONNX outputs: {diff}")
-
-    if diff < 1e-5:
+    """Compare two outputs from PyTorch and ONNX models"""
+    diffs = []
+    for i, (t, o) in enumerate(zip(torch_outputs, onnx_outputs)):
+        diffs.append(np.abs(t - o).max())
+        print(f"Output{i+1} max abs diff: {diffs[-1]}")
+    overall = max(diffs)
+    if overall < 1e-5:
         print("✅ PyTorch and ONNX models produce similar results")
     else:
         print("⚠️ PyTorch and ONNX models have significant differences")
@@ -135,10 +138,10 @@ if __name__ == "__main__":
     onnx_outputs = load_onnx_model_and_infer(onnx_path, signals, context)
 
     # Compare results
-    compare_torch_and_onnx(torch_outputs.numpy(), onnx_outputs)
+    compare_torch_and_onnx((torch_outputs[0].numpy(), torch_outputs[1].numpy()), onnx_outputs)
 
     print("\nExample inference with ONNX model:")
     print(f"Input signals shape: {signals.shape}")
     print(f"Input context shape: {context.shape}")
-    print(f"Output shape: {onnx_outputs.shape}")
-    print(f"First prediction: {onnx_outputs[0]}")
+    print(f"Output1 shape: {onnx_outputs[0].shape}, Output2 shape: {onnx_outputs[1].shape}")
+    print(f"First predictions: {onnx_outputs[0][0]}, {onnx_outputs[1][0]}")
