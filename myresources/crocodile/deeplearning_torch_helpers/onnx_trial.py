@@ -67,17 +67,18 @@ def save_model_to_onnx(model: Any, sample_input: Any, file_path: str):
         model,                                # Model being exported
         sample_input,                         # Sample inputs to the model
         file_path,                            # Output file
+        dynamo=False,
         export_params=True,                   # Store the trained weights
         # opset_version=23,                     # ONNX version to use
         do_constant_folding=True,             # Optimization: fold constants
-        input_names=['signals', 'context'],   # Names for inputs
-        output_names=['output1', 'output2'],  # Names for outputs
-        dynamic_axes={                        # Specify dynamic axes
-            'signals': {0: 'batch_size'},
-            'context': {0: 'batch_size'},
-            'output1': {0: 'batch_size'},
-            'output2': {0: 'batch_size'}
-        }
+        # input_names=['signals', 'context'],   # Names for inputs
+        # output_names=['output1', 'output2'],  # Names for outputs
+        # dynamic_axes={                        # Specify dynamic axes
+        #     'signals': {0: 'batch_size'},
+        #     'context': {0: 'batch_size'},
+        #     'output1': {0: 'batch_size'},
+        #     'output2': {0: 'batch_size'}
+        # }
     )
     print(f"Model exported to {file_path}")
 
@@ -92,7 +93,6 @@ def load_onnx_model_and_infer(onnx_path: Any, signals: Any, context: Any):
         'signals': signals.numpy(),
         'context': context.numpy()
     }
-
     # Run inference
     outputs = session.run(None, input_feed=onnx_inputs)
 

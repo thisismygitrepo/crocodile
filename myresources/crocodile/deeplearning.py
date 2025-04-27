@@ -44,6 +44,10 @@ class Specs:
         S(slf.ip_shapes).print(as_config=True, title="Input Shapes")
         S(slf.op_shapes).print(as_config=True, title="Output Shapes")
         S(slf.other_shapes).print(as_config=True, title="Other Shapes")
+    @staticmethod
+    def sample_input(slf: SpecsLike, batch_size: int = 32) -> dict[str, npt.NDArray[np.float64]]:
+        """Generate a sample input based on the input shapes."""
+        return {name: np.random.rand(batch_size, *shape) for name, shape in slf.ip_shapes.items()}
 
 
 @dataclass

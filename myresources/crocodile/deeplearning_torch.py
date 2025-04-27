@@ -24,7 +24,7 @@ import numpy as np
 import numpy.typing as npt
 
 from crocodile.file_management import P
-from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, SpecsLike
+from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, Specs, SpecsLike, HyperParams, get_hp_save_dir
 
 from abc import ABC
 from typing import Any, TypeVar, Union, Optional
@@ -362,3 +362,37 @@ class MeanAbsoluteError:
         x = self.x_mask * x
         y = self.y_mask * y
         return (abs(x - y)).mean()
+
+
+def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
+    save_dir = get_hp_save_dir(hp=hp)
+    print("💾 Saving model weights and artifacts...")
+    t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
+    t.save(model, save_dir.joinpath("model.pth"))
+    meta_dir = save_dir.joinpath("metadata/training")
+    import orjson
+    save_dir.joinpath("hparams.json").write_text(orjson.dumps(hp, option=orjson.OPT_INDENT_2).decode())
+    save_dir.joinpath("specs.json").write_text(orjson.dumps(specs, option=orjson.OPT_INDENT_2).decode())
+    meta_dir.joinpath("history.json").write_text(orjson.dumps(history, option=orjson.OPT_INDENT_2).decode())
+    print("\n📊 Creating and saving training visualizations...")
+    artist = plot_loss(history=history, y_label="loss")
+    artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+    onnx_path = save_dir.joinpath("model.onnx")
+    dy = {}
+    for k in specs.op_shapes.keys():
+        dy[k] = {0: 'batch_size'}
+    for k in specs.ip_shapes.keys():
+        dy[k] = {0: 'batch_size'}
+    try:
+        t.onnx.export(
+            model,
+            tuple(Specs.sample_input(specs, batch_size=1).values()),
+            str(onnx_path),
+            opset_version=20,
+            input_names=list(specs.ip_shapes.keys()),
+            output_names=list(specs.op_shapes.keys()),
+            dynamic_axes=dy
+        )
+        print(f"🚀 Model exported to ONNX format: {onnx_path}")
+    except Exception as e:
+        print(f"Error exporting model to ONNX format: {e}")
