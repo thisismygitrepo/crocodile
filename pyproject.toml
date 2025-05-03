@@ -119,4 +119,5 @@ dev = [
     "ipykernel>=6.29.5",
     "onnx>=1.17.0",
     "onnxruntime>=1.21.1",
+    "torchview>=0.2.7",
 ]
