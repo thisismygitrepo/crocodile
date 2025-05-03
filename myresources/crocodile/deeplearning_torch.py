@@ -384,9 +384,10 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
     for k in specs.ip_shapes.keys():
         dy[k] = {0: 'batch_size'}
     try:
+        dummy_dict = Specs.sample_input(specs, batch_size=1)
         t.onnx.export(
             model,
-            tuple(Specs.sample_input(specs, batch_size=1).values()),
+            tuple(t.Tensor(dummy_dict["x"])),
             str(onnx_path),
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
@@ -394,5 +395,12 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
             dynamic_axes=dy
         )
         print(f"🚀 Model exported to ONNX format: {onnx_path}")
+        import onnxruntime as ort
+        session = ort.InferenceSession(str(onnx_path))
+        op_onnx = session.run(None, dummy_dict)
+        op_torch = model(*dummy_dict.values())
+        diff = op_onnx[0] - op_torch.detach().cpu().numpy()
+        print(f"Difference between ONNX and Torch outputs: {diff.mean():.6f}")
+
     except Exception as e:
         print(f"Error exporting model to ONNX format: {e}")

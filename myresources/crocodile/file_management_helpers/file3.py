@@ -92,8 +92,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
 🔄 ════════════════════ CACHE UPDATE ════════════════════
 ⚠️  {self.name} cache: Updating cache from source func
 ⏱️  Age = {age} > {self.expire}
-════════════════════════════════════════════════════════
-""")
+════════════════════════════════════════════════════════""")
                 self.cache = self.source_func()
                 self.last_call_is_fresh = True
                 self.time_produced = datetime.now()
@@ -104,8 +103,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
 ✅ ════════════════════ USING CACHE ════════════════════
 📦 {self.name} cache: Using cached values
 ⏱️  Lag = {age}
-════════════════════════════════════════════════════════
-""")
+════════════════════════════════════════════════════════""")
         return self.cache
     @staticmethod
     def as_decorator(expire: Union[str, timedelta] = "1m", logger: Optional[PrintFunc] = None, path: OPLike = None,
@@ -129,8 +127,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
 ⚠️ ════════════════════ CLOUD FETCH WARNING ════════════════════
 🔄 Failed to get fresh data from cloud 
 📦 Using old cache @ {self.path}
-════════════════════════════════════════════════════════════════
-""")
+════════════════════════════════════════════════════════════════""")
         else:
             pass  # maybe we don't need to fetch it from cloud, if its too hot
         return self.reader(self.path)
@@ -169,8 +166,7 @@ class CacheV2(Generic[T]):
 📦 ════════════════════ CACHE V2 OPERATION ════════════════════
 🔄 {self.name} cache: Reading cached values from `{self.path}`
 ⏱️  Lag = {age} ms
-════════════════════════════════════════════════════════════════
-"""
+════════════════════════════════════════════════════════════════"""
                 try:
                     self.cache = self.reader(self.path)
                 except Exception as ex:
@@ -179,8 +175,7 @@ class CacheV2(Generic[T]):
 ❌ ════════════════════ CACHE V2 ERROR ════════════════════
 ⚠️  {self.name} cache: Cache file is corrupted
 🔍 Error: {ex}
-════════════════════════════════════════════════════════════
-"""
+════════════════════════════════════════════════════════════"""
                         self.logger(msg1 + msg2)
                     self.cache = self.source_func()
                     self.save(self.cache, self.path)
@@ -192,8 +187,7 @@ class CacheV2(Generic[T]):
 🆕 ════════════════════ NEW CACHE V2 ════════════════════
 🔄 {self.name} cache: Populating fresh cache from source func
 ℹ️  Reason: Previous cache never existed or there was an explicit fresh order
-════════════════════════════════════════════════════════════
-""")
+════════════════════════════════════════════════════════════""")
                 self.cache = self.source_func()
                 if self.path is None:
                     self.time_produced = time.time_ns() // 1_000_000
@@ -211,8 +205,7 @@ class CacheV2(Generic[T]):
 🔄 ════════════════════ CACHE V2 UPDATE ════════════════════
 ⚠️  {self.name} cache: Updating cache from source func
 ⏱️  Age = {age} ms > {self.expire} ms
-════════════════════════════════════════════════════════════
-""")
+════════════════════════════════════════════════════════════""")
                 self.cache = self.source_func()
                 if self.path is None:
                     self.time_produced = time.time_ns() // 1_000_000
@@ -224,8 +217,7 @@ class CacheV2(Generic[T]):
 ✅ ════════════════════ USING CACHE V2 ════════════════════
 📦 {self.name} cache: Using cached values
 ⏱️  Lag = {age} ms
-════════════════════════════════════════════════════════════
-""")
+════════════════════════════════════════════════════════════""")
         return self.cache
     @staticmethod
     def as_decorator(expire: int = 60000, logger: Optional[PrintFunc] = None, path: OPLike = None,
