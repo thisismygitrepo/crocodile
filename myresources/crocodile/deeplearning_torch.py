@@ -391,7 +391,7 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
         dummy_dict = Specs.sample_input(specs, batch_size=1)
         t.onnx.export(
             model,
-            tuple(t.Tensor(dummy_dict["x"])),
+            tuple(t.Tensor(dummy_dict[key]) for key in specs.ip_shapes),
             str(onnx_path),
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
