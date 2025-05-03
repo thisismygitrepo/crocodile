@@ -258,7 +258,7 @@ def load_onnx(save_dir: P):
     onnx.checker.check_model(onnx_model)
 
 
-def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
+def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any):
     save_dir = get_hp_save_dir(hp=hp)
     print("💾 Saving model weights and artifacts...")
     t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
@@ -275,6 +275,7 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
     artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
 
     print("Saving model to ONNX format...")
+    device = 'cpu'
     onnx_path = save_dir.joinpath("model.onnx")
     dy = {}
     for k in specs.op_shapes.keys():
@@ -283,9 +284,10 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
         dy[k] = {0: 'batch_size'}
     try:
         dummy_dict = Specs.sample_input(specs, batch_size=1)
+        model_cpu = model.to(device=device)
         t.onnx.export(
-            model,
-            tuple(t.Tensor(dummy_dict[key]) for key in specs.ip_shapes),
+            model_cpu,
+            tuple(t.Tensor(dummy_dict[key]).to(device=device) for key in specs.ip_shapes),
             str(onnx_path),
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
