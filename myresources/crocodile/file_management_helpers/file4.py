@@ -62,7 +62,14 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             tmp_path = slf.rename(path.parent.absolute() / randstr())
             path.delete(sure=True, verbose=verbose)
             tmp_path.rename(path)  # works if moving a path up and parent has same name
-        else: slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
+        else:
+            try:
+                slf.rename(path)  # self._return(res=path, inplace=True, operation='rename', orig=False, verbose=verbose, strict=True, msg='')
+            except OSError as oe: # OSError: [Errno 18] Invalid cross-device link:
+                # https://stackoverflow.com/questions/42392600/oserror-errno-18-invalid-cross-device-link
+                import shutil
+                shutil.move(str(slf), str(path))
+                _ = oe
         if verbose: print(f"🚚 MOVED {repr(self)} ==> {repr(path)}`")
         return path
     def copy(self, folder: OPLike = None, name: Optional[str]= None, path: OPLike = None, content: bool = False, verbose: bool = True, append: Optional[str] = None, overwrite: bool = False, orig: bool = False) -> 'P':  # tested %100  # TODO: replace `content` flag with ability to interpret "*" in resolve method.

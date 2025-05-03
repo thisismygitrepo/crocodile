@@ -23,7 +23,7 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 import numpy as np
 import numpy.typing as npt
 
-from crocodile.file_management import P
+from crocodile.file_management import P, PLike
 from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, Specs, SpecsLike, HyperParams, get_hp_save_dir
 
 from abc import ABC
@@ -118,17 +118,17 @@ class BaseModel:
         with t.no_grad():
             for batch in data_loader:
                 inputs, _ops, _other = batch
-                predictions = model(inputs)
+                predictions = model(*inputs)
                 results = [a_red.cpu().numpy() for a_red in predictions]
                 a_df = pd.DataFrame(np.array(results).flatten()).describe()
                 print("Stats of the output:")
                 print(a_df)
                 break
 
-    def save_model(self, save_dir: P) -> None:
-        t.save(self.model, save_dir.joinpath("model.pth"))
-    def save_weights(self, save_dir: P) -> None:
-        t.save(self.model.state_dict(), save_dir.joinpath("weights.pth"))
+    def save_model(self, save_dir: PLike) -> None:
+        t.save(self.model, P(save_dir).joinpath("model.pth"))
+    def save_weights(self, save_dir: PLike) -> None:
+        t.save(self.model.state_dict(), P(save_dir).joinpath("weights.pth"))
     @staticmethod
     def load_model(save_dir: P, map_location: Union[str, Device, None], weights_only: bool):
         print(f"Loading model from {save_dir} to Device `{map_location}`")
@@ -147,7 +147,7 @@ class BaseModel:
         return model
 
     @staticmethod
-    def load_weights(model: nn.Module, save_dir: P, map_location: Union[str, Device, None]):
+    def load_weights(model: nn.Module, save_dir: PLike, map_location: Union[str, Device, None]):
         if map_location is None and t.cuda.is_available():
             map_location = "cpu"
         path = save_dir.joinpath("weights.pth")
@@ -369,14 +369,18 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
     print("💾 Saving model weights and artifacts...")
     t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
     t.save(model, save_dir.joinpath("model.pth"))
+
     meta_dir = save_dir.joinpath("metadata/training")
     import orjson
     save_dir.joinpath("hparams.json").write_text(orjson.dumps(hp, option=orjson.OPT_INDENT_2).decode())
     save_dir.joinpath("specs.json").write_text(orjson.dumps(specs, option=orjson.OPT_INDENT_2).decode())
     meta_dir.joinpath("history.json").write_text(orjson.dumps(history, option=orjson.OPT_INDENT_2).decode())
+
     print("\n📊 Creating and saving training visualizations...")
     artist = plot_loss(history=history, y_label="loss")
     artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+
+    print("Saving model to ONNX format...")
     onnx_path = save_dir.joinpath("model.onnx")
     dy = {}
     for k in specs.op_shapes.keys():
@@ -384,9 +388,10 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
     for k in specs.ip_shapes.keys():
         dy[k] = {0: 'batch_size'}
     try:
+        dummy_dict = Specs.sample_input(specs, batch_size=1)
         t.onnx.export(
             model,
-            tuple(Specs.sample_input(specs, batch_size=1).values()),
+            tuple(t.Tensor(dummy_dict[key]) for key in specs.ip_shapes),
             str(onnx_path),
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
@@ -399,5 +404,13 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
         model_graph = draw_graph(model, ip)
         model_graph.visual_graph.render(str(meta_dir.joinpath("model_graph.png")), format='png')
         print(f"📈 Model graph saved to: {meta_dir.joinpath('model_graph.png')}")
+        import onnxruntime as ort
+        session = ort.InferenceSession(str(onnx_path))
+        op_onnx = session.run(None, dummy_dict)
+        op_torch = model(*dummy_dict.values())
+        diff = op_onnx[0] - op_torch.detach().cpu().numpy()
+        print(f"Difference between ONNX and Torch outputs: {diff.mean():.6f}")
+
     except Exception as e:
         print(f"Error exporting model to ONNX format: {e}")
+    return save_dir
