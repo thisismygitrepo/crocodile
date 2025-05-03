@@ -399,18 +399,21 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
             dynamic_axes=dy
         )
         print(f"🚀 Model exported to ONNX format: {onnx_path}")
-        ip = tuple(Specs.sample_input(specs, batch_size=1).values())
-        from torchview import draw_graph
-        model_graph = draw_graph(model, ip)
-        model_graph.visual_graph.render(str(meta_dir.joinpath("model_graph.png")), format='png')
-        print(f"📈 Model graph saved to: {meta_dir.joinpath('model_graph.png')}")
         import onnxruntime as ort
         session = ort.InferenceSession(str(onnx_path))
         op_onnx = session.run(None, dummy_dict)
         op_torch = model(*dummy_dict.values())
         diff = op_onnx[0] - op_torch.detach().cpu().numpy()
         print(f"Difference between ONNX and Torch outputs: {diff.mean():.6f}")
-
     except Exception as e:
         print(f"Error exporting model to ONNX format: {e}")
+
+    try:
+        ip = tuple(Specs.sample_input(specs, batch_size=1).values())
+        from torchview import draw_graph
+        model_graph = draw_graph(model, ip)
+        model_graph.visual_graph.render(str(meta_dir.joinpath("model_graph.png")), format='png')
+        print(f"📈 Model graph saved to: {meta_dir.joinpath('model_graph.png')}")
+    except Exception as e:
+        print(f"Error rendering model graph: {e}")
     return save_dir
