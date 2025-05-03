@@ -394,5 +394,10 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
             dynamic_axes=dy
         )
         print(f"🚀 Model exported to ONNX format: {onnx_path}")
+        ip = tuple(Specs.sample_input(specs, batch_size=1).values())
+        from torchview import draw_graph
+        model_graph = draw_graph(model, ip)
+        model_graph.visual_graph.render(str(meta_dir.joinpath("model_graph.png")), format='png')
+        print(f"📈 Model graph saved to: {meta_dir.joinpath('model_graph.png')}")
     except Exception as e:
         print(f"Error exporting model to ONNX format: {e}")
