@@ -248,7 +248,7 @@ class BaseModel:
 
 def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
     from torch import onnx
-    onnx_program = onnx.export(model, args=dummy_ip, verbose=True, dynamo=Tr)
+    onnx_program = onnx.export(model, args=dummy_ip, verbose=True, dynamo=True)
     save_path = save_dir.joinpath("model.onnx")
     onnx_program.save(str(save_path))
 def load_onnx(save_dir: P):
@@ -303,9 +303,10 @@ def save_all(model: Any, hp: HyperParams, specs: SpecsLike, history: Any):
         print(f"Error exporting model to ONNX format: {e}")
 
     try:
-        ip = tuple(Specs.sample_input(specs, batch_size=1).values())
+        # ip = tuple(Specs.sample_input(specs, batch_size=32).values())
+        input_sizes = tuple((32, ) + item for item in specs.ip_shapes.values())
         from torchview import draw_graph
-        model_graph = draw_graph(model, ip)
+        model_graph = draw_graph(model, input_size=input_sizes)
         model_graph.visual_graph.render(str(meta_dir.joinpath("model_graph.png")), format='png')
         print(f"📈 Model graph saved to: {meta_dir.joinpath('model_graph.png')}")
     except Exception as e:
