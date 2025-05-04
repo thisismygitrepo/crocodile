@@ -77,9 +77,9 @@ class BaseModel:
         if isinstance(y_pred_raw, t.Tensor):
             y_pred = (y_pred_raw.numpy(), )
         elif isinstance(y_pred_raw, list):
-            y_pred = [item.numpy() for item in y_pred_raw]  # type: ignore
+            y_pred = [item.cpu().numpy() for item in y_pred_raw]  # type: ignore
         elif isinstance(y_pred_raw, tuple):
-            y_pred = [item.numpy() for item in y_pred_raw]  # type: ignore
+            y_pred = [item.cpu().numpy() for item in y_pred_raw]  # type: ignore
         else:
             raise ValueError(f"y_pred_raw is of type {type(y_pred_raw)}")
 
