@@ -55,6 +55,7 @@ class BaseModel:
         specs: SpecsLike,
         split: dict[str, Any],
         dtype: t.dtype,
+        device: Device,
         names_test: Optional[list[str]] = None, batch_size: int = 32
         ) -> EvaluationData:
 
@@ -65,7 +66,7 @@ class BaseModel:
                                     split=split, specs=specs, aslice=aslice, indices=indices,
                                     use_slice=use_slice, which_split="test", size=batch_size
                                     )
-        ips = [t.Tensor(an_x_test).to(device="cpu", dtype=dtype) for an_x_test in x_test]
+        ips = [t.Tensor(an_x_test).to(device=device, dtype=dtype) for an_x_test in x_test]
         with t.no_grad():
             y_pred_raw = model(*ips)
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
