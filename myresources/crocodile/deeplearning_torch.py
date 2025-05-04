@@ -287,7 +287,7 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     for k in specs.ip_shapes.keys():
         dy[k] = {0: 'batch_size'}
     try:
-        dummy_dict = Specs.sample_input(specs, batch_size=1)
+        dummy_dict = Specs.sample_input(specs, batch_size=1, precision=hp.precision)
         model_cpu = model.to(device=device)
         t.onnx.export(
             model_cpu,
