@@ -21,6 +21,17 @@ from dataclasses import dataclass, field
 from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Protocol, Iterable
 
 
+HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
+PRECISON = Literal['float64', 'float32', 'float16']
+def precision2torch_dtype(precision: PRECISON) -> 't.dtype':
+    import torch  # type: ignore
+    match precision:
+        case 'float64': return torch.float64
+        case 'float32': return torch.float32
+        case 'float16': return torch.float16
+        case _: raise ValueError(f"Unknown precision: {precision}")
+
+
 class SpecsLike(Protocol):
     """Protocol defining the required attributes for specs-like objects"""
     ip_shapes: dict[str, tuple[int, ...]]
@@ -45,9 +56,12 @@ class Specs:
         S(slf.op_shapes).print(as_config=True, title="Output Shapes")
         S(slf.other_shapes).print(as_config=True, title="Other Shapes")
     @staticmethod
-    def sample_input(slf: SpecsLike, batch_size: int = 32) -> dict[str, npt.NDArray[np.float64]]:
+    def sample_input(slf: SpecsLike, precision: Optional[PRECISON], batch_size: int = 32) -> dict[str, npt.NDArray[np.float64] | npt.NDArray[np.float64]]:
         """Generate a sample input based on the input shapes."""
-        return {name: np.random.rand(batch_size, *shape) for name, shape in slf.ip_shapes.items()}
+        if precision is not None:
+            return {name: np.random.rand(batch_size, *shape).astype(precision) for name, shape in slf.ip_shapes.items()}
+        else:
+            return {name: np.random.rand(batch_size, *shape) for name, shape in slf.ip_shapes.items()}
 
 
 @dataclass
@@ -82,17 +96,6 @@ class Device(enum.Enum):
 SubclassedHParams = TypeVar("SubclassedHParams", bound='HParams')
 SubclassedDataReader = TypeVar("SubclassedDataReader", bound='DataReader')
 SubclassedBaseModel = TypeVar("SubclassedBaseModel", bound='BaseModel')
-
-
-HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
-PRECISON = Literal['float64', 'float32', 'float16']
-def precision2torch_dtype(precision: PRECISON) -> 't.dtype':
-    import torch  # type: ignore
-    match precision:
-        case 'float64': return torch.float64
-        case 'float32': return torch.float32
-        case 'float16': return torch.float16
-        case _: raise ValueError(f"Unknown precision: {precision}")
 
 
 class HyperParams(Protocol):
