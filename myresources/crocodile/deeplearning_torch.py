@@ -54,6 +54,7 @@ class BaseModel:
         model: Any,
         specs: SpecsLike,
         split: dict[str, Any],
+        dtype: t.dtype,
         names_test: Optional[list[str]] = None, batch_size: int = 32
         ) -> EvaluationData:
 
@@ -62,9 +63,11 @@ class BaseModel:
         use_slice: bool = False
         x_test, y_test, _others_test = DataReader.sample_dataset(
                                     split=split, specs=specs, aslice=aslice, indices=indices,
-                                    use_slice=use_slice, which_split="test", size=batch_size)
+                                    use_slice=use_slice, which_split="test", size=batch_size
+                                    )
+        ips = [t.Tensor(an_x_test).to(device="cpu", dtype=dtype) for an_x_test in x_test]
         with t.no_grad():
-            y_pred_raw = model([t.Tensor(item) for item in x_test])
+            y_pred_raw = model(*ips)
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
 
         if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
@@ -309,8 +312,9 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         input_sizes = tuple((32, ) + item for item in specs.ip_shapes.values())
         from torchview import draw_graph
         model_graph = draw_graph(model, input_size=input_sizes)
-        model_graph.visual_graph.render(str(meta_dir.joinpath("model_graph.png")), format='png')
-        print(f"📈 Model graph saved to: {meta_dir.joinpath('model_graph.png')}")
+        graph_path = meta_dir.parent.joinpath("model_graph.png")
+        model_graph.visual_graph.render(str(graph_path), format='png')
+        print(f"📈 Model graph saved to: {graph_path}")
     except Exception as e:
         print(f"Error rendering model graph: {e}")
     return save_dir
