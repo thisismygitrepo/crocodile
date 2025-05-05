@@ -233,10 +233,10 @@ class BaseModel:
 def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any):
     save_dir = get_hp_save_dir(hp=hp)
     hp.root = str(P(hp.root).collapseuser())
+
     print("💾 Saving model weights and artifacts...")
     t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
     t.save(model, save_dir.joinpath("model.pth"))
-
     meta_dir = save_dir.joinpath("metadata/training")
     import orjson
     save_dir.joinpath("hparams.json").write_text(orjson.dumps(hp, option=orjson.OPT_INDENT_2).decode())
@@ -247,14 +247,16 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     artist = plot_loss(history=history, y_label="loss")
     artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
 
-    print("Saving model to ONNX format...")
+    print("💾 Saving model to ONNX format...")
     device = 'cpu'
     onnx_path = save_dir.joinpath("model.onnx")
+
     dy = {}
     for k in specs.op_shapes.keys():
         dy[k] = {0: 'batch_size'}
     for k in specs.ip_shapes.keys():
         dy[k] = {0: 'batch_size'}
+
     try:
         dummy_dict = Specs.sample_input(specs, batch_size=1, precision=hp.precision)
         model_cpu = model.to(device=device)
@@ -290,4 +292,5 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         print(f"📈 Model graph saved to: {graph_path}")
     except Exception as e:
         print(f"Error rendering model graph: {e}")
+
     return save_dir
