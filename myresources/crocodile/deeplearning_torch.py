@@ -48,16 +48,9 @@ class BaseModel:
         self.optimizer = optimizer
         self.metrics = metrics
         self.history: list[dict[str, Any]] = []
-
     @staticmethod
-    def evaluate(
-        model: Any,
-        specs: SpecsLike,
-        split: dict[str, Any],
-        dtype: t.dtype,
-        device: Device,
-        names_test: Optional[list[str]] = None, batch_size: int = 32
-        ) -> EvaluationData:
+    def evaluate(model: Any, specs: SpecsLike, split: dict[str, Any], dtype: t.dtype, device: Device,
+                 names_test: Optional[list[str]] = None, batch_size: int = 32) -> EvaluationData:
 
         aslice: Optional[slice] = None  # slice(0, -1, 1)
         indices: Optional[list[int]] = None
@@ -70,10 +63,8 @@ class BaseModel:
         with t.no_grad():
             y_pred_raw = model(*ips)
         names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
-
         if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: names_test_resolved = names_test
-
         if isinstance(y_pred_raw, t.Tensor):
             y_pred = (y_pred_raw.numpy(), )
         elif isinstance(y_pred_raw, list):
@@ -82,10 +73,8 @@ class BaseModel:
             y_pred = [item.cpu().numpy() for item in y_pred_raw]  # type: ignore
         else:
             raise ValueError(f"y_pred_raw is of type {type(y_pred_raw)}")
-
         results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved],
-                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(prediction=y_pred, groun_truth=y_test)
-                                 )
+                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(prediction=y_pred, groun_truth=y_test))
         return results
 
     @staticmethod
@@ -151,9 +140,7 @@ class BaseModel:
 
     @staticmethod
     def infer(model: nn.Module, xx: tuple[npt.NDArray[np.float64 | np.float32], ...],
-                                          device: Device,
-                                          data_precision: Optional[str]
-                                          ) -> tuple[npt.NDArray[np.float32 | np.float64], ...]:
+             device: Device, data_precision: Optional[str]) -> tuple[npt.NDArray[np.float32 | np.float64], ...]:
         model.eval()
         if data_precision is None:
             xx_ = tuple(t.tensor(data=an_x).to(device=device) for an_x in xx)
@@ -167,14 +154,7 @@ class BaseModel:
         with t.no_grad(): op = model(*xx_)
         return tuple(an_op.cpu().detach().numpy() for an_op in op)
 
-    def fit(self, epochs: int,
-            train_loader: DataLoader[T],
-            test_loader: DataLoader[T],
-            ):
-        """
-        Standard training loop for Pytorch models. It is assumed that the model is already on the correct device.
-        """
-
+    def fit(self, epochs: int, train_loader: DataLoader[T], test_loader: DataLoader[T]):
         model = self.model
         loss_func = self.loss
         optimizer = self.optimizer
@@ -300,12 +280,13 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         print(f"Error exporting model to ONNX format: {e}")
 
     try:
-        # ip = tuple(Specs.sample_input(specs, batch_size=32).values())
         input_sizes = tuple((32, ) + item for item in specs.ip_shapes.values())
         from torchview import draw_graph
-        model_graph = draw_graph(model, input_size=input_sizes)
+        model_graph = draw_graph(model, input_size=input_sizes, show_shapes=True, depth=6, expand_nested=True,
+                                 hide_inner_tensors=True,
+                                 hide_module_functions=False, save_graph=True)
         graph_path = meta_dir.parent.joinpath("model_graph")
-        model_graph.visual_graph.render(str(graph_path), format='png')
+        model_graph.visual_graph.render(filename=str(graph_path), format='png')
         print(f"📈 Model graph saved to: {graph_path}")
     except Exception as e:
         print(f"Error rendering model graph: {e}")
