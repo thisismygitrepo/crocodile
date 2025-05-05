@@ -250,20 +250,9 @@ class BaseModel:
         return float(np.array(losses).mean(axis=0).squeeze())
 
 
-def save_onnx(model: nn.Module, dummy_ip: t.Tensor, save_dir: P):
-    from torch import onnx
-    onnx_program = onnx.export(model, args=dummy_ip, verbose=True, dynamo=True)
-    save_path = save_dir.joinpath("model.onnx")
-    onnx_program.save(str(save_path))
-def load_onnx(save_dir: P):
-    save_path = save_dir.joinpath("model.onnx")
-    from torch import onnx
-    onnx_model = onnx.load(save_path)
-    onnx.checker.check_model(onnx_model)
-
-
 def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any):
     save_dir = get_hp_save_dir(hp=hp)
+    hp.root = str(P(hp.root).collapseuser())
     print("💾 Saving model weights and artifacts...")
     t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
     t.save(model, save_dir.joinpath("model.pth"))
@@ -289,9 +278,10 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     try:
         dummy_dict = Specs.sample_input(specs, batch_size=1, precision=hp.precision)
         model_cpu = model.to(device=device)
+        inputs = tuple(t.Tensor(dummy_dict[key]).to(device=device) for key in specs.ip_shapes)
         t.onnx.export(
             model_cpu,
-            tuple(t.Tensor(dummy_dict[key]).to(device=device) for key in specs.ip_shapes),
+            inputs,
             str(onnx_path),
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
@@ -302,9 +292,10 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         import onnxruntime as ort
         session = ort.InferenceSession(str(onnx_path))
         op_onnx = session.run(None, dummy_dict)
-        op_torch = model(*dummy_dict.values())
-        diff = op_onnx[0] - op_torch.detach().cpu().numpy()
-        print(f"Difference between ONNX and Torch outputs: {diff.mean():.6f}")
+        op_torch = model(*inputs)
+        for idx, (an_op_nnx, an_op_torch) in enumerate(zip(op_onnx, op_torch)):
+            diff = an_op_nnx - an_op_torch.detach().cpu().numpy()
+            print(f"{idx}- Difference between ONNX and Torch outputs: {diff.mean():.6f}")
     except Exception as e:
         print(f"Error exporting model to ONNX format: {e}")
 
@@ -313,7 +304,7 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         input_sizes = tuple((32, ) + item for item in specs.ip_shapes.values())
         from torchview import draw_graph
         model_graph = draw_graph(model, input_size=input_sizes)
-        graph_path = meta_dir.parent.joinpath("model_graph.png")
+        graph_path = meta_dir.parent.joinpath("model_graph")
         model_graph.visual_graph.render(str(graph_path), format='png')
         print(f"📈 Model graph saved to: {graph_path}")
     except Exception as e:

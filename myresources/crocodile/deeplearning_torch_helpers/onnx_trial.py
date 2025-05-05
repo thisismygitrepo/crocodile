@@ -4,9 +4,6 @@ Example of creating a PyTorch model, saving it to ONNX, and performing inference
 
 import torch
 import torch.nn as nn
-import numpy as np
-import onnxruntime as ort
-from typing import Any
 
 
 class PredictionModel(nn.Module):
@@ -41,107 +38,40 @@ class PredictionModel(nn.Module):
         x = self.conv3(x)
         x = self.gelu(x)
         x = x.view(x.size(0), -1)  # Flatten
-
         # Process context info
         c = self.linear_context1(context)
         c = self.gelu(c)
         c = self.linear_context2(c)
         c = self.gelu(c)
-
         # Combine signal and context features
         x = torch.cat([x, c], dim=1)
-
         # Final prediction layers
         x = self.linear(x)
         x = self.lrelu(x)
         x = self.linear2(x)
         x = self.gelu(x)
         x = self.linear3(x)
-
         return x, x * 2
 
 
-def save_model_to_onnx(model: Any, sample_input: Any, file_path: str):
-    """Save PyTorch model to ONNX format"""
-    torch.onnx.export(
-        model,                                # Model being exported
-        sample_input,                         # Sample inputs to the model
-        file_path,                            # Output file
-        dynamo=False,
-        export_params=True,                   # Store the trained weights
-        # opset_version=23,                     # ONNX version to use
-        do_constant_folding=True,             # Optimization: fold constants
-        # input_names=['signals', 'context'],   # Names for inputs
-        # output_names=['output1', 'output2'],  # Names for outputs
-        # dynamic_axes={                        # Specify dynamic axes
-        #     'signals': {0: 'batch_size'},
-        #     'context': {0: 'batch_size'},
-        #     'output1': {0: 'batch_size'},
-        #     'output2': {0: 'batch_size'}
-        # }
-    )
-    print(f"Model exported to {file_path}")
-
-
-def load_onnx_model_and_infer(onnx_path: Any, signals: Any, context: Any):
-    """Load an ONNX model and perform inference"""
-    # Create ONNX Runtime session
-    session = ort.InferenceSession(onnx_path)
-
-    # Prepare inputs - need to match input_names used when saving
-    onnx_inputs = {
-        'signals': signals.numpy(),
-        'context': context.numpy()
-    }
-    # Run inference
-    outputs = session.run(None, input_feed=onnx_inputs)
-
-    return outputs
-
-
-def compare_torch_and_onnx(torch_outputs: Any, onnx_outputs: Any):
-    """Compare two outputs from PyTorch and ONNX models"""
-    diffs = []
-    for i, (t, o) in enumerate(zip(torch_outputs, onnx_outputs)):
-        diffs.append(np.abs(t - o).max())
-        print(f"Output{i+1} max abs diff: {diffs[-1]}")
-    overall = max(diffs)
-    if overall < 1e-5:
-        print("✅ PyTorch and ONNX models produce similar results")
-    else:
-        print("⚠️ PyTorch and ONNX models have significant differences")
-
-
 if __name__ == "__main__":
-    # Set random seed for reproducibility
     torch.manual_seed(42)
-
-    # Create model instance
     model = PredictionModel(input_channels=4, context_size=8)
 
-    # Generate sample inputs for the model (batch_size=32)
+    from crocodile.deeplearning_torch import save_all
+    from crocodile.deeplearning import HParams, Specs
+    from crocodile.file_management import P
+    hp = HParams(
+        seed=1, shuffle=True, precision="float32", test_split=0.2, learning_rate=0.1, batch_size=32, epochs=1, name="onnx_trial", root=str(P.home().joinpath("tmp_results", "model_root"))
+    )
+
     batch_size = 32
     sequence_length = 50
     signals = torch.randn(batch_size, 4, sequence_length)  # Shape: [batch, channels, sequence_length]
     context = torch.randn(batch_size, 8)                  # Shape: [batch, context_features]
 
-    # Run inference with PyTorch model
-    model.eval()
-    with torch.no_grad():
-        torch_outputs = model(signals, context)
-
-    # Save model to ONNX format
-    onnx_path = "prediction_model.onnx"
-    save_model_to_onnx(model, (signals, context), onnx_path)
-
-    # Load ONNX model and perform inference
-    onnx_outputs = load_onnx_model_and_infer(onnx_path, signals, context)
-
-    # Compare results
-    compare_torch_and_onnx((torch_outputs[0].numpy(), torch_outputs[1].numpy()), onnx_outputs)
-
-    print("\nExample inference with ONNX model:")
-    print(f"Input signals shape: {signals.shape}")
-    print(f"Input context shape: {context.shape}")
-    print(f"Output1 shape: {onnx_outputs[0].shape}, Output2 shape: {onnx_outputs[1].shape}")
-    print(f"First predictions: {onnx_outputs[0][0]}, {onnx_outputs[1][0]}")
+    specs = Specs(
+        ip_shapes={"signals": (4, sequence_length), "context": (8,)},
+        op_shapes={"output1": (2,), "output2": (2,)}  # Assuming the output shape is (2,)
+    )
+    save_all(model=model, hp=hp, specs=specs, history=[{"train": [0.1, 0.2, 3, 4], "test": [2, 1, 1, 2]}])
