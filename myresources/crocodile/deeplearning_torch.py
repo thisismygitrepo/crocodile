@@ -232,7 +232,7 @@ class BaseModel:
 
 def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any):
     save_dir = get_hp_save_dir(hp=hp)
-    hp.root = str(P(hp.root).collapseuser())
+    hp.root = str(P(hp.root).collapseuser(strict=False))
 
     print("💾 Saving model weights and artifacts...")
     t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
