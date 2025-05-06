@@ -13,7 +13,7 @@ import numpy.typing as npt
 import matplotlib.pyplot as plt
 
 from crocodile.file_management import P
-from crocodile.deeplearning import PRECISON, get_hp_save_dir, plot_loss, BaseModel as TF_BASE_MODEL
+from crocodile.deeplearning import PRECISION, get_hp_save_dir, plot_loss, BaseModel as TF_BASE_MODEL
 from crocodile.deeplearning_torch import BaseModel
 
 from typing import Literal, TypeAlias
@@ -26,7 +26,7 @@ WHICH: TypeAlias = Literal["train", "test"]
 @dataclass(frozen=True, slots=True)
 class HParams:
     in_features: int = 10
-    precision: PRECISON = "float32"
+    precision: PRECISION = "float32"
     lr: float = 0.001
     epochs: int = 500
     shuffle: bool = True

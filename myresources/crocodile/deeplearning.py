@@ -22,8 +22,8 @@ from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Proto
 
 
 HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
-PRECISON = Literal['float64', 'float32', 'float16']
-def precision2torch_dtype(precision: PRECISON) -> 't.dtype':
+PRECISION = Literal['float64', 'float32', 'float16']
+def precision2torch_dtype(precision: PRECISION) -> 't.dtype':
     import torch  # type: ignore
     match precision:
         case 'float64': return torch.float64
@@ -56,7 +56,7 @@ class Specs:
         S(slf.op_shapes).print(as_config=True, title="Output Shapes")
         S(slf.other_shapes).print(as_config=True, title="Other Shapes")
     @staticmethod
-    def sample_input(slf: SpecsLike, precision: Optional[PRECISON], batch_size: int = 32) -> dict[str, npt.NDArray[np.float64] | npt.NDArray[np.float64]]:
+    def sample_input(slf: SpecsLike, precision: Optional[PRECISION], batch_size: int = 32) -> dict[str, npt.NDArray[np.float64] | npt.NDArray[np.float64]]:
         """Generate a sample input based on the input shapes."""
         if precision is not None:
             return {name: np.random.rand(batch_size, *shape).astype(precision) for name, shape in slf.ip_shapes.items()}
@@ -106,7 +106,7 @@ class HyperParams(Protocol):
     # ===================== Data ==============================
     seed: int
     shuffle: bool
-    precision: PRECISON
+    precision: PRECISION
 
     # ===================== Training ==========================
     test_split: float
@@ -124,7 +124,7 @@ class HParams:
     # ===================== Data ==============================
     seed: int
     shuffle: bool
-    precision: PRECISON
+    precision: PRECISION
     # ===================== Model =============================
     # depth = 3
     # ===================== Training ==========================
@@ -298,7 +298,7 @@ class DataReader:
         return inputs, outputs, others
 
     @staticmethod
-    def get_random_inputs_outputs(batch_size: int, dtype: PRECISON,
+    def get_random_inputs_outputs(batch_size: int, dtype: PRECISION,
                                   ip_shapes: dict[str, tuple[int, ...]],
                                   op_shapes: dict[str, tuple[int, ...]]):
         x = [np.random.randn(batch_size, * ip_shape).astype(dtype) for ip_shape in ip_shapes.values()]

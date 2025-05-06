@@ -24,7 +24,7 @@ class HParams(dl.HParams):
     # ===================== Data ==============================
     seed: int = 234
     shuffle: bool = True
-    precision: dl.PRECISON  = 'float32'
+    precision: dl.PRECISION  = 'float32'
     # ===================== Model =============================
     # depth = 3
     # ===================== Training ==========================
