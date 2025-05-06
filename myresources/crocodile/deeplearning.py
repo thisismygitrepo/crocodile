@@ -215,14 +215,15 @@ class DataReader:
                        split_kwargs: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         # populating data specs ip / op shapes based on arguments sent to this method.
         split: dict[str, Any] = {}
-        strings = Specs.get_all_names(specs)
         keys = list(data_dict.keys())
-        if len(strings) != len(keys) or set(keys) != set(strings):
-            S(specs.__dict__).print(as_config=True, title="Specs Declared")
-            # S(data_dict).print(as_config=True, title="Specs Declared")
-            print(f"data_dict keys: {keys}")
-            raise ValueError("Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
+
         if populate_shapes:
+            strings = Specs.get_all_names(specs)
+            if len(strings) != len(keys) or set(keys) != set(strings):
+                S(specs.__dict__).print(as_config=True, title="Specs Declared")
+                # S(data_dict).print(as_config=True, title="Specs Declared")
+                print(f"data_dict keys: {keys}")
+                raise ValueError("Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
             delcared_ip_shapes = specs.ip_shapes
             delcared_op_shapes = specs.op_shapes
             delcared_other_shapes = specs.other_shapes
@@ -243,12 +244,13 @@ class DataReader:
                     print(f"Declared op shapes VS populated output shapes:     {delcared_op_shapes} ?= {specs.op_shapes}")
                     print(f"Declared other shapes VS populated other shapes:     {delcared_other_shapes} ?= {specs.other_shapes}")
                     raise ValueError("Shapes mismatch! The shapes that you declared do not match the shapes of the data dictionary passed to split method.")
+
         from sklearn.model_selection import train_test_split as tts  # pylint: disable=import-error  # type: ignore  # noqa
         # tts = model_selection.train_test_split
-        args = [data_dict[item] for item in strings]
+        args = [data_dict[item] for item in keys]
         result = tts(*args, test_size=test_size, shuffle=shuffle, random_state=random_state, **split_kwargs if split_kwargs is not None else {})
-        split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(strings)})
-        split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(strings)})
+        split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(keys)})
+        split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(keys)})
         print("================== Training Data Split ===========================")
         S(split).print()
         print("==================================================================")
