@@ -48,6 +48,82 @@ class BaseModel:
         self.optimizer = optimizer
         self.metrics = metrics
         self.history: list[dict[str, Any]] = []
+
+    def fit(self, epochs: int, train_loader: DataLoader[T], test_loader: DataLoader[T]):
+        model = self.model
+        loss_func = self.loss
+        optimizer = self.optimizer
+        metrics = self.metrics
+        history: list[dict[str, Any]] = self.history
+
+        batch_idx: int = 0
+        train_losses: list[float] = []
+        test_losses: list[float] = []
+        print('🚀 Training'.center(100, '-'))
+        for an_epoch in range(epochs):
+            train_loss = 0.0
+            total_samples = 0
+            model.train()  # Double checking
+            for batch_idx, batch in enumerate(train_loader):
+                _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch)
+                batch_length = len(batch[0])
+                loss_value = loss_tensor.item()
+                train_loss += loss_value * batch_length
+                total_samples += batch_length
+                if (batch_idx % 100) == 0:
+                    print(f'⚡ Training Loss = {train_loss/total_samples:0.2f}, Batch {batch_idx}/{len(train_loader)}', end='\r')
+            test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, metrics=metrics)
+            train_losses.append(train_loss / total_samples)
+            test_losses.append(test_loss)
+            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
+        print('✨ Training Completed'.center(100, '-'))
+        history.append({'train_loss': train_losses, 'test_loss': test_losses})
+        return train_losses, test_losses
+
+    @staticmethod
+    def train_step(model: nn.Module, loss_func: nn.Module, optimizer: Optimizer,
+                   batch: tuple[tuple[t.Tensor,  ...], tuple[t.Tensor,  ...], tuple[t.Tensor,  ...]],
+                   ):
+        x, y, _name = batch
+        optimizer.zero_grad()  # clear the gradients of all optimized variables
+        output = model.forward(*x)
+        try:
+            loss_val = loss_func(output, y)
+        except Exception as e:
+            for idx, (an_output, an_y) in enumerate(zip(output, y)):
+                if an_output.shape != an_y.shape:
+                    print(f'❌ Output shape = {an_output.shape}, Y shape = {an_y.shape}')
+                    raise ValueError(f"Shapes of output and y do not match at index {idx}") from e
+            for idx, (an_output, an_y) in enumerate(zip(output, y)):
+                if an_output.dtype != an_y.dtype:
+                    print(f'❌ Output dtype = {an_output.dtype}, Y dtype = {an_y.dtype}')
+                    raise ValueError(f"Data types of output and y do not match at index {idx}") from e
+            raise e
+        loss_val.backward()
+        optimizer.step()
+        return output, loss_val
+
+    @staticmethod
+    def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor]):
+        with t.no_grad():
+            x, y, _name = batch
+            op = model(*x)
+            loss_val = loss_func(op, y)
+            return op, loss_val
+
+    @staticmethod
+    def test(model: nn.Module, loss_func: nn.Module, loader: DataLoader[T], metrics: list[nn.Module]):
+        model.eval()
+        losses: list[list[float]] = []
+        for _idx, batch in enumerate(loader):
+            prediction, loss_value = BaseModel.test_step(model=model, loss_func=loss_func, batch=batch)
+            per_batch_losses: list[float] = [loss_value.item()]
+            for a_metric in metrics:
+                loss_value = a_metric(prediction, batch[1])
+                per_batch_losses.append(loss_value.item())
+            losses.append(per_batch_losses)
+        return float(np.array(losses).mean(axis=0).squeeze())
+
     @staticmethod
     def evaluate(model: Any, specs: SpecsLike, split: dict[str, Any], dtype: t.dtype, device: Device,
                  names_test: Optional[list[str]] = None, batch_size: int = 32) -> EvaluationData:
@@ -153,81 +229,6 @@ class BaseModel:
                 raise ValueError(f"Data precision {data_precision} not supported.")
         with t.no_grad(): op = model(*xx_)
         return tuple(an_op.cpu().detach().numpy() for an_op in op)
-
-    def fit(self, epochs: int, train_loader: DataLoader[T], test_loader: DataLoader[T]):
-        model = self.model
-        loss_func = self.loss
-        optimizer = self.optimizer
-        metrics = self.metrics
-        history: list[dict[str, Any]] = self.history
-
-        batch_idx: int = 0
-        train_losses: list[float] = []
-        test_losses: list[float] = []
-        print('🚀 Training'.center(100, '-'))
-        for an_epoch in range(epochs):
-            train_loss = 0.0
-            total_samples = 0
-            model.train()  # Double checking
-            for batch_idx, batch in enumerate(train_loader):
-                _output, loss_tensor = BaseModel.train_step(model=model, loss_func=loss_func, optimizer=optimizer, batch=batch)
-                batch_length = len(batch[0])
-                loss_value = loss_tensor.item()
-                train_loss += loss_value * batch_length
-                total_samples += batch_length
-                if (batch_idx % 100) == 0:
-                    print(f'⚡ Training Loss = {train_loss/total_samples:0.2f}, Batch {batch_idx}/{len(train_loader)}', end='\r')
-            test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, metrics=metrics)
-            train_losses.append(train_loss / total_samples)
-            test_losses.append(test_loss)
-            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
-        print('✨ Training Completed'.center(100, '-'))
-        history.append({'train_loss': train_losses, 'test_loss': test_losses})
-        return train_losses, test_losses
-
-    @staticmethod
-    def train_step(model: nn.Module, loss_func: nn.Module, optimizer: Optimizer,
-                   batch: tuple[tuple[t.Tensor,  ...], tuple[t.Tensor,  ...], tuple[t.Tensor,  ...]],
-                   ):
-        x, y, _name = batch
-        optimizer.zero_grad()  # clear the gradients of all optimized variables
-        output = model.forward(*x)
-        try:
-            loss_val = loss_func(output, y)
-        except Exception as e:
-            for idx, (an_output, an_y) in enumerate(zip(output, y)):
-                if an_output.shape != an_y.shape:
-                    print(f'❌ Output shape = {an_output.shape}, Y shape = {an_y.shape}')
-                    raise ValueError(f"Shapes of output and y do not match at index {idx}") from e
-            for idx, (an_output, an_y) in enumerate(zip(output, y)):
-                if an_output.dtype != an_y.dtype:
-                    print(f'❌ Output dtype = {an_output.dtype}, Y dtype = {an_y.dtype}')
-                    raise ValueError(f"Data types of output and y do not match at index {idx}") from e
-            raise e
-        loss_val.backward()
-        optimizer.step()
-        return output, loss_val
-
-    @staticmethod
-    def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor]):
-        with t.no_grad():
-            x, y, _name = batch
-            op = model(*x)
-            loss_val = loss_func(op, y)
-            return op, loss_val
-
-    @staticmethod
-    def test(model: nn.Module, loss_func: nn.Module, loader: DataLoader[T], metrics: list[nn.Module]):
-        model.eval()
-        losses: list[list[float]] = []
-        for _idx, batch in enumerate(loader):
-            prediction, loss_value = BaseModel.test_step(model=model, loss_func=loss_func, batch=batch)
-            per_batch_losses: list[float] = [loss_value.item()]
-            for a_metric in metrics:
-                loss_value = a_metric(prediction, batch[1])
-                per_batch_losses.append(loss_value.item())
-            losses.append(per_batch_losses)
-        return float(np.array(losses).mean(axis=0).squeeze())
 
 
 def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any):
