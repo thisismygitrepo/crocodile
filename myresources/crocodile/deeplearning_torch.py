@@ -85,8 +85,9 @@ class BaseModel:
                    batch: tuple[tuple[t.Tensor,  ...], tuple[t.Tensor,  ...], tuple[t.Tensor,  ...]],
                    ):
         x, y, _name = batch
+        # x, y= batch
         optimizer.zero_grad()  # clear the gradients of all optimized variables
-        output = model.forward(*x)
+        output = model(*x)
         try:
             loss_val = loss_func(output, y)
         except Exception as e:
@@ -107,6 +108,7 @@ class BaseModel:
     def test_step(model: nn.Module, loss_func: nn.Module, batch: tuple[t.Tensor, t.Tensor, t.Tensor]):
         with t.no_grad():
             x, y, _name = batch
+            # x, y = batch
             op = model(*x)
             loss_val = loss_func(op, y)
             return op, loss_val

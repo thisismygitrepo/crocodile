@@ -261,7 +261,7 @@ class AdvancedModelTrainer(Generic[T]):
         """
         Parses a batch from the DataLoader. Assumes batch is (inputs, targets, *optional_other_data).
         Inputs can be a single tensor or a tuple/list of tensors.
-        Targets are expected to be a single tensor.
+        Targets are expected to be a single tensor or tuple/list of tensors.
         Override this method if your DataLoader yields batches in a different format.
         """
         if len(batch) == 2: # inputs, targets
@@ -271,21 +271,35 @@ class AdvancedModelTrainer(Generic[T]):
         else:
             raise ValueError(f"Batch format not understood. Expected (inputs, targets, *optional) but got {len(batch)} elements.")
         
-        if isinstance(inputs, (list, tuple)):
-            inputs = [item.to(self.device) for item in inputs]
-        else:
-            inputs = inputs.to(self.device)
-        targets = targets.to(self.device)
+        # Recursively move tensors to device, supporting nested structures
+        inputs = self._to_device(inputs)
+        targets = self._to_device(targets)
+        
         return inputs, targets
+        
+    def _to_device(self, data: Any) -> Any:
+        """
+        Recursively moves data to the configured device.
+        Handles tensors, lists, tuples, and dictionaries containing tensors.
+        """
+        if isinstance(data, torch.Tensor):
+            return data.to(self.device)
+        elif isinstance(data, (list, tuple)):
+            return type(data)(self._to_device(item) for item in data)
+        elif isinstance(data, dict):
+            return {k: self._to_device(v) for k, v in data.items()}
+        else:
+            # For other types (e.g., scalars, numpy arrays), return as is
+            # If needed, you could add conversion for numpy arrays here
+            return data
 
     def _train_step(self, batch: Any) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, float]]:
         inputs, targets = self._parse_batch(batch)
-        
         with torch.amp.autocast('cuda', enabled=self.use_amp):
-            if isinstance(inputs, (list, tuple)):
-                outputs = self.model(*inputs)
-            else:
-                outputs = self.model(inputs)
+            # Always treat inputs as a tuple of tensors to unpack
+            if not isinstance(inputs, (list, tuple)):
+                inputs = (inputs,)
+            outputs = self.model(*inputs)
             
             try:
                 loss = self.criterion(outputs, targets)
@@ -525,13 +539,43 @@ if __name__ == '__main__':
     X_test_np = np.random.rand(200, 10).astype(np.float32)
     y_test_np = (X_test_np @ np.random.rand(10, 1).astype(np.float32) + np.random.randn(200,1).astype(np.float32) * 0.1).astype(np.float32)
 
-    train_dataset = TensorDataset(torch.from_numpy(X_train_np), torch.from_numpy(y_train_np))
-    val_dataset = TensorDataset(torch.from_numpy(X_val_np), torch.from_numpy(y_val_np))
-    test_dataset = TensorDataset(torch.from_numpy(X_test_np), torch.from_numpy(y_test_np))
+    # Convert numpy arrays to PyTorch tensors
+    X_train = torch.from_numpy(X_train_np)
+    y_train = torch.from_numpy(y_train_np)
+    X_val = torch.from_numpy(X_val_np)
+    y_val = torch.from_numpy(y_val_np)
+    X_test = torch.from_numpy(X_test_np)
+    y_test = torch.from_numpy(y_test_np)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32)
-    test_loader = DataLoader(test_dataset, batch_size=32)
+    # Create datasets with sample indices as the third element
+    train_dataset = TensorDataset(X_train, y_train)
+    val_dataset = TensorDataset(X_val, y_val)
+    test_dataset = TensorDataset(X_test, y_test)
+
+    # Custom collate function to add the sample info as third element
+    def train_collate_fn(batch):
+        inputs = torch.stack([item[0] for item in batch])
+        targets = torch.stack([item[1] for item in batch])
+        # Add sample indices as the third element (name/other_info)
+        indices = [f"sample_{i}" for i in range(len(batch))]
+        return (inputs, ), targets, indices
+
+    def val_collate_fn(batch):
+        inputs = torch.stack([item[0] for item in batch])
+        targets = torch.stack([item[1] for item in batch])
+        indices = [f"val_sample_{i}" for i in range(len(batch))]
+        return (inputs, ), targets, indices
+        
+    def test_collate_fn(batch):
+        inputs = torch.stack([item[0] for item in batch])
+        targets = torch.stack([item[1] for item in batch])
+        indices = [f"test_sample_{i}" for i in range(len(batch))]
+        return (inputs, ), targets, indices
+    
+    # Create data loaders with the collate functions
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=train_collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=32, collate_fn=val_collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=32, collate_fn=test_collate_fn)
 
     # 2. Simple Model
     class SimpleNet(nn.Module):
@@ -540,11 +584,22 @@ if __name__ == '__main__':
             self.fc1 = nn.Linear(input_dim, 64)
             self.relu = nn.ReLU()
             self.fc2 = nn.Linear(64, output_dim)
+        
         def forward(self, x):
+            # Simple forward function that takes a single input tensor
+            # The model is called with model(*x) where x is the first element from the batch
+            # Which is just the input tensor itself
             return self.fc2(self.relu(self.fc1(x)))
 
     model = SimpleNet(input_dim=10, output_dim=1)
 
+    # Example of using the older BaseModel from crocodile.deeplearning_torch
+    from crocodile.deeplearning_torch import BaseModel
+    mm = BaseModel(model=model, loss=nn.MSELoss(), optimizer=optim.Adam(lr=0.005, params=model.parameters()), metrics=[])
+    mm.fit(epochs=50, train_loader=train_loader, test_loader=test_loader)
+
+    # Create a new model for our AdvancedModelTrainer
+    model = SimpleNet(input_dim=10, output_dim=1)
     # 3. Loss, Optimizer, Scheduler
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4) # AdamW is often better
@@ -559,7 +614,7 @@ if __name__ == '__main__':
 
     metrics_dict = {"r2": r_squared}
     # 5. Callbacks
-    early_stopper = EarlyStopping(monitor='val_loss', patience=10, verbose=True, restore_best_weights=True)
+    early_stopper = EarlyStopping(monitor='val_loss', patience=100, verbose=True, restore_best_weights=True)
     # {epoch:02d} means epoch number with 2 digits, zero-padded. {val_loss:.2f} means val_loss formatted to 2 decimal places.
     model_checkpointer = ModelCheckpoint(filepath='./checkpoints/best_model_epoch_{epoch:02d}_valloss_{val_loss:.4f}.pth',
                                          monitor='val_loss', mode='min', save_best_only=True, verbose=True)
@@ -593,12 +648,6 @@ if __name__ == '__main__':
 
 
     # 8. Evaluate on Test Set (using the best model restored by EarlyStopping or loaded manually)
-    # If EarlyStopping restored best weights, trainer.model is already the best one.
-    # Otherwise, load the best checkpoint:
-    # best_model_path = "./checkpoints/best_model_..." # Find the actual best model path
-    # checkpoint = torch.load(best_model_path)
-    # trainer.model.load_state_dict(checkpoint) # Or checkpoint['model_state_dict'] if not save_weights_only
-    
     print("\nEvaluating on Test Set:")
     test_results = trainer.evaluate(test_loader)
     print(f"Test Results: {test_results}")
@@ -606,7 +655,7 @@ if __name__ == '__main__':
     # 9. Make Predictions
     print("\nMaking predictions on Test Set (first batch):")
     # Create a small loader for prediction example
-    first_batch_test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False) 
+    first_batch_test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False, collate_fn=test_collate_fn) 
     predictions = trainer.predict(first_batch_test_loader) # Returns a list of tensors (one per batch)
     
     print(f"Shape of first prediction batch: {predictions[0].shape}")
@@ -614,6 +663,8 @@ if __name__ == '__main__':
 
     # Print history
     print("\nTraining History:")
-    for key, values in history.items():
-        if values: # Only print if there's data
-            print(f"{key}: {[f'{v:.4f}' for v in values]}")
+    import pandas as pd
+    print(pd.DataFrame(history))
+    # for key, values in history.items():
+    #     if values: # Only print if there's data
+    #         print(f"{key}: {[f'{v:.4f}' for v in values]}")
