@@ -17,7 +17,7 @@ from crocodile.file_management import P, PLike
 from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, Specs, SpecsLike, HyperParams, get_hp_save_dir
 
 from typing import Any, TypeVar, Union, Optional
-
+import time
 
 T = TypeVar('T', bound=Any)
 Flatten = t.nn.Flatten
@@ -61,6 +61,7 @@ class BaseModel:
         test_losses: list[float] = []
         print('🚀 Training'.center(100, '-'))
         for an_epoch in range(epochs):
+            t_start_epoch = time.time()
             train_loss = 0.0
             total_samples = 0
             model.train()  # Double checking
@@ -75,7 +76,7 @@ class BaseModel:
             test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, metrics=metrics)
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
-            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
+            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}. Epoch duration {(time.time() - t_start_epoch)/60:0.1f} minutes.')
         print('✨ Training Completed'.center(100, '-'))
         history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
