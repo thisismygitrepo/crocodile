@@ -255,11 +255,11 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     device = 'cpu'
     onnx_path = save_dir.joinpath("model.onnx")
 
-    dy = {}
-    for k in specs.op_shapes.keys():
-        dy[k] = {0: 'batch_size'}
-    for k in specs.ip_shapes.keys():
-        dy[k] = {0: 'batch_size'}
+    dynamic_axes = {}
+    for an_op_name in specs.op_shapes.keys():
+        dynamic_axes[an_op_name] = {0: 'batch_size'}
+    for an_ip_name in specs.ip_shapes.keys():
+        dynamic_axes[an_ip_name] = {0: 'batch_size'}
 
     try:
         dummy_dict = Specs.sample_input(specs, batch_size=1, precision=hp.precision)
@@ -272,7 +272,7 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
             output_names=list(specs.op_shapes.keys()),
-            dynamic_axes=dy
+            dynamic_axes=dynamic_axes
         )
         print(f"🚀 Model exported to ONNX format: {onnx_path}")
         import onnxruntime as ort
@@ -294,6 +294,11 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         graph_path = meta_dir.parent.joinpath("model_graph")
         model_graph.visual_graph.render(filename=str(graph_path), format='png')
         print(f"📈 Model graph saved to: {graph_path}")
+
+        from torchinfo import summary
+        summ = summary(model=model, verbose=1, input_size=input_sizes,)
+        meta_dir.parent.joinpath("model_summary.txt").write_text(summ)
+
     except Exception as e:
         print(f"Error rendering model graph: {e}")
 
