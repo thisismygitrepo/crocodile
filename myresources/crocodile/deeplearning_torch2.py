@@ -18,10 +18,8 @@ T = TypeVar('T')
 class Callback:
     def __init__(self):
         self.trainer = None # Will be set by the trainer
-
     def set_trainer(self, trainer):
         self.trainer = trainer
-
     def on_train_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
     def on_train_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
     def on_epoch_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
@@ -153,7 +151,12 @@ class TensorBoardLogger(Callback):
         for key, value in logs.items():
             if isinstance(value, (int, float)):
                 self.writer.add_scalar(key, value, epoch)
-        # Log learning rate
+        # Log learning rate using get_last_lr() instead of relying on verbose output
+        if self.trainer and self.trainer.lr_scheduler:
+            if hasattr(self.trainer.lr_scheduler, 'get_last_lr'):
+                for i, lr in enumerate(self.trainer.lr_scheduler.get_last_lr()):
+                    self.writer.add_scalar(f'learning_rate/group_{i}', lr, epoch)
+        # Also log from optimizer directly as a fallback
         if self.trainer and self.trainer.optimizer:
             for i, param_group in enumerate(self.trainer.optimizer.param_groups):
                 self.writer.add_scalar(f'learning_rate/group_{i}', param_group['lr'], epoch)
@@ -581,10 +584,10 @@ if __name__ == '__main__':
     class SimpleNet(nn.Module):
         def __init__(self, input_dim, output_dim):
             super().__init__()
-            self.fc1 = nn.Linear(input_dim, 64)
+            self.fc1 = nn.Linear(input_dim, 640000)
             self.relu = nn.ReLU()
-            self.fc2 = nn.Linear(64, output_dim)
-        
+            self.fc2 = nn.Linear(640000, output_dim)
+
         def forward(self, x):
             # Simple forward function that takes a single input tensor
             # The model is called with model(*x) where x is the first element from the batch
@@ -597,14 +600,20 @@ if __name__ == '__main__':
     from crocodile.deeplearning_torch import BaseModel
     mm = BaseModel(model=model, loss=nn.MSELoss(), optimizer=optim.Adam(lr=0.005, params=model.parameters()), metrics=[])
     mm.fit(epochs=50, train_loader=train_loader, test_loader=test_loader)
+    import pandas as pd
+    import plotly.express as px
+    df = pd.DataFrame(mm.history[0]).reset_index(names=["epoch"])
+    fig = px.line(data_frame=df, x='epoch', y=['train_loss', 'test_loss'], title='Training and Validation Loss')
+    fig.show()
+    # raise ValueError
 
     # Create a new model for our AdvancedModelTrainer
     model = SimpleNet(input_dim=10, output_dim=1)
     # 3. Loss, Optimizer, Scheduler
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4) # AdamW is often better
-    # Scheduler that reduces LR when validation loss plateaus
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+    # Scheduler that reduces LR when validation loss plateaus - remove verbose parameter
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
 
     # 4. Metrics (optional)
     def r_squared(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
@@ -614,7 +623,7 @@ if __name__ == '__main__':
 
     metrics_dict = {"r2": r_squared}
     # 5. Callbacks
-    early_stopper = EarlyStopping(monitor='val_loss', patience=100, verbose=True, restore_best_weights=True)
+    early_stopper = EarlyStopping(monitor='train_loss', patience=10000, verbose=True, restore_best_weights=True)
     # {epoch:02d} means epoch number with 2 digits, zero-padded. {val_loss:.2f} means val_loss formatted to 2 decimal places.
     model_checkpointer = ModelCheckpoint(filepath='./checkpoints/best_model_epoch_{epoch:02d}_valloss_{val_loss:.4f}.pth',
                                          monitor='val_loss', mode='min', save_best_only=True, verbose=True)
@@ -642,7 +651,7 @@ if __name__ == '__main__':
     print(f"Using device: {trainer.device}")
     print(f"Using AMP: {trainer.use_amp}")
 
-    history = trainer.fit(epochs=50, train_loader=train_loader, val_loader=val_loader)
+    history = trainer.fit(epochs=500, train_loader=train_loader, val_loader=val_loader)
     # To resume:
     # history = trainer.fit(epochs=100, train_loader=train_loader, val_loader=val_loader, resume_from_checkpoint='./checkpoints/last_checkpoint.pth')
 
