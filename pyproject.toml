@@ -122,5 +122,6 @@ dev = [
     "onnxruntime>=1.21.1",
     "tensorboard>=2.19.0",
     "torch>=2.6.0",
+    "torchinfo>=1.8.0",
     "torchview>=0.2.7",
 ]

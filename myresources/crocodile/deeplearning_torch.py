@@ -17,7 +17,7 @@ from crocodile.file_management import P, PLike
 from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, Specs, SpecsLike, HyperParams, get_hp_save_dir
 
 from typing import Any, TypeVar, Union, Optional
-
+import time
 
 T = TypeVar('T', bound=Any)
 Flatten = t.nn.Flatten
@@ -61,6 +61,7 @@ class BaseModel:
         test_losses: list[float] = []
         print('🚀 Training'.center(100, '-'))
         for an_epoch in range(epochs):
+            t_start_epoch = time.time()
             train_loss = 0.0
             total_samples = 0
             model.train()  # Double checking
@@ -75,7 +76,7 @@ class BaseModel:
             test_loss = BaseModel.test(model=model, loss_func=loss_func, loader=test_loader, metrics=metrics)
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
-            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}')
+            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}. Epoch duration {(time.time() - t_start_epoch)/60:0.1f} minutes.')
         print('✨ Training Completed'.center(100, '-'))
         history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
@@ -254,11 +255,11 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     device = 'cpu'
     onnx_path = save_dir.joinpath("model.onnx")
 
-    dy = {}
-    for k in specs.op_shapes.keys():
-        dy[k] = {0: 'batch_size'}
-    for k in specs.ip_shapes.keys():
-        dy[k] = {0: 'batch_size'}
+    dynamic_axes = {}
+    for an_op_name in specs.op_shapes.keys():
+        dynamic_axes[an_op_name] = {0: 'batch_size'}
+    for an_ip_name in specs.ip_shapes.keys():
+        dynamic_axes[an_ip_name] = {0: 'batch_size'}
 
     try:
         dummy_dict = Specs.sample_input(specs, batch_size=1, precision=hp.precision)
@@ -271,7 +272,7 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
             opset_version=20,
             input_names=list(specs.ip_shapes.keys()),
             output_names=list(specs.op_shapes.keys()),
-            dynamic_axes=dy
+            dynamic_axes=dynamic_axes
         )
         print(f"🚀 Model exported to ONNX format: {onnx_path}")
         import onnxruntime as ort
@@ -293,6 +294,11 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
         graph_path = meta_dir.parent.joinpath("model_graph")
         model_graph.visual_graph.render(filename=str(graph_path), format='png')
         print(f"📈 Model graph saved to: {graph_path}")
+
+        from torchinfo import summary
+        summ = summary(model=model, verbose=1, input_size=input_sizes,)
+        meta_dir.parent.joinpath("model_summary.txt").write_text(summ)
+
     except Exception as e:
         print(f"Error rendering model graph: {e}")
 

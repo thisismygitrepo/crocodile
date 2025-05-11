@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset # Added TensorDataset for example
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import GradScaler
 from torch.utils.tensorboard import SummaryWriter # For TensorBoard logging
 import numpy as np
 # import time
@@ -623,7 +623,7 @@ if __name__ == '__main__':
 
     metrics_dict = {"r2": r_squared}
     # 5. Callbacks
-    early_stopper = EarlyStopping(monitor='train_loss', patience=10000, verbose=True, restore_best_weights=True)
+    early_stopper = EarlyStopping(monitor='val_loss', patience=30, verbose=True, restore_best_weights=False)
     # {epoch:02d} means epoch number with 2 digits, zero-padded. {val_loss:.2f} means val_loss formatted to 2 decimal places.
     model_checkpointer = ModelCheckpoint(filepath='./checkpoints/best_model_epoch_{epoch:02d}_valloss_{val_loss:.4f}.pth',
                                          monitor='val_loss', mode='min', save_best_only=True, verbose=True)
@@ -651,7 +651,7 @@ if __name__ == '__main__':
     print(f"Using device: {trainer.device}")
     print(f"Using AMP: {trainer.use_amp}")
 
-    history = trainer.fit(epochs=500, train_loader=train_loader, val_loader=val_loader)
+    history = trainer.fit(epochs=100, train_loader=train_loader, val_loader=val_loader)
     # To resume:
     # history = trainer.fit(epochs=100, train_loader=train_loader, val_loader=val_loader, resume_from_checkpoint='./checkpoints/last_checkpoint.pth')
 
