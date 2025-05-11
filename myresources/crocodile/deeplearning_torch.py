@@ -77,8 +77,8 @@ class BaseModel:
             train_losses.append(train_loss / total_samples)
             test_losses.append(test_loss)
             epoch_duration = (time.time() - t_start_epoch)/60
-            eta = (epochs - an_epoch) * epoch_duration
-            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}. Epoch duration {epoch_duration:0.1f} minutes. ETA {eta:0.1f} minutes.')
+            eta_hours = ((epochs - an_epoch) * epoch_duration) / 60
+            print(f'🔄 Epoch: {an_epoch:3}/{epochs}, train / test loss: {train_loss/total_samples:1.3f} / {test_losses[-1]:1.3f}. Epoch duration {epoch_duration:0.1f} minutes. ETA {eta_hours:0.1f} hours.')
         print('✨ Training Completed'.center(100, '-'))
         history.append({'train_loss': train_losses, 'test_loss': test_losses})
         return train_losses, test_losses
