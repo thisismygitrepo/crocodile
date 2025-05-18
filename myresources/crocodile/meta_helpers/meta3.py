@@ -2,7 +2,7 @@ from crocodile.core import install_n_import, List, Struct
 from crocodile.file_management import P, OPLike, PLike
 import os
 from typing import Union, Any, Optional
-from crocodile.meta_helpers.meta1 import Scout, scout
+from crocodile.meta_helpers.meta1 import Scout
 from crocodile.meta_helpers.meta11 import Response
 from crocodile.meta_helpers.meta2 import MACHINE, Terminal
 
@@ -102,12 +102,16 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         return self._remote_machine  # echo %OS% TODO: uname on linux
     def get_local_distro(self) -> str:
         if self._local_distro is None:
-            res = install_n_import("distro").name(pretty=True)
+            command = """uv run --with distro python -c "import distro; print(distro.name(pretty=True))" """
+            import subprocess
+            res = subprocess.run(command, shell=True, capture_output=True, text=True).stdout.strip()
             self._local_distro = res
             return res
         return self._local_distro
     def get_remote_distro(self):
-        if self._remote_distro is None: self._remote_distro = self.run_py("print(install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
+        if self._remote_distro is None:
+            self._remote_distro = self.run_py("print(install_n_import('distro').name(pretty=True))", verbose=False).op_if_successfull_or_default() or ""
+            # q.run("""~/.local/bin/uv run --with distro python -c "import distro; print(distro.name(pretty=True))" """)
         return self._remote_distro
     def restart_computer(self): self.run("Restart-Computer -Force" if self.get_remote_machine() == "Windows" else "sudo reboot")
     def send_ssh_key(self):

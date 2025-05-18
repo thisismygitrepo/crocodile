@@ -29,12 +29,6 @@ class ArtLib:
         cowsay = install_n_import("cowsay")
         char = random.choice(cowsay.char_names)
         return cowsay.get_output_string(char, text=text)
-    # @staticmethod
-    # def figlet(text: str):
-    #     pyfiglet = install_n_import("pyfiglet")
-    #     fs = pyfiglet.FigletFont.getFonts()
-    #     f = pyfiglet.Figlet(font=random.choice(fs))
-    #     return f.renderText(text)
 
 
 class BoxStyles:

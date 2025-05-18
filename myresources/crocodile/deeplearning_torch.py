@@ -249,9 +249,13 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     save_dir.joinpath("specs.json").write_text(orjson.dumps(specs, option=orjson.OPT_INDENT_2).decode())
     meta_dir.joinpath("history.json").write_text(orjson.dumps(history, option=orjson.OPT_INDENT_2).decode())
 
-    print("\n📊 Creating and saving training visualizations...")
-    artist = plot_loss(history=history, y_label="loss")
-    artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+    try:
+        print("\n📊 Creating and saving training visualizations...")
+        artist = plot_loss(history=history, y_label="loss")
+        artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
+    except Exception as e:
+        print(f"Error creating training visualizations: {e}")
+        print("❌ Failed to create training visualizations.")
 
     print("💾 Saving model to ONNX format...")
     device = 'cpu'
@@ -287,21 +291,34 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     except Exception as e:
         print(f"Error exporting model to ONNX format: {e}")
 
+    input_sizes = tuple((32, ) + item for item in specs.ip_shapes.values())
     try:
-        input_sizes = tuple((32, ) + item for item in specs.ip_shapes.values())
         from torchview import draw_graph
         model_graph = draw_graph(model, input_size=input_sizes, show_shapes=True, depth=6, expand_nested=True,
                                  hide_inner_tensors=True,
-                                 hide_module_functions=False, save_graph=True)
+                                 hide_module_functions=False, save_graph=True,
+                                    #  mode="eager",           # <<< add this
+                                    # strict=False            # <<< and relax strictness
+                                 )
         graph_path = meta_dir.parent.joinpath("model_graph")
         model_graph.visual_graph.render(filename=str(graph_path), format='png')
         print(f"📈 Model graph saved to: {graph_path}")
-
-        from torchinfo import summary
-        summ = summary(model=model, verbose=1, input_size=input_sizes,)
-        meta_dir.parent.joinpath("model_summary.txt").write_text(summ)
-
     except Exception as e:
         print(f"Error rendering model graph: {e}")
+
+    try:
+        # from torchviz import make_dot
+        # dot = make_dot(model(*inputs), params=dict(model.named_parameters()))
+        # dot_path = meta_dir.parent.joinpath("model_graph_dot")
+        # dot.render(filename=str(dot_path), format='png')
+        # print(f"📈 Model graph (dot) saved to: {dot_path}")
+        from torchinfo import summary
+        summ = summary(model=model.float(), verbose=1, input_size=input_sizes,)
+        meta_dir.parent.joinpath("model_summary.txt").write_text(str(summ))
+        print(f"📈 Model summary saved to: {meta_dir.parent.joinpath('model_summary.txt')}"
+                )
+    except Exception as e:
+        print(f"Error rendering model summary: {e}")
+        print("❌ Failed to create model summary.")
 
     return save_dir
