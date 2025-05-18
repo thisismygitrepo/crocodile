@@ -43,7 +43,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         return self
     def send2trash(self, verbose: bool = True) -> 'P':
         if self.exists():
-            install_n_import(library="send2trash").send2trash(self.resolve().to_str())
+            from send2trash import send2trash
+            send2trash(self.resolve().to_str())
             if verbose: print(f"🗑️ TRASHED {repr(self)}")
             return self  # do not expand user symlinks.
         elif verbose:
@@ -450,7 +451,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if slf.suffix == ".7z":
             if overwrite: P(folder).delete(sure=True)
             result = folder
-            with install_n_import("py7zr").SevenZipFile(file=slf, mode='r', password=pwd) as archive:
+            import py7zr
+            with py7zr.SevenZipFile(file=slf, mode='r', password=pwd) as archive:
                 if pattern is not None:
                     import re
                     pat = re.compile(pattern)

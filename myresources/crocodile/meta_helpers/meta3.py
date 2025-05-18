@@ -117,7 +117,9 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
     def send_ssh_key(self):
         self.copy_from_here("~/.ssh/id_rsa.pub")
         assert self.get_remote_machine() == "Windows"
-        self.run(P(install_n_import("machineconfig").scripts.windows.__path__.__dict__["_path"][0]).joinpath("openssh_server_add_sshkey.ps1").read_text())
+        code_url = "https://raw.githubusercontent.com/thisismygitrepo/machineconfig/refs/heads/main/src/machineconfig/setup_windows/openssh-server_add-sshkey.ps1"
+        code = P(code_url).download().read_text(encoding="utf-8")
+        self.run(code)
     def copy_env_var(self, name: str):
         assert self.get_remote_machine() == "Linux"
         return self.run(f"{name} = {os.environ[name]}; export {name}")
