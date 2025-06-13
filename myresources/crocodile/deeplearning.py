@@ -134,7 +134,7 @@ class HParams:
     epochs: int
     # ================== General ==============================
     name: str  # field(default_factory=lambda: "model-" + randstr(noun=True))
-    root: P  # = P.tmp(folder="tmp_models")
+    root: str  # = P.tmp(folder="tmp_models")
     device_name: Device = Device.cpu
 
     def save(self):
