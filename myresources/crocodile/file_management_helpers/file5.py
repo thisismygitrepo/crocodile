@@ -11,7 +11,7 @@ class Read:
         if Path(path).is_dir(): raise IsADirectoryError(f"Path is a directory, not a file: {path}")
         suffix = Path(path).suffix[1:]
         if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
-        if suffix == "sqlite":
+        if suffix in ("sqlite", "sqlite3", "db"):
             from crocodile.database import DBMS
             res = DBMS.from_local_db(path=path)
             print(res.describe_db())
