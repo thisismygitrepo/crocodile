@@ -49,6 +49,8 @@ def assert_requirements():
         if platform.system() == "Windows":
             Terminal().run("winget install ImageMagick.ImageMagick", shell="powershell")  # gives ffmpeg as well
             print("You might need to restart your machine before PATH change impact takes place.")
+        elif platform.system() == "Darwin":
+            Terminal().run("brew install imagemagick", shell="bash")  # macOS uses Homebrew
         else: raise NotImplementedError from err
 
 

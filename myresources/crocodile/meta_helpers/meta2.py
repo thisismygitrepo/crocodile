@@ -56,6 +56,7 @@ class Terminal:
             desc="Script to be executed:"
             if platform.system() == "Windows": lexer = "powershell"
             elif platform.system() == "Linux": lexer = "sh"
+            elif platform.system() == "Darwin": lexer = "sh"  # macOS uses similar shell to Linux
             else: raise NotImplementedError(f"Platform {platform.system()} not supported for lexer {lexer}")
             from rich.console import Console
             from rich.panel import Panel

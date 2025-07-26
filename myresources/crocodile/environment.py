@@ -119,7 +119,7 @@ class ShellVar(object):
         if system == "Windows":
             res = f"set {key} {val}"
             return res  # if not run else tm.run(res, shell=shell)
-        elif system == "Linux":
+        elif system in ["Linux", "Darwin"]:  # macOS uses same shell syntax as Linux
             res = f"{key} = {val}"
             return res  # if not run else tm.run(res, shell="bash")
         else: raise NotImplementedError
@@ -139,7 +139,7 @@ class EnvVar:
                 res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters # in case the variable included ";" separated paths, this limit can be exceeded.
                 return res  # if not run else tm.run(res, shell="powershell")
             else: raise NotImplementedError
-        elif system == "Linux": return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
+        elif system in ["Linux", "Darwin"]: return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
         else: raise NotImplementedError
     @staticmethod
     def get(key: str):
@@ -155,6 +155,12 @@ class EnvVar:
             else:
                 result = fr'[Environment]::SetEnvironmentVariable("{key}",$null,"{scope}")'
                 return result  # if run is False else tm.run(result, shell="powershell")
+        elif system in ["Linux", "Darwin"]:
+            if temp:
+                result = f"unset {key}"  # temporary removal for current session
+                return result
+            else:
+                raise NotImplementedError("Permanent deletion of environment variables on Unix systems requires manual editing of shell profiles")
         else:
             raise NotImplementedError
 
