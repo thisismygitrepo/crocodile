@@ -51,7 +51,7 @@ def run_in_isolated_ve(packages: list[str], pyscript: str) -> str:
     packages_space_separated = " ".join(packages)
     packages_space_separated = "pip setuptools " + packages_space_separated
     ve_creation_cmd = f"""
-uv venv $HOME/venvs/tmp/{ve_name} --python 3.11
+uv venv $HOME/venvs/tmp/{ve_name} --python 3.13
 . $HOME/venvs/tmp/{ve_name}/bin/activate
 uv pip install {packages_space_separated}"""
     import time
@@ -64,8 +64,8 @@ uv pip install {packages_space_separated}"""
     script_path.write_text(pyscript, encoding='utf-8')
     import platform
     if platform.system() == "Windows":
-        fire_script = f"$HOME\\venv\\Scripts\\activate; python {script_path}"
-    else:
+        fire_script = f"$HOME\\venvs\\tmp\\{ve_name}\\Scripts\\activate; python {script_path}"
+    else:  # Linux and macOS use the same virtual environment structure
         fire_script = f"source $HOME/venvs/tmp/{ve_name}/bin/activate; python {script_path}"
     print(f"🔥 Running the script in the ve `{ve_name}`".center(75, "="))
     subprocess.run(fire_script, shell=True, check=True, executable='/bin/bash')

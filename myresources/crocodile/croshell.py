@@ -40,8 +40,8 @@ def print_header():
 
     # link to tutorial or github
     # import crocodile
-    # version = crocodile.__version__
-    version = ""
+    # import the ver    sion from pyproject.toml
+    version = "14.5"
     _ = Text(f"✨ 🐊 Crocodile Shell {version} ✨" + " Made with 🐍 | Built with ❤️\n")
     _.stylize("#05f8fc on #293536")
     console.print(_)
@@ -70,7 +70,7 @@ def print_logo(logo: str):
             print("🚫 " + "-" * 70 + " 🚫\n")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
-    else:
+    elif platform.system() in ["Linux", "Darwin"]:  # Explicitly handle both Linux and macOS
         def is_executable_in_path(executable_name: str) -> bool:
             path_dirs = os.environ['PATH'].split(os.pathsep)
             for path_dir in path_dirs:
@@ -92,10 +92,15 @@ def print_logo(logo: str):
             else: print(P(__file__).parent.joinpath("art").search().sample(size=1).list[0].read_text())
         else:
             print("\n" + "🚫 " + "-" * 70 + " 🚫")
-            print("🔍 Missing ASCII art dependencies. Install with: curl bit.ly/cfgasciiartlinux -L | sudo bash")
+            install_cmd = "curl bit.ly/cfgasciiartlinux -L | sudo bash" if platform.system() == "Linux" else "brew install cowsay lolcat boxes figlet"
+            print(f"🔍 Missing ASCII art dependencies. Install with: {install_cmd}")
             print("🚫 " + "-" * 70 + " 🚫\n")
             _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
             print(_default_art.read_text())
+    else:
+        print(f"⚠️ Platform {platform.system()} not supported for ASCII art. Using default art.")
+        _default_art = P(__file__).parent.joinpath("art").search().sample(size=1)[0]
+        print(_default_art.read_text())
 
 
 if __name__ == "__main__":
