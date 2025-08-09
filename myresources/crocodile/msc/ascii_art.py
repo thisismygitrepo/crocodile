@@ -65,7 +65,11 @@ def get_art(comment: Optional[str] = None, artlib: Optional[BOX_OR_CHAR] = None,
     * text => figlet font => boxes => lolcat
     * text => cowsay => lolcat
     """
-    if comment is None: comment = subprocess.run("fortune", shell=True, capture_output=True, text=True, check=True).stdout
+    if comment is None:
+        try:
+            comment = subprocess.run("fortune", shell=True, capture_output=True, text=True, check=True).stdout
+        except Exception:
+            comment = "crocodile"
     if artlib is None: artlib = random.choice(['boxes', 'cowsay'])
     to_file = '' if not file else f'> {file}'
     if artlib == 'boxes':
@@ -112,11 +116,13 @@ def character_color(logo: str):
 
 
 def character_or_box_color(logo: str):
-    assert platform.system() == 'Linux', 'This function is only for Linux.'
+    assert platform.system() in {'Linux', 'Darwin'}, 'This function is only for Linux and macOS.'
     _new_art = P.tmp().joinpath("tmp_arts").create().joinpath(f"{randstr()}.txt")
     get_art(logo, artlib=None, file=str(_new_art), verbose=False)
-    command = f"cat {_new_art} | lolcat"
-    os.system(command)  # full path since lolcat might not be in PATH.
+    # Prefer bat on mac if available, fallback to cat
+    pager = "bat" if (platform.system() == "Darwin" and any((P(p).joinpath("bat").exists() for p in os.environ.get("PATH", "").split(os.pathsep)))) else "cat"
+    command = f"{pager} {_new_art} | lolcat"
+    os.system(command)
     # try:
     #     output = subprocess.check_output(_cmd, shell=True, stderr=subprocess.STDOUT)
     # except subprocess.CalledProcessError as e:
