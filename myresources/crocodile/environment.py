@@ -120,7 +120,7 @@ class ShellVar(object):
             res = f"set {key} {val}"
             return res  # if not run else tm.run(res, shell=shell)
         elif system in ["Linux", "Darwin"]:  # macOS uses same shell syntax as Linux
-            res = f"{key} = {val}"
+            res = f"{key}={val}"
             return res  # if not run else tm.run(res, shell="bash")
         else: raise NotImplementedError
 
@@ -139,7 +139,7 @@ class EnvVar:
                 res = f"setx {key} {val}"  # WARNING: setx limits val to 1024 characters # in case the variable included ";" separated paths, this limit can be exceeded.
                 return res  # if not run else tm.run(res, shell="powershell")
             else: raise NotImplementedError
-        elif system in ["Linux", "Darwin"]: return f"export {key} = {val}"  # this is shell command. in csh: `setenv key val`
+        elif system in ["Linux", "Darwin"]: return f"export {key}={val}"  # this is shell command. in csh: `setenv key val`
         else: raise NotImplementedError
     @staticmethod
     def get(key: str):
@@ -184,9 +184,9 @@ class PathVar:
             elif kind == "replace": command = fr'$env:Path = "{sep.join(dirs)}"'  # Replace the Path variable in the current window (use with caution!):
             else: raise KeyError
             return command  # if run is False else tm.run(command, shell="powershell")
-        elif system == "Linux": result = f'export PATH="{sep.join(dirs)}:$PATH"'
+        elif system in ["Linux", "Darwin"]: result = f'export PATH="{sep.join(dirs)}:$PATH"'
         else: raise ValueError
-        return result  # if run is False else tm.run(result, shell="powershell")
+        return result  # if run is False else tm.run(result, shell="bash")
 
     @staticmethod
     def append_permanently(path: str, scope: Literal["User", "system"] = "User"):
@@ -201,9 +201,9 @@ class PathVar:
             result = backup + command
             return result  # if run is False else tm.run(result, shell="powershell").print()
         else:
-            file = P.home().joinpath(".bashrc")
-            txt = file.read_text()
-            file.write_text(txt + f"\nexport PATH='{path}:$PATH'", encoding="utf-8")
+            profile = P.home().joinpath(".zshrc") if system == "Darwin" else P.home().joinpath(".bashrc")
+            txt = profile.read_text() if profile.exists() else ""
+            profile.write_text(txt + f"\nexport PATH='{path}:$PATH'\n", encoding="utf-8")
 
     @staticmethod
     def set_permanetly(path: str, scope: Literal["User", "system"] = "User"):

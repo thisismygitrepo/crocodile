@@ -123,14 +123,17 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
             webbrowser.open(str(self))
             return self
         if sys.platform == "win32":  # double quotes fail with cmd. # os.startfile(filename)  # works for files and folders alike, but if opener is given, e.g. opener="start"
-            subprocess.Popen(f"powershell start '{self.expanduser().resolve().str}'" if opener is None else rf'powershell {opener} \'{self}\'')
+            subprocess.Popen(f"powershell start '{self.expanduser().resolve().to_str()}'" if opener is None else rf'powershell {opener} \'{self}\'')
             return self  # fails for folders. Start must be passed, but is not defined.
-        elif sys.platform == 'linux':
+        elif sys.platform.startswith('linux'):
             subprocess.call(["xdg-open", self.expanduser().resolve().to_str()])
             return self  # works for files and folders alike
-        else:
-            subprocess.call(["open", self.expanduser().resolve().str])
+        elif sys.platform == 'darwin':
+            subprocess.call(["open", self.expanduser().resolve().to_str()])
             return self  # works for files and folders alike  # mac
+        else:
+            subprocess.call(["open", self.expanduser().resolve().to_str()])
+            return self
     def __call__(self, *args: Any, **kwargs: Any) -> None:
         self.start(*args, **kwargs)
         return None
@@ -616,13 +619,15 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         rclone_cmd = f"""rclone copyto '{localpath.as_posix()}' '{cloud}:{rp.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
         from crocodile.meta import Terminal
         if verbose: print(f"{'⬆️'*5} UPLOADING with `{rclone_cmd}`")
-        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell").capture()
+        shell_to_use = "powershell" if sys.platform == "win32" else "bash"
+        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell=shell_to_use).capture()
         _ = [item.delete(sure=True) for item in to_del]
         assert res.is_successful(strict_err=False, strict_returcode=True), res.print(capture=False, desc="Cloud Storage Operation")
         if verbose: print(f"{'⬆️'*5} UPLOAD COMPLETED.")
         if share:
             if verbose: print("🔗 SHARING FILE")
-            res = Terminal().run(f"""rclone link '{cloud}:{rp.as_posix()}'""", shell="powershell").capture()
+            shell_to_use = "powershell" if sys.platform == "win32" else "bash"
+            res = Terminal().run(f"""rclone link '{cloud}:{rp.as_posix()}'""", shell=shell_to_use).capture()
             tmp = res.op2path(strict_err=False, strict_returncode=False)
             if tmp is None:
                 res.print()
@@ -645,7 +650,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         rclone_cmd = f"""rclone copyto '{cloud}:{remotepath.as_posix()}' '{localpath.as_posix()}' {'--progress' if verbose else ''} --transfers={transfers}"""
         from crocodile.meta import Terminal
         if verbose: print(f"{'⬇️' * 5} DOWNLOADING with `{rclone_cmd}`")
-        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
+        shell_to_use = "powershell" if sys.platform == "win32" else "bash"
+        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell=shell_to_use)
         success = res.is_successful(strict_err=False, strict_returcode=True)
         if not success:
             res.print(capture=False, desc="Cloud Storage Operation")
@@ -666,7 +672,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         rclone_cmd += (" --delete-during" if delete else "")
         from crocodile.meta import Terminal
         if verbose : print(rclone_cmd)
-        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell="powershell")
+        shell_to_use = "powershell" if sys.platform == "win32" else "bash"
+        res = Terminal(stdout=None if verbose else subprocess.PIPE).run(rclone_cmd, shell=shell_to_use)
         success = res.is_successful(strict_err=False, strict_returcode=True)
         if not success:
             res.print(capture=False, desc="Cloud Storage Operation")
