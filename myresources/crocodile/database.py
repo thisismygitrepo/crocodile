@@ -2,7 +2,7 @@
 import time
 from typing import Optional, Any, Callable
 
-import pandas as pd
+import polars as pl
 
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine, text, inspect as inspect__, Engine, Connection
@@ -147,13 +147,13 @@ class DBMS:
             for command in commands:
                 result = conn.execute(text(command))
             conn.commit()  # if driver is sqlite3, the connection is autocommitting. # this commit is only needed in case of DBAPI driver.
-            return res_func(result) if not df else pd.DataFrame(res_func(result))
+            return res_func(result) if not df else pl.DataFrame(res_func(result))
 
     def execute_begin_once(self, command: str, res_func: Callable[[Any], Any] = lambda x: x.all(), df: bool = False):
         with self.eng.begin() as conn:
             result = conn.execute(text(command))  # no need for commit regardless of driver
             result = res_func(result)
-        return result if not df else pd.DataFrame(result)
+        return result if not df else pl.DataFrame(result)
 
     def execute(self, command: str):
         with self.eng.begin() as conn:
@@ -163,7 +163,7 @@ class DBMS:
 
     # def execute_script(self, command: str, df: bool = False):
     #     with self.eng.begin() as conn: result = conn.executescript(text(command))
-    #     return result if not df else pd.DataFrame(result)
+    #     return result if not df else pl.DataFrame(result)
 
     # ========================== TABLES =====================================
     def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
@@ -179,7 +179,7 @@ class DBMS:
             print(f"Reading table `{table}` from schema `{sch}`")
         if self.con:
             res = self.con.execute(text(f'''SELECT * FROM {self._get_table_identifier(table, sch)} '''))
-            return pd.DataFrame(res.fetchmany(size))
+            return pl.DataFrame(res.fetchmany(size))
 
     def insert_dicts(self, table: str, *mydicts: dict[str, Any]) -> None:
         cmd = f"""INSERT INTO {table} VALUES """
@@ -200,7 +200,7 @@ class DBMS:
             res = dict(table=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6,
                        columns=len(tbl.exported_columns), schema=self.sch)
             res_all.append(res)
-        return pd.DataFrame(res_all)
+        return pl.DataFrame(res_all)
 
     def describe_table(self, table: str, sch: Optional[str] = None, dtype: bool = True) -> None:
         print(table.center(100, "="))
@@ -212,11 +212,10 @@ class DBMS:
         res = Struct(dict(name=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6))
         res.print(dtype=False, as_config=True, title="TABLE DETAILS")
         dat = self.read_table(table=table, sch=sch, size=2)
-        cols = self.get_columns(table, sch=sch)
-        df = pd.DataFrame.from_records(dat, columns=cols)
+        df = dat  # dat is already a polars DataFrame
         print("SAMPLE:\n", df)
         assert self.insp is not None
-        if dtype: print("\nDETAILED COLUMNS:\n", pd.DataFrame(self.insp.get_columns(table)))
+        if dtype: print("\nDETAILED COLUMNS:\n", pl.DataFrame(self.insp.get_columns(table)))
         print("\n" * 3)
 
 
@@ -246,12 +245,12 @@ def from_db(table: str):
     with db.eng.connect() as conn:
         res = conn.execute(text(f"""SELECT * FROM "{table}" """))
         records = res.fetchall()
-        df = pd.DataFrame(records, columns=['time', 'idx', 'idx_max', 'data'])
-        df['data'] = df['data'].apply(pickle.loads)
+        df = pl.DataFrame(records, schema=['time', 'idx', 'idx_max', 'data'])
+        df = df.with_columns(pl.col('data').map_elements(pickle.loads))
         return df
 
 
-def get_table_specs(engine: Engine, table_name: str) -> pd.DataFrame:
+def get_table_specs(engine: Engine, table_name: str) -> pl.DataFrame:
     inspector = inspect__(engine)
     # Collect table information
     columns_info = [{
@@ -283,7 +282,7 @@ def get_table_specs(engine: Engine, table_name: str) -> pd.DataFrame:
     # Indexe
     index_info = [{
         'name': idx['name'],
-        'type': f"Index on {', '.join(idx['column_names'])}",
+        'type': f"Index on {', '.join(col for col in idx['column_names'] if col)}",
         'nullable': None,
         'default': None,
         'autoincrement': None,
@@ -293,7 +292,7 @@ def get_table_specs(engine: Engine, table_name: str) -> pd.DataFrame:
     # Combine all information
     all_info = columns_info + pk_info + fk_info + index_info
     # Convert to DataFrame
-    df = pd.DataFrame(all_info)
+    df = pl.DataFrame(all_info)
     return df
 
 if __name__ == '__main__':
