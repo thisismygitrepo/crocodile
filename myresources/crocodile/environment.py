@@ -82,6 +82,13 @@ class NetworkAddresses(TypedDict):
     local_ip_v4: str
     default_gateway: Optional[str]
     public_ip_v4: str
+    @staticmethod
+    def __repr__(self) -> str:
+        # multiline repr with equal spacing and indentation irrespective of length of each field.
+        res = ""
+        for key, value in self.items():
+            res += f"{key}: {value}\n"
+        return res
 
 
 def get_network_addresses() -> NetworkAddresses:

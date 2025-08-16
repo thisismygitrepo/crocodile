@@ -101,6 +101,7 @@ class DBMS:
         """Establish lazy initialization with database"""
         from sqlalchemy.pool import StaticPool, NullPool
         _ = NullPool
+        _ = driver
         if str(path) == "memory":
             print("Linking to in-memory database.")
             if share_across_threads:
@@ -110,11 +111,12 @@ class DBMS:
                 return create_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         path_repr = path.as_uri() if path.is_file() else path
+        dialect = path.suffix[1:]
         print(f"Linking to database at {path_repr}")
         if pool_size == 0:
-            res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+            res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         else:
-            res = create_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+            res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
 
     @staticmethod

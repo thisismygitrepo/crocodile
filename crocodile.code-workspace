@@ -1,0 +1,13 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "terminal.integrated.cwd": "${workspaceFolder}",
+        "terminal.integrated.defaultLocation": "editor",
+        "python.terminal.activateEnvironment": true,
+        "python.defaultInterpreterPath": "./.venv/bin/python"
+    }
+}
