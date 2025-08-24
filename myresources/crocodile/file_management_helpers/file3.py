@@ -65,7 +65,8 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
                     self.cache = self.source_func()
                     self.last_call_is_fresh = True
                     self.time_produced = datetime.now()
-                    if self.path is not None: self.save(self.cache, self.path)
+                    if self.path is not None:
+                        self.save(self.cache, self.path)
                     return self.cache
                 return self(fresh=False)  # may be the cache is old ==> check that by passing it through the logic again.
             else:
@@ -135,7 +136,7 @@ class Cache(Generic[T]):  # This class helps to accelrate access to latest data 
 
 class CacheV2(Generic[T]):
     def __init__(self, source_func: Callable[[], T],
-                 expire: int = 60000, logger: Optional[PrintFunc] = None, path: OPLike = None,
+                 expire_ms: int, logger: Optional[PrintFunc] = None, path: OPLike = None,
                  saver: Callable[[T, PLike], Any] = Save.pickle, reader: Callable[[PLike], T] = Read.pickle, name: Optional[str] = None) -> None:
         self.cache: Optional[T] = None
         self.source_func = source_func
@@ -144,7 +145,7 @@ class CacheV2(Generic[T]):
         self.save = saver
         self.reader = reader
         self.logger = logger
-        self.expire = expire  # in milliseconds
+        self.expire = expire_ms  # in milliseconds
         self.name = name if isinstance(name, str) else str(self.source_func)
     @property
     def age(self):
@@ -223,7 +224,7 @@ class CacheV2(Generic[T]):
     def as_decorator(expire: int = 60000, logger: Optional[PrintFunc] = None, path: OPLike = None,
                      name: Optional[str] = None):
         def decorator(source_func: Callable[[], T2]) -> CacheV2['T2']:
-            res = CacheV2(source_func=source_func, expire=expire, logger=logger, path=path, name=name)
+            res = CacheV2(source_func=source_func, expire_ms=expire, logger=logger, path=path, name=name)
             return res
         return decorator
 
