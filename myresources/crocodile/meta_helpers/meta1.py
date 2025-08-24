@@ -2,7 +2,7 @@ from crocodile.core import randstr, install_n_import, List
 from crocodile.file_management import P, OPLike, PLike
 import logging
 import sys
-from typing import Union, Any, Optional, TextIO, IO, Literal, TypeVar, ParamSpec
+from typing import Any, Optional, TextIO, IO, Literal, TypeVar, ParamSpec
 from dataclasses import dataclass
 
 
