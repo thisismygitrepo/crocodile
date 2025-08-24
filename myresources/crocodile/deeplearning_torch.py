@@ -176,7 +176,7 @@ class BaseModel:
             print('💫 Number of weights in the NN = ', sum(p.numel() for p in model.parameters()))
             print(''.center(57, '='))
     @staticmethod
-    def check_output_stats(model: nn.Module, data_loader: DataLoader):
+    def check_output_stats(model: nn.Module, data_loader: DataLoader[Any]) -> None:
         import pandas as pd
         with t.no_grad():
             for batch in data_loader:

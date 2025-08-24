@@ -483,7 +483,7 @@ class FigureManager:
         _ = units
         if isinstance(ax.figure, Figure): ax.figure.set_size_inches(float(w) / (r - left), float(h) / (t - b))
     @staticmethod
-    def get_ax_size(ax: Axes, units: Literal["inches", "pixels"] = "inches"):
+    def get_ax_size(ax: Axes, units: Literal["inches", "pixels"] = "inches") -> tuple[float, float]:
         assert ax.figure is not None, "Figure is not defined yet."
         w, h = ax.figure.get_size_inches()  # type: ignore
         if units == "pixels":

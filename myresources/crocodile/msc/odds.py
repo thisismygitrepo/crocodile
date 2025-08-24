@@ -8,7 +8,7 @@ from crocodile.core_modules.core_1 import install_n_import
 from crocodile.core import List
 # from crocodile.meta import Scheduler, Log
 # import time
-from typing import Optional, Any, Callable, TypeVar, Generic
+from typing import Optional, Any, Callable, TypeVar, Generic, Generator
 
 
 def share(path: P):
@@ -81,7 +81,7 @@ def tree(self: P, level: int = -1, limit_to_directories: bool = False, length_li
     # Based on: https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python"""
     space, branch, tee, last, dir_path, files, directories = '    ', '│   ', '├── ', '└── ', self, 0, 0
     def get_stats(apath: P): return (f" {(sts := apath.stats())['size']} MB. {sts['content_mod_time']}. " + desc(apath) if desc is not None else "") if stats or desc else ""
-    def inner(apath: P, prefix: str = '', level_: int = -1):
+    def inner(apath: P, prefix: str = '', level_: int = -1) -> Generator[str, None, None]:
         nonlocal files, directories
         if not level_: return  # 0, stop iterating
         pointers = [tee] * (len(content := apath.search("*", files=not limit_to_directories)) - 1) + [last]
@@ -99,7 +99,7 @@ def tree(self: P, level: int = -1, limit_to_directories: bool = False, length_li
     print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
 
-def get_compressable_directories(path: P, max_size_mb: float = 15_000.0):
+def get_compressable_directories(path: P, max_size_mb: float = 15_000.0) -> tuple[List[P], List[P], List[P]]:
     tmp_results = path.search("*", r=False)
     dirs2compress = List()
     dirs_violating = List()

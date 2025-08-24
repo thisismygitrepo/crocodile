@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset # Added TensorDataset for example
 from torch.cuda.amp import GradScaler
-from torch.utils.tensorboard import SummaryWriter # For TensorBoard logging
+from torch.utils.tensorboard.writer import SummaryWriter # For TensorBoard logging
 import numpy as np
 # import time
 import os
@@ -13,21 +13,24 @@ from typing import Any, TypeVar, Generic, Callable, Optional, Union, Dict, List,
 
 T = TypeVar('T')
 
+# Type for callback logs
+LogsType = Optional[Dict[str, Any]]
+
 
 # --- Callback System ---
 class Callback:
     def __init__(self):
-        self.trainer = None # Will be set by the trainer
-    def set_trainer(self, trainer):
+        self.trainer: Optional['AdvancedModelTrainer[Any]'] = None # Will be set by the trainer
+    def set_trainer(self, trainer: 'AdvancedModelTrainer[Any]') -> None:
         self.trainer = trainer
-    def on_train_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_train_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_epoch_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_epoch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_batch_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_batch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_validation_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
-    def on_validation_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None): pass
+    def on_train_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_train_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_epoch_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_epoch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_batch_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_batch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_validation_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
+    def on_validation_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None: pass
 
 
 class EarlyStopping(Callback):
@@ -49,11 +52,14 @@ class EarlyStopping(Callback):
         if delta < 0:
             raise ValueError("delta must be non-negative")
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         logs = logs or {}
         current_score = logs.get(self.monitor)
         if current_score is None:
             print(f"Warning: Early stopping monitor '{self.monitor}' not found in logs. Available keys: {list(logs.keys())}")
+            return
+
+        if epoch is None:
             return
 
         if self.mode == 'min':
@@ -66,7 +72,7 @@ class EarlyStopping(Callback):
             self.wait = 0
             self.best_epoch = epoch
             if self.restore_best_weights:
-                self.best_weights = copy.deepcopy(self.trainer.model.state_dict())
+                self.best_weights = copy.deepcopy(self.trainer.model.state_dict())  # type: ignore[union-attr]
             if self.verbose:
                 print(f"Epoch {epoch+1}: {self.monitor} improved to {current_score:.4f}. Saving model weights.")
         else:
@@ -74,11 +80,11 @@ class EarlyStopping(Callback):
             if self.verbose:
                 print(f"Epoch {epoch+1}: {self.monitor} did not improve from {self.best_score:.4f}. Patience {self.wait}/{self.patience}.")
             if self.wait >= self.patience:
-                self.trainer.stop_training = True
+                self.trainer.stop_training = True  # type: ignore[union-attr]
                 print(f"Epoch {epoch+1}: Early stopping triggered after {self.patience} epochs of no improvement.")
                 if self.restore_best_weights and self.best_weights is not None:
                     print(f"Restoring model weights from epoch {self.best_epoch+1} with {self.monitor} = {self.best_score:.4f}")
-                    self.trainer.model.load_state_dict(self.best_weights)
+                    self.trainer.model.load_state_dict(self.best_weights)  # type: ignore[union-attr]
 
 
 class ModelCheckpoint(Callback):
@@ -93,11 +99,14 @@ class ModelCheckpoint(Callback):
         self.best_score = np.inf if mode == 'min' else -np.inf
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         logs = logs or {}
         current_score = logs.get(self.monitor)
         if current_score is None:
             print(f"Warning: ModelCheckpoint monitor '{self.monitor}' not found in logs. Available keys: {list(logs.keys())}")
+            return
+
+        if epoch is None:
             return
 
         if self.mode == 'min':
@@ -123,21 +132,21 @@ class ModelCheckpoint(Callback):
         self._save_model(last_filepath, is_checkpoint=True, epoch=epoch, logs=logs)
 
 
-    def _save_model(self, path: str, is_checkpoint: bool = False, epoch: Optional[int] = None, logs: Optional[Dict] = None):
+    def _save_model(self, path: str, is_checkpoint: bool = False, epoch: Optional[int] = None, logs: LogsType = None) -> None:
         if self.save_weights_only and not is_checkpoint:
-            torch.save(self.trainer.model.state_dict(), path)
+            torch.save(self.trainer.model.state_dict(), path)  # type: ignore[union-attr]
         else:
             checkpoint_data = {
                 'epoch': epoch,
-                'model_state_dict': self.trainer.model.state_dict(),
-                'optimizer_state_dict': self.trainer.optimizer.state_dict(),
+                'model_state_dict': self.trainer.model.state_dict(),  # type: ignore[union-attr]
+                'optimizer_state_dict': self.trainer.optimizer.state_dict(),  # type: ignore[union-attr]
                 'val_loss': logs.get('val_loss') if logs else None, # Example, can store more
                 'best_score_checkpoint': self.best_score # Store the best score known at this checkpoint
             }
-            if self.trainer.lr_scheduler is not None:
-                checkpoint_data['scheduler_state_dict'] = self.trainer.lr_scheduler.state_dict()
-            if self.trainer.scaler is not None:
-                checkpoint_data['scaler_state_dict'] = self.trainer.scaler.state_dict()
+            if self.trainer.lr_scheduler is not None:  # type: ignore[union-attr]
+                checkpoint_data['scheduler_state_dict'] = self.trainer.lr_scheduler.state_dict()  # type: ignore[union-attr]
+            if self.trainer.scaler is not None:  # type: ignore[union-attr]
+                checkpoint_data['scaler_state_dict'] = self.trainer.scaler.state_dict()  # type: ignore[union-attr]
             torch.save(checkpoint_data, path)
 
 
@@ -146,8 +155,10 @@ class TensorBoardLogger(Callback):
         super().__init__()
         self.writer = SummaryWriter(log_dir)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         logs = logs or {}
+        if epoch is None:
+            return
         for key, value in logs.items():
             if isinstance(value, (int, float)):
                 self.writer.add_scalar(key, value, epoch)
@@ -160,35 +171,42 @@ class TensorBoardLogger(Callback):
         if self.trainer and self.trainer.optimizer:
             for i, param_group in enumerate(self.trainer.optimizer.param_groups):
                 self.writer.add_scalar(f'learning_rate/group_{i}', param_group['lr'], epoch)
-    def on_train_end(self, logs=None):
+    def on_train_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         self.writer.close()
 
 
 class TQDMProgressBar(Callback):
     def __init__(self):
         super().__init__()
-        self.epoch_bar = None
-        self.batch_bar = None
+        self.epoch_bar: Optional[tqdm] = None
+        self.batch_bar: Optional[tqdm] = None
 
-    def on_train_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None):
-        print(f"🚀 Starting Training on {self.trainer.device}...")
+    def on_train_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
+        print(f"🚀 Starting Training on {self.trainer.device}...")  # type: ignore[union-attr]
 
-    def on_epoch_begin(self, epoch, batch_idx=None, logs=None):
+    def on_epoch_begin(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
+        if epoch is None or self.trainer is None:
+            return
         self.epoch_bar = tqdm(total=self.trainer.num_epochs, initial=epoch, unit="epoch", desc=f"Epoch {epoch+1}/{self.trainer.num_epochs}", position=0, leave=True)
-        self.batch_bar = tqdm(total=len(self.trainer.train_loader), unit="batch", desc="Training", position=1, leave=False)
+        if self.trainer.train_loader is not None:
+            self.batch_bar = tqdm(total=len(self.trainer.train_loader), unit="batch", desc="Training", position=1, leave=False)
 
-    def on_batch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs=None):
+    def on_batch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         logs = logs or {}
-        self.batch_bar.update(1)
-        self.batch_bar.set_postfix(logs, refresh=True)
+        if self.batch_bar is not None:
+            self.batch_bar.update(1)
+            self.batch_bar.set_postfix(logs, refresh=True)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         logs = logs or {}
-        self.batch_bar.close()
-        self.epoch_bar.update(1)
-        self.epoch_bar.set_postfix(logs, refresh=True)
-        if epoch == self.trainer.num_epochs - 1 or self.trainer.stop_training:
-            self.epoch_bar.close()
+        if self.batch_bar is not None:
+            self.batch_bar.close()
+        if self.epoch_bar is not None:
+            self.epoch_bar.update(1)
+            self.epoch_bar.set_postfix(logs, refresh=True)
+        if epoch is not None and self.trainer is not None and (epoch == self.trainer.num_epochs - 1 or self.trainer.stop_training):
+            if self.epoch_bar is not None:
+                self.epoch_bar.close()
             print('✨ Training Completed'.center(100, '-'))
 
 # --- Main Trainer Class ---
@@ -198,7 +216,7 @@ class AdvancedModelTrainer(Generic[T]):
         model: nn.Module,
         criterion: nn.Module,
         optimizer: optim.Optimizer,
-        lr_scheduler: Optional[optim.lr_scheduler._LRScheduler] = None,
+        lr_scheduler: Optional[Any] = None,  # Use Any instead of private _LRScheduler
         metrics: Optional[Dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]]] = None,
         device: Optional[Union[str, torch.device]] = None,
         use_amp: bool = True, # Automatic Mixed Precision
@@ -226,7 +244,7 @@ class AdvancedModelTrainer(Generic[T]):
         self.model.to(self.device)
 
         self.use_amp = use_amp and self.device.type == 'cuda'
-        self.scaler = GradScaler() if self.use_amp else None
+        self.scaler = GradScaler() if self.use_amp else None  # type: ignore[call-arg]
         
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.clip_grad_norm = clip_grad_norm
@@ -249,7 +267,7 @@ class AdvancedModelTrainer(Generic[T]):
             return torch.device(device_option)
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def _call_callbacks(self, event_name: str, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: Optional[Dict] = None):
+    def _call_callbacks(self, event_name: str, epoch: Optional[int] = None, batch_idx: Optional[int] = None, logs: LogsType = None) -> None:
         for cb in self.callbacks:
             method = getattr(cb, event_name)
             # Determine which parameters to pass based on the event type
@@ -298,7 +316,7 @@ class AdvancedModelTrainer(Generic[T]):
 
     def _train_step(self, batch: Any) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, float]]:
         inputs, targets = self._parse_batch(batch)
-        with torch.amp.autocast('cuda', enabled=self.use_amp):
+        with torch.autocast(device_type='cuda', enabled=self.use_amp):  # Updated autocast syntax
             # Always treat inputs as a tuple of tensors to unpack
             if not isinstance(inputs, (list, tuple)):
                 inputs = (inputs,)
@@ -325,7 +343,7 @@ class AdvancedModelTrainer(Generic[T]):
         loss_scaled_for_accum = loss / self.gradient_accumulation_steps
 
         if self.use_amp:
-            self.scaler.scale(loss_scaled_for_accum).backward()
+            self.scaler.scale(loss_scaled_for_accum).backward()  # type: ignore[union-attr]
         else:
             loss_scaled_for_accum.backward()
 
@@ -360,13 +378,13 @@ class AdvancedModelTrainer(Generic[T]):
         
         self.optimizer.zero_grad() # Initialize gradients once for accumulation
 
-        for batch_idx, batch in enumerate(self.train_loader):
+        for batch_idx, batch in enumerate(self.train_loader):  # type: ignore[union-attr]
             self._call_callbacks('on_batch_begin', epoch=epoch_idx, batch_idx=batch_idx)
             
-            _, loss, batch_metrics = self._train_step(batch)
+            _, _loss, batch_metrics = self._train_step(batch)  # Rename to indicate it's intentionally unused
             
             # Handle gradient accumulation
-            if (batch_idx + 1) % self.gradient_accumulation_steps == 0 or (batch_idx + 1) == len(self.train_loader):
+            if (batch_idx + 1) % self.gradient_accumulation_steps == 0 or (batch_idx + 1) == len(self.train_loader):  # type: ignore[union-attr]
                 if self.clip_grad_norm is not None and self.scaler: # AMP
                     self.scaler.unscale_(self.optimizer) # Unscale before clipping
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad_norm)
@@ -454,7 +472,7 @@ class AdvancedModelTrainer(Generic[T]):
                 best_score_chkpt = checkpoint.get('best_score_checkpoint')
                 for cb in self.callbacks:
                     if hasattr(cb, 'best_score') and best_score_chkpt is not None:
-                        cb.best_score = best_score_chkpt
+                        cb.best_score = best_score_chkpt  # type: ignore[attr-defined]
                     if isinstance(cb, EarlyStopping) and 'epoch' in checkpoint: # Adjust patience based on last saved epoch
                         cb.best_epoch = checkpoint.get('epoch') # Assume best was at this saved epoch
 
@@ -556,20 +574,20 @@ if __name__ == '__main__':
     test_dataset = TensorDataset(X_test, y_test)
 
     # Custom collate function to add the sample info as third element
-    def train_collate_fn(batch):
+    def train_collate_fn(batch: List[Any]) -> Tuple[Tuple[torch.Tensor, ...], torch.Tensor, List[str]]:
         inputs = torch.stack([item[0] for item in batch])
         targets = torch.stack([item[1] for item in batch])
         # Add sample indices as the third element (name/other_info)
         indices = [f"sample_{i}" for i in range(len(batch))]
         return (inputs, ), targets, indices
 
-    def val_collate_fn(batch):
+    def val_collate_fn(batch: List[Any]) -> Tuple[Tuple[torch.Tensor, ...], torch.Tensor, List[str]]:
         inputs = torch.stack([item[0] for item in batch])
         targets = torch.stack([item[1] for item in batch])
         indices = [f"val_sample_{i}" for i in range(len(batch))]
         return (inputs, ), targets, indices
         
-    def test_collate_fn(batch):
+    def test_collate_fn(batch: List[Any]) -> Tuple[Tuple[torch.Tensor, ...], torch.Tensor, List[str]]:
         inputs = torch.stack([item[0] for item in batch])
         targets = torch.stack([item[1] for item in batch])
         indices = [f"test_sample_{i}" for i in range(len(batch))]
@@ -582,13 +600,13 @@ if __name__ == '__main__':
 
     # 2. Simple Model
     class SimpleNet(nn.Module):
-        def __init__(self, input_dim, output_dim):
+        def __init__(self, input_dim: int, output_dim: int):
             super().__init__()
             self.fc1 = nn.Linear(input_dim, 640000)
             self.relu = nn.ReLU()
             self.fc2 = nn.Linear(640000, output_dim)
 
-        def forward(self, x):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
             # Simple forward function that takes a single input tensor
             # The model is called with model(*x) where x is the first element from the batch
             # Which is just the input tensor itself

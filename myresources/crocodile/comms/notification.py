@@ -15,7 +15,7 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional, Any, Union, Literal
 
 
-def get_github_markdown_css():
+def get_github_markdown_css() -> str:
     pp = r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css'
     return P(pp).download_to_memory().text
 
@@ -108,7 +108,7 @@ encryption = ssl
     def close(self): self.server.quit()    # Closing is vital as many servers do not allow mutiple connections.
 
     @staticmethod
-    def send_and_close(config_name: Optional[str], to: str, subject: str, body: str):
+    def send_and_close(config_name: Optional[str], to: str, subject: str, body: str) -> Any:
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
             config = Email.get_source_of_truth()
@@ -137,7 +137,7 @@ encryption = ssl
             tmp.close()
 
     @staticmethod
-    def send_m365(to: list[str], subject: str, body: Optional[str], body_file: Optional[str], body_content_type: Literal["HTML", "Text"], attachments: Optional[list[P]] = None):
+    def send_m365(to: list[str], subject: str, body: Optional[str], body_file: Optional[str], body_content_type: Literal["HTML", "Text"], attachments: Optional[list[P]] = None) -> None:
         if body_file is not None:
             assert body is None, "You cannot pass both body and body_file."
             body_file_path = P(body_file)
