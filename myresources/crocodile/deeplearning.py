@@ -419,7 +419,7 @@ class BaseModel(ABC):
         path = P(directory).joinpath(self.model.name) + ".weights.h5"
         self.model.save_weights(path)
     @staticmethod
-    def load_model(directory: PLike):
+    def load_model(directory: PLike) -> Any:
         import keras
         return keras.models.load_model(str(directory))
     def load_weights(self, directory: PLike) -> None:
@@ -845,7 +845,7 @@ def batcher(func_type: str = 'function'):
         def batch(func: Callable[..., Any]):
             # from functools import wraps
             # @wraps(func)
-            def wrapper(self: Any, x: Any, *args: Any, per_instance_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any):
+            def wrapper(self: Any, x: Any, *args: Any, per_instance_kwargs: Optional[dict[str, Any]] = None, **kwargs: Any) -> npt.NDArray[Any]:
                 output = []
                 for counter, item in enumerate(x):
                     mykwargs = {key: value[counter] for key, value in per_instance_kwargs.items()} if per_instance_kwargs is not None else {}

@@ -188,9 +188,9 @@ class DataFrameHandler:
         onehot_names: list[str] = list(self.encoder_onehot.get_feature_names_out())
         return onehot_names + self.cols_ordinal + self.cols_numerical
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         atts: list[str] = ["scaler", "imputer", "cols_numerical", "cols_ordinal", "cols_onehot", "encoder_onehot", "encoder_ordinal", "clipper_categorical", "clipper_numerical"]
-        res = {}
+        res: dict[str, Any] = {}
         for att in atts:
             if hasattr(self, att):
                 res[att] = getattr(self, att)
