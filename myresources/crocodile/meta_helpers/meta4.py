@@ -12,9 +12,9 @@ class LoggerTemplate(Protocol):
     def warning(self, msg: str) -> None: pass
     def error(self, msg: str) -> None: pass
     def critical(self, msg: str) -> None: pass
-    @property
-    def file_path(self) -> Optional[Any]: return None
-    def get_history(self, lines: int = 200, to_html: bool = False) -> str: return ""
+    # @property
+    # def file_path(self) -> Optional[Any]: return None
+    # def get_history(self, lines: int, to_html: bool) -> str: return ""
 
 
 class Scheduler:
