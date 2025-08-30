@@ -38,12 +38,12 @@ class Base(object):
         saved_file = Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         if save_code: self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py"))
         return self
-    @classmethod
-    def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
-        obj = cls(*args, **kwargs)
-        import dill
-        obj.__setstate__(dict(dill.loads(Path(path).read_bytes())))
-        return obj
+    # @classmethod
+    # def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
+    #     obj = cls(*args, **kwargs)
+    #     import dill
+    #     obj.__setstate__(dict(dill.loads(Path(path).read_bytes())))
+    #     return obj
     def save_code(self, path: Union[str, Path]):
         import inspect
         module = inspect.getmodule(self)

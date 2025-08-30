@@ -77,12 +77,12 @@ class Read:
             raise ex
     @staticmethod
     def pkl(path: 'PLike', **kwargs: Any): return Read.pickle(path, **kwargs)
-    @staticmethod
-    def dill(path: 'PLike', **kwargs: Any) -> Any:
-        """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
-        import dill
-        obj = dill.loads(str=Path(path).read_bytes(), **kwargs)
-        return obj
+    # @staticmethod
+    # def dill(path: 'PLike', **kwargs: Any) -> Any:
+    #     """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
+    #     import dill
+    #     obj = dill.loads(str=Path(path).read_bytes(), **kwargs)
+    #     return obj
     @staticmethod
     def py(path: 'PLike', init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None):
         import runpy
