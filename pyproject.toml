@@ -71,28 +71,9 @@ docs = [
 
 [tool.setuptools]
 package-dir = {"" = "myresources"}
-py-modules = [
-    "crocodile.core",
-    "crocodile.croshell",
-    "crocodile.database",
-    "crocodile.deeplearning",
-    "crocodile.deeplearning_template",
-    "crocodile.deeplearning_df",
-    "crocodile.deeplearning_torch",
-    "crocodile.environment",
-    "crocodile.file_management",
-    "crocodile.matplotlib_management",
-    "crocodile.meta",
-    "crocodile.plotly_management",
-    "crocodile.toolbox",
-    "crocodile.comms.helper_funcs",
-    "crocodile.comms.notification",
-    "crocodile.comms.onedrive",
-    "crocodile.msc.ascii_art",
-    "crocodile.msc.dl_template",
-    "crocodile.msc.numerical",
-    "crocodile.msc.odds"
-]
+# Removed explicit py-modules list (it contained stale/non-existent modules like
+# crocodile.comms.helper_funcs, crocodile.comms.onedrive, crocodile.msc.dl_template).
+# Discovery now handled by packages.find below.
 
 [tool.setuptools.packages.find]
 where = ["myresources"]
