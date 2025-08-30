@@ -53,8 +53,8 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def __delitem__(self, key: str): del self.__dict__[key]
     def copy(self) -> 'Struct': return Struct(self.__dict__.copy())
     def to_dataframe(self, *args: Any, **kwargs: Any):
-        import pandas as pd
-        return pd.DataFrame(self.__dict__, *args, **kwargs)
+        import polars as pl
+        return pl.DataFrame(self.__dict__, *args, **kwargs)
     def keys(self, verbose: bool = False) -> 'List[Any]':
         from tqdm import tqdm
         return List(list(self.__dict__.keys()) if not verbose else tqdm(self.__dict__.keys()))
@@ -83,17 +83,17 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                 if kv_func(k, v): self.__dict__.__delitem__(k)
         return self
     def _pandas_repr(self, justify: int, return_str: bool = False, limit: int = 30):
-        import pandas as pd
+        import polars as pl
         import numpy as np
         col2: List[Any] = self.values().apply(lambda x: str(type(x)).split("'")[1])
         col3: List[Any] = self.values().apply(lambda x: Display.get_repr(x, justify=justify, limit=limit).replace("\n", " "))
         array = np.array([self.keys(), col2, col3]).T
-        res: pd.DataFrame = pd.DataFrame(array, columns=["key", "dtype", "details"])
+        res = pl.DataFrame({"key": array[:,0], "dtype": array[:,1], "details": array[:,2]})
         return res if not return_str else str(res)
     def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False,  # type: ignore # pylint: disable=W0237
               limit: int = 50, title: str = "", attrs: bool = False, **kwargs: Any) -> Union[str, None]:  # type: ignore
         _ = attrs
-        import pandas as pd
+    import polars as pl
         if as_config and not return_str:
             from rich import inspect
             inspect(self, value=False, title=title, docs=False, dunder=False, sort=False)
@@ -114,21 +114,23 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
                     return None
             else:
                 tmp2 = self._pandas_repr(justify=justify, return_str=False, limit=limit)
-                if isinstance(tmp2, pd.DataFrame):
-                    res = tmp2.drop(columns=[] if dtype else ["dtype"])
+                if isinstance(tmp2, pl.DataFrame):
+                    res = tmp2 if dtype else tmp2.drop("dtype")
                 else: raise TypeError(f"Unexpected type {type(tmp2)}")
                 if not return_str:
                     # import tabulate
                     import rich
-                    rich.print(res.to_markdown())
+                    rich.print(res.to_pandas().to_markdown())
                     # else: print(res)
                     return None
                 return str(res)
     @staticmethod
     def concat_values(*dicts: dict[Any, Any], orient: Literal["dict", "list", "series", "split", "tight", "index"] = 'list') -> 'Struct':
-        import pandas as pd
+        import polars as pl
         tmp = [Struct(x).to_dataframe() for x in dicts]
-        res = pd.concat(tmp).to_dict(orient=orient)
+        res = pl.concat(tmp).to_dict(as_series=False)
+        if orient != 'list':
+            return Struct(res)
         return Struct(res)  # type: ignore
     def plot_plt(self, title: str = '', xlabel: str = '', ylabel: str = '', **kwargs: Any):
         from crocodile.matplotlib_management import LineArtist

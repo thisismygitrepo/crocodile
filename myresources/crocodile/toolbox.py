@@ -8,7 +8,7 @@ This is `export file` where one can dictate what will be exposed with toolbox
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import matplotlib.pyplot as plt
 
 from crocodile.meta import generate_readme, Terminal, Log, Scheduler, SSH, scout
@@ -25,7 +25,7 @@ import datetime
 try:
     import plotly.express as px
     import plotly.graph_objects as go
-    _ = np, pd, px, plt, go
+    _ = np, pl, px, plt, go
 except ImportError:
     pass
 
@@ -55,7 +55,7 @@ _1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compressio
 #
 #     _ = plt, enum, FigureManager, FigurePolicy, ImShow, FigureSave, VisibilityViewer, VisibilityViewerAuto, Artist
 #
-#     _ = pd
+#     _ = pl
 
 
 if __name__ == '__main__':

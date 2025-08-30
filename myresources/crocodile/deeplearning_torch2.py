@@ -618,9 +618,9 @@ if __name__ == '__main__':
     from crocodile.deeplearning_torch import BaseModel
     mm = BaseModel(model=model, loss=nn.MSELoss(), optimizer=optim.Adam(lr=0.005, params=model.parameters()), metrics=[])
     mm.fit(epochs=50, train_loader=train_loader, test_loader=test_loader)
-    import pandas as pd
+    import polars as pl
     import plotly.express as px
-    df = pd.DataFrame(mm.history[0]).reset_index(names=["epoch"])
+    df = pl.DataFrame(mm.history[0]).with_row_index(name="epoch").to_pandas()
     fig = px.line(data_frame=df, x='epoch', y=['train_loss', 'test_loss'], title='Training and Validation Loss')
     fig.show()
     # raise ValueError
@@ -690,8 +690,8 @@ if __name__ == '__main__':
 
     # Print history
     print("\nTraining History:")
-    import pandas as pd
-    print(pd.DataFrame(history))
+    import polars as pl
+    print(pl.DataFrame(history).to_pandas())
     # for key, values in history.items():
     #     if values: # Only print if there's data
     #         print(f"{key}: {[f'{v:.4f}' for v in values]}")
