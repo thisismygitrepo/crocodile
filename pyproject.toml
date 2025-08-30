@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crocodile"
-version = "14.3"  # Version directly defined here instead of using dynamic
+version = "14.6"  # Version directly defined here instead of using dynamic
 description = "Deep Learning Framework & Workload Management For On-premise Personal Machines."
 readme = "README.md"
 authors = [
