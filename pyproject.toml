@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crocodile"
-version = "14.6"  # Version directly defined here instead of using dynamic
+version = "14.7"  # Version directly defined here instead of using dynamic
 description = "Deep Learning Framework & Workload Management For On-premise Personal Machines."
 readme = "README.md"
 authors = [
@@ -18,11 +18,9 @@ classifiers = [
 ]
 dependencies = [
     "bcrypt>=4.3.0",
-    "clipboard>=0.0.4",
     "colorlog>=6.9.0",
     "cryptography>=44.0.2",
     "distro>=1.9.0",
-    "fastparquet>=2024.11.0",
     "fire>=0.7.0",
     "gitpython>=3.1.44",
     "ipython>=8.35.0",
@@ -34,7 +32,6 @@ dependencies = [
     "plotly>=6.0.1",
     "psutil>=7.0.0",
     "py7zr>=0.22.0",
-    "pyarrow>=19.0.1",
     "randomname>=0.2.1",
     "requests>=2.32.3",
     "rich>=14.0.0",

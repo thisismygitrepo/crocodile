@@ -55,7 +55,6 @@ _1 = Base, timestamp, Save, Terminal, List, Struct, Display, P, Read, Compressio
 #
 #     _ = plt, enum, FigureManager, FigurePolicy, ImShow, FigureSave, VisibilityViewer, VisibilityViewerAuto, Artist
 #
-#     import pandas as pd
 #     _ = pd
 
 
