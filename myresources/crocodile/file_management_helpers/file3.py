@@ -9,7 +9,7 @@ from typing import Any, Optional, Union, Callable, TypeVar, NoReturn, Protocol, 
 T = TypeVar('T')
 T2 = TypeVar('T2')
 class PrintFunc(Protocol):
-    def __call__(self, *args: str) -> Union[NoReturn, None]: ...
+    def __call__(self, msg: str) -> Union[NoReturn, None]: ...
 
 
 class Cache(Generic[T]):  # This class helps to accelrate access to latest data coming from expensive function. The class has two flavours, memory-based and disk-based variants."""

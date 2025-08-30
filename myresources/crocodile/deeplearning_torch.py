@@ -17,6 +17,7 @@ from crocodile.file_management import P, PLike
 from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, Specs, SpecsLike, HyperParams, get_hp_save_dir
 
 from typing import Any, TypeVar, Union, Optional
+from pathlib import Path
 import time
 
 T = TypeVar('T', bound=Any)
@@ -193,7 +194,7 @@ class BaseModel:
     def save_weights(self, save_dir: PLike) -> None:
         t.save(self.model.state_dict(), P(save_dir).joinpath("weights.pth"))
     @staticmethod
-    def load_model(save_dir: P, map_location: Union[str, Device, None], weights_only: bool):
+    def load_model(save_dir: Path, map_location: Union[str, Device, None], weights_only: bool):
         print(f"Loading model from {save_dir} to Device `{map_location}`")
         if map_location is None and t.cuda.is_available():
             map_location = "cpu"
