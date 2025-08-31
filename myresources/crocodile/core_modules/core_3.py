@@ -93,7 +93,7 @@ class Struct(Base):  # inheriting from dict gives `get` method, should give `__c
     def print(self, dtype: bool = True, return_str: bool = False, justify: int = 30, as_config: bool = False, as_yaml: bool = False,  # type: ignore # pylint: disable=W0237
               limit: int = 50, title: str = "", attrs: bool = False, **kwargs: Any) -> Union[str, None]:  # type: ignore
         _ = attrs
-    import polars as pl
+        import polars as pl
         if as_config and not return_str:
             from rich import inspect
             inspect(self, value=False, title=title, docs=False, dunder=False, sort=False)
