@@ -93,8 +93,14 @@ class DBMS:
     def _get_table_identifier(self, table: str, sch: Optional[str]):
         if sch is None: sch = self.sch
         if sch is not None:
-            return f""" "{sch}"."{table}" """
-        else: return table
+            # Handle DuckDB schema names that contain dots (e.g., "klines.main")
+            if self.eng.url.drivername == 'duckdb' and '.' in sch and sch.endswith('.main'):
+                # For DuckDB schemas like "klines.main", just use the table name without schema
+                return f'"{table}"'
+            else:
+                return f'"{sch}"."{table}"'
+        else: 
+            return f'"{table}"'
 
     @staticmethod
     def make_sql_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = ["pysqlite", "DBAPI"][0], pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
@@ -176,18 +182,38 @@ class DBMS:
     # ========================== TABLES =====================================
     def read_table(self, table: Optional[str] = None, sch: Optional[str] = None, size: int = 5):
         if sch is None:
-            schemas = [a_sch for a_sch in self.schema if a_sch not in ["information_schema", "pg_catalog"]]
-            if len(schemas) > 1 and "public" in schemas:
-                schemas.remove("public")
-            sch = schemas[0]
+            # First try to find schemas that have tables (excluding system schemas)
+            schemas_with_tables = []
+            for schema_name in self.schema:
+                if schema_name not in ["information_schema", "pg_catalog", "system"]:
+                    if schema_name in self.sch_tab and len(self.sch_tab[schema_name]) > 0:
+                        schemas_with_tables.append(schema_name)
+            
+            if len(schemas_with_tables) == 0:
+                raise ValueError(f"No schemas with tables found. Available schemas: {self.schema}")
+            
+            # Prefer non-"main" schemas if available, otherwise use main
+            if len(schemas_with_tables) > 1 and "main" in schemas_with_tables:
+                sch = [s for s in schemas_with_tables if s != "main"][0]
+            else:
+                sch = schemas_with_tables[0]
+            print(f"Auto-selected schema: `{sch}` from available schemas: {schemas_with_tables}")
+            
         if table is None:
+            if sch not in self.sch_tab:
+                raise ValueError(f"Schema `{sch}` not found. Available schemas: {list(self.sch_tab.keys())}")
             tables = self.sch_tab[sch]
             assert len(tables) > 0, f"No tables found in schema `{sch}`"
             table = L(tables).sample(size=1).list[0]
             print(f"Reading table `{table}` from schema `{sch}`")
         if self.con:
-            res = self.con.execute(text(f'''SELECT * FROM {self._get_table_identifier(table, sch)} '''))
-            return pl.DataFrame(res.fetchmany(size))
+            try:
+                res = self.con.execute(text(f'''SELECT * FROM {self._get_table_identifier(table, sch)} '''))
+                return pl.DataFrame(res.fetchmany(size))
+            except Exception:
+                print(f"Error executing query for table `{table}` in schema `{sch}`")
+                print(f"Available schemas and tables: {self.sch_tab}")
+                raise
 
     def insert_dicts(self, table: str, *mydicts: dict[str, Any]) -> None:
         cmd = f"""INSERT INTO {table} VALUES """

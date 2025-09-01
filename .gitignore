@@ -148,3 +148,9 @@ dmypy.json
 
 # twine username and password
 .pypirc
+.links
+notebooks
+GEMINI.md
+CLAUDE.md
+.cursor
+.github
