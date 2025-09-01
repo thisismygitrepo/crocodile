@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from sqlalchemy import create_engine, text
 import psutil
 
@@ -15,14 +15,14 @@ def generate_random_dataframe():
     num_columns = 10
     column_names: list[str] = [''.join(np.random.choice(list('abcdefghijklmnopqrstuvwxyz'), 5)) for _ in range(num_columns)]
     data = np.random.rand(num_rows, num_columns)
-    df_ = pd.DataFrame(data, columns=column_names)
+    df_ = pl.DataFrame(data, schema=column_names)
     return df_
 
 
 for i in range(10):
     df = generate_random_dataframe()
     table_name = 'table_' + str(i)
-    df.to_sql(table_name, engine, index=False)
+    df.to_pandas().to_sql(table_name, engine, index=False)
 
 
 memory_before = psutil.virtual_memory().used / (1024 ** 3)  # Memory usage in GB

@@ -23,11 +23,11 @@ class Read:
                 import matplotlib.pyplot as pyplot
                 return pyplot.imread(path, **kwargs)  # from: plt.gcf().canvas.get_supported_filetypes().keys():
             if suffix == "parquet":
-                import pandas as pd
-                return pd.read_parquet(path, **kwargs)
+                import polars as pl
+                return pl.read_parquet(path, **kwargs)
             elif suffix == "csv":
-                import pandas as pd
-                return pd.read_csv(path, **kwargs)
+                import polars as pl
+                return pl.read_csv(path, **kwargs)
             try:
                 guess = install_n_import('magic', 'python-magic').from_file(path)
                 raise AttributeError(f"Unknown file type. failed to recognize the suffix `{suffix}`. According to libmagic1, the file seems to be: {guess}") from err
@@ -77,12 +77,12 @@ class Read:
             raise ex
     @staticmethod
     def pkl(path: 'PLike', **kwargs: Any): return Read.pickle(path, **kwargs)
-    @staticmethod
-    def dill(path: 'PLike', **kwargs: Any) -> Any:
-        """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
-        import dill
-        obj = dill.loads(str=Path(path).read_bytes(), **kwargs)
-        return obj
+    # @staticmethod
+    # def dill(path: 'PLike', **kwargs: Any) -> Any:
+    #     """handles imports automatically provided that saved object was from an imported class (not in defined in __main__)"""
+    #     import dill
+    #     obj = dill.loads(str=Path(path).read_bytes(), **kwargs)
+    #     return obj
     @staticmethod
     def py(path: 'PLike', init_globals: Optional[dict[str, Any]] = None, run_name: Optional[str] = None):
         import runpy
@@ -91,8 +91,8 @@ class Read:
     def txt(path: 'PLike', encoding: str = 'utf-8') -> str: return Path(path).read_text(encoding=encoding)
     @staticmethod
     def parquet(path: 'PLike', **kwargs: Any):
-        import pandas as pd
-        return pd.read_parquet(path, **kwargs)
+        import polars as pl
+        return pl.read_parquet(path, **kwargs)
 
 
 if __name__ == '__main__':

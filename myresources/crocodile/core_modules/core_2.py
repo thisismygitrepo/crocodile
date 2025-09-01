@@ -38,12 +38,12 @@ class Base(object):
         saved_file = Save.pickle(obj=obj, path=path, verbose=verbose, add_suffix=add_suffix, class_name="." + self.__class__.__name__, desc=desc or (f"Data of {self.__class__}" if data_only else desc))
         if save_code: self.save_code(path=saved_file.parent.joinpath(saved_file.name + "_saved_code.py"))
         return self
-    @classmethod
-    def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
-        obj = cls(*args, **kwargs)
-        import dill
-        obj.__setstate__(dict(dill.loads(Path(path).read_bytes())))
-        return obj
+    # @classmethod
+    # def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
+    #     obj = cls(*args, **kwargs)
+    #     import dill
+    #     obj.__setstate__(dict(dill.loads(Path(path).read_bytes())))
+    #     return obj
     def save_code(self, path: Union[str, Path]):
         import inspect
         module = inspect.getmodule(self)
@@ -145,8 +145,8 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
             if strict or value in self.list: self.list.remove(a_val)
         return self
     def to_series(self):
-        import pandas as pd
-        return pd.Series(self.list)
+        import polars as pl
+        return pl.Series(self.list)
     def to_list(self) -> list[T]: return self.list
     def to_numpy(self, **kwargs: Any) -> 'Any': import numpy as np; return np.array(self.list, **kwargs)
     # def to_struct(self, key_val: Optional[Callable[[T], tuple[Any, Any]]] = None) -> 'Struct':
@@ -182,13 +182,15 @@ class List(Generic[T]):  # Inheriting from Base gives save method.  # Use this c
         return List(Parallel(n_jobs=jobs, prefer=prefer)(delayed(func)(x, y) for x, y in iterator))  # type: ignore
 
     def to_dataframe(self, names: Optional[list[str]] = None, minimal: bool = False, obj_included: bool = True):
-        import pandas as pd
-        df = pd.DataFrame(columns=(['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys()))
-        if minimal: return df
-        for i, obj in enumerate(self.list):  # Populate the dataframe:
+        import polars as pl
+        cols = (['object'] if obj_included or names else []) + list(self.list[0].__dict__.keys())
+        if minimal:
+            return pl.DataFrame({c: [] for c in cols})
+        records: list[dict[str, Any]] = []
+        for i, obj in enumerate(self.list):
+            base = obj.__dict__.copy()
             if obj_included or names:
-                tmp: list[Any] = list(self.list[i].__dict__.values())
-                data: list[Any] = [obj] if names is None else [names[i]]
-                df.iloc[i] = pd.Series(data + tmp)
-            else: df.iloc[i] = pd.Series(self.list[i].__dict__.values())  # type: ignore
-        return df
+                key = 'object'
+                base = {key: (obj if names is None else names[i]), **base}
+            records.append(base)
+        return pl.DataFrame(records)

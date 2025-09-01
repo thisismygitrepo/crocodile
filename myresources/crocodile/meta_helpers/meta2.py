@@ -128,18 +128,18 @@ class Terminal:
             load_func_string = f"sys.path.insert(0, r'{module.parent}')\nimport {module.stem} as m\nobj=m.{func.__name__}"
         else: load_func_string = f"""obj = P(r'{Save.pickle(obj=func, path=P.tmpfile(tstamp=False, suffix=".pkl"), verbose=False)}').readit()"""
         return Terminal().run_py(load_func_string + load_kwargs_string + f"\n{cmd}\n" + run_string, header=header, interactive=interactive, ipython=ipython)  # Terminal().run_async("python", "-c", load_func_string + f"\n{cmd}\n{load_kwargs_string}\n")
-    @staticmethod
-    def replicate_session(cmd: str = ""):
-        import dill
-        file = P.tmpfile(suffix=".pkl")
-        script = f"""
-path = P(r'{file}')
-import dill
-sess = dill.load_session(str(path))
-path.delete(sure=True, verbose=False)
-{cmd}"""
-        dill.dump_session(file, main=sys.modules[__name__])
-        Terminal().run_py(script=script)
+#     @staticmethod
+#     def replicate_session(cmd: str = ""):
+#         import dill
+#         file = P.tmpfile(suffix=".pkl")
+#         script = f"""
+# path = P(r'{file}')
+# import dill
+# sess = dill.load_session(str(path))
+# path.delete(sure=True, verbose=False)
+# {cmd}"""
+#         dill.dump_session(file, main=sys.modules[__name__])
+#         Terminal().run_py(script=script)
     @staticmethod
     def get_header(wdir: OPLike, toolbox: bool): return f"""
 # >> Code prepended

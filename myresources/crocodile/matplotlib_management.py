@@ -2,7 +2,7 @@
 """plots
 """
 
-import pandas as pd
+import polars as pl
 import numpy as np
 import numpy.typing as npt
 
@@ -320,8 +320,14 @@ class FigureManager:
         else:
             fig = plt.figure(num="Keyboard shortcuts")
             for i, key in enumerate(self.help_menu.keys()): fig.text(0.1, 1 - 0.05 * (i + 1), f"{key:30s} {self.help_menu[key]['help']}")
-            print(pd.DataFrame([[val['help'], key] for key, val in self.help_menu.items()], columns=['Action', 'Key']), "\nDefault plt Keys:\n")
-            print(pd.DataFrame([[val['help'], key] for key, val in default_plt.items()], columns=['Action', 'Key']))
+            print(pl.DataFrame({
+                'Action': [val['help'] for key, val in self.help_menu.items()],
+                'Key': [key for key in self.help_menu.keys()]
+            }).to_pandas().to_markdown(), "\nDefault plt Keys:\n")
+            print(pl.DataFrame({
+                'Action': [val['help'] for key, val in default_plt.items()],
+                'Key': [key for key in default_plt.keys()]
+            }).to_pandas().to_markdown())
     # =============== EVENT METHODS ====================================
     def animate(self):
         raise NotImplementedError("a method of the artist child class that is inheriting from this class to define behaviour when user press next or previous buttons.")

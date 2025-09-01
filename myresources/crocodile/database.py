@@ -113,10 +113,18 @@ class DBMS:
         path_repr = path.as_uri() if path.is_file() else path
         dialect = path.suffix[1:]
         print(f"Linking to database at {path_repr}")
+        # Add DuckDB-specific read-only flag automatically when pointing to an existing .duckdb file
+        connect_args = kwargs.pop("connect_args", {}) or {}
+        try:
+            if path.suffix == ".duckdb":  # only apply for duckdb files
+                # don't overwrite user's explicit setting if already provided
+                connect_args.setdefault("read_only", True)
+        except Exception:
+            pass
         if pool_size == 0:
-            res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+            res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, poolclass=NullPool, connect_args=connect_args, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         else:
-            res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+            res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, pool_size=pool_size, connect_args=connect_args, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
 
     @staticmethod

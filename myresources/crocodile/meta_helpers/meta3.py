@@ -230,10 +230,10 @@ class SSH:  # inferior alternative: https://github.com/fabric/fabric
         print("\n")
         return target
     def print_summary(self):
-        import pandas as pd
-        df = pd.DataFrame.from_records(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)))
+        import polars as pl
+        df = pl.DataFrame(List(self.terminal_responses).apply(lambda rsp: dict(desc=rsp.desc, err=rsp.err, returncode=rsp.returncode)).list)
         print("\nSummary of operations performed:")
-        print(df.to_markdown())
-        if ((df['returncode'].to_list()[2:] == [None] * (len(df) - 2)) and (df['err'].to_list()[2:] == [''] * (len(df) - 2))): print("\nAll operations completed successfully.\n")
+        print(df.to_pandas().to_markdown())
+        if ((df.select('returncode').to_series().to_list()[2:] == [None] * (len(df) - 2)) and (df.select('err').to_series().to_list()[2:] == [''] * (len(df) - 2))): print("\nAll operations completed successfully.\n")
         else: print("\nSome operations failed. \n")
         return df

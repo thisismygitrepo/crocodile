@@ -95,8 +95,6 @@ def get_network_addresses() -> NetworkAddresses:
     import uuid
     mac = uuid.getnode()
     mac_address = ":".join((f"{mac}012X")[i:i + 2] for i in range(0, 12, 2))  # type: ignore
-
-
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:

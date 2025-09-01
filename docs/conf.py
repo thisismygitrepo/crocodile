@@ -14,8 +14,8 @@ project = 'crocodile'
 copyright = '2025, Alex Al-Saffar'
 author = 'Alex Al-Saffar'
 
-version = '14.3'
-release = '14.3'
+version = '14.6'
+release = '14.6'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

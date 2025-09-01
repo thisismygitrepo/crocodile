@@ -18,7 +18,7 @@ from crocodile.meta import *  # type: ignore # noqa: F403,F401 # pylint: disable
 from crocodile.matplotlib_management import *  # noqa: F403,F401 # type: ignore # pylint: disable=W0401,W0614
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import platform
 
 try:
@@ -51,8 +51,8 @@ D = core.Display
 L = core.List
 S = core.Struct
 D.set_numpy_display()
-D.set_pandas_display()
-_ = D, L, S, inspect, progress, pprint, traceback, pd, np, tb
+# No pandas display setup needed for polars; polars prints nicely by default.
+_ = D, L, S, inspect, progress, pprint, traceback, pl, np, tb
 
 
 def print_logo(logo: str):

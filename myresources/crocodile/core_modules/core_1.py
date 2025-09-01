@@ -142,12 +142,12 @@ class Save:
         import pickle
         data = pickle.dumps(obj=obj, **kwargs)
         return Path(path).write_bytes(data=data)
-    @staticmethod
-    @save_decorator(".pkl")
-    def dill(obj: Any, path: PLike, **kwargs: Any):
-        import dill
-        data = dill.dumps(obj=obj, **kwargs)
-        return Path(path).write_bytes(data=data)
+    # @staticmethod
+    # @save_decorator(".pkl")
+    # def dill(obj: Any, path: PLike, **kwargs: Any):
+    #     import dill
+    #     data = dill.dumps(obj=obj, **kwargs)
+    #     return Path(path).write_bytes(data=data)
     # @staticmethod
     # def h5(obj: Any, path: PLike, **kwargs: Any):
     #     import h5py
