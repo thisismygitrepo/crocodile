@@ -88,10 +88,12 @@ Minor changes
 
 [dependency-groups]
 dev = [
+    "duckdb-engine>=0.17.0",
     "ipykernel>=6.29.5",
     "keras>=3.11.3",
     "onnx>=1.17.0",
     "onnxruntime>=1.21.1",
+    "pyarrow>=21.0.0",
     "tensorboard>=2.19.0",
     "torch>=2.6.0",
     "torchinfo>=1.8.0",
