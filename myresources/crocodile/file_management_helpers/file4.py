@@ -99,7 +99,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         if not slf.exists():
             if strict: raise FileNotFoundError(f"`{slf}` is no where to be found!")
             else:
-                if verbose: print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}")
+                if verbose: print(f"💥 P.readit warning: FileNotFoundError, skipping reading of file `{self}`")
                 return default
         if verbose: print(f"Reading {slf} ({slf.size()} MB) ...")
         if '.tar.gz' in str(slf) or '.tgz' in str(slf) or '.gz' in str(slf) or '.tar.bz' in str(slf) or 'tbz' in str(slf) or 'tar.xz' in str(slf) or '.zip' in str(slf):
