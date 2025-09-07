@@ -15,7 +15,7 @@ from crocodile.file_management_helpers.file1 import (
 from crocodile.file_management_helpers.file2 import Compression, FILE_MODE, SHUTIL_FORMATS
 
 # Import cache classes from file3
-from crocodile.file_management_helpers.file3 import Cache, CacheV2, PrintFunc
+from crocodile.file_management_helpers.file3 import Cache, PrintFunc
 
 # Import path utilities from file4
 from crocodile.file_management_helpers.file4 import P, PLike, OPLike
@@ -35,7 +35,7 @@ __all__ = [
     'Compression', 'FILE_MODE', 'SHUTIL_FORMATS',
 
     # From file3 - Cache classes
-    'Cache', 'CacheV2', 'PrintFunc',
+    'Cache', 'PrintFunc',
 
     # From file4 - Path utilities
     'P', 'PLike', 'OPLike',

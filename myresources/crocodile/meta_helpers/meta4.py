@@ -7,6 +7,9 @@ from typing import Union, Any, Optional, Callable, Protocol
 
 
 class LoggerTemplate(Protocol):
+    def __init__(self) -> None:
+        super().__init__()
+        self.file_path: Optional[Any] = None
     def debug(self, msg: str) -> None: pass
     def info(self, msg: str) -> None: pass
     def warning(self, msg: str) -> None: pass

@@ -31,6 +31,7 @@ class DBMS:
 
         self.sch_tab: dict[str, list[str]]
         self.sch_vws: dict[str, list[str]]
+        self.description: Optional[pl.DataFrame] = None
         # self.tables = None
         # self.views = None
         # self.sch_tab: Optional[Struct] = None
@@ -99,7 +100,7 @@ class DBMS:
                 return f'"{table}"'
             else:
                 return f'"{sch}"."{table}"'
-        else: 
+        else:
             return f'"{table}"'
 
     @staticmethod
@@ -119,12 +120,12 @@ class DBMS:
         path_repr = path.as_uri() if path.is_file() else path
         dialect = path.suffix[1:]
         print(f"Linking to database at {path_repr}")
-        # Add DuckDB-specific read-only flag automatically when pointing to an existing .duckdb file
         connect_args = kwargs.pop("connect_args", {}) or {}
         try:
             if path.suffix == ".duckdb":  # only apply for duckdb files
                 # don't overwrite user's explicit setting if already provided
                 connect_args.setdefault("read_only", True)
+                print(" - Opening DuckDB in read-only mode.")
         except Exception:
             pass
         if pool_size == 0:
@@ -132,7 +133,6 @@ class DBMS:
         else:
             res = create_engine(url=f"{dialect}:///{path}", echo=echo, future=True, pool_size=pool_size, connect_args=connect_args, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
-
     @staticmethod
     def make_sql_async_engine(path: OPLike = None, echo: bool = False, dialect: str = "sqlite", driver: str = "aiosqlite", pool_size: int = 5, share_across_threads: bool = True, **kwargs: Any):
         """Establish lazy initialization with database"""
@@ -147,11 +147,21 @@ class DBMS:
                 return create_async_engine(url=f"{dialect}+{driver}:///:memory:", echo=echo, future=True, pool_size=pool_size, **kwargs)
         path = P.tmpfile(folder="tmp_dbs", suffix=".sqlite") if path is None else P(path).expanduser().absolute().create(parents_only=True)
         path_repr = path.as_uri() if path.is_file() else path
+        dialect = path.suffix[1:]
         print(f"Linking to database at {path_repr}")
+        # Add DuckDB-specific read-only flag automatically when pointing to an existing .duckdb file
+        connect_args = kwargs.pop("connect_args", {}) or {}
+        try:
+            if path.suffix == ".duckdb":  # only apply for duckdb files
+                # don't overwrite user's explicit setting if already provided
+                connect_args.setdefault("read_only", True)
+                print(" - Opening DuckDB in read-only mode.")
+        except Exception:
+            pass
         if pool_size == 0:
-            res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, poolclass=NullPool, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+            res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, poolclass=NullPool, connect_args=connect_args, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         else:
-            res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
+            res = create_async_engine(url=f"{dialect}+{driver}:///{path}", echo=echo, future=True, pool_size=pool_size, connect_args=connect_args, **kwargs)  # echo flag is just a short for the more formal way of logging sql commands.
         return res
 
     # ==================== QUERIES =====================================
@@ -188,17 +198,17 @@ class DBMS:
                 if schema_name not in ["information_schema", "pg_catalog", "system"]:
                     if schema_name in self.sch_tab and len(self.sch_tab[schema_name]) > 0:
                         schemas_with_tables.append(schema_name)
-            
+
             if len(schemas_with_tables) == 0:
                 raise ValueError(f"No schemas with tables found. Available schemas: {self.schema}")
-            
+
             # Prefer non-"main" schemas if available, otherwise use main
             if len(schemas_with_tables) > 1 and "main" in schemas_with_tables:
                 sch = [s for s in schemas_with_tables if s != "main"][0]
             else:
                 sch = schemas_with_tables[0]
             print(f"Auto-selected schema: `{sch}` from available schemas: {schemas_with_tables}")
-            
+
         if table is None:
             if sch not in self.sch_tab:
                 raise ValueError(f"Schema `{sch}` not found. Available schemas: {list(self.sch_tab.keys())}")
@@ -234,7 +244,8 @@ class DBMS:
             res = dict(table=table, count=count, size_mb=count * len(tbl.exported_columns) * 10 / 1e6,
                        columns=len(tbl.exported_columns), schema=self.sch)
             res_all.append(res)
-        return pl.DataFrame(res_all)
+        self.description = pl.DataFrame(res_all)
+        return self.description
 
     def describe_table(self, table: str, sch: Optional[str] = None, dtype: bool = True) -> None:
         print(table.center(100, "="))

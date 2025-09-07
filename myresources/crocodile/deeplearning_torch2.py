@@ -126,7 +126,7 @@ class ModelCheckpoint(Callback):
             if self.verbose:
                 print(f"Epoch {epoch+1}: saving model to {filepath_epoch}")
             self._save_model(filepath_epoch)
-        
+
         # Always save last model for resuming
         last_filepath = os.path.join(os.path.dirname(self.filepath), "last_checkpoint.pth")
         self._save_model(last_filepath, is_checkpoint=True, epoch=epoch, logs=logs)
@@ -245,7 +245,7 @@ class AdvancedModelTrainer(Generic[T]):
 
         self.use_amp = use_amp and self.device.type == 'cuda'
         self.scaler = GradScaler() if self.use_amp else None  # type: ignore[call-arg]
-        
+
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.clip_grad_norm = clip_grad_norm
 
@@ -253,7 +253,7 @@ class AdvancedModelTrainer(Generic[T]):
         for metric_name in self.metrics.keys():
             self.history[f"train_{metric_name}"] = []
             self.history[f"val_{metric_name}"] = []
-        
+
         self.stop_training = False
         self.num_epochs = 0
         self.train_loader: Optional[DataLoader[T]] = None
@@ -291,13 +291,13 @@ class AdvancedModelTrainer(Generic[T]):
             inputs, targets = batch[0], batch[1]
         else:
             raise ValueError(f"Batch format not understood. Expected (inputs, targets, *optional) but got {len(batch)} elements.")
-        
+
         # Recursively move tensors to device, supporting nested structures
         inputs = self._to_device(inputs)
         targets = self._to_device(targets)
-        
+
         return inputs, targets
-        
+
     def _to_device(self, data: Any) -> Any:
         """
         Recursively moves data to the configured device.
@@ -321,7 +321,7 @@ class AdvancedModelTrainer(Generic[T]):
             if not isinstance(inputs, (list, tuple)):
                 inputs = (inputs,)
             outputs = self.model(*inputs)
-            
+
             try:
                 loss = self.criterion(outputs, targets)
             except Exception as e:
@@ -351,12 +351,12 @@ class AdvancedModelTrainer(Generic[T]):
         with torch.no_grad(): # Metrics shouldn't affect gradients
             for name, func in self.metrics.items():
                 batch_metrics[name] = func(outputs, targets).item()
-        
+
         return outputs, loss, batch_metrics
 
     def _eval_step(self, batch: Any) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, float]]:
         inputs, targets = self._parse_batch(batch)
-        
+
         with torch.no_grad():
             if isinstance(inputs, (list, tuple)):
                 outputs = self.model(*inputs)
@@ -367,7 +367,7 @@ class AdvancedModelTrainer(Generic[T]):
             batch_metrics = {"loss": loss.item()}
             for name, func in self.metrics.items():
                 batch_metrics[name] = func(outputs, targets).item()
-        
+
         return outputs, loss, batch_metrics
 
     def _train_one_epoch(self, epoch_idx: int) -> Dict[str, float]:
@@ -375,14 +375,14 @@ class AdvancedModelTrainer(Generic[T]):
         total_loss = 0.0
         metric_totals: Dict[str, float] = {name: 0.0 for name in self.metrics.keys()}
         num_samples = 0
-        
+
         self.optimizer.zero_grad() # Initialize gradients once for accumulation
 
         for batch_idx, batch in enumerate(self.train_loader):  # type: ignore[union-attr]
             self._call_callbacks('on_batch_begin', epoch=epoch_idx, batch_idx=batch_idx)
-            
+
             _, _loss, batch_metrics = self._train_step(batch)  # Rename to indicate it's intentionally unused
-            
+
             # Handle gradient accumulation
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0 or (batch_idx + 1) == len(self.train_loader):  # type: ignore[union-attr]
                 if self.clip_grad_norm is not None and self.scaler: # AMP
@@ -408,7 +408,7 @@ class AdvancedModelTrainer(Generic[T]):
             for name in self.metrics.keys():
                 metric_totals[name] += batch_metrics[name] * batch_size
             num_samples += batch_size
-            
+
             log_batch_metrics = {f"train_{k}": v for k,v in batch_metrics.items()}
             self._call_callbacks('on_batch_end', epoch=epoch_idx, batch_idx=batch_idx, logs=log_batch_metrics)
 
@@ -422,21 +422,21 @@ class AdvancedModelTrainer(Generic[T]):
         total_loss = 0.0
         metric_totals: Dict[str, float] = {name: 0.0 for name in self.metrics.keys()}
         num_samples = 0
-        
+
         desc = "Validating" if prefix == "val" else "Testing"
         eval_bar = tqdm(loader, desc=desc, leave=False, position=1)
 
         for batch in eval_bar:
             _, _, batch_metrics = self._eval_step(batch) # We only need metrics here
-            
+
             # Assuming inputs is either a tensor or the first element of a list/tuple of tensors
             batch_size = batch[0][0].size(0) if isinstance(batch[0], (list, tuple)) else batch[0].size(0)
-            
+
             total_loss += batch_metrics["loss"] * batch_size
             for name in self.metrics.keys():
                 metric_totals[name] += batch_metrics[name] * batch_size
             num_samples += batch_size
-            
+
             eval_bar.set_postfix({f"{prefix}_loss": total_loss / num_samples if num_samples > 0 else 0.0}, refresh=True)
 
         avg_loss = total_loss / num_samples
@@ -462,12 +462,12 @@ class AdvancedModelTrainer(Generic[T]):
                 self.model.load_state_dict(checkpoint['model_state_dict'])
                 self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 start_epoch = checkpoint.get('epoch', -1) + 1 # Resume from next epoch
-                
+
                 if self.lr_scheduler and 'scheduler_state_dict' in checkpoint:
                     self.lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
                 if self.scaler and 'scaler_state_dict' in checkpoint:
                     self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
-                
+
                 # Restore best score for callbacks like ModelCheckpoint and EarlyStopping if available
                 best_score_chkpt = checkpoint.get('best_score_checkpoint')
                 for cb in self.callbacks:
@@ -490,10 +490,10 @@ class AdvancedModelTrainer(Generic[T]):
             if self.stop_training:
                 print("Training stopped prematurely by a callback or external signal.")
                 break
-            
+
             epoch_logs: Dict[str, float] = {}
             self._call_callbacks('on_epoch_begin', epoch=epoch_idx)
-            
+
             # Training phase
             train_metrics = self._train_one_epoch(epoch_idx)
             epoch_logs.update(train_metrics)
@@ -509,7 +509,7 @@ class AdvancedModelTrainer(Generic[T]):
             for key, value in epoch_logs.items():
                 if key not in self.history: self.history[key] = []
                 self.history[key].append(value)
-            
+
             # LR Scheduler step (some schedulers step per epoch, some per batch)
             # Common practice for ReduceLROnPlateau is to step with validation metric
             if self.lr_scheduler:
@@ -520,7 +520,7 @@ class AdvancedModelTrainer(Generic[T]):
                         print("Warning: ReduceLROnPlateau scheduler needs 'val_loss' or monitored metric in epoch_logs.")
                 else: # For other schedulers like StepLR, CosineAnnealingLR
                     self.lr_scheduler.step()
-            
+
             self._call_callbacks('on_epoch_end', epoch=epoch_idx, logs=epoch_logs)
 
         self._call_callbacks('on_train_end', logs=self.history)
@@ -553,7 +553,7 @@ if __name__ == '__main__':
     # Let's create a simple regression problem
     X_train_np = np.random.rand(1000, 10).astype(np.float32)
     y_train_np = (X_train_np @ np.random.rand(10, 1).astype(np.float32) + np.random.randn(1000,1).astype(np.float32) * 0.1).astype(np.float32)
-    
+
     X_val_np = np.random.rand(200, 10).astype(np.float32)
     y_val_np = (X_val_np @ np.random.rand(10, 1).astype(np.float32) + np.random.randn(200,1).astype(np.float32) * 0.1).astype(np.float32)
 
@@ -586,13 +586,13 @@ if __name__ == '__main__':
         targets = torch.stack([item[1] for item in batch])
         indices = [f"val_sample_{i}" for i in range(len(batch))]
         return (inputs, ), targets, indices
-        
+
     def test_collate_fn(batch: List[Any]) -> Tuple[Tuple[torch.Tensor, ...], torch.Tensor, List[str]]:
         inputs = torch.stack([item[0] for item in batch])
         targets = torch.stack([item[1] for item in batch])
         indices = [f"test_sample_{i}" for i in range(len(batch))]
         return (inputs, ), targets, indices
-    
+
     # Create data loaders with the collate functions
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=train_collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=32, collate_fn=val_collate_fn)
@@ -664,7 +664,7 @@ if __name__ == '__main__':
         callbacks=callbacks_list,
         random_seed=SEED
     )
-    
+
     # 7. Start Training
     print(f"Using device: {trainer.device}")
     print(f"Using AMP: {trainer.use_amp}")
@@ -682,9 +682,9 @@ if __name__ == '__main__':
     # 9. Make Predictions
     print("\nMaking predictions on Test Set (first batch):")
     # Create a small loader for prediction example
-    first_batch_test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False, collate_fn=test_collate_fn) 
+    first_batch_test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False, collate_fn=test_collate_fn)
     predictions = trainer.predict(first_batch_test_loader) # Returns a list of tensors (one per batch)
-    
+
     print(f"Shape of first prediction batch: {predictions[0].shape}")
     print(f"First 5 predictions: \n{predictions[0]}")
 

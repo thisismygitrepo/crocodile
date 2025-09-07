@@ -13,6 +13,7 @@ class Read:
         if suffix == "": raise ValueError(f"File type could not be inferred from suffix. Suffix is empty. Path: {path}")
         if suffix in ("sqlite", "sqlite3", "db", "duckdb"):
             from crocodile.database import DBMS
+            if suffix == "duckdb": pass
             res = DBMS.from_local_db(path=path)
             print(res.describe_db())
             return res
