@@ -18,8 +18,6 @@ class Scout:
     exists: bool
     is_dir: bool
     files: Optional[List[P]]
-
-
 def scout(source: PLike, z: bool = False, r: bool = False) -> Scout:
     source_full = P(source).expanduser().absolute()
     source_rel2home = source_full.collapseuser()
