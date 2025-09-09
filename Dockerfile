@@ -1,7 +1,7 @@
 
-# FROM python:3.11-slim
-# from official python repo, grab 3.11-alpine
-FROM python:3.11-alpine
+# FROM python:3.13-slim
+# from official python repo, grab 3.13-alpine
+FROM python:3.13-alpine
 
 RUN apk add build-base linux-headers  # # alpine misses this but its reqiured to build psutil
 

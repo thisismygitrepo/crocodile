@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crocodile"
-version = "14.9"  # Version directly defined here instead of using dynamic
+version = "15.0"  # Version directly defined here instead of using dynamic
 description = "Deep Learning Framework & Workload Management For On-premise Personal Machines."
 readme = "README.md"
 authors = [
@@ -18,31 +18,35 @@ classifiers = [
 ]
 dependencies = [
     "bcrypt>=4.3.0",
-    "colorlog>=6.9.0",
     "cryptography>=45.0.7",
+
+    "colorlog>=6.9.0",
     "distro>=1.9.0",
-    "duckdb-engine>=0.17.0",
+
     "fire>=0.7.1",
     "gitpython>=3.1.45",
-    "ipython>=9.5.0",
+
     "joblib>=1.5.2",
     "matplotlib>=3.10.6",
     "numpy<=2.2.6",  # because of numba
     "orjson>=3.11.3",
     "paramiko>=4.0.0",
     "plotly>=6.3.0",
-    "polars>=1.33.0",
     "psutil>=7.0.0",
-    "py7zr>=1.0.0",
-    "pyjson5>=1.6.9",
-    "pyyaml>=6.0.2",
     "randomname>=0.2.1",
     "requests>=2.32.3",
     "rich>=14.1.0",
+
     "sqlalchemy>=2.0.43",
+    "duckdb-engine>=0.17.0",
+
+    "polars>=1.33.0",
     "tabulate>=0.9.0",
     "tomli>=2.2.1",
     "tqdm>=4.67.1",
+    "pyjson5>=1.6.9",
+    "pyyaml>=6.0.2",
+
 ]
 
 [project.urls]
@@ -88,6 +92,7 @@ dev = [
     "click>=8.2.1",
     "duckdb-engine>=0.17.0",
     "ipykernel>=6.30.1",
+    "ipython>=9.5.0",
     "keras>=3.11.3",
     "onnx>=1.19.0",
     "onnxruntime>=1.22.1",
