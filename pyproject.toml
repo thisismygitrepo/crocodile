@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crocodile"
-version = "14.8"  # Version directly defined here instead of using dynamic
+version = "14.9"  # Version directly defined here instead of using dynamic
 description = "Deep Learning Framework & Workload Management For On-premise Personal Machines."
 readme = "README.md"
 authors = [
@@ -27,7 +27,7 @@ dependencies = [
     "ipython>=9.5.0",
     "joblib>=1.5.2",
     "matplotlib>=3.10.6",
-    "numpy>=2.3.2",
+    "numpy<=2.2.6",  # because of numba
     "orjson>=3.11.3",
     "paramiko>=4.0.0",
     "plotly>=6.3.0",
