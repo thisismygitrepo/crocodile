@@ -1,16 +1,16 @@
 [build-system]
-requires = ["setuptools>=70", "wheel"]
+requires = ["setuptools>=80", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "crocodile"
-version = "14.8"  # Version directly defined here instead of using dynamic
+version = "15.0"  # Version directly defined here instead of using dynamic
 description = "Deep Learning Framework & Workload Management For On-premise Personal Machines."
 readme = "README.md"
 authors = [
     {name = "Alex Al-Saffar", email = "programmer@usa.com"}
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -18,30 +18,35 @@ classifiers = [
 ]
 dependencies = [
     "bcrypt>=4.3.0",
+    "cryptography>=45.0.7",
+
     "colorlog>=6.9.0",
-    "cryptography>=44.0.2",
     "distro>=1.9.0",
-    "fire>=0.7.0",
-    "gitpython>=3.1.44",
-    "ipython>=8.35.0",
-    "joblib>=1.4.2",
-    "matplotlib>=3.10.1",
-    "numpy>=2.1.3",
-    "paramiko>=3.5.1",
-    "plotly>=6.0.1",
+
+    "fire>=0.7.1",
+    "gitpython>=3.1.45",
+
+    "joblib>=1.5.2",
+    "matplotlib>=3.10.6",
+    "numpy<=2.2.6",  # because of numba
+    "orjson>=3.11.3",
+    "paramiko>=4.0.0",
+    "plotly>=6.3.0",
     "psutil>=7.0.0",
-    "py7zr>=0.22.0",
     "randomname>=0.2.1",
     "requests>=2.32.3",
-    "rich>=14.0.0",
-    "sqlalchemy>=2.0.40",
+    "rich>=14.1.0",
+
+    "sqlalchemy>=2.0.43",
+    "duckdb-engine>=0.17.0",
+
+    "polars>=1.33.0",
     "tabulate>=0.9.0",
     "tomli>=2.2.1",
-    "pyjson5>=1.6.8",
-    "orjson>=3.10.18",
-    "pyyaml>=6.0.2",
     "tqdm>=4.67.1",
-    "polars>=1.32.3",
+    "pyjson5>=1.6.9",
+    "pyyaml>=6.0.2",
+
 ]
 
 [project.urls]
@@ -53,12 +58,8 @@ dependencies = [
 
 [project.optional-dependencies]
 full = [
-    "scikit-learn>=1.6.1",
-    "click>=8.1.8",
-    "torch>=2.6.0",
-    "types-paramiko>=3.5.0.20240928",
-    "types-requests>=2.32.0.20250328",
-    "types-tqdm>=4.67.0.20250404",
+
+
 ]
 docs = [
     "sphinx>=8.2.3",
@@ -88,15 +89,24 @@ Minor changes
 
 [dependency-groups]
 dev = [
+    "click>=8.2.1",
     "duckdb-engine>=0.17.0",
-    "ipykernel>=6.29.5",
+    "ipykernel>=6.30.1",
+    "ipython>=9.5.0",
     "keras>=3.11.3",
-    "onnx>=1.17.0",
-    "onnxruntime>=1.21.1",
+    "onnx>=1.19.0",
+    "onnxruntime>=1.22.1",
     "pyarrow>=21.0.0",
-    "tensorboard>=2.19.0",
-    "torch>=2.6.0",
+    "scikit-learn>=1.7.1",
+    "sphinx>=8.2.3",
+    "sphinx-autodoc-typehints>=3.1.0",
+    "sphinx-rtd-theme>=3.0.2",
+    "tensorboard>=2.20.0",
+    "torch>=2.8.0",
     "torchinfo>=1.8.0",
     "torchview>=0.2.7",
+    "types-paramiko>=4.0.0.20250822",
+    "types-requests>=2.32.4.20250809",
+    "types-tqdm>=4.67.0.20250809",
 ]
 full = []

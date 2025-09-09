@@ -178,13 +178,13 @@ class BaseModel:
             print(''.center(57, '='))
     @staticmethod
     def check_output_stats(model: nn.Module, data_loader: DataLoader[Any]) -> None:
-        import pandas as pd
+        import polars as pl
         with t.no_grad():
             for batch in data_loader:
                 inputs, _ops, _other = batch
                 predictions = model(*inputs)
                 results = [a_red.cpu().numpy() for a_red in predictions]
-                a_df = pd.DataFrame(np.array(results).flatten()).describe()
+                a_df = pl.DataFrame(np.array(results).flatten()).describe()
                 print("Stats of the output:")
                 print(a_df)
                 break
@@ -214,7 +214,7 @@ class BaseModel:
     def load_weights(model: nn.Module, save_dir: PLike, map_location: Union[str, Device, None]):
         if map_location is None and t.cuda.is_available():
             map_location = "cpu"
-        path = save_dir.joinpath("weights.pth")
+        path = P(save_dir).joinpath("weights.pth")
         model.load_state_dict(t.load(path, map_location=map_location))  # type: ignore
         model.eval()
         model.compile()
