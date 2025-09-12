@@ -1,5 +1,26 @@
 """
 Example of creating a PyTorch model, saving it to ONNX, and performing inference.
+
+
+What to try:
+
+Ensure optimized graph: opts = onnxruntime.SessionOptions(); opts.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+Choose optimal provider(s): e.g. CUDAExecutionProvider or TensorRTExecutionProvider (or OpenVINO / Dml) if GPU/accelerators available. Pass providers list explicitly.
+Tune threads: setenv OMP_NUM_THREADS, MKL_NUM_THREADS; or session options: intra_op_num_threads, inter_op_num_threads.
+Use IO binding: preallocate input/output OrtValues once; avoid per-call dict overhead.
+Batch once: For throughput measurement, call fewer runs with a large batch instead of many runs; amortize setup cost.
+Fuse tiny linears: Replace chain of small Linear + activations with a single wider projection + activation if acceptable; increases matmul size -> better BLAS efficiency.
+Replace sequence of 1D convs with a single conv (or depthwise + pointwise) to reduce kernel launches.
+Increase channel widths modestly (compute intensity) if latency target allows; paradoxically can speed throughput scaling.
+Export with higher opset and enable constant folding (torch.onnx.export(..., do_constant_folding=True)).
+If staying CPU: Build ORT with OpenMP/MKL or use pip wheel with MKL; test -- enable arena (default) and memory pattern (SessionOptions.enable_mem_pattern = True).
+Pin shapes static (no dynamic axes) so ORT can precompute and cache more.
+Warmup longer before timing (cache effects).
+Remove torch.compile when comparing fairness; or instead compile the exported ONNX via onnxruntime-extensions / ORT optimized builds.
+
+Recreate session with ENABLE_ALL + explicit providers.
+Set intra_op_num_threads to physical cores.
+Use IO binding to reuse buffers.
 """
 
 import torch
