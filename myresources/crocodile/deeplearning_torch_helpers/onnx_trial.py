@@ -28,8 +28,6 @@ class PredictionModel(nn.Module):
         self.lrelu = nn.LeakyReLU(negative_slope=0.3)
 
     def forward(self, signals: torch.Tensor, context: torch.Tensor):
-        print(signals.shape)
-        print(context.shape)
         # Process signals through convolutional layers
         x = self.conv1(signals)
         x = self.gelu(x)
@@ -57,9 +55,10 @@ class PredictionModel(nn.Module):
 if __name__ == "__main__":
     torch.manual_seed(42)
     model = PredictionModel(input_channels=4, context_size=8)
+    compiled_model = torch.compile(model)
 
     from crocodile.deeplearning_torch import save_all
-    from crocodile.deeplearning import HParams, Specs
+    from crocodile.deeplearning import HParams, Specs, get_hp_save_dir
     from crocodile.file_management import P
     hp = HParams(
         seed=1, shuffle=True, precision="float32", test_split=0.2, learning_rate=0.1, batch_size=32, epochs=1, name="onnx_trial", root=str(P.home().joinpath("tmp_results", "model_root"))
@@ -75,3 +74,87 @@ if __name__ == "__main__":
         op_shapes={"output1": (2,), "output2": (2,)}  # Assuming the output shape is (2,)
     )
     save_all(model=model, hp=hp, specs=specs, history=[{"train": [0.1, 0.2, 3, 4], "test": [2, 1, 1, 2]}])
+
+    save_dir = get_hp_save_dir(hp=hp)
+    onnx_path = save_dir.joinpath("model.onnx")
+    
+    # Prepare test data for speed comparison
+    batch_sizes = [1, 32, 128, 1000, 5000]
+    num_runs = 100
+    
+    import time
+    import onnxruntime as ort
+    
+    print("Setting up ONNX session...")
+    session = ort.InferenceSession(str(onnx_path))
+    print(session.get_providers())
+    import torch
+    print(torch.cuda.is_available())
+    
+    print("Starting speed comparison...")
+    print(f"{'Batch Size':<12} {'PyTorch (ms)':<15} {'ONNX (ms)':<12} {'Speedup':<10}")
+    print("-" * 55)
+    
+    for batch_size in batch_sizes:
+        # Generate test data
+        test_signals = torch.randn(batch_size, 4, sequence_length)
+        test_context = torch.randn(batch_size, 8)
+        
+        # PyTorch inference timing
+        model.eval()
+        with torch.no_grad():
+            # Warmup
+            for _ in range(10):
+                _ = model(test_signals, test_context)
+            
+            # Actual timing
+            start_time = time.perf_counter()
+            for _ in range(num_runs):
+                _ = model(test_signals, test_context)
+            pytorch_time = (time.perf_counter() - start_time) * 1000 / num_runs
+        
+        # ONNX inference timing
+        dummy_dict = {
+            "signals": test_signals.numpy(),
+            "context": test_context.numpy()
+        }
+        
+        # Warmup
+        for _ in range(10):
+            _ = session.run(None, dummy_dict)
+        
+        # Actual timing
+        start_time = time.perf_counter()
+        for _ in range(num_runs):
+            _ = session.run(None, dummy_dict)
+        onnx_time = (time.perf_counter() - start_time) * 1000 / num_runs
+        
+        speedup = pytorch_time / onnx_time
+        print(f"{batch_size:<12} {pytorch_time:<15.3f} {onnx_time:<12.3f} {speedup:<10.2f}x")
+    
+    print("\nTesting output consistency...")
+    # Verify outputs are consistent
+    test_batch = 10
+    test_signals_small = torch.randn(test_batch, 4, sequence_length)
+    test_context_small = torch.randn(test_batch, 8)
+    
+    model.eval()
+    with torch.no_grad():
+        pytorch_output = model(test_signals_small, test_context_small)
+    
+    onnx_input = {
+        "signals": test_signals_small.numpy(),
+        "context": test_context_small.numpy()
+    }
+    onnx_output = session.run(None, onnx_input)
+    
+    # Compare outputs
+    pytorch_out1, pytorch_out2 = pytorch_output
+    onnx_out1, onnx_out2 = onnx_output
+    
+    diff1 = torch.abs(pytorch_out1 - torch.from_numpy(onnx_out1)).max()
+    diff2 = torch.abs(pytorch_out2 - torch.from_numpy(onnx_out2)).max()
+    
+    print(f"Max difference in output1: {diff1:.6f}")
+    print(f"Max difference in output2: {diff2:.6f}")
+    print("✓ Outputs are consistent" if diff1 < 1e-5 and diff2 < 1e-5 else "⚠ Outputs differ significantly")

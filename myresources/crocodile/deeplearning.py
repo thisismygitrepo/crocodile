@@ -4,7 +4,7 @@ dl
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
+import polars as pl
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -70,7 +70,7 @@ class EvaluationData:
     y_pred: list[Any]
     y_true: list[Any]
     names: list[str]
-    loss_df: Optional['pd.DataFrame']
+    loss_df: Optional['pl.DataFrame']
     def __repr__(self) -> str:
         print("EvaluationData Object")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
         _ = S(self.__dict__).print()
@@ -228,8 +228,8 @@ class DataReader:
             delcared_op_shapes = specs.op_shapes
             delcared_other_shapes = specs.other_shapes
             for data_name, data_value in data_dict.items():
-                if type(data_value) in {pd.DataFrame, pd.Series}:
-                    a_shape = data_value.iloc[0].shape
+                if type(data_value) in {pl.DataFrame, pl.Series}:
+                    a_shape = data_value.get_column(data_value.columns[0])[0].shape
                 else:
                     try: item = data_value[0]
                     except IndexError as ie: raise IndexError(f"Data name: {data_name}, data value: {data_value}") from ie
@@ -282,8 +282,8 @@ class DataReader:
         others: list[Any] = []
         for idx, key in zip([0] * len(keys_ip) + [1] * len(keys_op) + [2] * len(keys_others), keys_ip + keys_op + keys_others):
             tmp3: Any = split[key]
-            if isinstance(tmp3, (pd.DataFrame, pd.Series)):
-                item = tmp.iloc[np.array(selection)]
+            if isinstance(tmp3, (pl.DataFrame, pl.Series)):
+                item = tmp3[np.array(selection)]
             elif tmp3 is not None:
                 item = tmp3[selection]
             elif tmp3 is None: raise ValueError(f"Split key {key} is None. Make sure that the data is loaded.")
@@ -485,7 +485,7 @@ class BaseModel(ABC):
         return results
 
     @staticmethod
-    def get_metrics_evaluations(prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pd.DataFrame':
+    def get_metrics_evaluations(prediction: list['npt.NDArray[np.float64]'], groun_truth: list['npt.NDArray[np.float64]']) -> 'pl.DataFrame':
         metrics: list[Any] = []
         loss_dict: dict[str, list[Any]] = dict()
         for a_metric in metrics:
@@ -498,7 +498,7 @@ class BaseModel(ABC):
                 if hasattr(a_metric, "reset_states"): a_metric.reset_states()
                 loss = a_metric(y_pred=a_prediction[None], y_true=a_y_test[None])
                 loss_dict[name].append(np.array(loss).item())
-        return pd.DataFrame(loss_dict)
+        return pl.DataFrame(loss_dict)
 
     def save_class(self, weights_only: bool = True, version: str = 'v0', strict: bool = True, desc: str = ""):
         """Simply saves everything:
@@ -673,9 +673,27 @@ class BaseModel(ABC):
             try:
                 res = []
                 for item_str, item_val in zip(keys_ip + keys_op, list(ips) + list(ops)):
-                    a_df = pd.DataFrame(np.array(item_val).flatten()).describe().rename(columns={0: item_str})
+                    # Using numpy describe instead of pandas for consistency with polars
+                    vals = np.array(item_val).flatten()
+                    stats = {
+                        'count': len(vals),
+                        'mean': np.mean(vals),
+                        'std': np.std(vals),
+                        'min': np.min(vals),
+                        '25%': np.percentile(vals, 25),
+                        '50%': np.percentile(vals, 50),
+                        '75%': np.percentile(vals, 75),
+                        'max': np.max(vals)
+                    }
+                    # Create polars DataFrame instead of pandas
+                    a_df = pl.DataFrame({'metric': list(stats.keys()), item_str: list(stats.values())})
                     res.append(a_df)
-                print(pd.concat(res, axis=1))
+                # Concatenate polars DataFrames
+                if res:
+                    combined_df = res[0]
+                    for df in res[1:]:
+                        combined_df = combined_df.join(df, on='metric', how='outer')
+                    print(combined_df)
             except Exception as ex:
                 print(f"Could not do stats on outputs and inputs. Error: {ex}")
             print("Build Test Finished".center(50, '-'))

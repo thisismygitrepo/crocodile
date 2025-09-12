@@ -19,6 +19,7 @@ applyTo: "**/*.py"
 * If you are writing a test or any temporary script for discovering or undestanding something as an intermediate step, then,
   please keep all your temp scripts and files under ./.ai/tmp_scripts directory, its included in .gitignore and won't litter the repo.
   Its also nice if you create a subdirectory therein to contain relevant files for the task at hand, to avoid confusion with other files from other ai agents working simulataneously on other things.
+* When you run a command in the terminal, please don't assume that it will run in the correct repo root directory. Always cd first to the repo root, or the desired directory, then run the command.
 
 # Python Coding Rules
 * Please type hint all the code. Use fully quilaified types, not just generics like dict, list, etc, rather dict[str, int], list[float], 'npt.NDarray[np.float32]', etc.
@@ -30,13 +31,15 @@ applyTo: "**/*.py"
 * Please prefer to use absolute imports, avoid relatives when possible.
 * Use triple quotes and triple double quotes f-strings for string formatting and avoid when possible all goofy escaping when interpolation.
 * If needed, opt for polars not pandas, whenever possible.
-* when finished, run a linting static analysis check against files you touched, any fix any mistakes.
+* when finished, run a linting static analysis check against files you touched, Any fix any mistakes.
 * Please run `uv run -m pyright $file_touched` and address all issues. if `pyright is not there, first run `uv add pyright --dev`.
+* For all type checkers and linters, like mypy, pyright, pyrefly and pylint, there are config files at different levels of the repo all the way up to home directory level. You don't need to worry about them, just be mindful that they exist. The tools themselves will respect the configs therein.
+* If you want to run all linters and pycheckers agains the entire project to make sure everything is clean, I prepared a nice shell script, you can run it from the repo root as `./scripts/lint_and_typecheck.sh`. It will produce markdown files that are you are meant to look at @ ./.linters/*.md
 
 # General Programming Ethos:
 * Make sure all the code is rigorous, no lazy stuff.
     * For example, always avoid default values in arguments of functions. Those are evil and cause confusion. Always be explicit in parameter passing.
-    * Unless asked explicitly, please never ever attempt to change code files by writing meta code to do string manipulation on files. Please do change the files one by one, no matter how many there is. Don't worry about time, its okay, take your time and do them one by one. You can stop in the middle and we will have another LLM to help with the rest.
+    * Please never ever attempt to change code files by writing meta code to do string manipulation on files, e.g. with `sed` command with terminal. Please do change the files one by one, no matter how many there is. Don't worry about time, nor context window size, its okay, take your time and do the legwork. You can stop in the middle and we will have another LLM to help with the rest.
 * Please avoid writing README files and avoid docstring and comments in code unless absolutely necessary. Use clear naming conventions instead of documenting.
 * Always prefer to functional style of programming over OOP.
 * When passing arguments or constructing dicts or lists or tuples, avoid breaking lines too much, try to use ~ 150 characters per line before breaking to new one.
