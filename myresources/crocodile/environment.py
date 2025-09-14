@@ -3,7 +3,7 @@
 """
 
 
-from crocodile.core import List as L
+from crocodile.core import List as List22
 from crocodile.file_management import P
 from crocodile.meta import SHELLS, Terminal
 import platform
@@ -54,10 +54,10 @@ class WindowsPaths:
 
 
 tmp = os.environ["PATH"]
-tmp_path: L[P] = L(tmp.split(sep)).apply(P)  # type: ignore
+tmp_path: List22[P] = List22(tmp.split(sep)).apply(P)  # type: ignore
 PATH = tmp_path
 
-PSPath = L(tmp.split(sep)).apply(P)
+PSPath = List22(tmp.split(sep)).apply(P)
 
 HostName          = platform.node()  # e.g. "MY-SURFACE", os.env["COMPUTERNAME") only works for windows.
 UserName          = getpass.getuser()  # e.g: username, os.env["USERNAME") only works for windows.
@@ -247,10 +247,10 @@ def get_shell_profiles(shell: SHELLS):
     return ShellProfile()
 
 
-def construct_path(path_list: list[str]): return L(set(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
+def construct_path(path_list: list[str]): return List22(set(path_list)).reduce(lambda x, y: str(x) + sep + str(y))
 def get_path_defined_files(string_: str = "*.exe"):
     res = PATH.search(string_).reduce(lambda x, y: x + y)
-    L(res).print()
+    List22(res).print()
     return res
 
 

@@ -6,13 +6,15 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 from tqdm import tqdm
-import matplotlib.pyplot as plt
+import pickle  # stdlib pickle for inline serialization replacing Save/Read .pickle helpers.
+import json  # stdlib json for inline serialization replacing Save/Read .json helpers.
+# import matplotlib.pyplot as plt
 
-from crocodile.matplotlib_management import ImShow, FigureManager, Axes
-from crocodile.core import List as L, Struct as S, Base, Save
-from crocodile.file_management import P, PLike, Read
-
-from crocodile.meta import generate_readme
+# from crocodile.matplotlib_management import ImShow, FigureManager, Axes
+from crocodile.core import Struct as Struct22
+from crocodile.file_management import P
+from pathlib import Path
+# from crocodile.meta import generate_readme
 
 import enum
 import copy
@@ -23,7 +25,7 @@ from typing import TypeVar, Type, Any, Optional, Union, Callable, Literal, Proto
 
 HPARAMS_SUBPATH: str = 'metadata/hyperparameters'  # location within model directory where this will be saved.
 PRECISION = Literal['float64', 'float32', 'float16']
-def precision2torch_dtype(precision: PRECISION) -> 't.dtype':
+def precision2torch_dtype(precision: PRECISION) -> 'Any':  # returning torch dtype, annotated as Any to avoid forward reference issues
     import torch  # type: ignore
     match precision:
         case 'float64': return torch.float64
@@ -52,9 +54,9 @@ class Specs:
         return [item + f"_{which_split}" for item in names]
     @staticmethod
     def pretty_print(slf: SpecsLike) -> None:
-        S(slf.ip_shapes).print(as_config=True, title="Input Shapes")
-        S(slf.op_shapes).print(as_config=True, title="Output Shapes")
-        S(slf.other_shapes).print(as_config=True, title="Other Shapes")
+        Struct22(slf.ip_shapes).print(as_config=True, title="Input Shapes")
+        Struct22(slf.op_shapes).print(as_config=True, title="Output Shapes")
+        Struct22(slf.other_shapes).print(as_config=True, title="Other Shapes")
     @staticmethod
     def sample_input(slf: SpecsLike, precision: Optional[PRECISION], batch_size: int = 32) -> dict[str, npt.NDArray[np.float64] | npt.NDArray[np.float64]]:
         """Generate a sample input based on the input shapes."""
@@ -73,7 +75,7 @@ class EvaluationData:
     loss_df: Optional['pl.DataFrame']
     def __repr__(self) -> str:
         print("EvaluationData Object")  # this is useful to move to new line in IPython console and skip the header `In [5]` which throws off table aliegnment of header and content.
-        _ = S(self.__dict__).print()
+        _ = Struct22(self.__dict__).print()
         return ""
 
 
@@ -142,20 +144,26 @@ class HParams:
         subpath = HPARAMS_SUBPATH
         save_dir = get_hp_save_dir(self)
         self_repr = str(self)
-
         save_dir.joinpath(subpath, 'hparams.txt').create(parents_only=True).write_text(self_repr)
-
-        try: data: dict[str, Any] = self.__getstate__()
+        try:
+            data: dict[str, Any] = self.__getstate__()
         except AttributeError:
             data = self.__dict__
-        Save.pickle(path=save_dir.joinpath(subpath, "hparams.HParams.dat.pkl"), obj=data)
-        Save.pickle(path=save_dir.joinpath(subpath, "hparams.HParams.pkl"), obj=self)
+        # inline pickle dump (was Save.pickle)
+        path_data = save_dir.joinpath(subpath, "hparams.HParams.dat.pkl")
+        path_obj = save_dir.joinpath(subpath, "hparams.HParams.pkl")
+        path_data.parent.create(parents_only=True)
+        path_data.write_bytes(pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL))
+        path_obj.parent.create(parents_only=True)
+        path_obj.write_bytes(pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL))
 
     def __getstate__(self) -> dict[str, Any]: return self.__dict__
     def __setstate__(self, state: dict[str, Any]): return self.__dict__.update(state)
     @classmethod
-    def from_saved_data(cls, path: PLike, *args: Any, **kwargs: Any):
-        data: dict[str, Any] = Read.pickle(path=P(path) / HPARAMS_SUBPATH / "hparams.HParams.dat.pkl", *args, **kwargs)
+    def from_saved_data(cls, path: Path, *args: Any, **kwargs: Any):
+        # inline pickle load (was Read.pickle)
+        data_path = P(path) / HPARAMS_SUBPATH / "hparams.HParams.dat.pkl"
+        data: dict[str, Any] = pickle.loads(data_path.read_bytes())
         return cls(**data)
 
 
@@ -178,17 +186,24 @@ class DataReader:
         _ = kwargs
         hp = self.hp
         base = (P(path) if path is not None else get_hp_save_dir(hp)).joinpath(self.subpath).create()
-        try: data: dict[str, Any] = self.__getstate__()
-        except AttributeError: data = self.__dict__
-        Save.pickle(path=base / "data_reader.DataReader.dat.pkl", obj=data)
-        Save.pickle(path=base / "data_reader.DataReader.pkl", obj=self)
+        try:
+            data: dict[str, Any] = self.__getstate__()
+        except AttributeError:
+            data = self.__dict__
+        # inline pickle dump (was Save.pickle)
+        path_data = base / "data_reader.DataReader.dat.pkl"
+        path_obj = base / "data_reader.DataReader.pkl"
+        path_data.parent.create(parents_only=True)
+        path_data.write_bytes(pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL))
+        path_obj.parent.create(parents_only=True)
+        path_obj.write_bytes(pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL))
     @classmethod
     def from_saved_data(cls, path: Union[str, P],
-                        # hp: SubclassedHParams,  # type: ignore
                         hp: HyperParams,
                         **kwargs: Any):
-        path = P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
-        data: dict[str, Any] = Read.pickle(path)
+        data_path = P(path) / cls.subpath / "data_reader.DataReader.dat.pkl"
+        # inline pickle load (was Read.pickle)
+        data: dict[str, Any] = pickle.loads(data_path.read_bytes())
         obj = cls(hp=hp, **kwargs)
         obj.__setstate__(data)
         return obj
@@ -201,11 +216,11 @@ class DataReader:
     def __setstate__(self, state: dict[str, Any]) -> None: return self.__dict__.update(state)
     def __repr__(self):
         print("DataReader Object with these keys: \n")
-        S(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
+        Struct22(self.specs.__dict__).print(as_config=True, title="Data Specs")  # config print
         split = self.split
         if bool(split):
             print("Split-Data Table:")
-            S(split).print(as_config=False, title="Split Data")  # table print
+            Struct22(split).print(as_config=False, title="Split Data")  # table print
         return "--" * 50
 
     @staticmethod
@@ -220,7 +235,7 @@ class DataReader:
         if populate_shapes:
             strings = Specs.get_all_names(specs)
             if len(strings) != len(keys) or set(keys) != set(strings):
-                S(specs.__dict__).print(as_config=True, title="Specs Declared")
+                Struct22(specs.__dict__).print(as_config=True, title="Specs Declared")
                 # S(data_dict).print(as_config=True, title="Specs Declared")
                 print(f"data_dict keys: {keys}")
                 raise ValueError("Arguments mismatch! The specs that you declared have keys that do not match the keys of the data dictionary passed to split method.")
@@ -252,7 +267,7 @@ class DataReader:
         split.update({astring + '_train': result[ii * 2] for ii, astring in enumerate(keys)})
         split.update({astring + '_test': result[ii * 2 + 1] for ii, astring in enumerate(keys)})
         print("================== Training Data Split ===========================")
-        S(split).print()
+        Struct22(split).print()
         print("==================================================================")
         return split
 
@@ -314,12 +329,12 @@ class DataReader:
     #     self.scaler = StandardScaler()
     #     split['x_train'] = self.scaler.fit_transform(split['x_train'])
     #     split['x_test']= self.scaler.transform(split['x_test'])
-    def image_viz(self, pred: 'npt.NDArray[np.float64]', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
-        """
-        Assumes numpy inputs
-        """
-        if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
-        else: self.plotter = ImShow(img_tensor=pred, sup_titles=names, labels=['Reconstruction', 'Ground Truth'], origin='lower', **kwargs)
+    # def image_viz(self, pred: 'npt.NDArray[np.float64]', gt: Optional[Any] = None, names: Optional[list[str]] = None, **kwargs: Any):
+    #     """
+    #     Assumes numpy inputs
+    #     """
+    #     if gt is None: self.plotter = ImShow(pred, labels=None, sup_titles=names, origin='lower', **kwargs)
+    #     else: self.plotter = ImShow(img_tensor=pred, sup_titles=names, labels=['Reconstruction', 'Ground Truth'], origin='lower', **kwargs)
 
     # def viz(self, eval_data: EvaluationData, **kwargs: Any):
     #     """Implement here how you would visualize a batch of input and ouput pair. Assume Numpy arguments rather than tensors."""
@@ -350,7 +365,7 @@ class BaseModel(ABC):
         if __module.startswith('__main__'):
             print("💀 Model class is defined in main. Saving the code from the current working directory. Consider importing the model class from a module.")
         self.history = history if history is not None else []  # should be populated in fit method, or loaded up.
-    def get_model(self):
+    def get_model(self) -> Any:  # abstract-like; concrete subclasses must implement
         raise NotImplementedError
     def fit(self, viz: bool = True,
             weight_name: Optional[str] = None,
@@ -362,19 +377,21 @@ class BaseModel(ABC):
         hp = self.hp
         specs = self.data.specs
         split = self.data.split
-        x_train = [split[item] for item in specs.get_split_names(names=list(specs.ip_shapes.keys()), which_split="train")]
-        y_train = [split[item] for item in specs.get_split_names(names=list(specs.op_shapes.keys()), which_split="train")]
-        x_test = [split[item] for item in specs.get_split_names(names=list(specs.ip_shapes.keys()), which_split="test")]
-        y_test = [split[item] for item in specs.get_split_names(names=list(specs.op_shapes.keys()), which_split="test")]
+        # specs is SpecsLike; static helper comes from Specs class; using getattr to satisfy type checker.
+        _get_split_names = getattr(Specs, 'get_split_names')  # type: ignore[attr-defined]
+        x_train = [split[item] for item in _get_split_names(names=list(specs.ip_shapes.keys()), which_split="train")]
+        y_train = [split[item] for item in _get_split_names(names=list(specs.op_shapes.keys()), which_split="train")]
+        x_test = [split[item] for item in _get_split_names(names=list(specs.ip_shapes.keys()), which_split="test")]
+        y_test = [split[item] for item in _get_split_names(names=list(specs.op_shapes.keys()), which_split="test")]
         if weight_name is not None:
             assert weight_name in specs.other_shapes, f"weight_string must be one of {specs.other_shapes}"
             if sample_weight is None:
-                train_weight_str = specs.get_split_names(names=[weight_name], which_split="train")[0]
+                train_weight_str = _get_split_names(names=[weight_name], which_split="train")[0]
                 sample_weight = split[train_weight_str]
             else:
                 print("⚠️ sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
             if val_sample_weight is None:
-                test_weight_str = specs.get_split_names(names=[weight_name], which_split="test")[0]
+                test_weight_str = _get_split_names(names=[weight_name], which_split="test")[0]
                 val_sample_weight = split[test_weight_str]
             else:
                 print("⚠️ val_sample_weight is passed directly to `fit` method, ignoring `weight_name` argument.")
@@ -412,17 +429,17 @@ class BaseModel(ABC):
         self.model.compile(loss=new_loss)
     def __call__(self, *args: Any, **kwargs: Any):
         return self.model(*args, **kwargs)
-    def save_model(self, path: PLike):
+    def save_model(self, path: Path):
         path_qualified = str(path) + ".keras"
         self.model.save(path_qualified)
-    def save_weights(self, directory: PLike):
+    def save_weights(self, directory: Path):
         path = P(directory).joinpath(self.model.name) + ".weights.h5"
         self.model.save_weights(path)
     @staticmethod
-    def load_model(directory: PLike) -> Any:
+    def load_model(directory: Path) -> Any:
         import keras
         return keras.models.load_model(str(directory))
-    def load_weights(self, directory: PLike) -> None:
+    def load_weights(self, directory: Path) -> None:
         search_res = P(directory).search('*.data*')
         if len(search_res) > 0:
             path = search_res.list[0].__str__().split('.data')[0]
@@ -512,9 +529,12 @@ class BaseModel(ABC):
         hp = self.hp
         hp.save()  # goes into the meta path.
         self.data.save()  # goes into the meta path.
-        Save.pickle(obj=self.history, path=get_hp_save_dir(hp) / 'metadata/training/history.pkl', verbose=True, desc="Training History")  # goes into the meta path.
-        try: generate_readme(get_hp_save_dir(hp), obj=self.__class__, desc=desc)
-        except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
+        # inline pickle dump (was Save.pickle)
+        history_path = get_hp_save_dir(hp) / 'metadata/training/history.pkl'
+        history_path.parent.create(parents_only=True)
+        history_path.write_bytes(pickle.dumps(self.history, protocol=pickle.HIGHEST_PROTOCOL))  # goes into the meta path.
+        # try: generate_readme(get_hp_save_dir(hp), obj=self.__class__, desc=desc)
+        # except Exception as ex: print(ex)  # often fails because model is defined in main during experiments.
         save_dir = get_hp_save_dir(hp).joinpath(f'{"weights" if weights_only else "model"}_save_{version}')
         if weights_only:
             self.save_weights(save_dir.create())
@@ -540,16 +560,18 @@ class BaseModel(ABC):
             'model_class': self.__class__.__name__,
             'data_class': self.data.__class__.__name__,
             'hp_class': hp.__class__.__name__,
-            # the above is sufficient if module comes from installed package. Otherwise, if its from a repo, we need to add the following:
             'module_path_rh': module_path_rh,
             'cwd_rh': P.cwd().collapseuser().as_posix(),
-                 }
-        Save.json(obj=specs, path=get_hp_save_dir(hp).joinpath('metadata/code_specs.json').to_str(), indent=4)
+        }
+        # inline json dump (was Save.json)
+        code_specs_path = get_hp_save_dir(hp).joinpath('metadata/code_specs.json')
+        code_specs_path.parent.create(parents_only=True)
+        code_specs_path.write_text(json.dumps(specs, indent=4))
         print(f'SAVED Model Class @ {get_hp_save_dir(hp).as_uri()}')
         return get_hp_save_dir(hp)
 
     @classmethod
-    def from_class_weights(cls, path: PLike,
+    def from_class_weights(cls, path: Path,
                            hparam_class: Optional[Type[SubclassedHParams]] = None,
                            data_class: Optional[Type[SubclassedDataReader]] = None,
                            device_name: Optional[Device] = None, verbose: bool = True):
@@ -557,14 +579,18 @@ class BaseModel(ABC):
         if hparam_class is not None:
             hp_obj: SubclassedHParams = hparam_class.from_saved_data(path)
         else:
-            hp_obj = Read.pickle(path=path / HPARAMS_SUBPATH + "hparams.HParams.pkl")
+            # inline pickle load (was Read.pickle)
+            hp_pickle_path = path / HPARAMS_SUBPATH + "hparams.HParams.pkl"
+            hp_obj = pickle.loads(P(hp_pickle_path).read_bytes())
         if device_name: hp_obj.device_name = device_name
         if str(hp_obj.root) != path.parent:
             hp_obj.root, hp_obj.name = str(path.parent), path.name  # if user moved the file to somewhere else, this will help alighment with new directory in case a modified version is to be saved.
 
         if data_class is not None: d_obj: SubclassedDataReader = data_class.from_saved_data(path, hp=hp_obj)
         else:
-            d_obj = Read.pickle(path=path / DataReader.subpath / "data_reader.DataReader.pkl")
+            # inline pickle load (was Read.pickle)
+            d_reader_path = path / DataReader.subpath / "data_reader.DataReader.pkl"
+            d_obj = pickle.loads(P(d_reader_path).read_bytes())
         # if type(hp_obj) is Generic[HParams]:
         d_obj.hp = hp_obj  # type: ignore
         # else:rd
@@ -579,14 +605,16 @@ class BaseModel(ABC):
         save_dir_weights = list(path.search('*_save_*'))[0]
         model_obj.load_weights(directory=save_dir_weights)
         history_path = path / "metadata/training/history.pkl"
-        if history_path.exists(): history: list[dict[str, Any]] = Read.pickle(path=history_path)
-        else: history = []
+        if history_path.exists():
+            history: list[dict[str, Any]] = pickle.loads(history_path.read_bytes())  # inline pickle load
+        else:
+            history = []
         model_obj.history = history
         _ = print(f"LOADED {model_obj.__class__}: {model_obj.hp.name}") if verbose else None
         return model_obj
 
     @classmethod
-    def from_class_model(cls, path: PLike):
+    def from_class_model(cls, path: Path):
         path = P(path)
         hp_obj = HParams.from_saved_data(path)
         data_obj = DataReader.from_saved_data(path, hp=hp_obj)
@@ -597,9 +625,11 @@ class BaseModel(ABC):
         return wrapper_class
 
     @staticmethod
-    def from_path(path_model: PLike, **kwargs: Any) -> 'SubclassedBaseModel':  # type: ignore
+    def from_path(path_model: Path, **kwargs: Any) -> 'SubclassedBaseModel':  # type: ignore
         path_model = P(path_model).expanduser().absolute()
-        specs = Read.json(path=path_model.joinpath('metadata/code_specs.json'))
+        # inline json load (was Read.json)
+        specs_path = path_model.joinpath('metadata/code_specs.json')
+        specs = json.loads(specs_path.read_text())
         print(f"Loading up module: `{specs['__module__']}`.")
         import importlib
         try:
@@ -646,8 +676,9 @@ class BaseModel(ABC):
         """
         specs = self.data.specs
         try:
-            keys_ip = specs.get_split_names(list(specs.ip_shapes.keys()), which_split="test")
-            keys_op = specs.get_split_names(list(specs.op_shapes.keys()), which_split="test")
+            _get_split_names = getattr(Specs, 'get_split_names')  # type: ignore[attr-defined]
+            keys_ip = _get_split_names(list(specs.ip_shapes.keys()), which_split="test")
+            keys_op = _get_split_names(list(specs.op_shapes.keys()), which_split="test")
         except TypeError as te:
             raise ValueError("Failed to load up sample data. Make sure that data has been loaded up properly.") from te
 
@@ -667,8 +698,8 @@ class BaseModel(ABC):
         if verbose:
             print("\n")
             print("Build Test".center(50, '-'))
-            S.from_keys_values(keys_ip, L(ips).apply(lambda x: x.shape)).print(as_config=True, title="Input shapes:")
-            S.from_keys_values(keys_op, L(ops).apply(lambda x: x.shape)).print(as_config=True, title="Output shape:")
+            Struct22.from_keys_values(keys_ip, [x.shape for x in ips]).print(as_config=True, title="Input shapes:")
+            Struct22.from_keys_values(keys_op, [x.shape for x in ops]).print(as_config=True, title="Output shape:")
             print("\n\nStats on output data for random normal input:")
             try:
                 res = []
@@ -731,21 +762,21 @@ class Ensemble(Base):
         self.performance: Iterable[Any] = []
 
     @classmethod
-    def from_saved_models(cls, parent_dir: PLike, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+    def from_saved_models(cls, parent_dir: Path, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(hp_class=hp_class, data_class=data_class, model_class=model_class,  # type: ignore
                         path=parent_dir, size=len(P(parent_dir).search('*__model__*')))
         obj.models = list(P(parent_dir).search(pattern='*__model__*').apply(model_class.from_class_model))
         return obj
 
     @classmethod
-    def from_saved_weights(cls, parent_dir: PLike, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
+    def from_saved_weights(cls, parent_dir: Path, model_class: Type[SubclassedBaseModel], hp_class: Type[SubclassedHParams], data_class: Type[SubclassedDataReader]) -> 'Ensemble':
         obj = cls(model_class=model_class, hp_class=hp_class, data_class=data_class,  # type: ignore
                         path=parent_dir, size=len(P(parent_dir).search('*__model__*')))
         obj.models = list(P(parent_dir).search('*__model__*').apply(model_class.from_class_weights))  # type: ignore
         return obj
 
     @staticmethod
-    def from_path(path: PLike) -> list[SubclassedBaseModel]:  # type: ignore
+    def from_path(path: Path) -> list[SubclassedBaseModel]:  # type: ignore
         tmp = P(path).expanduser().absolute().search("*")
         tmp2 = tmp.apply(BaseModel.from_path)
         return list(tmp2)  # type: ignore
@@ -764,67 +795,70 @@ class Ensemble(Base):
             self.performance.append(BaseModel.evaluate(model=self.models[i], data=self.data))
             if save:
                 self.models[i].save_class()
-                Save.pickle(obj=self.performance, path=get_hp_save_dir(self.models[i].hp) / "performance.pkl")
+                # inline pickle dump (was Save.pickle)
+                perf_path = get_hp_save_dir(self.models[i].hp) / "performance.pkl"
+                perf_path.parent.create(parents_only=True)
+                perf_path.write_bytes(pickle.dumps(self.performance, protocol=pickle.HIGHEST_PROTOCOL))
         print("\n\n", " Finished fitting the ensemble ".center(100, ">"), "\n")
 
     def clear_memory(self): pass  # t.cuda.empty_cache()
 
 
 def plot_loss(history: list[dict[str, Any]], y_label: str):
-    res = S.concat_values(*history)
+    res = Struct22.concat_values(*history)
     return res.plot_plt(title="Loss Curve", xlabel="epochs", ylabel=y_label)
 
 
-def visualize(eval_data: EvaluationData, ax: Optional[Axes], title: str):
-    if ax is None:
-        fig, axis = plt.subplots(figsize=(14, 10))
-    else:
-        fig = ax.get_figure()
-        axis = ax
-    x = np.arange(len(eval_data.y_true[0]))
-    axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
-    axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
-    axis.legend()
-    axis.set_title(title or 'Predicted vs True')
-    FigureManager.grid(axis)
-    plt.show(block=False)
-    plt.pause(0.5)  # pause a bit so that the figure is displayed.
-    return fig
+# def visualize(eval_data: EvaluationData, ax: Optional[Axes], title: str):
+#     if ax is None:
+#         fig, axis = plt.subplots(figsize=(14, 10))
+#     else:
+#         fig = ax.get_figure()
+#         axis = ax
+#     x = np.arange(len(eval_data.y_true[0]))
+#     axis.bar(x, eval_data.y_true[0].squeeze(), label='y_true', width=0.4)
+#     axis.bar(x + 0.4, eval_data.y_pred[0].squeeze(), label='y_pred', width=0.4)
+#     axis.legend()
+#     axis.set_title(title or 'Predicted vs True')
+#     FigureManager.grid(axis)
+#     plt.show(block=False)
+#     plt.pause(0.5)  # pause a bit so that the figure is displayed.
+#     return fig
 
 
-class Losses:
-    @staticmethod
-    def get_log_square_loss_class():
-        import tensorflow as tf
-        import keras
-        class LogSquareLoss(keras.losses.Loss):  # type: ignore  # pylint: disable=no-member
-            def __init__(self, *args: Any, **kwargs: Any):
-                super().__init__(*args, **kwargs)
-                self.name = "LogSquareLoss"
+# class Losses:
+#     @staticmethod
+#     def get_log_square_loss_class():
+#         import tensorflow as tf
+#         import keras
+#         class LogSquareLoss(keras.losses.Loss):  # type: ignore  # pylint: disable=no-member
+#             def __init__(self, *args: Any, **kwargs: Any):
+#                 super().__init__(*args, **kwargs)
+#                 self.name = "LogSquareLoss"
 
-            def call(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]'):
-                _ = self
-                tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))  # type: ignore
-                factor = tf.Tensor(20) / tmp  # type: ignore
-                return factor * tf.math.log(tf.reduce_mean((y_true - y_pred)**2))
-        return LogSquareLoss
+#             def call(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]'):
+#                 _ = self
+#                 tmp = tf.math.log(tf.convert_to_tensor(10.0, dtype=y_pred.dtype))  # type: ignore
+#                 factor = tf.Tensor(20) / tmp  # type: ignore
+#                 return factor * tf.math.log(tf.reduce_mean((y_true - y_pred)**2))
+#         return LogSquareLoss
 
-    @staticmethod
-    def get_mean_max_error(tf: Any):
-        """
-        For Tensorflow
-        """
-        import keras
-        class MeanMaxError(keras.metrics.Metric):
-            def __init__(self, name: str = 'MeanMaximumError', **kwargs: Any):
-                super(MeanMaxError, self).__init__(name=name, **kwargs)
-                self.mme = self.add_weight(name='mme', initializer='zeros')
-                self.__name__ = name
+#     @staticmethod
+#     def get_mean_max_error(tf: Any):
+#         """
+#         For Tensorflow
+#         """
+#         import keras
+#         class MeanMaxError(keras.metrics.Metric):
+#             def __init__(self, name: str = 'MeanMaximumError', **kwargs: Any):
+#                 super(MeanMaxError, self).__init__(name=name, **kwargs)
+#                 self.mme = self.add_weight(name='mme', initializer='zeros')
+#                 self.__name__ = name
 
-            def update_state(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]', sample_weight: Optional['npt.NDArray[np.float64]'] = None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
-            def result(self): return self.mme
-            def reset_states(self): self.mme.assign(0.0)
-        return MeanMaxError
+#             def update_state(self, y_true: 'npt.NDArray[np.float64]', y_pred: 'npt.NDArray[np.float64]', sample_weight: Optional['npt.NDArray[np.float64]'] = None): self.mme.assign(tf.reduce_mean(tf.reduce_max(sample_weight or 1.0 * tf.abs(y_pred - y_true), axis=1)))
+#             def result(self): return self.mme
+#             def reset_states(self): self.mme.assign(0.0)
+#         return MeanMaxError
 
 
 # class HPTuning:
@@ -906,5 +940,4 @@ def _load_class(file_path: str):
 
 
 if __name__ == '__main__':
-    import torch as t
     pass

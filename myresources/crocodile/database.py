@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text, inspect as inspect__, Engine, Connec
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.engine import Inspector
 from sqlalchemy.sql.schema import MetaData
-from crocodile.core import Struct, List as L
+from crocodile.core import Struct, List as List22
 from crocodile.file_management import P, OPLike
 
 
@@ -214,7 +214,7 @@ class DBMS:
                 raise ValueError(f"Schema `{sch}` not found. Available schemas: {list(self.sch_tab.keys())}")
             tables = self.sch_tab[sch]
             assert len(tables) > 0, f"No tables found in schema `{sch}`"
-            table = L(tables).sample(size=1).list[0]
+            table = List22(tables).sample(size=1).list[0]
             print(f"Reading table `{table}` from schema `{sch}`")
         if self.con:
             try:
