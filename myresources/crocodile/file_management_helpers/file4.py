@@ -426,7 +426,8 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         path_resolved, slf = self._resolve_path(folder, name, path, self.name).expanduser().resolve(), self.expanduser().resolve()
         if use_7z:  # benefits over regular zip and encrypt: can handle very large files with low memory footprint
             path_resolved = path_resolved + '.7z' if not path_resolved.suffix == '.7z' else path_resolved
-            with install_n_import("py7zr").SevenZipFile(file=path_resolved, mode=mode, password=pwd) as archive: archive.writeall(path=str(slf), arcname=None)
+            import py7zr
+            with py7zr.SevenZipFile(file=path_resolved, mode=mode, password=pwd) as archive: archive.writeall(path=str(slf), arcname=None)
         else:
             arcname_obj = P(arcname or slf.name)
             if arcname_obj.name != slf.name: arcname_obj /= slf.name  # arcname has to start from somewhere and end with filename
@@ -573,7 +574,7 @@ class P(type(Path()), Path):  # type: ignore # pylint: disable=E0241
         from crocodile.meta import Terminal
         Terminal(stdout=None).run(f"sharing {self} {('--username ' + str(username)) if username else ''} {('--password ' + password) if password else ''}", shell="powershell")
     def to_qr(self, text: bool = True, path: OPLike = None) -> None:
-        qrcode = install_n_import("qrcode")
+        import qrcode
         qr = qrcode.QRCode()
         qr.add_data(str(self) if "http" in str(self) else (self.read_text() if text else self.read_bytes()))
         import io

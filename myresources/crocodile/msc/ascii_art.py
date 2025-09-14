@@ -26,7 +26,7 @@ BOX_OR_CHAR = Literal['boxes', 'cowsay']
 class ArtLib:
     @staticmethod
     def cowsay(text: str):
-        cowsay = install_n_import("cowsay")
+        import cowsay
         char = random.choice(cowsay.char_names)
         return cowsay.get_output_string(char, text=text)
 

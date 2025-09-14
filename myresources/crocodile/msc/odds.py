@@ -17,13 +17,13 @@ def share(path: P):
     return response.json()['link'] if ['link'] in response.json() else response.json()
 
 def edit_video(path: P, t_start: float = 0.0, t_end: Optional[float] = None, speed: float = 1.0, suffix: Optional[str] = None, rotate: float = 0.0, volume: float = 1.0, fps: float = 25.0):
-    ed = install_n_import("moviepy").editor
+    import moviepy as ed
     clip = ed.VideoFileClip(path); print(f"{clip.size=}, {clip.duration=}, {clip.fps=}")
     clip.subclip(t_start=t_start, t_end=t_end).rotate(rotate).volumex(volume).fx(ed.vfx.speedx, speed).write_videofile(path.append("_modified").with_suffix(path.suffix if suffix is None else suffix), fps=fps)
 
 
 def capture_from_webcam(show: bool = True, wait: bool = True, save: bool = False):
-    cv2 = install_n_import("cv2", "opencv-python")
+    import cv2
     cam = cv2.VideoCapture(0)
     cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3000)
     cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000)
@@ -43,7 +43,8 @@ def capture_from_webcam(show: bool = True, wait: bool = True, save: bool = False
 
 def qr(txt: str):
     file = P.tmpfile(suffix=".png")
-    install_n_import("qrcode").make(txt).save(file.__str__())
+    import qrcode
+    qrcode.make(txt).save(str(file))
     return file()
 def count_number_of_lines_of_code_in_repo(path: P, extension: str = ".py", r: bool = True, **kwargs: Any): return P(path).search(f"*{extension}", r=r, **kwargs).read_text(encoding="utf-8").splitlines().apply(len).np.sum()
 def profile_memory(command: str):

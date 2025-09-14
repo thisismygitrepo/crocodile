@@ -800,11 +800,6 @@ class ImShow(FigureManager):
     # def from_complex(data: 'npt.NDArray[np.float64]', pause: bool = True, **kwargs: Any): ImShow(data.real, data.imag, np.angle(data), abs(data), labels=['Real Part', 'Imaginary Part', 'Angle in Radians', 'Absolute Value'], pause=pause, **kwargs)
     @staticmethod
     def test() -> None: ImShow(img_tensor=np.random.rand(12, 10, 80, 120, 3))  # https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html # https://gist.github.com/mikhailov-work/ee72ba4191942acecc03fe6da94fc73f
-    @staticmethod
-    def resize(path: PLike, m: int, n: int):
-        from crocodile.core import install_n_import
-        res = install_n_import(library="skimage", package="scikit-image").transform.resize(plt.imread(str(path)), (m, n), anti_aliasing=True)
-        plt.imsave(str(path), res)
 
 
 if __name__ == '__main__':
