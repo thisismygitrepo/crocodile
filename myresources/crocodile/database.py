@@ -282,8 +282,6 @@ def to_db(table: str, idx: int, idx_max: int, data: Any):
         )
         conn.commit()
     db.close()
-
-
 def from_db(table: str):
     import pickle
     db = DBMS.from_local_db(DB_TMP_PATH)
