@@ -2,8 +2,9 @@
 """Notifications Module
 """
 
-from crocodile.core import install_n_import
-from crocodile.file_management import P, Read
+# from crocodile.core import install_n_import
+# from crocodile.file_management import P, Read
+from pathlib import Path
 # from crocodile.meta import RepeatUntilNoException
 import smtplib
 import imaplib
@@ -13,15 +14,22 @@ import imaplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Any, Union, Literal
+from markdown import markdown
+
+
+
+def download_to_memory(path: Path, allow_redirects: bool = True, timeout: Optional[float] = None, params: Any = None) -> 'Any':
+    import requests
+    return requests.get(path.as_posix().replace("https:/", "https://").replace("http:/", "http://"), allow_redirects=allow_redirects, timeout=timeout, params=params)  # Alternative: from urllib import request; request.urlopen(url).read().decode('utf-8').
 
 
 def get_github_markdown_css() -> str:
     pp = r'https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown-dark.css'
-    return P(pp).download_to_memory().text
+    return download_to_memory(Path(pp)).text
 
 
 def md2html(body: str):
-    gh_style = P(__file__).parent.joinpath("gh_style.css").read_text()
+    gh_style = Path(__file__).parent.joinpath("gh_style.css").read_text()
     return f"""
 <!DOCTYPE html>
 <html>
@@ -41,7 +49,7 @@ def md2html(body: str):
 </style>
 <body>
 <div class="markdown-body">
-{install_n_import(library="markdown").markdown(body)}
+{markdown(body)}
 </div>
 </body>
 </html>"""
@@ -50,7 +58,7 @@ def md2html(body: str):
 class Email:
     @staticmethod
     def get_source_of_truth():
-        path = P.home().joinpath("dotfiles/machineconfig/emails.ini")
+        path = Path.home().joinpath("dotfiles/machineconfig/emails.ini")
         if not path.exists():
             raise FileNotFoundError(f"""File not found: {path}. It should be an ini file with this structure
 [resend]
@@ -66,7 +74,12 @@ imap_port = 465
 encryption = ssl
 
 """)
-        return Read.ini(path=path)
+
+        if not Path(path).exists() or Path(path).is_dir(): raise FileNotFoundError(f"File not found or is a directory: {path}")
+        import configparser
+        res = configparser.ConfigParser()
+        res.read(filenames=[str(path)], encoding=None)
+        return res
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
@@ -111,24 +124,25 @@ encryption = ssl
     def send_and_close(config_name: Optional[str], to: str, subject: str, body: str) -> Any:
         """If config_name is None, it sends from a generic email address."""
         if config_name is None:
-            config = Email.get_source_of_truth()
-            try:
-                api_key = config['resend']['api_key']
-                to = config["resend"]["signup_email"]
-            except KeyError as ke:
-                msggg = "You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file."
-                raise KeyError(msggg) from ke
+            raise NotImplementedError("Sending email without a config_name is not implemented. You need to create an emails.ini file in ~/dotfiles/machineconfig/ with your email configuration. See the docstring of the get_source_of_truth method for more information.")
+            # config = Email.get_source_of_truth()
+            # try:
+            #     api_key = config['resend']['api_key']
+            #     to = config["resend"]["signup_email"]
+            # except KeyError as ke:
+            #     msggg = "You did not pass a config_name, therefore, the default is to use resend, however, you need to add your resend api key to the emails.ini file."
+            #     raise KeyError(msggg) from ke
 
-            _resend = install_n_import("resend")
-            import resend  # type: ignore
-            resend.api_key = api_key
-            r = resend.Emails.send({
-            "from": "onboarding@resend.dev",
-            "to": to,
-            "subject": subject,
-            "html": md2html(body=body)
-            })
-            return r
+            # _resend = install_n_import("resend")
+            # import resend  # type: ignore
+            # resend.api_key = api_key
+            # r = resend.Emails.send({
+            # "from": "onboarding@resend.dev",
+            # "to": to,
+            # "subject": subject,
+            # "html": md2html(body=body)
+            # })
+            # return r
 
         else:
             config = dict(Email.get_source_of_truth()[config_name])
@@ -140,7 +154,7 @@ encryption = ssl
     def send_m365(to: list[str], subject: str, body: Optional[str], body_file: Optional[str], body_content_type: Literal["HTML", "Text"], attachments: Optional[list[P]] = None) -> None:
         if body_file is not None:
             assert body is None, "You cannot pass both body and body_file."
-            body_file_path = P(body_file)
+            body_file_path = Path(body_file)
             assert body_file_path.exists(), f"File not found: {body_file_path}"
         else:
             body_file_path = None
@@ -158,25 +172,25 @@ encryption = ssl
         response.print(desc="Email sending response")
 
 
-class PhoneNotification:  # security concerns: avoid using this.
-    def __init__(self, token: Optional[str]):
-        if token is None:
-            path = P.home().joinpath("dotfiles/machineconfig/phone_notification.ini")
-            ini = Read.ini(path)
-            token_ = ini["default"]["token"]
-        else:
-            token_ = token
-        pushbullet = install_n_import("pushbullet")
-        self.api = pushbullet.Pushbullet(token_)
-    def send_notification(self, title: str = "Note From Python", body: str = "A notfication"):
-        self.api.push_note(title=title, body=body)
-    @staticmethod
-    def open_website():
-        P(r"https://www.pushbullet.com/")()
-    @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
-    def try_me(bulletpoint_token: str):
-        n = PhoneNotification(bulletpoint_token)
-        n.send_notification()
+# class PhoneNotification:  # security concerns: avoid using this.
+#     def __init__(self, token: Optional[str]):
+#         if token is None:
+#             path = P.home().joinpath("dotfiles/machineconfig/phone_notification.ini")
+#             ini = Read.ini(path)
+#             token_ = ini["default"]["token"]
+#         else:
+#             token_ = token
+#         pushbullet = install_n_import("pushbullet")
+#         self.api = pushbullet.Pushbullet(token_)
+#     def send_notification(self, title: str = "Note From Python", body: str = "A notfication"):
+#         self.api.push_note(title=title, body=body)
+#     @staticmethod
+#     def open_website():
+#         P(r"https://www.pushbullet.com/")()
+#     @staticmethod  # https://www.youtube.com/watch?v=tbzPcKRZlHg
+#     def try_me(bulletpoint_token: str):
+#         n = PhoneNotification(bulletpoint_token)
+#         n.send_notification()
 
 
 if __name__ == '__main__':
