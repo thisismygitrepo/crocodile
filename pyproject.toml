@@ -99,6 +99,7 @@ dev = [
     "opencv-python>=4.12.0.88",
     "py7zr>=1.0.0",
     "pyarrow>=21.0.0",
+    "pyright>=1.1.405",
     "qrcode>=8.2",
     "requests>=2.32.3",
     "scikit-learn>=1.7.1",

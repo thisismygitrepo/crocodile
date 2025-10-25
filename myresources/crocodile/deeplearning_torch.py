@@ -13,7 +13,6 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 import numpy as np
 import numpy.typing as npt
 
-from crocodile.file_management import P, PLike
 from crocodile.deeplearning import plot_loss, EvaluationData, DataReader, BaseModel as TF_BASEMODEL, Specs, SpecsLike, HyperParams, get_hp_save_dir
 
 from typing import Any, TypeVar, Union, Optional
@@ -148,15 +147,13 @@ class BaseModel:
         if names_test is None: names_test_resolved = [str(item) for item in np.arange(start=0, stop=len(x_test))]
         else: names_test_resolved = names_test
         if isinstance(y_pred_raw, t.Tensor):
-            y_pred = (y_pred_raw.numpy(), )
-        elif isinstance(y_pred_raw, list):
-            y_pred = [item.cpu().numpy() for item in y_pred_raw]  # type: ignore
-        elif isinstance(y_pred_raw, tuple):
-            y_pred = [item.cpu().numpy() for item in y_pred_raw]  # type: ignore
+            y_pred_list: list[npt.NDArray[Any]] = [y_pred_raw.cpu().numpy()]
+        elif isinstance(y_pred_raw, (list, tuple)):
+            y_pred_list = [item.cpu().numpy() for item in y_pred_raw]  # type: ignore[arg-type]
         else:
             raise ValueError(f"y_pred_raw is of type {type(y_pred_raw)}")
-        results = EvaluationData(x=x_test, y_pred=y_pred, y_true=y_test, names=[str(item) for item in names_test_resolved],
-                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(prediction=y_pred, groun_truth=y_test))
+        results = EvaluationData(x=x_test, y_pred=y_pred_list, y_true=y_test, names=[str(item) for item in names_test_resolved],
+                                 loss_df=TF_BASEMODEL.get_metrics_evaluations(prediction=y_pred_list, groun_truth=y_test))
         return results
 
     @staticmethod
@@ -189,10 +186,10 @@ class BaseModel:
                 print(a_df)
                 break
 
-    def save_model(self, save_dir: PLike) -> None:
-        t.save(self.model, P(save_dir).joinpath("model.pth"))
-    def save_weights(self, save_dir: PLike) -> None:
-        t.save(self.model.state_dict(), P(save_dir).joinpath("weights.pth"))
+    def save_model(self, save_dir: Path) -> None:
+        t.save(self.model, save_dir / "model.pth")
+    def save_weights(self, save_dir: Path) -> None:
+        t.save(self.model.state_dict(), save_dir / "weights.pth")
     @staticmethod
     def load_model(save_dir: Path, map_location: Union[str, Device, None], weights_only: bool):
         print(f"Loading model from {save_dir} to Device `{map_location}`")
@@ -211,10 +208,10 @@ class BaseModel:
         return model
 
     @staticmethod
-    def load_weights(model: nn.Module, save_dir: PLike, map_location: Union[str, Device, None]):
+    def load_weights(model: nn.Module, save_dir: Path, map_location: Union[str, Device, None]):
         if map_location is None and t.cuda.is_available():
             map_location = "cpu"
-        path = P(save_dir).joinpath("weights.pth")
+        path = save_dir / "weights.pth"
         model.load_state_dict(t.load(path, map_location=map_location))  # type: ignore
         model.eval()
         model.compile()
@@ -239,12 +236,14 @@ class BaseModel:
 
 def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any):
     save_dir = get_hp_save_dir(hp=hp)
-    hp.root = str(P(hp.root).collapseuser(strict=False))
+    # Collapse user path representation (replace home with ~) equivalently using Path; retaining absolute path here.
+    hp.root = str(Path(hp.root).expanduser())
 
     print("💾 Saving model weights and artifacts...")
     t.save(model.state_dict(), save_dir.joinpath("weights.pth"))
     t.save(model, save_dir.joinpath("model.pth"))
     meta_dir = save_dir.joinpath("metadata/training")
+    meta_dir.mkdir(parents=True, exist_ok=True)
     import orjson
     save_dir.joinpath("hparams.json").write_text(orjson.dumps(hp, option=orjson.OPT_INDENT_2).decode())
     save_dir.joinpath("specs.json").write_text(orjson.dumps(specs, option=orjson.OPT_INDENT_2).decode())
@@ -253,8 +252,9 @@ def save_all(model: t.nn.Module, hp: HyperParams, specs: SpecsLike, history: Any
     try:
         print("\n📊 Creating and saving training visualizations...")
         artist = plot_loss(history=history, y_label="loss")
-        artist.fig.savefig(fname=str(meta_dir.joinpath("loss_curve.png").append(index=True).create(parents_only=True)), dpi=300)
-    except Exception as e:
+        loss_curve_path = meta_dir / "loss_curve.png"
+        artist.fig.savefig(fname=str(loss_curve_path), dpi=300)
+    except Exception as e:  # pragma: no cover - best effort visualization
         print(f"Error creating training visualizations: {e}")
         print("❌ Failed to create training visualizations.")
 
